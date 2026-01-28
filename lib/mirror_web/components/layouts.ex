@@ -35,40 +35,52 @@ defmodule MirrorWeb.Layouts do
 
   def app(assigns) do
     ~H"""
-    <header class="navbar px-4 sm:px-6 lg:px-8">
-      <div class="flex-1">
-        <a href="/" class="flex-1 flex w-fit items-center gap-2">
-          <img src={~p"/images/logo.svg"} width="36" />
-          <span class="text-sm font-semibold">v{Application.spec(:phoenix, :vsn)}</span>
-        </a>
+    <div class="min-h-screen bg-slate-950 text-slate-100">
+      <div class="pointer-events-none absolute inset-0 overflow-hidden">
+        <div class="absolute -left-40 top-0 h-[36rem] w-[36rem] rounded-full bg-sky-500/10 blur-[160px]" />
+        <div class="absolute right-[-10rem] top-32 h-[28rem] w-[28rem] rounded-full bg-amber-400/10 blur-[140px]" />
+        <div class="absolute bottom-[-12rem] left-1/4 h-[24rem] w-[24rem] rounded-full bg-emerald-400/10 blur-[140px]" />
       </div>
-      <div class="flex-none">
-        <ul class="flex flex-column px-1 space-x-4 items-center">
-          <li>
-            <a href="https://phoenixframework.org/" class="btn btn-ghost">Website</a>
-          </li>
-          <li>
-            <a href="https://github.com/phoenixframework/phoenix" class="btn btn-ghost">GitHub</a>
-          </li>
-          <li>
-            <.theme_toggle />
-          </li>
-          <li>
-            <a href="https://hexdocs.pm/phoenix/overview.html" class="btn btn-primary">
-              Get Started <span aria-hidden="true">&rarr;</span>
-            </a>
-          </li>
-        </ul>
-      </div>
-    </header>
 
-    <main class="px-4 py-20 sm:px-6 lg:px-8">
-      <div class="mx-auto max-w-2xl space-y-4">
-        {render_slot(@inner_block)}
-      </div>
-    </main>
+      <div class="relative z-10">
+        <header class="border-b border-white/10 bg-slate-950/70 backdrop-blur">
+          <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-4">
+            <div class="flex items-center gap-3">
+              <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-300/80 via-sky-300/70 to-emerald-300/80 text-slate-950 shadow-lg">
+                <.icon name="hero-sparkles" class="size-5" />
+              </div>
+              <div>
+                <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Mirror</p>
+                <p class="text-lg font-semibold text-white">Master of Magic Classic</p>
+              </div>
+            </div>
+            <nav class="flex flex-wrap items-center gap-4 text-sm text-slate-200">
+              <.link navigate={~p"/"} class="group relative">
+                <span class="transition group-hover:text-white">Overview</span>
+                <span class="absolute -bottom-1 left-0 h-px w-0 bg-amber-300 transition-all group-hover:w-full" />
+              </.link>
+              <.link navigate={~p"/arcanus"} class="group relative">
+                <span class="transition group-hover:text-white">Arcanus</span>
+                <span class="absolute -bottom-1 left-0 h-px w-0 bg-sky-300 transition-all group-hover:w-full" />
+              </.link>
+              <.link navigate={~p"/myrror"} class="group relative">
+                <span class="transition group-hover:text-white">Myrror</span>
+                <span class="absolute -bottom-1 left-0 h-px w-0 bg-emerald-300 transition-all group-hover:w-full" />
+              </.link>
+              <div class="ml-2">
+                <.theme_toggle />
+              </div>
+            </nav>
+          </div>
+        </header>
 
-    <.flash_group flash={@flash} />
+        <main class="mx-auto max-w-6xl px-6 py-10">
+          {render_slot(@inner_block)}
+        </main>
+      </div>
+
+      <.flash_group flash={@flash} />
+    </div>
     """
   end
 
@@ -122,31 +134,30 @@ defmodule MirrorWeb.Layouts do
   """
   def theme_toggle(assigns) do
     ~H"""
-    <div class="card relative flex flex-row items-center border-2 border-base-300 bg-base-300 rounded-full">
-      <div class="absolute w-1/3 h-full rounded-full border-1 border-base-200 bg-base-100 brightness-200 left-0 [[data-theme=light]_&]:left-1/3 [[data-theme=dark]_&]:left-2/3 transition-[left]" />
-
+    <div class="flex items-center rounded-full border border-white/10 bg-white/5 p-1 text-xs text-white/70">
       <button
-        class="flex p-2 cursor-pointer w-1/3"
+        class="flex items-center gap-1 rounded-full px-3 py-1 transition hover:text-white"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="system"
       >
-        <.icon name="hero-computer-desktop-micro" class="size-4 opacity-75 hover:opacity-100" />
+        <.icon name="hero-computer-desktop-micro" class="size-4" />
+        <span class="hidden sm:inline">System</span>
       </button>
-
       <button
-        class="flex p-2 cursor-pointer w-1/3"
+        class="flex items-center gap-1 rounded-full px-3 py-1 transition hover:text-white"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="light"
       >
-        <.icon name="hero-sun-micro" class="size-4 opacity-75 hover:opacity-100" />
+        <.icon name="hero-sun-micro" class="size-4" />
+        <span class="hidden sm:inline">Light</span>
       </button>
-
       <button
-        class="flex p-2 cursor-pointer w-1/3"
+        class="flex items-center gap-1 rounded-full px-3 py-1 transition hover:text-white"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="dark"
       >
-        <.icon name="hero-moon-micro" class="size-4 opacity-75 hover:opacity-100" />
+        <.icon name="hero-moon-micro" class="size-4" />
+        <span class="hidden sm:inline">Dark</span>
       </button>
     </div>
     """

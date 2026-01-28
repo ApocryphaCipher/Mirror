@@ -23,6 +23,21 @@ end
 config :mirror, MirrorWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+parse_offset = fn value ->
+  case value do
+    nil -> nil
+    "0x" <> hex -> String.to_integer(hex, 16)
+    other -> String.to_integer(other)
+  end
+end
+
+config :mirror, Mirror.SaveFile.Blocks,
+  terrain: parse_offset.(System.get_env("MIRROR_TERRAIN_OFFSET")),
+  terrain_flags: parse_offset.(System.get_env("MIRROR_TERRAIN_FLAGS_OFFSET")),
+  minerals: parse_offset.(System.get_env("MIRROR_MINERALS_OFFSET")),
+  exploration: parse_offset.(System.get_env("MIRROR_EXPLORATION_OFFSET")),
+  landmass: parse_offset.(System.get_env("MIRROR_LANDMASS_OFFSET"))
+
 if config_env() == :prod do
   # The secret key base is used to sign/encrypt cookies and other secrets.
   # A default value is used in config/dev.exs and config/test.exs but you

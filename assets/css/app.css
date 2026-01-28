@@ -103,3 +103,24 @@
 [data-phx-session], [data-phx-teleported-src] { display: contents }
 
 /* This file is for your main application CSS */
+
+:root {
+  --mirror-body: "Figtree", "Avenir Next", "Trebuchet MS", sans-serif;
+  --mirror-display: "Cinzel", "Iowan Old Style", "Georgia", serif;
+}
+
+body {
+  font-family: var(--mirror-body);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--mirror-display);
+  letter-spacing: -0.01em;
+}
+
+#map-canvas {
+  image-rendering: pixelated;
+}

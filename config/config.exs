@@ -8,7 +8,8 @@
 import Config
 
 config :mirror,
-  generators: [timestamp_type: :utc_datetime]
+  generators: [timestamp_type: :utc_datetime],
+  terrain_water_values: [0]
 
 # Configure the endpoint
 config :mirror, MirrorWeb.Endpoint,
