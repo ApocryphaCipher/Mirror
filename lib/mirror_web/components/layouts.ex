@@ -31,6 +31,10 @@ defmodule MirrorWeb.Layouts do
     default: nil,
     doc: "the current [scope](https://hexdocs.pm/phoenix/scopes.html)"
 
+  attr :full_bleed, :boolean,
+    default: false,
+    doc: "when true, remove max width/padding so content can span the viewport"
+
   slot :inner_block, required: true
 
   def app(assigns) do
@@ -44,7 +48,11 @@ defmodule MirrorWeb.Layouts do
 
       <div class="relative z-10">
         <header class="border-b border-white/10 bg-slate-950/70 backdrop-blur">
-          <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-4">
+          <div class={[
+            "flex flex-wrap items-center justify-between gap-4 py-4",
+            @full_bleed && "w-full px-4",
+            !@full_bleed && "mx-auto max-w-6xl px-6"
+          ]}>
             <div class="flex items-center gap-3">
               <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-300/80 via-sky-300/70 to-emerald-300/80 text-slate-950 shadow-lg">
                 <.icon name="hero-sparkles" class="size-5" />
@@ -74,7 +82,10 @@ defmodule MirrorWeb.Layouts do
           </div>
         </header>
 
-        <main class="mx-auto max-w-6xl px-6 py-10">
+        <main class={[
+          @full_bleed && "w-full p-0",
+          !@full_bleed && "mx-auto max-w-6xl px-6 py-10"
+        ]}>
           {render_slot(@inner_block)}
         </main>
       </div>

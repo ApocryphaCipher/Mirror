@@ -9,10 +9,17 @@ defmodule Mirror.TileCache do
   alias Mirror.LBX.{Image, Palette}
   alias Mirror.Paths
 
-  @decoder_version 1
+  @decoder_version 2
 
   def fetch(%LBX{} = lbx, index, opts \\ []) do
-    palette = Keyword.get(opts, :palette, Palette.default())
+    palette_opt = Keyword.get(opts, :palette, :auto)
+
+    {palette, _source} =
+      case LBX.resolve_palette(lbx, index, palette: palette_opt) do
+        {:ok, palette, source} -> {palette, source}
+        {:error, _} -> {Palette.default(), :fallback}
+      end
+
     palette_hash = Palette.hash(palette)
     entry_dir = entry_dir(lbx.path, index)
     meta_path = meta_path(entry_dir, palette_hash)

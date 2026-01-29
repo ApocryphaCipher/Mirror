@@ -2,7 +2,6 @@ defmodule MirrorWeb.TileProbeLive do
   use MirrorWeb, :live_view
 
   alias Mirror.{AssetMap, LBX, Paths, TileCache}
-  alias Mirror.LBX.Palette
 
   @page_size 80
 
@@ -26,7 +25,7 @@ defmodule MirrorWeb.TileProbeLive do
       |> assign(:selected_entry, nil)
       |> assign(:selected_frame, 0)
       |> assign(:preview, nil)
-      |> assign(:palette_source, "default")
+      |> assign(:palette_source, "auto")
       |> assign_forms()
 
     {:ok, socket}
@@ -71,12 +70,11 @@ defmodule MirrorWeb.TileProbeLive do
     mom_path = socket.assigns.mom_path
     lbx_name = socket.assigns.selected_lbx
     index = parse_int(index, 0)
-    palette = Palette.default()
 
-    preview =
-      case load_entry_preview(mom_path, lbx_name, index, palette) do
-        {:ok, preview} -> preview
-        {:error, reason} -> %{error: reason}
+    {preview, palette_source} =
+      case load_entry_preview(mom_path, lbx_name, index, :auto) do
+        {:ok, preview, source} -> {preview, source}
+        {:error, reason} -> {%{error: reason}, "error"}
       end
 
     socket =
@@ -84,6 +82,7 @@ defmodule MirrorWeb.TileProbeLive do
       |> assign(:selected_entry, index)
       |> assign(:selected_frame, 0)
       |> assign(:preview, preview)
+      |> assign(:palette_source, palette_source)
       |> assign_forms()
 
     {:noreply, socket}
@@ -367,10 +366,11 @@ defmodule MirrorWeb.TileProbeLive do
     end
   end
 
-  defp load_entry_preview(mom_path, lbx_name, index, palette) do
+  defp load_entry_preview(mom_path, lbx_name, index, palette_opt) do
     path = resolve_lbx_path(mom_path, lbx_name)
 
     with {:ok, lbx} <- LBX.open(path),
+         {:ok, palette, source} <- LBX.resolve_palette(lbx, index, palette: palette_opt),
          {:ok, image} <- TileCache.fetch(lbx, index, palette: palette) do
       frames =
         Enum.map(image.frames, fn frame ->
@@ -388,7 +388,7 @@ defmodule MirrorWeb.TileProbeLive do
          height: image.height,
          frame_count: image.frame_count,
          frames: frames
-       }}
+       }, Atom.to_string(source)}
     end
   end
 

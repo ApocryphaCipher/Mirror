@@ -7,10 +7,9 @@ defmodule Mirror.TileAtlas do
 
   alias Mirror.{AssetMap, Paths, TileCache}
   alias Mirror.LBX
-  alias Mirror.LBX.Palette
 
   def build(opts \\ []) do
-    palette = Keyword.get(opts, :palette, Palette.default())
+    palette = Keyword.get(opts, :palette, :auto)
     terrain_map = AssetMap.load(:terrain)
     overlay_map = AssetMap.load(:overlay)
     mom_path = Paths.mom_path()

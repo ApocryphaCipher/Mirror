@@ -59,6 +59,7 @@ defmodule MirrorWeb.MapLive do
   @impl true
   def handle_event("load_save", %{"load" => %{"path" => path}}, socket) do
     path = String.trim(path || "")
+
     socket =
       socket
       |> assign(:load_path, path)
@@ -317,73 +318,73 @@ defmodule MirrorWeb.MapLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash}>
-      <div class="space-y-8">
-        <div class="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Plane view</p>
-            <h2 class="text-3xl font-semibold text-white">
-              {if @plane == :arcanus, do: "Arcanus", else: "Myrror"}
-            </h2>
-            <p class="text-sm text-slate-400">
-              {if @state.save_path, do: @state.save_path, else: "No save loaded yet."}
-            </p>
-          </div>
-          <div class="flex flex-wrap gap-3">
-            <button
-              id="undo-button"
-              type="button"
-              phx-click="undo"
-              class="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
-            >
-              Undo
-            </button>
-            <button
-              id="redo-button"
-              type="button"
-              phx-click="redo"
-              class="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
-            >
-              Redo
-            </button>
-            <button
-              id="render-mode-button"
-              type="button"
-              phx-click="toggle_render_mode"
-              class="rounded-full border border-amber-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-amber-100 transition hover:border-amber-200"
-            >
-              Render: {if @render_mode == :tiles, do: "Tiles", else: "Values"}
-            </button>
-            <button
-              :if={@render_mode == :tiles}
-              id="reload-tiles-button"
-              type="button"
-              phx-click="reload_tiles"
-              class="rounded-full border border-emerald-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100 transition hover:border-emerald-200"
-            >
-              Reload tiles
-            </button>
-            <button
-              id="export-stats-button"
-              type="button"
-              phx-click="export_stats"
-              class="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
-            >
-              Export stats
-            </button>
-          </div>
-        </div>
-
-        <div class="grid gap-6 lg:grid-cols-[1.4fr_0.9fr]">
-          <div class="space-y-6">
-            <div class="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-black/40">
-              <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Load save</p>
+    <Layouts.app flash={@flash} full_bleed>
+      <div class="relative min-h-[100svh]">
+        <div class="relative flex min-h-[100svh] flex-col">
+          <header class="pointer-events-auto border-b border-white/10 bg-slate-950/80 px-6 py-5 shadow-lg shadow-black/60 backdrop-blur">
+            <div class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-xl shadow-black/60 backdrop-blur">
+              <div class="flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Plane view</p>
+                  <h2 class="text-3xl font-semibold text-white">
+                    {if @plane == :arcanus, do: "Arcanus", else: "Myrror"}
+                  </h2>
+                  <p class="text-sm text-slate-400">
+                    {if @state.save_path, do: @state.save_path, else: "No save loaded yet."}
+                  </p>
+                </div>
+                <div class="flex flex-wrap gap-3">
+                  <button
+                    id="undo-button"
+                    type="button"
+                    phx-click="undo"
+                    class="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
+                  >
+                    Undo
+                  </button>
+                  <button
+                    id="redo-button"
+                    type="button"
+                    phx-click="redo"
+                    class="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
+                  >
+                    Redo
+                  </button>
+                  <button
+                    id="render-mode-button"
+                    type="button"
+                    phx-click="toggle_render_mode"
+                    class="rounded-full border border-amber-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-amber-100 transition hover:border-amber-200"
+                  >
+                    Render: {if @render_mode == :tiles, do: "Tiles", else: "Values"}
+                  </button>
+                  <button
+                    :if={@render_mode == :tiles}
+                    id="reload-tiles-button"
+                    type="button"
+                    phx-click="reload_tiles"
+                    class="rounded-full border border-emerald-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100 transition hover:border-emerald-200"
+                  >
+                    Reload tiles
+                  </button>
+                  <button
+                    id="export-stats-button"
+                    type="button"
+                    phx-click="export_stats"
+                    class="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
+                  >
+                    Export stats
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="mt-4 grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
               <.form
                 for={@load_form}
                 id="load-form"
                 phx-submit="load_save"
                 phx-change="update_load_path"
-                class="mt-4 grid gap-3 md:grid-cols-[1fr_auto]"
+                class="grid gap-3 md:grid-cols-[1fr_auto]"
               >
                 <.input
                   field={@load_form[:path]}
@@ -399,244 +400,251 @@ defmodule MirrorWeb.MapLive do
                   Load save
                 </button>
               </.form>
-            </div>
-
-            <div class="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-black/40">
-              <div class="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Map editor</p>
-                  <h3 class="text-lg font-semibold text-white">Layer stack + canvas</h3>
-                </div>
-                <.form
-                  for={@save_form}
-                  id="save-form"
-                  phx-submit="save_file"
-                  phx-change="update_save_path"
-                  class="flex flex-wrap items-center gap-2"
+              <.form
+                for={@save_form}
+                id="save-form"
+                phx-submit="save_file"
+                phx-change="update_save_path"
+                class="grid gap-3 md:grid-cols-[1fr_auto]"
+              >
+                <.input
+                  field={@save_form[:path]}
+                  type="text"
+                  placeholder="Output path (optional)"
+                  class="rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200 placeholder:text-slate-500"
+                />
+                <button
+                  id="save-button"
+                  type="submit"
+                  class="rounded-2xl border border-emerald-300/40 px-5 py-2 text-sm font-semibold text-emerald-100 transition hover:border-emerald-200"
                 >
-                  <.input
-                    field={@save_form[:path]}
-                    type="text"
-                    placeholder="Output path (optional)"
-                    class="min-w-[16rem] rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200 placeholder:text-slate-500"
-                  />
-                  <button
-                    id="save-button"
-                    type="submit"
-                    class="rounded-2xl border border-emerald-300/40 px-4 py-2 text-sm font-semibold text-emerald-100 transition hover:border-emerald-200"
-                  >
-                    Save
-                  </button>
-                </.form>
-              </div>
+                  Save
+                </button>
+              </.form>
+            </div>
+          </header>
 
-              <div class="mt-6 grid gap-6 lg:grid-cols-[0.5fr_1fr]">
-                <div class="space-y-4">
-                  <div class="space-y-2">
-                    <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Layers</p>
-                    <div class="space-y-2">
-                      <%= for layer <- @layers do %>
-                        <button
-                          id={"layer-#{layer}"}
-                          type="button"
-                          phx-click="set_active_layer"
-                          phx-value-layer={Atom.to_string(layer)}
-                          class={[
-                            "w-full rounded-2xl border px-3 py-2 text-left text-sm transition",
-                            layer == @active_layer &&
-                              "border-amber-300/60 bg-amber-300/10 text-white",
-                            layer != @active_layer &&
-                              "border-white/10 text-slate-300 hover:border-white/30"
-                          ]}
-                        >
-                          <span class="font-semibold">{@layer_labels[layer]}</span>
-                          <%= if layer == :computed_adj_mask do %>
-                            <span class="ml-2 text-[0.65rem] uppercase tracking-[0.2em] text-slate-500">
-                              Derived
-                            </span>
-                          <% end %>
-                        </button>
-                      <% end %>
+          <div class="flex-1 min-h-0">
+            <div class="grid h-full gap-0 lg:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)_minmax(18rem,24rem)]">
+              <div class="flex h-full flex-col gap-6 overflow-y-auto border-r border-white/10 bg-slate-950/90 p-4">
+                <div class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-lg shadow-black/60 backdrop-blur">
+                  <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Map editor</p>
+                      <h3 class="text-lg font-semibold text-white">Layer stack + tools</h3>
                     </div>
                   </div>
 
-                  <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
-                    <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Selection</p>
+                  <div class="mt-6 grid gap-6 lg:grid-cols-[0.5fr_1fr]">
+                    <div class="space-y-4">
+                      <div class="space-y-2">
+                        <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Layers</p>
+                        <div class="space-y-2">
+                          <%= for layer <- @layers do %>
+                            <button
+                              id={"layer-#{layer}"}
+                              type="button"
+                              phx-click="set_active_layer"
+                              phx-value-layer={Atom.to_string(layer)}
+                              class={[
+                                "w-full rounded-2xl border px-3 py-2 text-left text-sm transition",
+                                layer == @active_layer &&
+                                  "border-amber-300/60 bg-amber-300/10 text-white",
+                                layer != @active_layer &&
+                                  "border-white/10 text-slate-300 hover:border-white/30"
+                              ]}
+                            >
+                              <span class="font-semibold">{@layer_labels[layer]}</span>
+                              <%= if layer == :computed_adj_mask do %>
+                                <span class="ml-2 text-[0.65rem] uppercase tracking-[0.2em] text-slate-500">
+                                  Derived
+                                </span>
+                              <% end %>
+                            </button>
+                          <% end %>
+                        </div>
+                      </div>
+
+                      <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
+                        <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Selection</p>
+                        <.form
+                          for={@selection_form}
+                          id="selection-form"
+                          phx-submit="set_selection"
+                          class="mt-3 space-y-3"
+                        >
+                          <.input
+                            field={@selection_form[:value]}
+                            type="number"
+                            class="rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200"
+                          />
+                          <button
+                            id="apply-selection-button"
+                            type="submit"
+                            class="w-full rounded-2xl border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
+                          >
+                            Apply value
+                          </button>
+                        </.form>
+                        <p class="mt-3 text-xs text-slate-500">
+                          Scroll to cycle values. Right-click to sample.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div class="space-y-4">
+                      <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-4 text-xs text-slate-400">
+                        <p class="uppercase tracking-[0.3em] text-slate-500">Controls</p>
+                        <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                          <div class="flex items-start gap-2">
+                            <.icon name="hero-hand-raised" class="size-4 text-amber-300" />
+                            <span>Left drag paints with the current selection.</span>
+                          </div>
+                          <div class="flex items-start gap-2">
+                            <.icon name="hero-eye" class="size-4 text-sky-300" />
+                            <span>Right click samples the current layer.</span>
+                          </div>
+                          <div class="flex items-start gap-2">
+                            <.icon name="hero-adjustments-horizontal" class="size-4 text-emerald-300" />
+                            <span>Alt/Shift modify the scroll step size.</span>
+                          </div>
+                          <div class="flex items-start gap-2">
+                            <.icon name="hero-command-line" class="size-4 text-indigo-300" />
+                            <span>Ctrl toggles sampling mode.</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="relative bg-slate-950">
+                <canvas
+                  id="map-canvas"
+                  phx-hook="MapCanvas"
+                  phx-update="ignore"
+                  data-map-width={@map_width}
+                  data-map-height={@map_height}
+                  data-layer-type={layer_type(@active_layer)}
+                  data-tiles={@encoded_layer}
+                  data-terrain={@terrain_encoded}
+                  data-terrain-flags={@terrain_flags_encoded}
+                  data-minerals={@minerals_encoded}
+                  data-render-mode={Atom.to_string(@render_mode)}
+                  data-tile-size="32"
+                  class="absolute inset-0 h-full w-full"
+                >
+                </canvas>
+              </div>
+
+              <aside class="flex h-full flex-col gap-6 overflow-y-auto border-l border-white/10 bg-slate-950/90 p-4">
+                <div class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-lg shadow-black/60 backdrop-blur pointer-events-auto">
+                  <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Research</p>
+                  <h3 class="mt-2 text-lg font-semibold text-white">Value intel</h3>
+                  <div class="mt-4 space-y-3">
                     <.form
-                      for={@selection_form}
-                      id="selection-form"
-                      phx-submit="set_selection"
-                      class="mt-3 space-y-3"
+                      for={@value_name_form}
+                      id="value-name-form"
+                      phx-submit="set_value_name"
+                      class="grid gap-3"
                     >
-                      <.input
-                        field={@selection_form[:value]}
-                        type="number"
-                        class="rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200"
-                      />
+                      <div class="grid gap-3 sm:grid-cols-2">
+                        <.input
+                          field={@value_name_form[:value]}
+                          type="number"
+                          class="rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200"
+                        />
+                        <.input
+                          field={@value_name_form[:name]}
+                          type="text"
+                          placeholder="Label this value"
+                          class="rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200 placeholder:text-slate-500"
+                        />
+                      </div>
                       <button
-                        id="apply-selection-button"
+                        id="save-value-name-button"
                         type="submit"
-                        class="w-full rounded-2xl border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
+                        class="rounded-2xl border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
                       >
-                        Apply value
+                        Save label
                       </button>
                     </.form>
-                    <p class="mt-3 text-xs text-slate-500">
-                      Scroll to cycle values. Right-click to sample.
-                    </p>
-                  </div>
-                </div>
 
-                <div class="space-y-4">
-                  <div class="rounded-3xl border border-white/10 bg-slate-950/40 p-4">
-                    <canvas
-                      id="map-canvas"
-                      phx-hook="MapCanvas"
-                      phx-update="ignore"
-                      data-map-width={@map_width}
-                      data-map-height={@map_height}
-                      data-layer-type={layer_type(@active_layer)}
-                      data-tiles={@encoded_layer}
-                      data-terrain={@terrain_encoded}
-                      data-terrain-flags={@terrain_flags_encoded}
-                      data-minerals={@minerals_encoded}
-                      data-render-mode={Atom.to_string(@render_mode)}
-                      data-tile-size="16"
-                      class="h-auto w-full rounded-2xl border border-white/10 bg-slate-950"
-                    >
-                    </canvas>
-                  </div>
-                  <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-4 text-xs text-slate-400">
-                    <p class="uppercase tracking-[0.3em] text-slate-500">Controls</p>
-                    <div class="mt-3 grid gap-2 sm:grid-cols-2">
-                      <div class="flex items-start gap-2">
-                        <.icon name="hero-hand-raised" class="size-4 text-amber-300" />
-                        <span>Left drag paints with the current selection.</span>
-                      </div>
-                      <div class="flex items-start gap-2">
-                        <.icon name="hero-eye" class="size-4 text-sky-300" />
-                        <span>Right click samples the current layer.</span>
-                      </div>
-                      <div class="flex items-start gap-2">
-                        <.icon name="hero-adjustments-horizontal" class="size-4 text-emerald-300" />
-                        <span>Alt/Shift modify the scroll step size.</span>
-                      </div>
-                      <div class="flex items-start gap-2">
-                        <.icon name="hero-command-line" class="size-4 text-indigo-300" />
-                        <span>Ctrl toggles sampling mode.</span>
+                    <div class="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+                      <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Histogram</p>
+                      <div class="mt-3 space-y-2">
+                        <%= for entry <- hist_entries(@state, @active_layer) do %>
+                          <button
+                            id={"hist-#{entry.value}"}
+                            type="button"
+                            phx-click="set_selection"
+                            phx-value-value={entry.value}
+                            class="flex w-full items-center justify-between rounded-xl border border-white/10 px-3 py-2 text-xs text-slate-200 transition hover:border-white/30"
+                          >
+                            <span class="font-semibold">#{entry.value}</span>
+                            <span class="text-slate-500">{entry.name || "???"}</span>
+                            <span class="text-slate-400">{entry.count}</span>
+                          </button>
+                        <% end %>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
 
-          <aside class="space-y-6">
-            <div class="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-black/40">
-              <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Research</p>
-              <h3 class="mt-2 text-lg font-semibold text-white">Value intel</h3>
-              <div class="mt-4 space-y-3">
-                <.form
-                  for={@value_name_form}
-                  id="value-name-form"
-                  phx-submit="set_value_name"
-                  class="grid gap-3"
-                >
-                  <div class="grid gap-3 sm:grid-cols-2">
-                    <.input
-                      field={@value_name_form[:value]}
-                      type="number"
-                      class="rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200"
-                    />
-                    <.input
-                      field={@value_name_form[:name]}
-                      type="text"
-                      placeholder="Label this value"
-                      class="rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200 placeholder:text-slate-500"
-                    />
-                  </div>
-                  <button
-                    id="save-value-name-button"
-                    type="submit"
-                    class="rounded-2xl border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
-                  >
-                    Save label
-                  </button>
-                </.form>
-
-                <div class="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
-                  <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Histogram</p>
-                  <div class="mt-3 space-y-2">
-                    <%= for entry <- hist_entries(@state, @active_layer) do %>
-                      <button
-                        id={"hist-#{entry.value}"}
-                        type="button"
-                        phx-click="set_selection"
-                        phx-value-value={entry.value}
-                        class="flex w-full items-center justify-between rounded-xl border border-white/10 px-3 py-2 text-xs text-slate-200 transition hover:border-white/30"
+                <div class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-lg shadow-black/60 backdrop-blur pointer-events-auto">
+                  <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Bit names</p>
+                  <div class="mt-4 space-y-3">
+                    <%= for {bit, form} <- @bit_forms do %>
+                      <.form
+                        for={form}
+                        id={"bit-form-#{bit}"}
+                        phx-submit="set_bit_name"
+                        class="flex items-center gap-3"
                       >
-                        <span class="font-semibold">#{entry.value}</span>
-                        <span class="text-slate-500">{entry.name || "???"}</span>
-                        <span class="text-slate-400">{entry.count}</span>
-                      </button>
+                        <.input field={form[:bit]} type="hidden" />
+                        <span class="text-xs font-semibold text-slate-300">Bit {bit}</span>
+                        <.input
+                          field={form[:name]}
+                          type="text"
+                          placeholder="Name"
+                          class="flex-1 rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200 placeholder:text-slate-500"
+                        />
+                        <button
+                          type="submit"
+                          class="rounded-full border border-white/20 px-3 py-2 text-[0.6rem] font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
+                        >
+                          Save
+                        </button>
+                      </.form>
                     <% end %>
                   </div>
                 </div>
-              </div>
-            </div>
 
-            <div class="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-black/40">
-              <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Bit names</p>
-              <div class="mt-4 space-y-3">
-                <%= for {bit, form} <- @bit_forms do %>
-                  <.form
-                    for={form}
-                    id={"bit-form-#{bit}"}
-                    phx-submit="set_bit_name"
-                    class="flex items-center gap-3"
-                  >
-                    <.input field={form[:bit]} type="hidden" />
-                    <span class="text-xs font-semibold text-slate-300">Bit {bit}</span>
-                    <.input
-                      field={form[:name]}
-                      type="text"
-                      placeholder="Name"
-                      class="flex-1 rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200 placeholder:text-slate-500"
-                    />
-                    <button
-                      type="submit"
-                      class="rounded-full border border-white/20 px-3 py-2 text-[0.6rem] font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
-                    >
-                      Save
-                    </button>
-                  </.form>
-                <% end %>
-              </div>
-            </div>
-
-            <div class="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-black/40">
-              <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Hover vision</p>
-              <div class="mt-4 space-y-2 text-sm text-slate-300">
-                <%= if @hover do %>
-                  <p>Tile: ({@hover.x}, {@hover.y})</p>
-                  <p>Terrain: {@hover.terrain} ({@hover.terrain_class})</p>
-                  <p>Adj mask: {@hover.adj_mask}</p>
-                  <div class="mt-3 grid gap-2 text-xs">
-                    <%= for ray <- @hover.rays do %>
-                      <div class="flex items-center justify-between rounded-lg border border-white/10 px-3 py-2">
-                        <span class="uppercase text-slate-400">{ray.dir}</span>
-                        <span class="text-slate-200">{ray.hit}</span>
-                        <span class="text-slate-500">d{ray.dist}</span>
+                <div class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-lg shadow-black/60 backdrop-blur pointer-events-auto">
+                  <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Hover vision</p>
+                  <div class="mt-4 space-y-2 text-sm text-slate-300">
+                    <%= if @hover do %>
+                      <p>Tile: ({@hover.x}, {@hover.y})</p>
+                      <p>Terrain: {@hover.terrain} ({@hover.terrain_class})</p>
+                      <p>Adj mask: {@hover.adj_mask}</p>
+                      <div class="mt-3 grid gap-2 text-xs">
+                        <%= for ray <- @hover.rays do %>
+                          <div class="flex items-center justify-between rounded-lg border border-white/10 px-3 py-2">
+                            <span class="uppercase text-slate-400">{ray.dir}</span>
+                            <span class="text-slate-200">{ray.hit}</span>
+                            <span class="text-slate-500">d{ray.dist}</span>
+                          </div>
+                        <% end %>
                       </div>
+                    <% else %>
+                      <p class="text-slate-500">Hover a tile to inspect adjacency and ray hits.</p>
                     <% end %>
                   </div>
-                <% else %>
-                  <p class="text-slate-500">Hover a tile to inspect adjacency and ray hits.</p>
-                <% end %>
-              </div>
+                </div>
+              </aside>
             </div>
-          </aside>
+          </div>
         </div>
       </div>
     </Layouts.app>
@@ -1088,7 +1096,9 @@ defmodule MirrorWeb.MapLive do
     state = socket.assigns.state
 
     load_form = to_form(%{"path" => socket.assigns.load_path || ""}, as: :load)
-    save_form = to_form(%{"path" => socket.assigns.save_path_input || state.save_path || ""}, as: :save)
+
+    save_form =
+      to_form(%{"path" => socket.assigns.save_path_input || state.save_path || ""}, as: :save)
 
     selection_form =
       to_form(%{"value" => Map.get(state.selection, state.active_layer, 0)}, as: :selection)
