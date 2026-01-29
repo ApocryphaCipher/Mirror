@@ -11,6 +11,7 @@ defmodule Mirror.Application do
       MirrorWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:mirror, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Mirror.PubSub},
+      Mirror.Engine.Supervisor,
       Mirror.SessionStore,
       Mirror.Stats,
       # Start a worker by calling: Mirror.Worker.start_link(arg)

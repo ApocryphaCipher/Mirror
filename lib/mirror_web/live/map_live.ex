@@ -2,6 +2,7 @@ defmodule MirrorWeb.MapLive do
   use MirrorWeb, :live_view
   import Bitwise
 
+  alias Mirror.Engine.{Delta, Session, SessionSupervisor, View}
   alias Mirror.{Paths, SaveFile, SessionStore, Stats, TileAtlas}
   alias Mirror.Map, as: MirrorMap
 
@@ -44,6 +45,11 @@ defmodule MirrorWeb.MapLive do
       socket
       |> assign(:session_id, session_id)
       |> assign(:plane, plane)
+
+    state = ensure_engine_session(state, session_id, connected?(socket))
+
+    socket =
+      socket
       |> assign_from_state(state)
       |> assign(:active_stroke, nil)
       |> assign(:hover, nil)
@@ -99,8 +105,16 @@ defmodule MirrorWeb.MapLive do
             normalize_phase_loop_status(
               Map.get(socket.assigns.state, :phase_loop_status, :unknown)
             ),
-          phase_loop_detecting: false
+          phase_loop_detecting: false,
+          engine_session_id: nil,
+          engine_player_id: Map.get(socket.assigns.state, :engine_player_id, :observer)
         }
+
+        state =
+          case start_engine_session(path) do
+            {:ok, engine_session_id} -> %{state | engine_session_id: engine_session_id}
+            {:error, _reason} -> state
+          end
 
         SessionStore.put(socket.assigns.session_id, state)
         observe_stats(state)
@@ -1262,11 +1276,19 @@ defmodule MirrorWeb.MapLive do
       true ->
         value = Map.get(state.selection, layer, 0)
         {updated_state, change, updates} = do_apply_change(state, plane, layer, x, y, value)
+        changes = change && [{x, y, elem(change, 0), elem(change, 1)}]
 
         socket =
           socket
           |> assign(:state, updated_state)
-          |> maybe_push_updates(layer, updates)
+          |> maybe_push_updates(layer, updates, changes)
+
+        socket =
+          if changes do
+            emit_engine_delta(socket, plane, layer, changes)
+          else
+            socket
+          end
 
         SessionStore.put(socket.assigns.session_id, updated_state)
         {socket, change}
@@ -1308,6 +1330,7 @@ defmodule MirrorWeb.MapLive do
     case history do
       [stroke | rest] ->
         {state, updates, layer} = apply_stroke(state, plane, stroke, :undo)
+        changes = stroke_changes(stroke, :undo)
         redo = [stroke | Map.get(state.redo, plane, [])]
 
         state = %{
@@ -1320,7 +1343,8 @@ defmodule MirrorWeb.MapLive do
 
         socket
         |> assign(:state, state)
-        |> maybe_push_updates(layer, updates)
+        |> maybe_push_updates(layer, updates, changes)
+        |> emit_engine_delta(plane, layer, changes)
 
       [] ->
         socket
@@ -1335,6 +1359,7 @@ defmodule MirrorWeb.MapLive do
     case redo do
       [stroke | rest] ->
         {state, updates, layer} = apply_stroke(state, plane, stroke, :redo)
+        changes = stroke_changes(stroke, :redo)
         history = [stroke | Map.get(state.history, plane, [])]
 
         state = %{
@@ -1347,7 +1372,8 @@ defmodule MirrorWeb.MapLive do
 
         socket
         |> assign(:state, state)
-        |> maybe_push_updates(layer, updates)
+        |> maybe_push_updates(layer, updates, changes)
+        |> emit_engine_delta(plane, layer, changes)
 
       [] ->
         socket
@@ -1565,7 +1591,8 @@ defmodule MirrorWeb.MapLive do
       phase_loop_len: loop_len,
       phase_loop_status: phase_loop_status,
       phase_loop_detecting: Map.get(state, :phase_loop_detecting, false),
-      snapshot_mode: Map.get(state, :snapshot_mode, true)
+      snapshot_mode: Map.get(state, :snapshot_mode, true),
+      engine_session_id: Map.get(state, :engine_session_id)
     )
   end
 
@@ -1636,15 +1663,31 @@ defmodule MirrorWeb.MapLive do
     hover =
       if state.save && valid_coord?(x, y) do
         plane_layers = Map.fetch!(state.planes, plane)
-        terrain_value = MirrorMap.get_tile_u16_le(plane_layers.terrain, x, y)
+        engine_tile = engine_tile(state, plane, x, y)
+        engine_terrain = engine_tile && Map.get(engine_tile, :terrain_u16)
+        terrain_value = engine_terrain || MirrorMap.get_tile_u16_le(plane_layers.terrain, x, y)
         adj = MirrorMap.get_tile_u8(plane_layers.computed_adj_mask, x, y)
         layer = state.active_layer
 
+        engine_layer_value =
+          case engine_tile do
+            nil -> nil
+            _ -> engine_layer(layer) && Map.get(engine_tile, engine_layer(layer))
+          end
+
         layer_value =
-          if layer in @u16_layers do
-            MirrorMap.get_tile_u16_le(plane_layers[layer], x, y)
-          else
-            MirrorMap.get_tile_u8(plane_layers[layer], x, y)
+          cond do
+            layer == :computed_adj_mask ->
+              MirrorMap.get_tile_u8(plane_layers.computed_adj_mask, x, y)
+
+            not is_nil(engine_layer_value) ->
+              engine_layer_value
+
+            layer in @u16_layers ->
+              MirrorMap.get_tile_u16_le(plane_layers[layer], x, y)
+
+            true ->
+              MirrorMap.get_tile_u8(plane_layers[layer], x, y)
           end
 
         rays =
@@ -1659,7 +1702,8 @@ defmodule MirrorWeb.MapLive do
           layer_value: layer_value,
           original_value: original_tile_value(state, plane, layer, x, y),
           adj_mask: adj,
-          rays: rays
+          rays: rays,
+          engine_tile: engine_tile
         }
       else
         nil
@@ -1776,7 +1820,8 @@ defmodule MirrorWeb.MapLive do
 
         socket
         |> assign(:state, updated_state)
-        |> maybe_push_updates(layer, updates)
+        |> maybe_push_updates(layer, updates, stroke.changes)
+        |> emit_engine_delta(plane, layer, stroke.changes)
         |> assign_hover(x, y)
     end
   end
@@ -1814,17 +1859,56 @@ defmodule MirrorWeb.MapLive do
     })
   end
 
-  defp maybe_push_updates(socket, layer, updates) do
+  defp maybe_push_updates(socket, layer, updates, changes) do
     if connected?(socket) and layer == socket.assigns.active_layer and updates != [] do
-      push_event(socket, "tile_updates", %{
+      payload_changes =
+        if is_list(changes) do
+          Enum.map(changes, fn {x, y, prev, new} ->
+            %{x: x, y: y, value: new, prev: prev, new: new}
+          end)
+        else
+          updates
+        end
+
+      push_event(socket, "engine_delta", %{
+        plane: Atom.to_string(socket.assigns.plane),
         layer: Atom.to_string(layer),
         layer_type: layer_type(layer),
-        updates: updates
+        delta_type: "tile_set",
+        changes: payload_changes
       })
     end
 
     socket
   end
+
+  defp emit_engine_delta(socket, plane, layer, changes) when is_list(changes) do
+    state = socket.assigns.state
+    engine_layer = engine_layer(layer)
+
+    if engine_layer && Map.get(state, :engine_session_id) do
+      delta = %Delta{
+        type: :tile_set,
+        plane: plane,
+        layer: engine_layer,
+        changes: changes,
+        meta: %{source: :map_live}
+      }
+
+      case Session.whereis(state.engine_session_id) do
+        nil -> :noop
+        pid -> Session.apply_delta(pid, delta)
+      end
+    end
+
+    socket
+  end
+
+  defp stroke_changes(stroke, :undo) do
+    Enum.map(stroke.changes, fn {x, y, prev, new} -> {x, y, new, prev} end)
+  end
+
+  defp stroke_changes(stroke, :redo), do: stroke.changes
 
   defp maybe_push_tile_assets(socket) do
     state = socket.assigns.state
@@ -1868,6 +1952,23 @@ defmodule MirrorWeb.MapLive do
 
   defp layer_type(layer) do
     if layer in @u16_layers, do: "u16", else: "u8"
+  end
+
+  defp engine_layer(:terrain), do: :terrain_u16
+  defp engine_layer(:terrain_flags), do: :terrain_flags_u8
+  defp engine_layer(:minerals), do: :minerals_u8
+  defp engine_layer(:exploration), do: :exploration_u8
+  defp engine_layer(:landmass), do: :landmass_u8
+  defp engine_layer(_layer), do: nil
+
+  defp engine_tile(state, plane, x, y) do
+    with session_id when not is_nil(session_id) <- Map.get(state, :engine_session_id),
+         tile when is_map(tile) <- View.tile_truth(session_id, plane, x, y),
+         true <- map_size(tile) > 0 do
+      tile
+    else
+      _ -> nil
+    end
   end
 
   defp u8_layer?(layer), do: layer in @u8_layers
@@ -1958,7 +2059,9 @@ defmodule MirrorWeb.MapLive do
       snapshot_values: %{},
       phase_loop_len: nil,
       phase_loop_status: :unknown,
-      phase_loop_detecting: false
+      phase_loop_detecting: false,
+      engine_session_id: nil,
+      engine_player_id: :observer
     }
   end
 
@@ -1976,7 +2079,51 @@ defmodule MirrorWeb.MapLive do
     |> Map.put_new(:phase_loop_status, :unknown)
     |> Map.update(:phase_loop_status, :unknown, &normalize_phase_loop_status/1)
     |> Map.put_new(:phase_loop_detecting, false)
+    |> Map.put_new(:engine_session_id, nil)
+    |> Map.put_new(:engine_player_id, :observer)
   end
+
+  defp ensure_engine_session(state, session_id, connected?) do
+    cond do
+      not connected? ->
+        state
+
+      is_nil(state.save) ->
+        state
+
+      engine_session_alive?(Map.get(state, :engine_session_id)) ->
+        state
+
+      true ->
+        case start_engine_session(state.save.path) do
+          {:ok, engine_session_id} ->
+            state = %{state | engine_session_id: engine_session_id}
+            SessionStore.put(session_id, state)
+            state
+
+          {:error, _reason} ->
+            state
+        end
+    end
+  end
+
+  defp engine_session_alive?(nil), do: false
+
+  defp engine_session_alive?(session_id) do
+    case Session.whereis(session_id) do
+      nil -> false
+      _pid -> true
+    end
+  end
+
+  defp start_engine_session(path) when is_binary(path) and path != "" do
+    with {:ok, pid} <- SessionSupervisor.start_session(seed: System.unique_integer([:positive])),
+         {:ok, session_id} <- Session.load_save(pid, path) do
+      {:ok, session_id}
+    end
+  end
+
+  defp start_engine_session(_path), do: {:error, :missing_path}
 
   defp default_load_path do
     case Paths.mom_path() do

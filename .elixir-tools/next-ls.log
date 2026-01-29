@@ -340,3 +340,158 @@ This will trigger a full recompilation in order to re-index your codebase.
 10:22:16.784 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 410µs
 
 10:22:22.199 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 205µs
+
+11:11:53.433 [info] Loading 51 CA(s) from :otp store
+
+11:11:54.887 id=0 [debug] handled request client -> server initialize in 1033ms
+
+11:11:54.916 [debug] sent notification server -> client window/logMessage
+
+11:11:54.931 [debug] NextLS v0.23.4 has initialized!
+
+11:11:54.931 [debug] sent notification server -> client window/logMessage
+
+11:11:54.931 [debug] Log file located at e:/repo/elixir/mirror/.elixir-tools/next-ls.log
+
+11:11:54.947 [debug] sent notification server -> client window/logMessage
+
+11:11:54.947 [info] [extension] Credo initializing with options %NextLS.InitOpts.Extensions.Credo{enable: true, cli_options: []}
+
+11:11:54.947 id=4 [debug] sent request server -> client client/registerCapability
+
+11:11:59.867 [debug] sent notification server -> client window/logMessage
+
+11:11:59.867 [debug] Booting runtimes...
+
+11:11:59.886 id=3523 [debug] sent request server -> client window/workDoneProgress/create
+
+11:11:59.911 [debug] sent notification server -> client $/progress
+
+11:12:00.042 [debug] sent notification server -> client window/logMessage
+
+11:12:00.042 [info] Beginning DB migration...
+
+11:12:00.108 [debug] sent notification server -> client window/logMessage
+
+11:12:00.108 [info] Database is on the latest version: 7
+
+11:12:00.108 [debug] sent notification server -> client window/logMessage
+
+11:12:00.108 [info] Finished DB migration...
+
+11:12:00.124 [error] ** (MatchError) no match of right hand side value: {:error, {:shutdown, {:failed_to_start_child, NextLS.Runtime, {:badarg, [{NextLS.Runtime, :init, 1, [file: ~c"lib/next_ls/runtime.ex", line: 131, error_info: %{cause: {1, :binary, :type, nil}, function: :format_bs_fail, module: :erl_erts_errors}]}, {:gen_server, :init_it, 2, [file: ~c"gen_server.erl", line: 2229]}, {:gen_server, :init_it, 6, [file: ~c"gen_server.erl", line: 2184]}, {:proc_lib, :init_p_do_apply, 3, [file: ~c"proc_lib.erl", line: 329]}]}}}}
+    (next_ls 0.23.4) lib/next_ls.ex:907: anonymous fn/5 in NextLS.handle_notification/2
+    (elixir 1.17.3) lib/enum.ex:2531: Enum."-reduce/3-lists^foldl/2-0-"/3
+    (next_ls 0.23.4) lib/next_ls.ex:902: NextLS.handle_notification/2
+    (gen_lsp 0.11.0) lib/gen_lsp.ex:528: anonymous fn/2 in GenLSP.loop/3
+    (telemetry 1.3.0) /Users/runner/work/next-ls/next-ls/deps/telemetry/src/telemetry.erl:324: :telemetry.span/3
+    (gen_lsp 0.11.0) lib/gen_lsp.ex:524: anonymous fn/4 in GenLSP.loop/3
+    (gen_lsp 0.11.0) lib/gen_lsp.ex:601: anonymous fn/4 in GenLSP.attempt/4
+    (elixir 1.17.3) lib/task/supervised.ex:101: Task.Supervised.invoke_mfa/2
+
+
+11:12:00.124 [debug] sent notification server -> client window/logMessage
+
+11:12:00.124 [warning] client -> server notification crashed
+
+11:13:40.666 [debug] handled notification client -> server $/setTrace in 24ms
+
+11:13:40.669 [debug] handled notification client -> server $/setTrace in 102µs
+
+11:14:00.364 [debug] handled notification client -> server workspace/didChangeWorkspaceFolders in 47ms
+
+11:24:01.305 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 58ms
+
+11:24:10.425 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 307µs
+
+11:24:27.153 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 307µs
+
+11:25:21.960 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 307µs
+
+11:26:17.290 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 307µs
+
+11:26:54.517 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 307µs
+
+11:27:10.887 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 308µs
+
+11:27:16.513 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 409µs
+
+11:27:21.639 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 308µs
+
+11:28:13.173 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 307µs
+
+11:28:27.206 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 307µs
+
+11:28:37.256 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 205µs
+
+11:28:45.374 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 205µs
+
+11:29:25.993 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 204µs
+
+11:29:36.798 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 205µs
+
+11:31:06.880 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 307µs
+
+11:31:27.124 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 307µs
+
+11:32:39.023 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 205µs
+
+11:33:05.102 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 205µs
+
+11:33:22.748 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 410µs
+
+11:33:30.532 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 205µs
+
+11:33:38.330 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 204µs
+
+11:33:46.446 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 204µs
+
+11:34:05.752 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 307µs
+
+11:34:31.289 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 205µs
+
+11:34:37.096 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 204µs
+
+11:35:17.933 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 205µs
+
+11:35:24.125 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 205µs
+
+11:35:28.360 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 307µs
+
+11:35:34.404 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 204µs
+
+11:35:39.226 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 410µs
+
+11:43:58.603 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 512µs
+
+11:44:09.673 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 307µs
+
+11:44:15.305 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 308µs
+
+11:44:23.100 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 307µs
+
+11:44:31.682 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 205µs
+
+11:44:44.696 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 205µs
+
+11:45:04.481 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 308µs
+
+11:45:12.937 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 307µs
+
+11:45:25.124 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 410µs
+
+11:45:38.622 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 205µs
+
+11:45:48.076 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 307µs
+
+11:45:55.231 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 615µs
+
+11:46:05.864 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 307µs
+
+11:51:45.333 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 409µs
+
+11:51:59.078 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 205µs
+
+11:52:27.032 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 308µs
+
+11:52:32.256 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 205µs

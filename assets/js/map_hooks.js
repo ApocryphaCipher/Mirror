@@ -101,6 +101,50 @@ const MapCanvas = {
       this.renderAll()
     })
 
+    this.handleEvent("engine_delta", payload => {
+      if (!payload || !Array.isArray(payload.changes)) return
+      if (payload.delta_type && payload.delta_type !== "tile_set") return
+
+      const layer = payload.layer || this.activeLayer
+      if (payload.layer_type) {
+        this.layerType = payload.layer_type
+      }
+
+      payload.changes.forEach(change => {
+        const x = change.x
+        const y = change.y
+        const value = change.new ?? change.value
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(value)) return
+
+        const idx = y * this.mapWidth + x
+        if (idx < 0 || idx >= this.values.length) return
+
+        if (layer === this.activeLayer) {
+          this.values[idx] = value
+        }
+        if (layer === "terrain") {
+          this.terrainValues[idx] = value
+        }
+        if (layer === "terrain_flags") {
+          this.terrainFlags[idx] = value
+        }
+        if (layer === "minerals") {
+          this.mineralsValues[idx] = value
+        }
+
+        if (
+          layer === "terrain" &&
+          this.activeLayer === "terrain" &&
+          this.renderMode === "tiles" &&
+          this.hasTileAssets()
+        ) {
+          this.redrawNeighborhood(x, y)
+        } else if (layer === this.activeLayer) {
+          this.drawTile(x, y, value)
+        }
+      })
+    })
+
     this.handleEvent("tile_updates", payload => {
       if (!payload || !Array.isArray(payload.updates)) return
       this.layerType = payload.layer_type || this.layerType
