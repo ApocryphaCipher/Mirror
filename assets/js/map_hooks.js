@@ -19,6 +19,9 @@ const MapCanvas = {
     this.lastTileKey = null
     this.isPointerDown = false
     this.pointerButton = 0
+    this.phaseLoopDetecting = false
+    this.phaseLoopCanvas = null
+    this.phaseLoopCtx = null
 
     this.ctx = this.el.getContext("2d", {alpha: false})
     this.ctx.imageSmoothingEnabled = false
@@ -141,6 +144,10 @@ const MapCanvas = {
       this.exportSnapshot(payload || {})
     })
 
+    this.handleEvent("phase_loop_detect", payload => {
+      this.detectPhaseLoop(payload || {})
+    })
+
     this.handleEvent("stats_export", payload => {
       if (!payload || !payload.content) return
       const blob = new Blob([payload.content], {type: "application/json"})
@@ -210,6 +217,18 @@ const MapCanvas = {
     if (value === true || value === "true" || value === 1 || value === "1") return true
     if (value === false || value === "false" || value === 0 || value === "0") return false
     return fallback
+  },
+
+  parsePositiveInt(value, fallback) {
+    const parsed = parseInt(value ?? fallback, 10)
+    if (!Number.isFinite(parsed) || parsed < 1) return fallback
+    return parsed
+  },
+
+  parseNonNegativeInt(value, fallback) {
+    const parsed = parseInt(value ?? fallback, 10)
+    if (!Number.isFinite(parsed) || parsed < 0) return fallback
+    return parsed
   },
 
   normalizePhaseIndex(value) {
@@ -480,7 +499,9 @@ const MapCanvas = {
 
   exportSnapshot(payload) {
     if (!this.hasTileAssets()) return
-    const phaseIndex = this.normalizePhaseIndex(payload.phase_index ?? payload.phaseIndex)
+    const phaseIndex = this.normalizePhaseIndex(
+      payload.effective_phase ?? payload.phase_index ?? payload.phaseIndex
+    )
     const filename = payload.filename || `mirror-snapshot-phase-${phaseIndex}.png`
     const canvas = document.createElement("canvas")
     const size = this.tileSize
@@ -511,6 +532,103 @@ const MapCanvas = {
         this.drawTileArt(x, y, {includeMinerals: false, render})
       }
     }
+  },
+
+  detectPhaseLoop(payload) {
+    if (this.phaseLoopDetecting) return
+    if (!this.hasTileAssets()) {
+      this.pushEvent("phase_loop_detected", {
+        status: "error",
+        reason: "missing_assets",
+      })
+      return
+    }
+
+    this.phaseLoopDetecting = true
+    try {
+      const maxPhases = this.parsePositiveInt(payload.max_phases, 32)
+      const threshold = this.parseNonNegativeInt(payload.threshold, 0)
+      const fallback = this.parsePositiveInt(payload.fallback, 8)
+
+      const baseline = this.renderPhaseImageData(0)
+      let detected = null
+
+      for (let phase = 1; phase <= maxPhases; phase++) {
+        const image = this.renderPhaseImageData(phase)
+        const diff = this.diffImageData(baseline, image, threshold)
+        if (diff <= threshold) {
+          detected = {loop_len: phase, diff}
+          break
+        }
+      }
+
+      const status = detected ? "detected" : "assumed"
+      const loopLen = detected ? detected.loop_len : fallback
+      const diff = detected ? detected.diff : null
+
+      this.phaseLoopDetecting = false
+      this.pushEvent("phase_loop_detected", {
+        status,
+        loop_len: loopLen,
+        diff,
+        max_phases: maxPhases,
+        threshold,
+      })
+    } catch (_error) {
+      this.phaseLoopDetecting = false
+      this.pushEvent("phase_loop_detected", {
+        status: "error",
+        reason: "exception",
+      })
+    }
+  },
+
+  renderPhaseImageData(phaseIndex) {
+    const size = this.tileSize
+    const width = this.mapWidth * size
+    const height = this.mapHeight * size
+
+    if (!this.phaseLoopCanvas) {
+      this.phaseLoopCanvas = document.createElement("canvas")
+    }
+
+    const canvas = this.phaseLoopCanvas
+    if (canvas.width !== width) canvas.width = width
+    if (canvas.height !== height) canvas.height = height
+
+    if (!this.phaseLoopCtx) {
+      this.phaseLoopCtx = canvas.getContext("2d", {alpha: false})
+    }
+
+    const ctx = this.phaseLoopCtx
+    ctx.imageSmoothingEnabled = false
+    this.fillBackground(ctx, size)
+    this.renderSnapshotTiles(ctx, size, phaseIndex)
+    return ctx.getImageData(0, 0, width, height)
+  },
+
+  diffImageData(base, current, threshold) {
+    if (!base || !current || base.data.length !== current.data.length) {
+      return Number.POSITIVE_INFINITY
+    }
+
+    const baseData = base.data
+    const currentData = current.data
+    let diff = 0
+
+    if (threshold <= 0) {
+      for (let i = 0; i < baseData.length; i++) {
+        if (baseData[i] !== currentData[i]) return 1
+      }
+      return 0
+    }
+
+    for (let i = 0; i < baseData.length; i++) {
+      diff += Math.abs(baseData[i] - currentData[i])
+      if (diff > threshold) return diff
+    }
+
+    return diff
   },
 
   adjMaskAt(x, y) {

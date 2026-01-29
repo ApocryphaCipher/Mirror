@@ -24,6 +24,10 @@ defmodule MirrorWeb.MapLive do
     computed_adj_mask: "Adjacency Mask"
   }
 
+  @phase_loop_max 32
+  @phase_loop_fallback 8
+  @phase_loop_threshold 0
+
   @impl true
   def mount(_params, session, socket) do
     session_id = session["mirror_session_id"] || "local"
@@ -85,7 +89,13 @@ defmodule MirrorWeb.MapLive do
           dataset_id: save.dataset_id,
           render_mode: socket.assigns.state.render_mode || :tiles,
           phase_index: socket.assigns.state.phase_index || 0,
-          snapshot_mode: Map.get(socket.assigns.state, :snapshot_mode, true)
+          snapshot_mode: Map.get(socket.assigns.state, :snapshot_mode, true),
+          phase_loop_len: Map.get(socket.assigns.state, :phase_loop_len),
+          phase_loop_status:
+            normalize_phase_loop_status(
+              Map.get(socket.assigns.state, :phase_loop_status, :unknown)
+            ),
+          phase_loop_detecting: false
         }
 
         SessionStore.put(socket.assigns.session_id, state)
@@ -268,12 +278,18 @@ defmodule MirrorWeb.MapLive do
     plane = socket.assigns.plane
 
     if state.save do
+      phase_input = state.phase_index || 0
+      effective_phase = effective_phase_index(state)
+
       socket =
         socket
         |> push_tile_assets(state)
         |> push_event("snapshot_export", %{
-          filename: "mirror-snapshot-#{plane}-phase-#{state.phase_index}.png",
-          phase_index: state.phase_index
+          filename: "mirror-snapshot-#{plane}-phase-#{effective_phase}.png",
+          phase_index: effective_phase,
+          phase_input: phase_input,
+          effective_phase: effective_phase,
+          loop_len: phase_loop_len(state)
         })
 
       {:noreply, socket}
@@ -332,6 +348,102 @@ defmodule MirrorWeb.MapLive do
     socket =
       socket
       |> assign_from_state(state)
+      |> assign_forms()
+
+    socket =
+      if connected?(socket) do
+        push_map_state(socket)
+      else
+        socket
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_event("detect_phase_loop", _params, socket) do
+    state = socket.assigns.state
+
+    cond do
+      not state.save ->
+        {:noreply, put_flash(socket, :error, "Load a save to detect the phase loop.")}
+
+      state.render_mode != :tiles ->
+        {:noreply, put_flash(socket, :error, "Switch to Tiles render mode to detect phases.")}
+
+      true ->
+        state = %{state | phase_loop_detecting: true}
+        SessionStore.put(socket.assigns.session_id, state)
+
+        socket =
+          socket
+          |> assign_from_state(state)
+          |> assign_forms()
+
+        socket =
+          if connected?(socket) do
+            socket
+            |> push_tile_assets(state)
+            |> push_event("phase_loop_detect", %{
+              max_phases: @phase_loop_max,
+              threshold: @phase_loop_threshold,
+              fallback: @phase_loop_fallback
+            })
+          else
+            socket
+          end
+
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("phase_loop_detected", params, socket) do
+    state = socket.assigns.state
+    status = Map.get(params, "status", "unknown")
+
+    {next_state, socket} =
+      case status do
+        "detected" ->
+          loop_len =
+            params
+            |> Map.get("loop_len")
+            |> parse_int(state.phase_loop_len || @phase_loop_fallback)
+            |> max(1)
+
+          state = %{
+            state
+            | phase_loop_len: loop_len,
+              phase_loop_status: :detected,
+              phase_loop_detecting: false
+          }
+
+          {state, put_flash(socket, :info, "Detected phase loop length: #{loop_len}.")}
+
+        "assumed" ->
+          loop_len =
+            params
+            |> Map.get("loop_len")
+            |> parse_int(@phase_loop_fallback)
+            |> max(1)
+
+          state = %{
+            state
+            | phase_loop_len: loop_len,
+              phase_loop_status: :assumed,
+              phase_loop_detecting: false
+          }
+
+          {state, put_flash(socket, :info, "No loop found. Using #{loop_len} as a fallback.")}
+
+        _ ->
+          state = %{state | phase_loop_detecting: false, phase_loop_status: :unknown}
+          {state, put_flash(socket, :error, "Phase loop detection failed.")}
+      end
+
+    SessionStore.put(socket.assigns.session_id, next_state)
+
+    socket =
+      socket
+      |> assign_from_state(next_state)
       |> assign_forms()
 
     socket =
@@ -429,19 +541,49 @@ defmodule MirrorWeb.MapLive do
                   >
                     Snapshot: {if @snapshot_mode, do: "On", else: "Off"}
                   </button>
-                  <.form
-                    for={@phase_form}
-                    id="phase-form"
-                    phx-change="set_phase_index"
-                    class="rounded-full border border-white/20 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200"
+                  <div class="flex flex-col gap-1">
+                    <.form
+                      for={@phase_form}
+                      id="phase-form"
+                      phx-change="set_phase_index"
+                      class="rounded-full border border-white/20 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200"
+                    >
+                      <.input
+                        field={@phase_form[:index]}
+                        type="number"
+                        label="Phase"
+                        class="w-20 rounded-2xl border border-white/10 bg-slate-950/70 text-slate-200"
+                      />
+                    </.form>
+                    <div class="flex flex-wrap items-center gap-2 text-[0.65rem] uppercase tracking-[0.2em] text-slate-400">
+                      <span>Input: {@phase_input}</span>
+                      <span>Effective: {@phase_index}</span>
+                      <span>
+                        Loop: {if(@phase_loop_len, do: @phase_loop_len, else: "Unknown")}
+                      </span>
+                      <%= case @phase_loop_status do %>
+                        <% :detected -> %>
+                          <span class="text-emerald-300/80">Detected</span>
+                        <% :assumed -> %>
+                          <span class="text-amber-300/80">Assumed</span>
+                        <% _ -> %>
+                          <span class="text-slate-500">Unknown</span>
+                      <% end %>
+                    </div>
+                  </div>
+                  <button
+                    :if={@render_mode == :tiles}
+                    id="detect-phase-loop-button"
+                    type="button"
+                    phx-click="detect_phase_loop"
+                    disabled={@phase_loop_detecting}
+                    class={[
+                      "rounded-full border border-fuchsia-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-fuchsia-100 transition hover:border-fuchsia-200",
+                      @phase_loop_detecting && "cursor-not-allowed opacity-60"
+                    ]}
                   >
-                    <.input
-                      field={@phase_form[:index]}
-                      type="number"
-                      label="Phase"
-                      class="w-20 rounded-2xl border border-white/10 bg-slate-950/70 text-slate-200"
-                    />
-                  </.form>
+                    {if @phase_loop_detecting, do: "Detecting...", else: "Detect loop"}
+                  </button>
                   <button
                     :if={@render_mode == :tiles}
                     id="reload-tiles-button"
@@ -1138,9 +1280,35 @@ defmodule MirrorWeb.MapLive do
     end)
   end
 
+  defp phase_loop_len(%{phase_loop_len: len}) when is_integer(len) and len > 0, do: len
+  defp phase_loop_len(_), do: nil
+
+  defp effective_phase_index(state) do
+    phase_input = state.phase_index || 0
+
+    case phase_loop_len(state) do
+      nil -> phase_input
+      len -> rem(phase_input, len)
+    end
+  end
+
+  defp normalize_phase_loop_status(status) do
+    case status do
+      :detected -> :detected
+      "detected" -> :detected
+      :assumed -> :assumed
+      "assumed" -> :assumed
+      _ -> :unknown
+    end
+  end
+
   defp assign_from_state(socket, state) do
     plane = socket.assigns.plane
     plane_layers = Map.get(state.planes, plane)
+    phase_input = state.phase_index || 0
+    loop_len = phase_loop_len(state)
+    effective_phase = effective_phase_index(state)
+    phase_loop_status = normalize_phase_loop_status(Map.get(state, :phase_loop_status))
 
     encoded_layer =
       if plane_layers do
@@ -1184,7 +1352,11 @@ defmodule MirrorWeb.MapLive do
       map_width: MirrorMap.width(),
       map_height: MirrorMap.height(),
       render_mode: state.render_mode,
-      phase_index: state.phase_index,
+      phase_index: effective_phase,
+      phase_input: phase_input,
+      phase_loop_len: loop_len,
+      phase_loop_status: phase_loop_status,
+      phase_loop_detecting: Map.get(state, :phase_loop_detecting, false),
       snapshot_mode: Map.get(state, :snapshot_mode, true)
     )
   end
@@ -1284,7 +1456,7 @@ defmodule MirrorWeb.MapLive do
       layer: Atom.to_string(state.active_layer),
       layer_type: layer_type(state.active_layer),
       render_mode: Atom.to_string(state.render_mode),
-      phase_index: state.phase_index,
+      phase_index: effective_phase_index(state),
       snapshot_mode: Map.get(state, :snapshot_mode, true)
     })
   end
@@ -1305,7 +1477,7 @@ defmodule MirrorWeb.MapLive do
       terrain_flags: Base.encode64(plane_layers.terrain_flags),
       minerals: Base.encode64(plane_layers.minerals),
       render_mode: Atom.to_string(state.render_mode),
-      phase_index: state.phase_index,
+      phase_index: effective_phase_index(state),
       snapshot_mode: Map.get(state, :snapshot_mode, true)
     })
   end
@@ -1417,7 +1589,10 @@ defmodule MirrorWeb.MapLive do
       dataset_id: nil,
       render_mode: :tiles,
       phase_index: 0,
-      snapshot_mode: true
+      snapshot_mode: true,
+      phase_loop_len: nil,
+      phase_loop_status: :unknown,
+      phase_loop_detecting: false
     }
   end
 
@@ -1429,6 +1604,10 @@ defmodule MirrorWeb.MapLive do
     |> Map.put_new(:render_mode, :tiles)
     |> Map.put_new(:phase_index, 0)
     |> Map.put_new(:snapshot_mode, true)
+    |> Map.put_new(:phase_loop_len, nil)
+    |> Map.put_new(:phase_loop_status, :unknown)
+    |> Map.update(:phase_loop_status, :unknown, &normalize_phase_loop_status/1)
+    |> Map.put_new(:phase_loop_detecting, false)
   end
 
   defp default_load_path do

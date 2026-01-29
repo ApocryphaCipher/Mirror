@@ -286,3 +286,33 @@ This will trigger a full recompilation in order to re-index your codebase.
 21:37:56.214 id=23 [debug] handled request client -> server textDocument/documentSymbol in 9ms
 
 21:37:57.674 [debug] handled notification client -> server textDocument/didClose in 102µs
+
+21:49:56.222 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 308µs
+
+21:50:04.036 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 205µs
+
+21:50:34.220 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 308µs
+
+21:50:44.216 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 205µs
+
+21:50:55.098 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 205µs
+
+21:51:04.000 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 512µs
+
+21:51:13.744 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 205µs
+
+21:51:23.364 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 205µs
+
+21:51:54.426 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 307µs
+
+21:51:59.809 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 410µs
+
+21:53:03.184 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 205µs
+
+21:53:37.395 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 307µs
+
+21:53:42.529 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 307µs
+
+21:55:02.437 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 308µs
+
+21:56:37.838 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 614µs
