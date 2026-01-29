@@ -15,6 +15,12 @@ defmodule MirrorWeb.Endpoint do
     websocket: [connect_info: [session: @session_options]],
     longpoll: [connect_info: [session: @session_options]]
 
+  plug Plug.Static,
+    at: "/momime",
+    from: Path.expand("../../resources", __DIR__),
+    gzip: false,
+    only: ~w(momime.client.graphics)
+
   # Serve at "/" the static files from "priv/static" directory.
   #
   # When code reloading is disabled (e.g., in production),

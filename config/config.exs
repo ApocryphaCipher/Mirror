@@ -11,6 +11,7 @@ config :mirror,
   generators: [timestamp_type: :utc_datetime],
   terrain_water_values: [0],
   mom_path: nil,
+  momime_resources_dir: Path.expand("../resources", __DIR__),
   asset_map_dir: Path.expand("../priv/asset_map", __DIR__),
   tile_cache_dir: Path.expand("../priv/tile_cache", __DIR__)
 

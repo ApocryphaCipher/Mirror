@@ -5,29 +5,37 @@ defmodule Mirror.TileAtlas do
 
   require Logger
 
-  alias Mirror.{AssetMap, Paths, TileCache}
+  alias Mirror.{AssetMap, MomimePngIndex, Paths, TileCache}
   alias Mirror.LBX
 
   def build(opts \\ []) do
-    palette = Keyword.get(opts, :palette, :auto)
-    terrain_map = AssetMap.load(:terrain)
-    overlay_map = AssetMap.load(:overlay)
-    mom_path = Paths.mom_path()
+    case MomimePngIndex.load_assets() do
+      {:ok, assets} ->
+        assets
 
-    {images, terrain_groups} =
-      if map_size(terrain_map) == 0 do
-        fallback_terrain_groups(mom_path, palette, %{})
-      else
-        build_groups(terrain_map, mom_path, palette, %{})
-      end
+      :error ->
+        palette = Keyword.get(opts, :palette, :auto)
+        terrain_map = AssetMap.load(:terrain)
+        overlay_map = AssetMap.load(:overlay)
+        mom_path = Paths.mom_path()
 
-    {images, overlay_groups} = build_groups(overlay_map, mom_path, palette, images)
+        {images, terrain_groups} =
+          if map_size(terrain_map) == 0 do
+            fallback_terrain_groups(mom_path, palette, %{})
+          else
+            build_groups(terrain_map, mom_path, palette, %{})
+          end
 
-    %{
-      images: images,
-      terrain_groups: terrain_groups,
-      overlay_groups: overlay_groups
-    }
+        {images, overlay_groups} = build_groups(overlay_map, mom_path, palette, images)
+
+        %{
+          backend: :lbx,
+          images: images,
+          terrain_groups: terrain_groups,
+          overlay_groups: overlay_groups,
+          momime: nil
+        }
+    end
   end
 
   defp build_groups(map, mom_path, palette, images) when is_map(map) do

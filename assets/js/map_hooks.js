@@ -9,6 +9,15 @@ const ADJ_DIRS = [
   [-1, -1],
 ]
 
+const LAYER_STACK = [
+  "terrain",
+  "terrain_flags",
+  "minerals",
+  "exploration",
+  "landmass",
+  "computed_adj_mask",
+]
+
 const MapCanvas = {
   mounted() {
     this.tileSize = parseInt(this.el.dataset.tileSize || "12", 10)
@@ -18,19 +27,30 @@ const MapCanvas = {
     this.renderMode = this.el.dataset.renderMode || "values"
     this.activeLayer = this.el.dataset.layer || "terrain"
     this.phaseIndex = this.normalizePhaseIndex(this.el.dataset.phaseIndex)
+    this.plane = this.el.dataset.plane || "arcanus"
     this.snapshotMode = this.parseBool(this.el.dataset.snapshotMode, true)
     this.values = this.decodeTiles(this.el.dataset.tiles || "", this.layerType)
     this.terrainValues = this.decodeTiles(this.el.dataset.terrain || "", "u16")
     this.terrainFlags = this.decodeTiles(this.el.dataset.terrainFlags || "", "u8")
     this.mineralsValues = this.decodeTiles(this.el.dataset.minerals || "", "u8")
+    this.explorationValues = this.decodeTiles(this.el.dataset.exploration || "", "u8")
+    this.landmassValues = this.decodeTiles(this.el.dataset.landmass || "", "u8")
+    this.computedAdjMaskValues = this.decodeTiles(this.el.dataset.computedAdjMask || "", "u8")
+    this.tileBackend = "lbx"
     this.tileImages = {}
     this.terrainGroups = {}
     this.overlayGroups = {}
+    this.momimeIndex = {}
+    this.momimeFrames = {}
+    this.momimeBaseUrl = ""
+    this.momimeImageCache = {}
     this.terrainNames = {}
     this.terrainWaterValues = [0]
     this.terrainWaterValueSet = new Set(this.terrainWaterValues)
     this.terrainFlagNames = {}
     this.terrainKindOverrides = {}
+    this.layerVisibility = {}
+    this.layerOpacity = {}
     this.lastTileKey = null
     this.isPointerDown = false
     this.pointerButton = 0
@@ -76,6 +96,14 @@ const MapCanvas = {
         this.renderMode = payload.render_mode
         needsRender = true
       }
+      if (payload.layer_visibility) {
+        this.layerVisibility = payload.layer_visibility
+        needsRender = true
+      }
+      if (payload.layer_opacity) {
+        this.layerOpacity = payload.layer_opacity
+        needsRender = true
+      }
       if (Object.prototype.hasOwnProperty.call(payload, "phase_index")) {
         this.phaseIndex = this.normalizePhaseIndex(payload.phase_index)
         needsRender = true
@@ -93,6 +121,9 @@ const MapCanvas = {
       if (payload.layer) {
         this.activeLayer = payload.layer
       }
+      if (payload.plane) {
+        this.plane = payload.plane
+      }
       this.layerType = payload.layer_type || this.layerType
       this.values = this.decodeTiles(payload.values || "", this.layerType)
       if (payload.terrain) {
@@ -104,8 +135,23 @@ const MapCanvas = {
       if (payload.minerals) {
         this.mineralsValues = this.decodeTiles(payload.minerals, "u8")
       }
+      if (payload.exploration) {
+        this.explorationValues = this.decodeTiles(payload.exploration, "u8")
+      }
+      if (payload.landmass) {
+        this.landmassValues = this.decodeTiles(payload.landmass, "u8")
+      }
+      if (payload.computed_adj_mask) {
+        this.computedAdjMaskValues = this.decodeTiles(payload.computed_adj_mask, "u8")
+      }
       if (payload.render_mode) {
         this.renderMode = payload.render_mode
+      }
+      if (payload.layer_visibility) {
+        this.layerVisibility = payload.layer_visibility
+      }
+      if (payload.layer_opacity) {
+        this.layerOpacity = payload.layer_opacity
       }
       if (Object.prototype.hasOwnProperty.call(payload, "phase_index")) {
         this.phaseIndex = this.normalizePhaseIndex(payload.phase_index)
@@ -146,14 +192,22 @@ const MapCanvas = {
         if (layer === "minerals") {
           this.mineralsValues[idx] = value
         }
+        if (layer === "exploration") {
+          this.explorationValues[idx] = value
+        }
+        if (layer === "landmass") {
+          this.landmassValues[idx] = value
+        }
+        if (layer === "computed_adj_mask") {
+          this.computedAdjMaskValues[idx] = value
+        }
 
-        if (
-          layer === "terrain" &&
-          this.activeLayer === "terrain" &&
-          this.renderMode === "tiles" &&
-          this.hasTileAssets()
-        ) {
-          this.redrawNeighborhood(x, y)
+        if (this.renderMode === "tiles" && this.hasTileAssets()) {
+          if (layer === "terrain") {
+            this.redrawNeighborhood(x, y)
+          } else if (this.isLayerVisible(layer)) {
+            this.drawStackedTile(x, y)
+          }
         } else if (layer === this.activeLayer) {
           this.drawTile(x, y, value)
         }
@@ -176,8 +230,21 @@ const MapCanvas = {
         if (payload.layer === "minerals") {
           this.mineralsValues[idx] = update.value
         }
-        if (this.activeLayer === "terrain" && this.renderMode === "tiles" && this.hasTileAssets()) {
-          this.redrawNeighborhood(update.x, update.y)
+        if (payload.layer === "exploration") {
+          this.explorationValues[idx] = update.value
+        }
+        if (payload.layer === "landmass") {
+          this.landmassValues[idx] = update.value
+        }
+        if (payload.layer === "computed_adj_mask") {
+          this.computedAdjMaskValues[idx] = update.value
+        }
+        if (this.renderMode === "tiles" && this.hasTileAssets()) {
+          if (payload.layer === "terrain") {
+            this.redrawNeighborhood(update.x, update.y)
+          } else if (this.isLayerVisible(payload.layer)) {
+            this.drawStackedTile(update.x, update.y)
+          }
         } else {
           this.drawTile(update.x, update.y, update.value)
         }
@@ -186,11 +253,17 @@ const MapCanvas = {
 
     this.handleEvent("tile_assets", payload => {
       if (!payload) return
+      this.tileBackend = payload.backend || this.tileBackend || "lbx"
       this.terrainGroups = payload.terrain_groups || {}
       this.overlayGroups = payload.overlay_groups || {}
       this.terrainNames = payload.terrain_names || {}
       this.terrainFlagNames = payload.terrain_flag_names || {}
       this.terrainKindOverrides = payload.terrain_kind_overrides || {}
+      const momime = payload.momime || {}
+      this.momimeIndex = momime.index || {}
+      this.momimeFrames = momime.frames || {}
+      this.momimeBaseUrl = momime.base_url || ""
+      this.momimeImageCache = {}
       if (Array.isArray(payload.terrain_water_values)) {
         this.terrainWaterValues = payload.terrain_water_values
         this.terrainWaterValueSet = new Set(this.terrainWaterValues)
@@ -312,12 +385,17 @@ const MapCanvas = {
 
   drawTile(x, y, value) {
     if (this.renderMode === "tiles" && this.hasTileAssets()) {
-      this.drawTileForLayer(x, y, value)
+      this.drawStackedTile(x, y)
     } else {
       this.drawValueTile(x, y, value)
     }
   },
   drawTileForLayer(x, y, value) {
+    if (this.renderMode === "tiles" && this.hasTileAssets()) {
+      this.drawStackedTile(x, y)
+      return
+    }
+
     if (this.activeLayer === "terrain") {
       this.drawTerrainTile(x, y)
       return
@@ -345,9 +423,9 @@ const MapCanvas = {
     }
   },
 
-  drawValueTile(x, y, value, render) {
+  drawValueTile(x, y, value, render, layerType) {
     const {ctx, size} = this.resolveRender(render)
-    ctx.fillStyle = this.colorForValue(value)
+    ctx.fillStyle = this.colorForValue(value, layerType)
     ctx.fillRect(
       x * size,
       y * size,
@@ -357,22 +435,7 @@ const MapCanvas = {
   },
 
   renderTilesForLayer() {
-    if (this.activeLayer === "terrain") {
-      this.renderTerrainTiles()
-      return
-    }
-
-    if (this.activeLayer === "minerals") {
-      this.renderMineralTiles()
-      return
-    }
-
-    if (this.activeLayer === "terrain_flags") {
-      this.renderFlagTiles()
-      return
-    }
-
-    this.renderValues()
+    this.renderLayerStack()
   },
 
   renderValues() {
@@ -389,6 +452,35 @@ const MapCanvas = {
       for (let x = 0; x < this.mapWidth; x++) {
         this.drawTerrainTile(x, y, render)
       }
+    }
+  },
+
+  renderLayerStack(render) {
+    const resolved = this.resolveRender(render)
+    this.fillBackground(resolved.ctx, resolved.size)
+
+    for (let y = 0; y < this.mapHeight; y++) {
+      for (let x = 0; x < this.mapWidth; x++) {
+        this.drawTerrainBase(x, y, resolved)
+      }
+    }
+
+    const layers = this.layerStack()
+    for (let i = 0; i < layers.length; i++) {
+      const layer = layers[i]
+      if (layer === "terrain") continue
+      if (!this.isLayerVisible(layer)) continue
+      const opacity = this.layerOpacityValue(layer)
+      if (opacity <= 0) continue
+
+      resolved.ctx.save()
+      resolved.ctx.globalAlpha = opacity
+      for (let y = 0; y < this.mapHeight; y++) {
+        for (let x = 0; x < this.mapWidth; x++) {
+          this.drawLayerOverlay(layer, x, y, resolved)
+        }
+      }
+      resolved.ctx.restore()
     }
   },
 
@@ -416,6 +508,9 @@ const MapCanvas = {
   },
 
   hasTileAssets() {
+    if (this.tileBackend === "momime_png") {
+      return this.momimeIndex && Object.keys(this.momimeIndex).length > 0
+    }
     return this.tileImages && Object.keys(this.tileImages).length > 0
   },
 
@@ -453,9 +548,47 @@ const MapCanvas = {
     this.drawTileArt(x, y, {includeOverlays: true, render})
   },
 
+  drawTerrainBase(x, y, render) {
+    const resolved = this.resolveRender(render)
+    this.drawTileArt(x, y, {includeOverlays: false, render: resolved})
+    this.drawFeatureOverlays(x, y, resolved)
+    this.drawEmbeddedSpecialOverlay(x, y, resolved)
+  },
+
+  drawStackedTile(x, y, render) {
+    const resolved = this.resolveRender(render)
+    this.fillTileBackground(x, y, resolved)
+    this.drawTerrainBase(x, y, resolved)
+
+    const layers = this.layerStack()
+    for (let i = 0; i < layers.length; i++) {
+      const layer = layers[i]
+      if (layer === "terrain") continue
+      if (!this.isLayerVisible(layer)) continue
+      const opacity = this.layerOpacityValue(layer)
+      if (opacity <= 0) continue
+
+      resolved.ctx.save()
+      resolved.ctx.globalAlpha = opacity
+      this.drawLayerOverlay(layer, x, y, resolved)
+      resolved.ctx.restore()
+    }
+  },
+
   drawTileArt(x, y, options = {}) {
     const render = this.resolveRender(options.render)
     const includeOverlays = options.includeOverlays !== false
+    if (this.tileBackend === "momime_png") {
+      const drawn = this.drawMomimeBaseTile(x, y, render)
+      if (!drawn) {
+        this.drawMissingTile(x, y, render, "missing")
+      }
+      if (includeOverlays) {
+        this.drawOverlays(x, y, render)
+      }
+      return
+    }
+
     const idx = y * this.mapWidth + x
     const terrainValue = this.terrainValues[idx] || 0
     const kind = this.terrainKindAt(x, y, terrainValue)
@@ -510,6 +643,72 @@ const MapCanvas = {
     this.drawEmbeddedSpecialOverlay(x, y, render)
   },
 
+  layerStack() {
+    return LAYER_STACK
+  },
+
+  isLayerVisible(layer) {
+    if (layer === "terrain") return true
+    if (this.layerVisibility && Object.prototype.hasOwnProperty.call(this.layerVisibility, layer)) {
+      return !!this.layerVisibility[layer]
+    }
+    return layer === this.activeLayer
+  },
+
+  layerOpacityValue(layer) {
+    const fallback = layer === "terrain" ? 100 : 70
+    const raw = this.layerOpacity?.[layer]
+    const value = Number.isFinite(raw) ? raw : parseFloat(raw ?? fallback)
+    if (!Number.isFinite(value)) return fallback / 100
+    return Math.max(0, Math.min(100, value)) / 100
+  },
+
+  layerTypeFor(layer) {
+    return layer === "terrain" ? "u16" : "u8"
+  },
+
+  layerValues(layer) {
+    switch (layer) {
+      case "terrain":
+        return this.terrainValues
+      case "terrain_flags":
+        return this.terrainFlags
+      case "minerals":
+        return this.mineralsValues
+      case "exploration":
+        return this.explorationValues
+      case "landmass":
+        return this.landmassValues
+      case "computed_adj_mask":
+        return this.computedAdjMaskValues
+      default:
+        return null
+    }
+  },
+
+  drawLayerOverlay(layer, x, y, render) {
+    switch (layer) {
+      case "terrain_flags":
+        this.drawFlagOverlays(x, y, render)
+        break
+      case "minerals":
+        this.drawMineralOverlay(x, y, render)
+        break
+      case "exploration":
+      case "landmass":
+      case "computed_adj_mask": {
+        const values = this.layerValues(layer)
+        if (!values) return
+        const idx = y * this.mapWidth + x
+        const value = values[idx] || 0
+        this.drawValueTile(x, y, value, render, this.layerTypeFor(layer))
+        break
+      }
+      default:
+        break
+    }
+  },
+
   drawMineralTile(x, y, render) {
     this.fillTileBackground(x, y, render)
     this.drawMineralOverlay(x, y, render)
@@ -532,7 +731,7 @@ const MapCanvas = {
 
   terrainSpriteRef(kind, x, y, seed, render) {
     if (!kind || kind === "unknown") return null
-    const mask = this.adjMaskForKind(kind, x, y)
+    const mask = kind === "ocean" ? 0 : this.adjMaskForKind(kind, x, y)
     const edgeClass = this.edgeClassForKind(kind, mask)
     return this.pickTerrainEntry(kind, edgeClass, seed, render)
   },
@@ -721,6 +920,144 @@ const MapCanvas = {
     return true
   },
 
+  maskString(mask) {
+    const value = Number.isFinite(mask) ? mask : 0
+    return value.toString(2).padStart(8, "0")
+  },
+
+  momimeBaseKey(plane, kind, mask) {
+    return `${plane}|${kind}|${mask}`
+  },
+
+  momimeKey(plane, kind, mask, frame) {
+    return `${plane}|${kind}|${mask}|${frame}`
+  },
+
+  pickMomimeFrame(frames, phaseIndex) {
+    if (!frames || frames.length === 0) return "0"
+    const usable = frames.filter(frame => frame !== "0")
+    if (usable.length === 0) return "0"
+    return usable[phaseIndex % usable.length]
+  },
+
+  pickMomimeFallbackFrame(frames) {
+    if (!frames || frames.length === 0) return "0"
+    const usable = frames.filter(frame => frame !== "0")
+    return usable.length ? usable[0] : frames[0]
+  },
+
+  resolveMomimePath(plane, kind, mask, phaseIndex) {
+    const baseKey = this.momimeBaseKey(plane, kind, mask)
+    const frames = this.momimeFrames?.[baseKey] || []
+    const frame = this.pickMomimeFrame(frames, phaseIndex)
+    let path = this.momimeIndex?.[this.momimeKey(plane, kind, mask, frame)]
+    if (path) return {path, frame}
+
+    path = this.momimeIndex?.[this.momimeKey(plane, kind, mask, "0")]
+    if (path) return {path, frame: "0"}
+
+    if (frames.length > 0) {
+      const anyFrame = this.pickMomimeFallbackFrame(frames)
+      path = this.momimeIndex?.[this.momimeKey(plane, kind, mask, anyFrame)]
+      if (path) return {path, frame: anyFrame}
+    }
+
+    const zeroMask = "00000000"
+    path = this.momimeIndex?.[this.momimeKey(plane, kind, zeroMask, frame)]
+    if (path) return {path, frame}
+
+    path = this.momimeIndex?.[this.momimeKey(plane, kind, zeroMask, "0")]
+    if (path) return {path, frame: "0"}
+
+    return null
+  },
+
+  momimeUrl(path) {
+    if (!path) return null
+    if (!this.momimeBaseUrl) return path
+    return `${this.momimeBaseUrl}/${path}`
+  },
+
+  getMomimeImage(path) {
+    const url = this.momimeUrl(path)
+    if (!url) return null
+    let entry = this.momimeImageCache[url]
+    if (!entry) {
+      const img = new Image()
+      entry = {img, loaded: false, failed: false}
+      img.onload = () => {
+        entry.loaded = true
+        this.renderAll()
+      }
+      img.onerror = () => {
+        entry.failed = true
+      }
+      img.src = url
+      this.momimeImageCache[url] = entry
+    }
+    return entry
+  },
+
+  drawMomimeImage(img, x, y, render) {
+    const {ctx, size} = this.resolveRender(render)
+    ctx.drawImage(
+      img,
+      x * size,
+      y * size,
+      size,
+      size
+    )
+  },
+
+  drawMomimeBaseTile(x, y, render) {
+    const resolved = this.resolveRender(render)
+    const idx = y * this.mapWidth + x
+    const terrainValue = this.terrainValues[idx] || 0
+    const kind = this.terrainKindAt(x, y, terrainValue)
+    if (!kind || kind === "unknown") return false
+
+    const mask = kind === "ocean" ? 0 : this.adjMaskForKind(kind, x, y)
+    const maskString = this.maskString(mask)
+    const plane = this.plane || "arcanus"
+    const resolvedPath = this.resolveMomimePath(plane, kind, maskString, resolved.phaseIndex)
+    if (!resolvedPath) return false
+
+    const imageEntry = this.getMomimeImage(resolvedPath.path)
+    if (!imageEntry) return false
+    if (imageEntry.failed) {
+      this.drawMissingTile(x, y, resolved, "missing")
+      return true
+    }
+    if (!imageEntry.loaded) {
+      this.drawLoadingTile(x, y, resolved)
+      return true
+    }
+    this.drawMomimeImage(imageEntry.img, x, y, resolved)
+    return true
+  },
+
+  drawMissingTile(x, y, render, label) {
+    const {ctx, size} = this.resolveRender(render)
+    ctx.fillStyle = "#ff00ff"
+    ctx.fillRect(x * size, y * size, size, size)
+    if (size >= 12) {
+      ctx.fillStyle = "#0f172a"
+      ctx.font = `${Math.max(8, Math.floor(size / 3))}px sans-serif`
+      ctx.fillText(label || "?", x * size + 2, y * size + size - 2)
+    }
+  },
+
+  drawLoadingTile(x, y, render) {
+    const {ctx, size} = this.resolveRender(render)
+    ctx.fillStyle = "#1f2937"
+    ctx.fillRect(x * size, y * size, size, size)
+    if (size >= 12) {
+      ctx.fillStyle = "#e2e8f0"
+      ctx.font = `${Math.max(8, Math.floor(size / 3))}px sans-serif`
+      ctx.fillText("...", x * size + 2, y * size + size - 2)
+    }
+  },
+
   exportSnapshot(payload) {
     if (!this.hasTileAssets()) return
     const phaseIndex = this.normalizePhaseIndex(
@@ -751,11 +1088,7 @@ const MapCanvas = {
 
   renderSnapshotTiles(ctx, size, phaseIndex) {
     const render = {ctx, size, phaseIndex, usePhase: true}
-    for (let y = 0; y < this.mapHeight; y++) {
-      for (let x = 0; x < this.mapWidth; x++) {
-        this.drawTileArt(x, y, {includeOverlays: true, render})
-      }
-    }
+    this.renderLayerStack(render)
   },
 
   detectPhaseLoop(payload) {
@@ -1108,15 +1441,16 @@ const MapCanvas = {
         if (ny < 0 || ny >= this.mapHeight) continue
         if (nx < 0) nx += this.mapWidth
         if (nx >= this.mapWidth) nx -= this.mapWidth
-        this.drawTerrainTile(nx, ny)
+        this.drawStackedTile(nx, ny)
       }
     }
   },
 
-  colorForValue(value) {
+  colorForValue(value, layerType) {
     const hue = (value * 37) % 360
-    const lightness = this.layerType === "u16" ? 28 + (value % 32) : 30 + (value % 64) / 2
-    const saturation = this.layerType === "u16" ? 48 : 62
+    const type = layerType || this.layerType
+    const lightness = type === "u16" ? 28 + (value % 32) : 30 + (value % 64) / 2
+    const saturation = type === "u16" ? 48 : 62
     return `hsl(${hue}, ${saturation}%, ${lightness}%)`
   },
 

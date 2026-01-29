@@ -116,6 +116,8 @@ defmodule MirrorWeb.MapLive do
             {:error, _reason} -> state
           end
 
+        state = normalize_state(state)
+
         SessionStore.put(socket.assigns.session_id, state)
         observe_stats(state)
 
@@ -174,7 +176,7 @@ defmodule MirrorWeb.MapLive do
   def handle_event("set_active_layer", %{"layer" => layer}, socket) do
     state = socket.assigns.state
     layer = Enum.find(@layers, state.active_layer, &(&1 |> Atom.to_string() == layer))
-    state = %{state | active_layer: layer}
+    state = state |> Map.put(:active_layer, layer) |> ensure_layer_visible(layer)
 
     SessionStore.put(socket.assigns.session_id, state)
 
@@ -190,6 +192,64 @@ defmodule MirrorWeb.MapLive do
         |> push_map_state()
         |> push_map_reload()
         |> maybe_push_tile_assets()
+      else
+        socket
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_event("set_layer_setting", %{"layer" => layer} = params, socket) do
+    state = socket.assigns.state
+    layer = Enum.find(@layers, state.active_layer, &(&1 |> Atom.to_string() == layer))
+    settings = Map.get(params, "layer_#{layer}") || %{}
+
+    current_visible =
+      Map.get(Map.get(state, :layer_visibility, %{}), layer, layer == :terrain)
+
+    visible_value = Map.get(settings, "visible", current_visible)
+
+    visibility =
+      Map.get(state, :layer_visibility, %{})
+      |> Map.put_new(:terrain, true)
+      |> Map.put(layer, truthy?(visible_value))
+
+    current_opacity =
+      Map.get(
+        Map.get(state, :layer_opacity, %{}),
+        layer,
+        if(layer == :terrain, do: 100, else: 70)
+      )
+
+    opacity_value = Map.get(settings, "opacity", current_opacity)
+
+    opacity =
+      Map.get(state, :layer_opacity, %{})
+      |> Map.put_new(:terrain, 100)
+      |> Map.put(layer, parse_opacity(opacity_value))
+
+    state =
+      if layer == :terrain do
+        state
+        |> Map.put(:layer_visibility, Map.put(visibility, :terrain, true))
+        |> Map.put(:layer_opacity, opacity)
+      else
+        state
+        |> Map.put(:layer_visibility, visibility)
+        |> Map.put(:layer_opacity, opacity)
+      end
+
+    SessionStore.put(socket.assigns.session_id, state)
+
+    socket =
+      socket
+      |> assign_from_state(state)
+      |> assign_forms()
+      |> refresh_hover()
+
+    socket =
+      if connected?(socket) do
+        push_map_state(socket)
       else
         socket
       end
@@ -525,6 +585,8 @@ defmodule MirrorWeb.MapLive do
   def handle_event("reload_tiles", _params, socket) do
     socket =
       if connected?(socket) do
+        Mirror.MomimePngIndex.reset()
+
         socket
         |> assign(:tile_assets, nil)
         |> maybe_push_tile_assets()
@@ -718,28 +780,68 @@ defmodule MirrorWeb.MapLive do
                     <div class="space-y-4">
                       <div class="space-y-2">
                         <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Layers</p>
-                        <div class="space-y-2">
+                        <div class="space-y-3">
                           <%= for layer <- @layers do %>
-                            <button
-                              id={"layer-#{layer}"}
-                              type="button"
-                              phx-click="set_active_layer"
-                              phx-value-layer={Atom.to_string(layer)}
+                            <div
+                              id={"layer-row-#{layer}"}
                               class={[
-                                "w-full rounded-2xl border px-3 py-2 text-left text-sm transition",
-                                layer == @active_layer &&
-                                  "border-amber-300/60 bg-amber-300/10 text-white",
-                                layer != @active_layer &&
-                                  "border-white/10 text-slate-300 hover:border-white/30"
+                                "rounded-2xl border p-3",
+                                layer == @active_layer && "border-amber-300/40 bg-amber-300/10",
+                                layer != @active_layer && "border-white/10 bg-slate-950/40"
                               ]}
                             >
-                              <span class="font-semibold">{@layer_labels[layer]}</span>
-                              <%= if layer == :computed_adj_mask do %>
-                                <span class="ml-2 text-[0.65rem] uppercase tracking-[0.2em] text-slate-500">
-                                  Derived
+                              <div class="flex items-center justify-between gap-3">
+                                <button
+                                  id={"layer-#{layer}"}
+                                  type="button"
+                                  phx-click="set_active_layer"
+                                  phx-value-layer={Atom.to_string(layer)}
+                                  class={[
+                                    "text-left text-sm transition",
+                                    layer == @active_layer && "text-white",
+                                    layer != @active_layer && "text-slate-300 hover:text-white"
+                                  ]}
+                                >
+                                  <span class="font-semibold">{@layer_labels[layer]}</span>
+                                  <%= if layer == :computed_adj_mask do %>
+                                    <span class="ml-2 text-[0.65rem] uppercase tracking-[0.2em] text-slate-500">
+                                      Derived
+                                    </span>
+                                  <% end %>
+                                </button>
+                                <span class="text-xs text-slate-400">
+                                  {Map.get(@layer_opacity, layer, 100)}%
                                 </span>
-                              <% end %>
-                            </button>
+                              </div>
+
+                              <.form
+                                for={@layer_forms[layer]}
+                                id={"layer-form-#{layer}"}
+                                phx-change="set_layer_setting"
+                                phx-value-layer={Atom.to_string(layer)}
+                                class="mt-3 grid gap-2"
+                              >
+                                <.input
+                                  field={@layer_forms[layer][:visible]}
+                                  type="checkbox"
+                                  label={
+                                    if(layer == :terrain, do: "Base (always on)", else: "Show layer")
+                                  }
+                                  disabled={layer == :terrain}
+                                  class="h-4 w-4 rounded border border-white/20 bg-slate-950 text-amber-300 focus:ring-2 focus:ring-amber-300/40"
+                                />
+                                <.input
+                                  field={@layer_forms[layer][:opacity]}
+                                  type="range"
+                                  label="Opacity"
+                                  min="0"
+                                  max="100"
+                                  step="5"
+                                  phx-debounce="100"
+                                  class="h-2 w-full cursor-pointer appearance-none rounded-full bg-white/10 accent-amber-300"
+                                />
+                              </.form>
+                            </div>
                           <% end %>
                         </div>
                       </div>
@@ -805,12 +907,16 @@ defmodule MirrorWeb.MapLive do
                   phx-update="ignore"
                   data-map-width={@map_width}
                   data-map-height={@map_height}
+                  data-plane={Atom.to_string(@plane)}
                   data-layer={Atom.to_string(@active_layer)}
                   data-layer-type={layer_type(@active_layer)}
                   data-tiles={@encoded_layer}
                   data-terrain={@terrain_encoded}
                   data-terrain-flags={@terrain_flags_encoded}
                   data-minerals={@minerals_encoded}
+                  data-exploration={@exploration_encoded}
+                  data-landmass={@landmass_encoded}
+                  data-computed-adj-mask={@adj_mask_encoded}
                   data-render-mode={Atom.to_string(@render_mode)}
                   data-phase-index={@phase_index}
                   data-snapshot-mode={@snapshot_mode}
@@ -1572,6 +1678,32 @@ defmodule MirrorWeb.MapLive do
         ""
       end
 
+    exploration_encoded =
+      if plane_layers do
+        Base.encode64(plane_layers.exploration)
+      else
+        ""
+      end
+
+    landmass_encoded =
+      if plane_layers do
+        Base.encode64(plane_layers.landmass)
+      else
+        ""
+      end
+
+    adj_mask_encoded =
+      if plane_layers do
+        Base.encode64(plane_layers.computed_adj_mask)
+      else
+        ""
+      end
+
+    layer_visibility =
+      Map.get(state, :layer_visibility, default_layer_visibility(state.active_layer))
+
+    layer_opacity = Map.get(state, :layer_opacity, default_layer_opacity())
+
     assign(socket,
       state: state,
       plane_layers: plane_layers,
@@ -1579,10 +1711,15 @@ defmodule MirrorWeb.MapLive do
       terrain_encoded: terrain_encoded,
       terrain_flags_encoded: terrain_flags_encoded,
       minerals_encoded: minerals_encoded,
+      exploration_encoded: exploration_encoded,
+      landmass_encoded: landmass_encoded,
+      adj_mask_encoded: adj_mask_encoded,
       active_layer: state.active_layer,
       selection_value: Map.get(state.selection, state.active_layer, 0),
       layers: @layers,
       layer_labels: @layer_labels,
+      layer_visibility: layer_visibility,
+      layer_opacity: layer_opacity,
       map_width: MirrorMap.width(),
       map_height: MirrorMap.height(),
       render_mode: state.render_mode,
@@ -1609,6 +1746,8 @@ defmodule MirrorWeb.MapLive do
 
     phase_form = to_form(%{"index" => state.phase_index || 0}, as: :phase)
 
+    layer_forms = layer_forms(state)
+
     value_name_form =
       to_form(
         %{
@@ -1634,10 +1773,29 @@ defmodule MirrorWeb.MapLive do
       save_form: save_form,
       selection_form: selection_form,
       phase_form: phase_form,
+      layer_forms: layer_forms,
       value_name_form: value_name_form,
       bit_forms: bit_forms,
       bit_names: Enum.into(0..7, %{}, fn bit -> {bit, current_bit_name(state, bit)} end)
     )
+  end
+
+  defp layer_forms(state) do
+    visibility = Map.get(state, :layer_visibility, %{})
+    opacity = Map.get(state, :layer_opacity, %{})
+
+    Enum.into(@layers, %{}, fn layer ->
+      visible_value = Map.get(visibility, layer, layer == :terrain)
+      opacity_value = Map.get(opacity, layer, if(layer == :terrain, do: 100, else: 70))
+
+      form =
+        to_form(
+          %{"visible" => visible_value, "opacity" => opacity_value},
+          as: "layer_#{layer}"
+        )
+
+      {layer, form}
+    end)
   end
 
   defp current_value_name(%{dataset_id: nil}), do: ""
@@ -1829,12 +1987,19 @@ defmodule MirrorWeb.MapLive do
   defp push_map_state(socket) do
     state = socket.assigns.state
 
+    layer_visibility =
+      Map.get(state, :layer_visibility, default_layer_visibility(state.active_layer))
+
+    layer_opacity = Map.get(state, :layer_opacity, default_layer_opacity())
+
     push_event(socket, "map_state", %{
       layer: Atom.to_string(state.active_layer),
       layer_type: layer_type(state.active_layer),
       render_mode: Atom.to_string(state.render_mode),
       phase_index: effective_phase_index(state),
-      snapshot_mode: Map.get(state, :snapshot_mode, true)
+      snapshot_mode: Map.get(state, :snapshot_mode, true),
+      layer_visibility: stringify_layer_map(layer_visibility),
+      layer_opacity: stringify_layer_map(layer_opacity)
     })
   end
 
@@ -1845,6 +2010,11 @@ defmodule MirrorWeb.MapLive do
     layer = state.active_layer
     values = Base.encode64(Map.fetch!(plane_layers, layer))
 
+    layer_visibility =
+      Map.get(state, :layer_visibility, default_layer_visibility(state.active_layer))
+
+    layer_opacity = Map.get(state, :layer_opacity, default_layer_opacity())
+
     push_event(socket, "map_reload", %{
       plane: Atom.to_string(plane),
       layer: Atom.to_string(layer),
@@ -1853,9 +2023,14 @@ defmodule MirrorWeb.MapLive do
       terrain: Base.encode64(plane_layers.terrain),
       terrain_flags: Base.encode64(plane_layers.terrain_flags),
       minerals: Base.encode64(plane_layers.minerals),
+      exploration: Base.encode64(plane_layers.exploration),
+      landmass: Base.encode64(plane_layers.landmass),
+      computed_adj_mask: Base.encode64(plane_layers.computed_adj_mask),
       render_mode: Atom.to_string(state.render_mode),
       phase_index: effective_phase_index(state),
-      snapshot_mode: Map.get(state, :snapshot_mode, true)
+      snapshot_mode: Map.get(state, :snapshot_mode, true),
+      layer_visibility: stringify_layer_map(layer_visibility),
+      layer_opacity: stringify_layer_map(layer_opacity)
     })
   end
 
@@ -1933,9 +2108,11 @@ defmodule MirrorWeb.MapLive do
     terrain_water_values = Application.get_env(:mirror, :terrain_water_values, [0])
 
     push_event(socket, "tile_assets", %{
+      backend: Atom.to_string(Map.get(atlas, :backend, :lbx)),
       images: atlas.images,
       terrain_groups: atlas.terrain_groups,
       overlay_groups: atlas.overlay_groups,
+      momime: atlas.momime,
       terrain_names: terrain_names,
       terrain_flag_names: terrain_flag_names,
       terrain_water_values: terrain_water_values
@@ -2058,6 +2235,66 @@ defmodule MirrorWeb.MapLive do
     value in [true, "true", "1", 1, "on"]
   end
 
+  defp default_layer_visibility(active_layer) do
+    Enum.into(@layers, %{}, fn layer ->
+      visible = layer == :terrain || layer == active_layer
+      {layer, visible}
+    end)
+  end
+
+  defp default_layer_opacity do
+    Enum.into(@layers, %{}, fn layer ->
+      {layer, if(layer == :terrain, do: 100, else: 70)}
+    end)
+  end
+
+  defp normalize_layer_visibility(active_layer, visibility) when is_map(visibility) do
+    Enum.into(@layers, %{}, fn layer ->
+      default_visible = layer == :terrain || layer == active_layer
+      value = Map.get(visibility, layer, default_visible)
+      {layer, if(layer == :terrain, do: true, else: value)}
+    end)
+  end
+
+  defp normalize_layer_visibility(active_layer, _visibility) do
+    default_layer_visibility(active_layer)
+  end
+
+  defp normalize_layer_opacity(opacity) when is_map(opacity) do
+    defaults = default_layer_opacity()
+
+    Enum.into(@layers, %{}, fn layer ->
+      {layer, Map.get(opacity, layer, Map.fetch!(defaults, layer))}
+    end)
+  end
+
+  defp normalize_layer_opacity(_opacity), do: default_layer_opacity()
+
+  defp ensure_layer_visible(state, layer) do
+    visibility = Map.get(state, :layer_visibility, default_layer_visibility(state.active_layer))
+    visibility = visibility |> Map.put(:terrain, true) |> Map.put(layer, true)
+    Map.put(state, :layer_visibility, visibility)
+  end
+
+  defp parse_opacity(value) when is_integer(value) do
+    value |> min(100) |> max(0)
+  end
+
+  defp parse_opacity(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {int, _} -> parse_opacity(int)
+      :error -> 100
+    end
+  end
+
+  defp parse_opacity(_value), do: 100
+
+  defp stringify_layer_map(map) do
+    Enum.into(map || %{}, %{}, fn {key, value} ->
+      {to_string(key), value}
+    end)
+  end
+
   defp normalize_state(nil) do
     %{
       save: nil,
@@ -2076,27 +2313,38 @@ defmodule MirrorWeb.MapLive do
       phase_loop_len: nil,
       phase_loop_status: :unknown,
       phase_loop_detecting: false,
+      layer_visibility: default_layer_visibility(:terrain),
+      layer_opacity: default_layer_opacity(),
       engine_session_id: nil,
       engine_player_id: :observer
     }
   end
 
   defp normalize_state(state) do
+    state =
+      state
+      |> Map.put_new(:active_layer, :terrain)
+      |> Map.put_new(:selection, default_selection())
+      |> Map.put_new(:history, %{arcanus: [], myrror: []})
+      |> Map.put_new(:redo, %{arcanus: [], myrror: []})
+      |> Map.put_new(:render_mode, :tiles)
+      |> Map.put_new(:phase_index, 0)
+      |> Map.put_new(:snapshot_mode, true)
+      |> Map.put_new(:snapshot_values, %{})
+      |> Map.put_new(:original_planes, Map.get(state, :save) && Map.get(state.save, :planes))
+      |> Map.put_new(:phase_loop_len, nil)
+      |> Map.put_new(:phase_loop_status, :unknown)
+      |> Map.update(:phase_loop_status, :unknown, &normalize_phase_loop_status/1)
+      |> Map.put_new(:phase_loop_detecting, false)
+      |> Map.put_new(:engine_session_id, nil)
+      |> Map.put_new(:engine_player_id, :observer)
+
+    visibility = normalize_layer_visibility(state.active_layer, Map.get(state, :layer_visibility))
+    opacity = normalize_layer_opacity(Map.get(state, :layer_opacity))
+
     state
-    |> Map.put_new(:selection, default_selection())
-    |> Map.put_new(:history, %{arcanus: [], myrror: []})
-    |> Map.put_new(:redo, %{arcanus: [], myrror: []})
-    |> Map.put_new(:render_mode, :tiles)
-    |> Map.put_new(:phase_index, 0)
-    |> Map.put_new(:snapshot_mode, true)
-    |> Map.put_new(:snapshot_values, %{})
-    |> Map.put_new(:original_planes, state.save && state.save.planes)
-    |> Map.put_new(:phase_loop_len, nil)
-    |> Map.put_new(:phase_loop_status, :unknown)
-    |> Map.update(:phase_loop_status, :unknown, &normalize_phase_loop_status/1)
-    |> Map.put_new(:phase_loop_detecting, false)
-    |> Map.put_new(:engine_session_id, nil)
-    |> Map.put_new(:engine_player_id, :observer)
+    |> Map.put(:layer_visibility, visibility)
+    |> Map.put(:layer_opacity, opacity)
   end
 
   defp ensure_engine_session(state, session_id, connected?) do
