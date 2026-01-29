@@ -153,6 +153,8 @@ defmodule Mirror.TileAtlas do
     end
   end
 
+  @fallback_tile_window 256
+
   defp find_default_lbx(lbx_files) do
     Enum.find(lbx_files, fn name ->
       String.downcase(name) == "compix.lbx"
@@ -176,34 +178,52 @@ defmodule Mirror.TileAtlas do
   end
 
   defp build_tile_pool(lbx, entries, palette, images, tile_size, target_count) do
-    Enum.reduce_while(entries, {images, []}, fn entry, {images_acc, pool} ->
-      if entry.type == :image do
-        case TileCache.fetch(lbx, entry.index, palette: palette) do
-          {:ok, image} ->
-            frame = List.first(image.frames)
+    {images, pool, _window_start, _window_end} =
+      Enum.reduce_while(entries, {images, [], nil, nil}, fn entry,
+                                                            {images_acc, pool, window_start,
+                                                             window_end} ->
+        cond do
+          entry.type != :image ->
+            {:cont, {images_acc, pool, window_start, window_end}}
 
-            if frame && frame.width == tile_size && frame.height == tile_size do
-              key = TileCache.key(lbx.path, entry.index, frame.index, image.palette_hash)
-              images_acc = Map.put_new(images_acc, key, encode_image(frame))
+          window_end && entry.index > window_end ->
+            {:halt, {images_acc, pool, window_start, window_end}}
 
-              pool = pool ++ [%{"key" => key, "width" => frame.width, "height" => frame.height}]
+          true ->
+            case TileCache.fetch(lbx, entry.index, palette: palette) do
+              {:ok, image} ->
+                frame = List.first(image.frames)
 
-              if length(pool) >= target_count do
-                {:halt, {images_acc, pool}}
-              else
-                {:cont, {images_acc, pool}}
-              end
-            else
-              {:cont, {images_acc, pool}}
+                if frame && frame.width == tile_size && frame.height == tile_size do
+                  window_start = window_start || entry.index
+                  window_end = window_end || window_start + @fallback_tile_window - 1
+
+                  if entry.index > window_end do
+                    {:halt, {images_acc, pool, window_start, window_end}}
+                  else
+                    key = TileCache.key(lbx.path, entry.index, frame.index, image.palette_hash)
+                    images_acc = Map.put_new(images_acc, key, encode_image(frame))
+
+                    pool =
+                      pool ++ [%{"key" => key, "width" => frame.width, "height" => frame.height}]
+
+                    if length(pool) >= target_count do
+                      {:halt, {images_acc, pool, window_start, window_end}}
+                    else
+                      {:cont, {images_acc, pool, window_start, window_end}}
+                    end
+                  end
+                else
+                  {:cont, {images_acc, pool, window_start, window_end}}
+                end
+
+              _ ->
+                {:cont, {images_acc, pool, window_start, window_end}}
             end
-
-          _ ->
-            {:cont, {images_acc, pool}}
         end
-      else
-        {:cont, {images_acc, pool}}
-      end
-    end)
+      end)
+
+    {images, pool}
   end
 
   defp build_terrain_groups([]), do: %{}

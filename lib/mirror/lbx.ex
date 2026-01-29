@@ -687,7 +687,12 @@ defmodule Mirror.LBX do
     palette_bin = Palette.to_binary(palette)
 
     for <<idx::unsigned-integer-size(8) <- indices>>, into: <<>> do
-      :binary.part(palette_bin, idx * 4, 4)
+      <<r::unsigned-integer-size(8), g::unsigned-integer-size(8), b::unsigned-integer-size(8),
+        a::unsigned-integer-size(8)>> =
+        :binary.part(palette_bin, idx * 4, 4)
+
+      <<b::unsigned-integer-size(8), g::unsigned-integer-size(8), r::unsigned-integer-size(8),
+        a::unsigned-integer-size(8)>>
     end
   end
 

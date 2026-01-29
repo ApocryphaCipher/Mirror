@@ -9,7 +9,7 @@ defmodule Mirror.TileCache do
   alias Mirror.LBX.{Image, Palette}
   alias Mirror.Paths
 
-  @decoder_version 2
+  @decoder_version 3
 
   def fetch(%LBX{} = lbx, index, opts \\ []) do
     palette_opt = Keyword.get(opts, :palette, :auto)

@@ -519,13 +519,14 @@ defmodule MirrorWeb.MapLive do
                 </div>
               </div>
 
-              <div class="relative bg-slate-950">
+              <div class="relative overflow-auto bg-slate-950">
                 <canvas
                   id="map-canvas"
                   phx-hook="MapCanvas"
                   phx-update="ignore"
                   data-map-width={@map_width}
                   data-map-height={@map_height}
+                  data-layer={Atom.to_string(@active_layer)}
                   data-layer-type={layer_type(@active_layer)}
                   data-tiles={@encoded_layer}
                   data-terrain={@terrain_encoded}
@@ -533,7 +534,7 @@ defmodule MirrorWeb.MapLive do
                   data-minerals={@minerals_encoded}
                   data-render-mode={Atom.to_string(@render_mode)}
                   data-tile-size="32"
-                  class="absolute inset-0 h-full w-full"
+                  class="block"
                 >
                 </canvas>
               </div>

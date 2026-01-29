@@ -5,6 +5,7 @@ const MapCanvas = {
     this.mapHeight = parseInt(this.el.dataset.mapHeight || "40", 10)
     this.layerType = this.el.dataset.layerType || "u8"
     this.renderMode = this.el.dataset.renderMode || "values"
+    this.activeLayer = this.el.dataset.layer || "terrain"
     this.values = this.decodeTiles(this.el.dataset.tiles || "", this.layerType)
     this.terrainValues = this.decodeTiles(this.el.dataset.terrain || "", "u16")
     this.terrainFlags = this.decodeTiles(this.el.dataset.terrainFlags || "", "u8")
@@ -22,6 +23,16 @@ const MapCanvas = {
     this.resizeCanvas()
     this.renderAll()
 
+    this.handleResize = () => {
+      const nextDpr = window.devicePixelRatio || 1
+      const nextDeviceTile = Math.max(1, Math.round(this.tileSize * nextDpr))
+      if (nextDeviceTile !== this.deviceTileSize) {
+        this.resizeCanvas()
+        this.renderAll()
+      }
+    }
+    window.addEventListener("resize", this.handleResize)
+
     this.el.addEventListener("contextmenu", event => event.preventDefault())
     this.el.addEventListener("pointerdown", this.onPointerDown.bind(this))
     this.el.addEventListener("pointermove", this.onPointerMove.bind(this))
@@ -30,15 +41,30 @@ const MapCanvas = {
     this.el.addEventListener("wheel", this.onWheel.bind(this), {passive: false})
 
     this.handleEvent("map_state", payload => {
+      let needsRender = false
+      if (payload.layer) {
+        if (payload.layer !== this.activeLayer) {
+          this.activeLayer = payload.layer
+          needsRender = true
+        }
+      }
       if (payload.layer_type) {
         this.layerType = payload.layer_type
+        needsRender = true
       }
       if (payload.render_mode) {
         this.renderMode = payload.render_mode
+        needsRender = true
+      }
+      if (needsRender) {
+        this.renderAll()
       }
     })
 
     this.handleEvent("map_reload", payload => {
+      if (payload.layer) {
+        this.activeLayer = payload.layer
+      }
       this.layerType = payload.layer_type || this.layerType
       this.values = this.decodeTiles(payload.values || "", this.layerType)
       if (payload.terrain) {
@@ -72,7 +98,7 @@ const MapCanvas = {
         if (payload.layer === "minerals") {
           this.mineralsValues[idx] = update.value
         }
-        if (payload.layer === "terrain" && this.renderMode === "tiles" && this.hasTileAssets()) {
+        if (this.activeLayer === "terrain" && this.renderMode === "tiles" && this.hasTileAssets()) {
           this.redrawNeighborhood(update.x, update.y)
         } else {
           this.drawTile(update.x, update.y, update.value)
@@ -109,9 +135,33 @@ const MapCanvas = {
     })
   },
 
+  destroyed() {
+    if (this.handleResize) {
+      window.removeEventListener("resize", this.handleResize)
+    }
+  },
+
   resizeCanvas() {
-    this.el.width = this.mapWidth * this.tileSize
-    this.el.height = this.mapHeight * this.tileSize
+    const dpr = window.devicePixelRatio || 1
+    const deviceTileSize = Math.max(1, Math.round(this.tileSize * dpr))
+    const cssWidth = this.mapWidth * this.tileSize
+    const cssHeight = this.mapHeight * this.tileSize
+    const deviceWidth = this.mapWidth * deviceTileSize
+    const deviceHeight = this.mapHeight * deviceTileSize
+
+    this.deviceTileSize = deviceTileSize
+    this.dpr = deviceTileSize / this.tileSize
+    this.el.style.width = `${cssWidth}px`
+    this.el.style.height = `${cssHeight}px`
+
+    if (this.el.width !== deviceWidth) {
+      this.el.width = deviceWidth
+    }
+    if (this.el.height !== deviceHeight) {
+      this.el.height = deviceHeight
+    }
+
+    this.ctx.imageSmoothingEnabled = false
   },
 
   decodeTiles(encoded, layerType) {
@@ -137,15 +187,34 @@ const MapCanvas = {
 
   drawTile(x, y, value) {
     if (this.renderMode === "tiles" && this.hasTileAssets()) {
-      this.drawTileArt(x, y)
+      this.drawTileForLayer(x, y, value)
     } else {
       this.drawValueTile(x, y, value)
     }
   },
+  drawTileForLayer(x, y, value) {
+    if (this.activeLayer === "terrain") {
+      this.drawTerrainTile(x, y)
+      return
+    }
+
+    if (this.activeLayer === "minerals") {
+      this.drawMineralTile(x, y)
+      return
+    }
+
+    if (this.activeLayer === "terrain_flags") {
+      this.drawValueTile(x, y, value)
+      return
+    }
+
+    this.drawValueTile(x, y, value)
+  },
 
   renderAll() {
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0)
     if (this.renderMode === "tiles" && this.hasTileAssets()) {
-      this.renderTiles()
+      this.renderTilesForLayer()
     } else {
       this.renderValues()
     }
@@ -153,12 +222,32 @@ const MapCanvas = {
 
   drawValueTile(x, y, value) {
     this.ctx.fillStyle = this.colorForValue(value)
+    const size = this.deviceTileSize
     this.ctx.fillRect(
-      x * this.tileSize,
-      y * this.tileSize,
-      this.tileSize,
-      this.tileSize
+      x * size,
+      y * size,
+      size,
+      size
     )
+  },
+
+  renderTilesForLayer() {
+    if (this.activeLayer === "terrain") {
+      this.renderTerrainTiles()
+      return
+    }
+
+    if (this.activeLayer === "minerals") {
+      this.renderMineralTiles()
+      return
+    }
+
+    if (this.activeLayer === "terrain_flags") {
+      this.renderFlagTiles()
+      return
+    }
+
+    this.renderValues()
   },
 
   renderValues() {
@@ -170,10 +259,32 @@ const MapCanvas = {
     }
   },
 
+  renderTerrainTiles() {
+    for (let y = 0; y < this.mapHeight; y++) {
+      for (let x = 0; x < this.mapWidth; x++) {
+        this.drawTerrainTile(x, y)
+      }
+    }
+  },
+
   renderTiles() {
     for (let y = 0; y < this.mapHeight; y++) {
       for (let x = 0; x < this.mapWidth; x++) {
         this.drawTileArt(x, y)
+      }
+    }
+  },
+
+  renderFlagTiles() {
+    this.renderValues()
+  },
+
+  renderMineralTiles() {
+    this.fillBackground()
+
+    for (let y = 0; y < this.mapHeight; y++) {
+      for (let x = 0; x < this.mapWidth; x++) {
+        this.drawMineralTile(x, y)
       }
     }
   },
@@ -199,7 +310,23 @@ const MapCanvas = {
     return result
   },
 
-  drawTileArt(x, y) {
+  fillBackground() {
+    this.ctx.fillStyle = "#020617"
+    this.ctx.fillRect(0, 0, this.el.width, this.el.height)
+  },
+
+  fillTileBackground(x, y) {
+    const size = this.deviceTileSize
+    this.ctx.fillStyle = "#020617"
+    this.ctx.fillRect(x * size, y * size, size, size)
+  },
+
+  drawTerrainTile(x, y) {
+    this.drawTileArt(x, y, {includeMinerals: false})
+  },
+
+  drawTileArt(x, y, options = {}) {
+    const includeMinerals = options.includeMinerals !== false
     const idx = y * this.mapWidth + x
     const terrainValue = this.terrainValues[idx] || 0
     const terrainType = terrainValue & 0xff
@@ -214,14 +341,26 @@ const MapCanvas = {
       return
     }
 
+    if (includeMinerals) {
+      this.drawMineralOverlay(x, y)
+    }
+  },
+
+  drawMineralTile(x, y) {
+    this.fillTileBackground(x, y)
+    this.drawMineralOverlay(x, y)
+  },
+
+  drawMineralOverlay(x, y) {
+    const idx = y * this.mapWidth + x
     const mineral = this.mineralsValues[idx] || 0
-    if (mineral > 0) {
-      const overlayEntries =
-        this.overlayGroups[`resource_${mineral}`] || this.overlayGroups["resource"] || []
-      const overlayEntry = this.pickEntry(overlayEntries, 0, idx)
-      if (overlayEntry) {
-        this.drawImageEntry(overlayEntry, x, y)
-      }
+    if (mineral <= 0) return
+
+    const overlayEntries =
+      this.overlayGroups[`resource_${mineral}`] || this.overlayGroups["resource"] || []
+    const overlayEntry = this.pickEntry(overlayEntries, 0, idx)
+    if (overlayEntry) {
+      this.drawImageEntry(overlayEntry, x, y)
     }
   },
 
@@ -239,12 +378,13 @@ const MapCanvas = {
   drawImageEntry(entry, x, y) {
     const image = this.tileImages[entry.key]
     if (!image) return false
+    const size = this.deviceTileSize
     this.ctx.drawImage(
       image.canvas,
-      x * this.tileSize,
-      y * this.tileSize,
-      this.tileSize,
-      this.tileSize
+      x * size,
+      y * size,
+      size,
+      size
     )
     return true
   },
@@ -287,7 +427,7 @@ const MapCanvas = {
         if (ny < 0 || ny >= this.mapHeight) continue
         if (nx < 0) nx += this.mapWidth
         if (nx >= this.mapWidth) nx -= this.mapWidth
-        this.drawTileArt(nx, ny)
+        this.drawTerrainTile(nx, ny)
       }
     }
   },
@@ -305,8 +445,8 @@ const MapCanvas = {
     const scaleY = this.el.height / rect.height
     const px = (event.clientX - rect.left) * scaleX
     const py = (event.clientY - rect.top) * scaleY
-    const x = Math.floor(px / this.tileSize)
-    const y = Math.floor(py / this.tileSize)
+    const x = Math.floor(px / this.deviceTileSize)
+    const y = Math.floor(py / this.deviceTileSize)
 
     if (x < 0 || y < 0 || x >= this.mapWidth || y >= this.mapHeight) {
       return null
