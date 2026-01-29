@@ -1,5 +1,6 @@
 defmodule MirrorWeb.MapLive do
   use MirrorWeb, :live_view
+  import Bitwise
 
   alias Mirror.{Paths, SaveFile, SessionStore, Stats, TileAtlas}
   alias Mirror.Map, as: MirrorMap
@@ -14,6 +15,7 @@ defmodule MirrorWeb.MapLive do
   ]
 
   @u16_layers [:terrain]
+  @u8_layers @layers -- @u16_layers -- [:computed_adj_mask]
 
   @layer_labels %{
     terrain: "Terrain (u16)",
@@ -81,6 +83,7 @@ defmodule MirrorWeb.MapLive do
         state = %{
           save: save,
           planes: planes,
+          original_planes: save.planes,
           active_layer: :terrain,
           selection: default_selection(),
           history: %{arcanus: [], myrror: []},
@@ -90,6 +93,7 @@ defmodule MirrorWeb.MapLive do
           render_mode: socket.assigns.state.render_mode || :tiles,
           phase_index: socket.assigns.state.phase_index || 0,
           snapshot_mode: Map.get(socket.assigns.state, :snapshot_mode, true),
+          snapshot_values: %{},
           phase_loop_len: Map.get(socket.assigns.state, :phase_loop_len),
           phase_loop_status:
             normalize_phase_loop_status(
@@ -164,6 +168,7 @@ defmodule MirrorWeb.MapLive do
       socket
       |> assign_from_state(state)
       |> assign_forms()
+      |> refresh_hover()
 
     socket =
       if connected?(socket) do
@@ -210,6 +215,32 @@ defmodule MirrorWeb.MapLive do
     end
 
     {:noreply, assign_forms(socket)}
+  end
+
+  def handle_event("inspect_toggle_bit", %{"bit" => bit}, socket) do
+    bit = parse_int(bit, 0)
+    {:noreply, update_inspected_tile(socket, fn value -> bxor(value, 1 <<< bit) end)}
+  end
+
+  def handle_event("inspect_set_value", %{"value" => value}, socket) do
+    value = parse_int(value, 0)
+    {:noreply, update_inspected_tile(socket, fn _value -> value end)}
+  end
+
+  def handle_event("inspect_invert", _params, socket) do
+    {:noreply, update_inspected_tile(socket, fn value -> bxor(value, 0xFF) end)}
+  end
+
+  def handle_event("inspect_revert", _params, socket) do
+    {:noreply, revert_inspected_tile(socket)}
+  end
+
+  def handle_event("inspect_snapshot_a", _params, socket) do
+    {:noreply, snapshot_inspected_value(socket)}
+  end
+
+  def handle_event("inspect_restore_a", _params, socket) do
+    {:noreply, restore_inspected_snapshot(socket)}
   end
 
   def handle_event("map_pointer", params, socket) do
@@ -830,6 +861,183 @@ defmodule MirrorWeb.MapLive do
                 </div>
 
                 <div class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-lg shadow-black/60 backdrop-blur pointer-events-auto">
+                  <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Tile inspector</p>
+                  <h3 class="mt-2 text-lg font-semibold text-white">Bit flag lab</h3>
+                  <div class="mt-4 space-y-4 text-sm text-slate-300">
+                    <%= if @state.save && @hover do %>
+                      <% value = @hover.layer_value || 0 %>
+                      <% original_value = @hover.original_value %>
+                      <% snapshot_value = snapshot_value(@state, @plane, @active_layer) %>
+                      <% unsupported_layer = not u8_layer?(@active_layer) %>
+                      <div class="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+                        <div class="flex flex-wrap items-center justify-between gap-3 text-[0.65rem] uppercase tracking-[0.2em] text-slate-500">
+                          <span>Tile ({@hover.x}, {@hover.y})</span>
+                          <span>{@layer_labels[@active_layer]}</span>
+                        </div>
+                        <div class="mt-3 flex flex-wrap items-end justify-between gap-4">
+                          <div>
+                            <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Current</p>
+                            <div class="flex items-baseline gap-3">
+                              <span class="text-3xl font-semibold text-white">{value}</span>
+                              <span class="text-sm font-semibold text-slate-400">
+                                {hex_byte(value)}
+                              </span>
+                            </div>
+                          </div>
+                          <div class="text-xs text-slate-500">
+                            <%= if is_integer(original_value) do %>
+                              <p class="uppercase tracking-[0.2em] text-slate-500">Original</p>
+                              <p class="text-sm text-slate-300">
+                                {original_value} ({hex_byte(original_value)})
+                              </p>
+                            <% else %>
+                              <p class="text-slate-600">Original value unavailable</p>
+                            <% end %>
+                          </div>
+                        </div>
+                      </div>
+
+                      <%= if unsupported_layer do %>
+                        <p class="text-xs text-slate-500">
+                          Bit toggles only apply to u8 layers. Switch to Terrain Flags, Minerals,
+                          Exploration, or Landmass.
+                        </p>
+                      <% else %>
+                        <div class="grid gap-2 sm:grid-cols-2">
+                          <%= for bit <- 0..7 do %>
+                            <% bit_on = bit_set?(value, bit) %>
+                            <% bit_name = Map.get(@bit_names, bit) %>
+                            <button
+                              id={"inspect-bit-#{bit}"}
+                              type="button"
+                              phx-click="inspect_toggle_bit"
+                              phx-value-bit={bit}
+                              class={[
+                                "group flex items-center justify-between rounded-xl border px-3 py-2 text-xs transition",
+                                bit_on &&
+                                  "border-emerald-300/50 bg-emerald-300/10 text-emerald-100",
+                                not bit_on &&
+                                  "border-white/10 text-slate-300 hover:border-white/30"
+                              ]}
+                              aria-pressed={bit_on}
+                            >
+                              <div class="flex items-center gap-3">
+                                <span class={[
+                                  "inline-flex h-6 w-6 items-center justify-center rounded-lg border text-[0.65rem] font-semibold",
+                                  bit_on &&
+                                    "border-emerald-300/60 bg-emerald-300/20 text-emerald-100",
+                                  not bit_on && "border-white/10 text-slate-400"
+                                ]}>
+                                  {if bit_on, do: "1", else: "0"}
+                                </span>
+                                <div>
+                                  <p class="text-[0.65rem] uppercase tracking-[0.2em] text-slate-400">
+                                    Bit {bit}
+                                  </p>
+                                  <p class="text-xs text-slate-500">
+                                    {if bit_name in [nil, ""], do: "Unlabeled", else: bit_name}
+                                  </p>
+                                </div>
+                              </div>
+                              <span class="text-[0.6rem] uppercase tracking-[0.2em] text-slate-500">
+                                Toggle
+                              </span>
+                            </button>
+                          <% end %>
+                        </div>
+
+                        <div class="grid gap-2 sm:grid-cols-2">
+                          <button
+                            id="inspect-set-zero"
+                            type="button"
+                            phx-click="inspect_set_value"
+                            phx-value-value="0"
+                            class="rounded-xl border border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200 transition hover:border-white/30"
+                          >
+                            Set 0
+                          </button>
+                          <button
+                            id="inspect-set-255"
+                            type="button"
+                            phx-click="inspect_set_value"
+                            phx-value-value="255"
+                            class="rounded-xl border border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200 transition hover:border-white/30"
+                          >
+                            Set 255
+                          </button>
+                          <button
+                            id="inspect-invert"
+                            type="button"
+                            phx-click="inspect_invert"
+                            class="rounded-xl border border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200 transition hover:border-white/30"
+                          >
+                            Invert
+                          </button>
+                          <button
+                            id="inspect-revert"
+                            type="button"
+                            phx-click="inspect_revert"
+                            disabled={is_nil(original_value)}
+                            class={[
+                              "rounded-xl border px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition",
+                              is_nil(original_value) &&
+                                "cursor-not-allowed border-white/5 text-slate-600",
+                              not is_nil(original_value) &&
+                                "border-white/10 text-slate-200 hover:border-white/30"
+                            ]}
+                          >
+                            Revert tile
+                          </button>
+                        </div>
+
+                        <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-3">
+                          <div class="grid gap-2 sm:grid-cols-2">
+                            <button
+                              id="inspect-snapshot-a"
+                              type="button"
+                              phx-click="inspect_snapshot_a"
+                              class="rounded-xl border border-white/10 px-3 py-2 text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-200 transition hover:border-white/30"
+                            >
+                              Snapshot A
+                            </button>
+                            <button
+                              id="inspect-restore-a"
+                              type="button"
+                              phx-click="inspect_restore_a"
+                              disabled={is_nil(snapshot_value)}
+                              class={[
+                                "rounded-xl border px-3 py-2 text-[0.65rem] font-semibold uppercase tracking-[0.2em] transition",
+                                is_nil(snapshot_value) &&
+                                  "cursor-not-allowed border-white/5 text-slate-600",
+                                not is_nil(snapshot_value) &&
+                                  "border-white/10 text-slate-200 hover:border-white/30"
+                              ]}
+                            >
+                              Restore A
+                            </button>
+                          </div>
+                          <%= if is_integer(snapshot_value) do %>
+                            <p class="mt-2 text-[0.65rem] uppercase tracking-[0.2em] text-slate-500">
+                              A: {snapshot_value} ({hex_byte(snapshot_value)})
+                            </p>
+                          <% else %>
+                            <p class="mt-2 text-[0.65rem] uppercase tracking-[0.2em] text-slate-600">
+                              A: Empty
+                            </p>
+                          <% end %>
+                        </div>
+                      <% end %>
+                    <% else %>
+                      <%= if @state.save do %>
+                        <p class="text-slate-500">Hover a tile to inspect bit flags.</p>
+                      <% else %>
+                        <p class="text-slate-500">Load a save to inspect tile flags.</p>
+                      <% end %>
+                    <% end %>
+                  </div>
+                </div>
+
+                <div class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-lg shadow-black/60 backdrop-blur pointer-events-auto">
                   <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Bit names</p>
                   <div class="mt-4 space-y-3">
                     <%= for {bit, form} <- @bit_forms do %>
@@ -1400,7 +1608,8 @@ defmodule MirrorWeb.MapLive do
       selection_form: selection_form,
       phase_form: phase_form,
       value_name_form: value_name_form,
-      bit_forms: bit_forms
+      bit_forms: bit_forms,
+      bit_names: Enum.into(0..7, %{}, fn bit -> {bit, current_bit_name(state, bit)} end)
     )
   end
 
@@ -1429,6 +1638,14 @@ defmodule MirrorWeb.MapLive do
         plane_layers = Map.fetch!(state.planes, plane)
         terrain_value = MirrorMap.get_tile_u16_le(plane_layers.terrain, x, y)
         adj = MirrorMap.get_tile_u8(plane_layers.computed_adj_mask, x, y)
+        layer = state.active_layer
+
+        layer_value =
+          if layer in @u16_layers do
+            MirrorMap.get_tile_u16_le(plane_layers[layer], x, y)
+          else
+            MirrorMap.get_tile_u8(plane_layers[layer], x, y)
+          end
 
         rays =
           Mirror.Map.Rays.ray_observations(plane_layers.terrain, x, y)
@@ -1439,6 +1656,8 @@ defmodule MirrorWeb.MapLive do
           y: y,
           terrain: terrain_value,
           terrain_class: MirrorMap.terrain_class(terrain_value),
+          layer_value: layer_value,
+          original_value: original_tile_value(state, plane, layer, x, y),
           adj_mask: adj,
           rays: rays
         }
@@ -1447,6 +1666,119 @@ defmodule MirrorWeb.MapLive do
       end
 
     assign(socket, :hover, hover)
+  end
+
+  defp refresh_hover(socket) do
+    case socket.assigns.hover do
+      %{x: x, y: y} -> assign_hover(socket, x, y)
+      _ -> socket
+    end
+  end
+
+  defp update_inspected_tile(socket, updater) do
+    state = socket.assigns.state
+    layer = state.active_layer
+    plane = socket.assigns.plane
+
+    with true <- state.save != nil,
+         true <- u8_layer?(layer),
+         %{x: x, y: y} <- socket.assigns.hover,
+         true <- valid_coord?(x, y),
+         value when is_integer(value) <- tile_value(state, plane, layer, x, y) do
+      updated_value = updater.(value)
+      apply_single_tile_change(socket, layer, x, y, clamp_value(layer, updated_value))
+    else
+      _ -> socket
+    end
+  end
+
+  defp revert_inspected_tile(socket) do
+    state = socket.assigns.state
+    layer = state.active_layer
+    plane = socket.assigns.plane
+
+    with true <- state.save != nil,
+         true <- u8_layer?(layer),
+         %{x: x, y: y} <- socket.assigns.hover,
+         true <- valid_coord?(x, y),
+         value when is_integer(value) <- original_tile_value(state, plane, layer, x, y) do
+      apply_single_tile_change(socket, layer, x, y, clamp_value(layer, value))
+    else
+      _ -> socket
+    end
+  end
+
+  defp snapshot_inspected_value(socket) do
+    state = socket.assigns.state
+    layer = state.active_layer
+    plane = socket.assigns.plane
+
+    with true <- state.save != nil,
+         true <- u8_layer?(layer),
+         %{x: x, y: y} <- socket.assigns.hover,
+         true <- valid_coord?(x, y),
+         value when is_integer(value) <- tile_value(state, plane, layer, x, y) do
+      snapshot_values =
+        state.snapshot_values
+        |> Map.put({plane, layer}, value)
+
+      updated_state = %{state | snapshot_values: snapshot_values}
+      SessionStore.put(socket.assigns.session_id, updated_state)
+      assign(socket, :state, updated_state)
+    else
+      _ -> socket
+    end
+  end
+
+  defp restore_inspected_snapshot(socket) do
+    state = socket.assigns.state
+    layer = state.active_layer
+    plane = socket.assigns.plane
+
+    with true <- state.save != nil,
+         true <- u8_layer?(layer),
+         %{x: x, y: y} <- socket.assigns.hover,
+         true <- valid_coord?(x, y),
+         value when is_integer(value) <- snapshot_value(state, plane, layer) do
+      apply_single_tile_change(socket, layer, x, y, clamp_value(layer, value))
+    else
+      _ -> socket
+    end
+  end
+
+  defp snapshot_value(state, plane, layer) do
+    state.snapshot_values
+    |> Map.get({plane, layer})
+  end
+
+  defp apply_single_tile_change(socket, layer, x, y, value) do
+    state = socket.assigns.state
+    plane = socket.assigns.plane
+
+    {updated_state, change, updates} = do_apply_change(state, plane, layer, x, y, value)
+
+    case change do
+      nil ->
+        socket
+
+      {prev, new} ->
+        stroke = %{layer: layer, changes: [{x, y, prev, new}]}
+        history = [stroke | Map.get(updated_state.history, plane, [])]
+        redo = Map.put(updated_state.redo, plane, [])
+
+        updated_state = %{
+          updated_state
+          | history: Map.put(updated_state.history, plane, history),
+            redo: redo
+        }
+
+        SessionStore.put(socket.assigns.session_id, updated_state)
+
+        socket
+        |> assign(:state, updated_state)
+        |> maybe_push_updates(layer, updates)
+        |> assign_hover(x, y)
+    end
   end
 
   defp push_map_state(socket) do
@@ -1538,6 +1870,38 @@ defmodule MirrorWeb.MapLive do
     if layer in @u16_layers, do: "u16", else: "u8"
   end
 
+  defp u8_layer?(layer), do: layer in @u8_layers
+
+  defp bit_set?(value, bit) when is_integer(value) and is_integer(bit) do
+    (value &&& 1 <<< bit) != 0
+  end
+
+  defp bit_set?(_value, _bit), do: false
+
+  defp hex_byte(value) when is_integer(value) do
+    value
+    |> Integer.to_string(16)
+    |> String.upcase()
+    |> String.pad_leading(2, "0")
+    |> then(&("0x" <> &1))
+  end
+
+  defp hex_byte(_value), do: "0x00"
+
+  defp original_tile_value(state, plane, layer, x, y) do
+    with planes when is_map(planes) <- Map.get(state, :original_planes),
+         plane_layers when is_map(plane_layers) <- Map.get(planes, plane),
+         binary when is_binary(binary) <- Map.get(plane_layers, layer) do
+      if layer in @u16_layers do
+        MirrorMap.get_tile_u16_le(binary, x, y)
+      else
+        MirrorMap.get_tile_u8(binary, x, y)
+      end
+    else
+      _ -> nil
+    end
+  end
+
   defp tool_and_layer(socket, button, mods) do
     layer = socket.assigns.state.active_layer
 
@@ -1581,6 +1945,7 @@ defmodule MirrorWeb.MapLive do
     %{
       save: nil,
       planes: %{},
+      original_planes: nil,
       active_layer: :terrain,
       selection: default_selection(),
       history: %{arcanus: [], myrror: []},
@@ -1590,6 +1955,7 @@ defmodule MirrorWeb.MapLive do
       render_mode: :tiles,
       phase_index: 0,
       snapshot_mode: true,
+      snapshot_values: %{},
       phase_loop_len: nil,
       phase_loop_status: :unknown,
       phase_loop_detecting: false
@@ -1604,6 +1970,8 @@ defmodule MirrorWeb.MapLive do
     |> Map.put_new(:render_mode, :tiles)
     |> Map.put_new(:phase_index, 0)
     |> Map.put_new(:snapshot_mode, true)
+    |> Map.put_new(:snapshot_values, %{})
+    |> Map.put_new(:original_planes, state.save && state.save.planes)
     |> Map.put_new(:phase_loop_len, nil)
     |> Map.put_new(:phase_loop_status, :unknown)
     |> Map.update(:phase_loop_status, :unknown, &normalize_phase_loop_status/1)
