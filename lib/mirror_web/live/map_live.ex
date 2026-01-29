@@ -1929,12 +1929,16 @@ defmodule MirrorWeb.MapLive do
 
     atlas = socket.assigns.tile_assets
     terrain_names = terrain_name_map(state)
+    terrain_flag_names = terrain_flag_name_map(state)
+    terrain_water_values = Application.get_env(:mirror, :terrain_water_values, [0])
 
     push_event(socket, "tile_assets", %{
       images: atlas.images,
       terrain_groups: atlas.terrain_groups,
       overlay_groups: atlas.overlay_groups,
-      terrain_names: terrain_names
+      terrain_names: terrain_names,
+      terrain_flag_names: terrain_flag_names,
+      terrain_water_values: terrain_water_values
     })
   end
 
@@ -1946,6 +1950,18 @@ defmodule MirrorWeb.MapLive do
       case Stats.value_name(state.dataset_id, :terrain, value) do
         nil -> acc
         name -> Map.put(acc, Integer.to_string(value), name)
+      end
+    end)
+  end
+
+  defp terrain_flag_name_map(%{dataset_id: nil}), do: %{}
+
+  defp terrain_flag_name_map(state) do
+    0..7
+    |> Enum.reduce(%{}, fn bit, acc ->
+      case Stats.bit_name(state.dataset_id, :terrain_flags, bit) do
+        nil -> acc
+        name -> Map.put(acc, Integer.to_string(bit), name)
       end
     end)
   end

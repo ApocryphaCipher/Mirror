@@ -1,3 +1,14 @@
+const ADJ_DIRS = [
+  [0, -1],
+  [1, -1],
+  [1, 0],
+  [1, 1],
+  [0, 1],
+  [-1, 1],
+  [-1, 0],
+  [-1, -1],
+]
+
 const MapCanvas = {
   mounted() {
     this.tileSize = parseInt(this.el.dataset.tileSize || "12", 10)
@@ -16,6 +27,10 @@ const MapCanvas = {
     this.terrainGroups = {}
     this.overlayGroups = {}
     this.terrainNames = {}
+    this.terrainWaterValues = [0]
+    this.terrainWaterValueSet = new Set(this.terrainWaterValues)
+    this.terrainFlagNames = {}
+    this.terrainKindOverrides = {}
     this.lastTileKey = null
     this.isPointerDown = false
     this.pointerButton = 0
@@ -174,6 +189,12 @@ const MapCanvas = {
       this.terrainGroups = payload.terrain_groups || {}
       this.overlayGroups = payload.overlay_groups || {}
       this.terrainNames = payload.terrain_names || {}
+      this.terrainFlagNames = payload.terrain_flag_names || {}
+      this.terrainKindOverrides = payload.terrain_kind_overrides || {}
+      if (Array.isArray(payload.terrain_water_values)) {
+        this.terrainWaterValues = payload.terrain_water_values
+        this.terrainWaterValueSet = new Set(this.terrainWaterValues)
+      }
       this.tileImages = this.buildTileImages(payload.images || {})
       this.renderAll()
     })
@@ -429,29 +450,64 @@ const MapCanvas = {
   },
 
   drawTerrainTile(x, y, render) {
-    this.drawTileArt(x, y, {includeMinerals: false, render})
+    this.drawTileArt(x, y, {includeOverlays: true, render})
   },
 
   drawTileArt(x, y, options = {}) {
     const render = this.resolveRender(options.render)
-    const includeMinerals = options.includeMinerals !== false
+    const includeOverlays = options.includeOverlays !== false
     const idx = y * this.mapWidth + x
     const terrainValue = this.terrainValues[idx] || 0
-    const terrainType = terrainValue & 0xff
-    const name = this.terrainNames[String(terrainType)]
-    const groupName = name || `terrain_${terrainType}`
-    const entries = this.terrainGroups[groupName] || []
-    const mask = this.adjMaskAt(x, y)
-    const entry = this.pickEntry(entries, mask, idx, render)
+    const kind = this.terrainKindAt(x, y, terrainValue)
+    const entry = this.terrainSpriteRef(kind, x, y, idx, render)
 
     if (!entry || !this.drawImageEntry(entry, x, y, render)) {
       this.drawValueTile(x, y, this.values[idx], render)
-      return
     }
 
-    if (includeMinerals) {
-      this.drawMineralOverlay(x, y, render)
+    if (includeOverlays) {
+      this.drawOverlays(x, y, render)
     }
+  },
+
+  drawOverlays(x, y, render) {
+    const resolved = this.resolveRender(render)
+    this.drawFeatureOverlays(x, y, resolved)
+    this.drawFlagOverlays(x, y, resolved)
+    this.drawSpecialOverlays(x, y, resolved)
+  },
+
+  drawFeatureOverlays(x, y, render) {
+    const kind = this.terrainKindAt(x, y)
+    const idx = y * this.mapWidth + x
+    const groupNames = this.featureGroupNames(kind)
+    const entry = this.pickOverlayEntry(groupNames, "interior", idx, render)
+    if (entry) {
+      this.drawImageEntry(entry, x, y, render)
+    }
+  },
+
+  drawFlagOverlays(x, y, render) {
+    const idx = y * this.mapWidth + x
+    const flags = this.terrainFlags[idx] || 0
+    if (!flags) return
+
+    for (let bit = 0; bit < 8; bit++) {
+      if ((flags & (1 << bit)) === 0) continue
+      const baseGroup = this.flagBaseGroup(bit)
+      const mask = this.adjMaskForFlag(bit, x, y)
+      const edgeClass = this.edgeClassFromMask(mask, {mode: "same"})
+      const groupNames = this.overlayGroupNames(baseGroup, edgeClass)
+      const entry = this.pickOverlayEntry(groupNames, edgeClass, idx, render)
+      if (entry) {
+        this.drawImageEntry(entry, x, y, render)
+      }
+    }
+  },
+
+  drawSpecialOverlays(x, y, render) {
+    this.drawMineralOverlay(x, y, render)
+    this.drawEmbeddedSpecialOverlay(x, y, render)
   },
 
   drawMineralTile(x, y, render) {
@@ -465,40 +521,164 @@ const MapCanvas = {
     const mineral = this.mineralsValues[idx] || 0
     if (mineral <= 0) return
 
-    const overlayEntries =
-      this.overlayGroups[`resource_${mineral}`] || this.overlayGroups["resource"] || []
-    const overlayEntry = this.pickEntry(overlayEntries, 0, idx, resolved)
+    const groupNames = this.overlayGroupNames(`resource_${mineral}`, "interior").concat(
+      this.overlayGroupNames("resource", "interior")
+    )
+    const overlayEntry = this.pickOverlayEntry(groupNames, "interior", idx, resolved)
     if (overlayEntry) {
       this.drawImageEntry(overlayEntry, x, y, resolved)
     }
   },
 
-  pickEntry(entries, mask, seed, render) {
+  terrainSpriteRef(kind, x, y, seed, render) {
+    if (!kind || kind === "unknown") return null
+    const mask = this.adjMaskForKind(kind, x, y)
+    const edgeClass = this.edgeClassForKind(kind, mask)
+    return this.pickTerrainEntry(kind, edgeClass, seed, render)
+  },
+
+  pickTerrainEntry(kind, edgeClass, seed, render) {
+    const groupNames = this.groupNamesForKind(kind, edgeClass)
+    return this.pickEntryFromGroups(this.terrainGroups, groupNames, edgeClass, seed, render)
+  },
+
+  pickOverlayEntry(groupNames, edgeClass, seed, render) {
+    return this.pickEntryFromGroups(this.overlayGroups, groupNames, edgeClass, seed, render)
+  },
+
+  pickEntryFromGroups(groups, groupNames, edgeClass, seed, render) {
+    if (!groups || !groupNames || groupNames.length === 0) return null
+    const uniqueNames = this.uniqueGroupNames(groupNames)
+
+    for (let i = 0; i < uniqueNames.length; i++) {
+      const group = uniqueNames[i]
+      const entries = groups[group] || []
+      if (entries.length === 0) continue
+      const edgeEntries = edgeClass ? this.entriesForEdgeClass(entries, edgeClass) : []
+      const pool = edgeEntries.length ? edgeEntries : entries
+      const entry = this.pickEntryFromPool(pool, seed, render)
+      if (entry) return entry
+    }
+
+    return null
+  },
+
+  pickEntryFromPool(entries, seed, render) {
     if (!entries || entries.length === 0) return null
     const resolved = this.resolveRender(render)
-    const maskEntries = this.entriesForMask(entries, mask)
-    const baseEntries = entries.filter(entry => !entry.variant)
-    const pool = maskEntries.length ? maskEntries : (baseEntries.length ? baseEntries : entries)
 
     if (resolved.usePhase) {
-      const phaseEntry = this.pickPhaseEntry(pool, resolved.phaseIndex)
+      const phaseEntry = this.pickPhaseEntry(entries, resolved.phaseIndex)
       if (phaseEntry) return phaseEntry
     }
 
-    return pool[seed % pool.length]
+    return entries[seed % entries.length]
   },
 
-  entriesForMask(entries, mask) {
-    return entries.filter(entry => this.variantMatchesMask(entry.variant, mask))
+  entriesForEdgeClass(entries, edgeClass) {
+    if (!edgeClass) return []
+    return entries.filter(entry => this.variantMatchesEdge(entry.variant, edgeClass))
   },
 
-  variantMatchesMask(variant, mask) {
-    if (!variant) return false
+  variantMatchesEdge(variant, edgeClass) {
+    if (!variant || !edgeClass) return false
     const text = String(variant).toLowerCase()
-    const maskText = String(mask)
-    if (text === maskText || text === `mask_${maskText}`) return true
-    const regex = new RegExp(`(^|\\D)mask[_:-]?${maskText}(\\D|$)`)
-    return regex.test(text)
+    const edgeText = String(edgeClass).toLowerCase()
+    if (text === edgeText) return true
+    if (text.includes(edgeText)) return true
+    const alias = this.edgeClassAlias(edgeClass)
+    if (alias) {
+      const aliasText = alias.toLowerCase()
+      if (text === aliasText) return true
+      const regex = new RegExp(`(^|\\D)${aliasText}(\\D|$)`)
+      return regex.test(text)
+    }
+    return false
+  },
+
+  edgeClassAlias(edgeClass) {
+    switch (edgeClass) {
+      case "edge_n":
+        return "N"
+      case "edge_e":
+        return "E"
+      case "edge_s":
+        return "S"
+      case "edge_w":
+        return "W"
+      case "corner_ne":
+        return "NE"
+      case "corner_nw":
+        return "NW"
+      case "corner_se":
+        return "SE"
+      case "corner_sw":
+        return "SW"
+      case "edge_ns":
+        return "NS"
+      case "edge_ew":
+        return "EW"
+      case "peninsula_n":
+        return "PEN_N"
+      case "peninsula_e":
+        return "PEN_E"
+      case "peninsula_s":
+        return "PEN_S"
+      case "peninsula_w":
+        return "PEN_W"
+      default:
+        return null
+    }
+  },
+
+  normalizeGroupToken(value) {
+    return String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+  },
+
+  featureGroupNames(kind) {
+    if (!kind || kind === "unknown") return []
+    const token = this.normalizeGroupToken(kind)
+    return this.uniqueGroupNames([
+      `feature_${token}`,
+      `${token}_feature`,
+      "feature"
+    ])
+  },
+
+  flagBaseGroup(bit) {
+    const name = this.normalizeGroupToken(this.terrainFlagNames?.[String(bit)])
+    if (name) return `flag_${name}`
+    return `flag_${bit}`
+  },
+
+  overlayGroupNames(baseGroup, edgeClass) {
+    if (!baseGroup) return []
+    const names = []
+    const normalized = this.normalizeGroupToken(baseGroup)
+    const edge = edgeClass && edgeClass !== "interior" ? edgeClass : null
+    if (edge) {
+      names.push(`${normalized}_${edge}`)
+      const alias = this.edgeClassAlias(edge)
+      if (alias) names.push(`${normalized}_${alias}`)
+    } else {
+      names.push(`${normalized}_interior`)
+    }
+    names.push(normalized)
+    return this.uniqueGroupNames(names)
+  },
+
+  uniqueGroupNames(names) {
+    const seen = new Set()
+    return names.filter(name => {
+      if (!name) return false
+      if (seen.has(name)) return false
+      seen.add(name)
+      return true
+    })
   },
 
   parsePhaseTag(variant) {
@@ -573,7 +753,7 @@ const MapCanvas = {
     const render = {ctx, size, phaseIndex, usePhase: true}
     for (let y = 0; y < this.mapHeight; y++) {
       for (let x = 0; x < this.mapWidth; x++) {
-        this.drawTileArt(x, y, {includeMinerals: false, render})
+        this.drawTileArt(x, y, {includeOverlays: true, render})
       }
     }
   },
@@ -675,34 +855,249 @@ const MapCanvas = {
     return diff
   },
 
-  adjMaskAt(x, y) {
-    const dirs = [
-      [0, -1],
-      [1, -1],
-      [1, 0],
-      [1, 1],
-      [0, 1],
-      [-1, 1],
-      [-1, 0],
-      [-1, -1],
-    ]
+  terrainKindAt(x, y, terrainValue) {
+    const idx = y * this.mapWidth + x
+    const value = terrainValue ?? this.terrainValues[idx] ?? 0
+    const baseKind = this.terrainBaseKindForValue(value)
 
-    const center = (this.terrainValues[y * this.mapWidth + x] || 0) & 0xff
-    let mask = 0
+    if (baseKind === "ocean" || baseKind === "unknown") {
+      return baseKind
+    }
 
-    dirs.forEach(([dx, dy], index) => {
+    if (baseKind === "shore") {
+      return "shore"
+    }
+
+    if (this.isAdjacentToOcean(x, y)) {
+      return "shore"
+    }
+
+    return baseKind
+  },
+
+  terrainBaseKindAt(x, y) {
+    const idx = y * this.mapWidth + x
+    const value = this.terrainValues[idx] ?? 0
+    return this.terrainBaseKindForValue(value)
+  },
+
+  terrainBaseKindForValue(value) {
+    if (!Number.isFinite(value)) return "unknown"
+    const base = value & 0xff
+    const override = this.terrainKindOverrides?.[String(base)]
+    if (override) return this.normalizeKind(override)
+    if (this.terrainWaterValueSet && this.terrainWaterValueSet.has(base)) return "ocean"
+
+    const name = String(this.terrainNames?.[String(base)] || "").toLowerCase()
+    if (name) {
+      if (this.matchesKeyword(name, ["ocean", "sea", "water"])) return "ocean"
+      if (this.matchesKeyword(name, ["shore", "coast", "beach"])) return "shore"
+      if (this.matchesKeyword(name, ["desert", "dune", "sand", "waste"])) return "desert"
+      if (this.matchesKeyword(name, ["tundra", "snow", "ice"])) return "tundra"
+      if (this.matchesKeyword(name, ["swamp", "marsh", "bog"])) return "swamp"
+      if (this.matchesKeyword(name, ["hill", "hills", "highland"])) return "hill"
+      if (this.matchesKeyword(name, ["mountain", "peak", "volcano", "crater"])) {
+        return "mountain"
+      }
+      if (this.matchesKeyword(name, ["grass", "plain", "prairie"])) return "grass"
+    }
+
+    return "grass"
+  },
+
+  normalizeKind(value) {
+    const normalized = String(value || "").trim().toLowerCase()
+    if (normalized === "") return "unknown"
+    if (
+      [
+        "ocean",
+        "shore",
+        "grass",
+        "desert",
+        "tundra",
+        "swamp",
+        "hill",
+        "mountain",
+      ].includes(normalized)
+    ) {
+      return normalized
+    }
+    if (["water", "sea"].includes(normalized)) return "ocean"
+    return "unknown"
+  },
+
+  matchesKeyword(name, keywords) {
+    return keywords.some(keyword => name.includes(keyword))
+  },
+
+  isAdjacentToOcean(x, y) {
+    for (let i = 0; i < ADJ_DIRS.length; i++) {
+      const [dx, dy] = ADJ_DIRS[i]
       let nx = x + dx
       let ny = y + dy
-      if (ny < 0 || ny >= this.mapHeight) return
+      if (ny < 0 || ny >= this.mapHeight) continue
       if (nx < 0) nx += this.mapWidth
       if (nx >= this.mapWidth) nx -= this.mapWidth
-      const neighbor = (this.terrainValues[ny * this.mapWidth + nx] || 0) & 0xff
-      if (neighbor === center) {
-        mask |= 1 << index
+      if (this.terrainBaseKindAt(nx, ny) === "ocean") return true
+    }
+
+    return false
+  },
+
+  adjMaskForKind(kind, x, y) {
+    if (!kind || kind === "unknown") return 0
+    const useOceanMask = kind === "shore"
+    let mask = 0
+
+    for (let i = 0; i < ADJ_DIRS.length; i++) {
+      const [dx, dy] = ADJ_DIRS[i]
+      let nx = x + dx
+      let ny = y + dy
+      if (ny < 0 || ny >= this.mapHeight) continue
+      if (nx < 0) nx += this.mapWidth
+      if (nx >= this.mapWidth) nx -= this.mapWidth
+
+      const neighborKind = useOceanMask ? this.terrainBaseKindAt(nx, ny) : this.terrainKindAt(nx, ny)
+      const match = useOceanMask ? neighborKind === "ocean" : neighborKind === kind
+
+      if (match) {
+        mask |= 1 << i
       }
-    })
+    }
 
     return mask
+  },
+
+  adjMaskForFlag(bit, x, y) {
+    if (bit < 0 || bit > 7) return 0
+    let mask = 0
+
+    for (let i = 0; i < ADJ_DIRS.length; i++) {
+      const [dx, dy] = ADJ_DIRS[i]
+      let nx = x + dx
+      let ny = y + dy
+      if (ny < 0 || ny >= this.mapHeight) continue
+      if (nx < 0) nx += this.mapWidth
+      if (nx >= this.mapWidth) nx -= this.mapWidth
+
+      const idx = ny * this.mapWidth + nx
+      const flags = this.terrainFlags[idx] || 0
+      if ((flags & (1 << bit)) !== 0) {
+        mask |= 1 << i
+      }
+    }
+
+    return mask
+  },
+
+  edgeClassForKind(kind, mask) {
+    const mode = kind === "shore" ? "presence" : "same"
+    return this.edgeClassFromMask(mask, {mode})
+  },
+
+  edgeClassFromMask(mask, opts = {}) {
+    const mode = opts.mode || "same"
+    const card = this.cardinalMask(mask)
+    const bits = mode === "presence" ? card : (card ^ 0b1111)
+    const bitCount = this.countBits(bits)
+
+    if (bitCount === 0 || bitCount === 4) return "interior"
+    if (bitCount === 1) return `edge_${this.dirFromBits(bits)}`
+    if (bitCount === 2) {
+      const corner = this.cornerFromBits(bits)
+      if (corner) return corner
+      if (bits === 0b0101) return "edge_ns"
+      if (bits === 0b1010) return "edge_ew"
+    }
+    if (bitCount === 3) {
+      const missing = bits ^ 0b1111
+      return `peninsula_${this.dirFromBits(missing)}`
+    }
+
+    return "fallback"
+  },
+
+  cardinalMask(mask) {
+    let card = 0
+    if (mask & (1 << 0)) card |= 0b0001
+    if (mask & (1 << 2)) card |= 0b0010
+    if (mask & (1 << 4)) card |= 0b0100
+    if (mask & (1 << 6)) card |= 0b1000
+    return card
+  },
+
+  countBits(value) {
+    let count = 0
+    let v = value
+    while (v) {
+      v &= v - 1
+      count++
+    }
+    return count
+  },
+
+  dirFromBits(bits) {
+    switch (bits) {
+      case 0b0001:
+        return "n"
+      case 0b0010:
+        return "e"
+      case 0b0100:
+        return "s"
+      case 0b1000:
+        return "w"
+      default:
+        return "n"
+    }
+  },
+
+  cornerFromBits(bits) {
+    switch (bits) {
+      case 0b0011:
+        return "corner_ne"
+      case 0b1001:
+        return "corner_nw"
+      case 0b0110:
+        return "corner_se"
+      case 0b1100:
+        return "corner_sw"
+      default:
+        return null
+    }
+  },
+
+  groupNamesForKind(kind, edgeClass) {
+    if (!kind || kind === "unknown") return []
+    const base = this.normalizeGroupToken(kind)
+    const names = []
+    const edge = edgeClass && edgeClass !== "interior" ? edgeClass : null
+    if (edge) {
+      names.push(`${base}_${edge}`)
+      const alias = this.edgeClassAlias(edge)
+      if (alias) names.push(`${base}_${alias}`)
+      names.push(`${base}_edge`)
+    } else {
+      names.push(`${base}_interior`)
+    }
+    names.push(base)
+    names.push(`terrain_${base}`)
+    return this.uniqueGroupNames(names)
+  },
+
+  drawEmbeddedSpecialOverlay(x, y, render) {
+    const resolved = this.resolveRender(render)
+    const idx = y * this.mapWidth + x
+    const terrainValue = this.terrainValues[idx] || 0
+    const embedded = (terrainValue >> 8) & 0xff
+    if (embedded <= 0) return
+
+    const groupNames = this.overlayGroupNames(`special_${embedded}`, "interior").concat(
+      this.overlayGroupNames("special", "interior")
+    )
+    const overlayEntry = this.pickOverlayEntry(groupNames, "interior", idx, resolved)
+    if (overlayEntry) {
+      this.drawImageEntry(overlayEntry, x, y, resolved)
+    }
   },
 
   redrawNeighborhood(x, y) {
