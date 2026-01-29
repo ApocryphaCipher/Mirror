@@ -280,3 +280,9 @@ This will trigger a full recompilation in order to re-index your codebase.
 21:36:46.674 id=20 [debug] handled request client -> server textDocument/documentSymbol in 9ms
 
 21:36:46.975 id=21 [debug] handled request client -> server textDocument/documentSymbol in 9ms
+
+21:37:55.903 id=22 [debug] handled request client -> server textDocument/codeAction in 410µs
+
+21:37:56.214 id=23 [debug] handled request client -> server textDocument/documentSymbol in 9ms
+
+21:37:57.674 [debug] handled notification client -> server textDocument/didClose in 102µs
