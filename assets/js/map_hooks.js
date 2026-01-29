@@ -6,6 +6,8 @@ const MapCanvas = {
     this.layerType = this.el.dataset.layerType || "u8"
     this.renderMode = this.el.dataset.renderMode || "values"
     this.activeLayer = this.el.dataset.layer || "terrain"
+    this.phaseIndex = this.normalizePhaseIndex(this.el.dataset.phaseIndex)
+    this.snapshotMode = this.parseBool(this.el.dataset.snapshotMode, true)
     this.values = this.decodeTiles(this.el.dataset.tiles || "", this.layerType)
     this.terrainValues = this.decodeTiles(this.el.dataset.terrain || "", "u16")
     this.terrainFlags = this.decodeTiles(this.el.dataset.terrainFlags || "", "u8")
@@ -56,6 +58,14 @@ const MapCanvas = {
         this.renderMode = payload.render_mode
         needsRender = true
       }
+      if (Object.prototype.hasOwnProperty.call(payload, "phase_index")) {
+        this.phaseIndex = this.normalizePhaseIndex(payload.phase_index)
+        needsRender = true
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, "snapshot_mode")) {
+        this.snapshotMode = this.parseBool(payload.snapshot_mode, this.snapshotMode)
+        needsRender = true
+      }
       if (needsRender) {
         this.renderAll()
       }
@@ -78,6 +88,12 @@ const MapCanvas = {
       }
       if (payload.render_mode) {
         this.renderMode = payload.render_mode
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, "phase_index")) {
+        this.phaseIndex = this.normalizePhaseIndex(payload.phase_index)
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, "snapshot_mode")) {
+        this.snapshotMode = this.parseBool(payload.snapshot_mode, this.snapshotMode)
       }
       this.renderAll()
     })
@@ -119,6 +135,10 @@ const MapCanvas = {
       if (!payload || !payload.mode) return
       this.renderMode = payload.mode
       this.renderAll()
+    })
+
+    this.handleEvent("snapshot_export", payload => {
+      this.exportSnapshot(payload || {})
     })
 
     this.handleEvent("stats_export", payload => {
@@ -185,6 +205,27 @@ const MapCanvas = {
     return bytes
   },
 
+  parseBool(value, fallback = false) {
+    if (value === undefined || value === null) return fallback
+    if (value === true || value === "true" || value === 1 || value === "1") return true
+    if (value === false || value === "false" || value === 0 || value === "0") return false
+    return fallback
+  },
+
+  normalizePhaseIndex(value) {
+    const parsed = parseInt(value ?? "0", 10)
+    if (!Number.isFinite(parsed) || parsed < 0) return 0
+    return parsed
+  },
+
+  resolveRender(render) {
+    const ctx = render?.ctx || this.ctx
+    const size = render?.size || this.deviceTileSize
+    const phaseIndex = this.normalizePhaseIndex(render?.phaseIndex ?? this.phaseIndex)
+    const usePhase = render?.usePhase ?? this.snapshotMode
+    return {ctx, size, phaseIndex, usePhase}
+  },
+
   drawTile(x, y, value) {
     if (this.renderMode === "tiles" && this.hasTileAssets()) {
       this.drawTileForLayer(x, y, value)
@@ -220,10 +261,10 @@ const MapCanvas = {
     }
   },
 
-  drawValueTile(x, y, value) {
-    this.ctx.fillStyle = this.colorForValue(value)
-    const size = this.deviceTileSize
-    this.ctx.fillRect(
+  drawValueTile(x, y, value, render) {
+    const {ctx, size} = this.resolveRender(render)
+    ctx.fillStyle = this.colorForValue(value)
+    ctx.fillRect(
       x * size,
       y * size,
       size,
@@ -259,10 +300,10 @@ const MapCanvas = {
     }
   },
 
-  renderTerrainTiles() {
+  renderTerrainTiles(render) {
     for (let y = 0; y < this.mapHeight; y++) {
       for (let x = 0; x < this.mapWidth; x++) {
-        this.drawTerrainTile(x, y)
+        this.drawTerrainTile(x, y, render)
       }
     }
   },
@@ -279,12 +320,13 @@ const MapCanvas = {
     this.renderValues()
   },
 
-  renderMineralTiles() {
-    this.fillBackground()
+  renderMineralTiles(render) {
+    const resolved = this.resolveRender(render)
+    this.fillBackground(resolved.ctx, resolved.size)
 
     for (let y = 0; y < this.mapHeight; y++) {
       for (let x = 0; x < this.mapWidth; x++) {
-        this.drawMineralTile(x, y)
+        this.drawMineralTile(x, y, resolved)
       }
     }
   },
@@ -310,22 +352,25 @@ const MapCanvas = {
     return result
   },
 
-  fillBackground() {
-    this.ctx.fillStyle = "#020617"
-    this.ctx.fillRect(0, 0, this.el.width, this.el.height)
+  fillBackground(ctx = this.ctx, size = this.deviceTileSize) {
+    const width = this.mapWidth * size
+    const height = this.mapHeight * size
+    ctx.fillStyle = "#020617"
+    ctx.fillRect(0, 0, width, height)
   },
 
-  fillTileBackground(x, y) {
-    const size = this.deviceTileSize
-    this.ctx.fillStyle = "#020617"
-    this.ctx.fillRect(x * size, y * size, size, size)
+  fillTileBackground(x, y, render) {
+    const {ctx, size} = this.resolveRender(render)
+    ctx.fillStyle = "#020617"
+    ctx.fillRect(x * size, y * size, size, size)
   },
 
-  drawTerrainTile(x, y) {
-    this.drawTileArt(x, y, {includeMinerals: false})
+  drawTerrainTile(x, y, render) {
+    this.drawTileArt(x, y, {includeMinerals: false, render})
   },
 
   drawTileArt(x, y, options = {}) {
+    const render = this.resolveRender(options.render)
     const includeMinerals = options.includeMinerals !== false
     const idx = y * this.mapWidth + x
     const terrainValue = this.terrainValues[idx] || 0
@@ -334,52 +379,96 @@ const MapCanvas = {
     const groupName = name || `terrain_${terrainType}`
     const entries = this.terrainGroups[groupName] || []
     const mask = this.adjMaskAt(x, y)
-    const entry = this.pickEntry(entries, mask, idx)
+    const entry = this.pickEntry(entries, mask, idx, render)
 
-    if (!entry || !this.drawImageEntry(entry, x, y)) {
-      this.drawValueTile(x, y, this.values[idx])
+    if (!entry || !this.drawImageEntry(entry, x, y, render)) {
+      this.drawValueTile(x, y, this.values[idx], render)
       return
     }
 
     if (includeMinerals) {
-      this.drawMineralOverlay(x, y)
+      this.drawMineralOverlay(x, y, render)
     }
   },
 
-  drawMineralTile(x, y) {
-    this.fillTileBackground(x, y)
-    this.drawMineralOverlay(x, y)
+  drawMineralTile(x, y, render) {
+    this.fillTileBackground(x, y, render)
+    this.drawMineralOverlay(x, y, render)
   },
 
-  drawMineralOverlay(x, y) {
+  drawMineralOverlay(x, y, render) {
+    const resolved = this.resolveRender(render)
     const idx = y * this.mapWidth + x
     const mineral = this.mineralsValues[idx] || 0
     if (mineral <= 0) return
 
     const overlayEntries =
       this.overlayGroups[`resource_${mineral}`] || this.overlayGroups["resource"] || []
-    const overlayEntry = this.pickEntry(overlayEntries, 0, idx)
+    const overlayEntry = this.pickEntry(overlayEntries, 0, idx, resolved)
     if (overlayEntry) {
-      this.drawImageEntry(overlayEntry, x, y)
+      this.drawImageEntry(overlayEntry, x, y, resolved)
     }
   },
 
-  pickEntry(entries, mask, seed) {
+  pickEntry(entries, mask, seed, render) {
     if (!entries || entries.length === 0) return null
-    const maskKey = `mask_${mask}`
-    const variant = entries.find(entry => entry.variant === maskKey || entry.variant === `${mask}`)
-    if (variant) return variant
-
+    const resolved = this.resolveRender(render)
+    const maskEntries = this.entriesForMask(entries, mask)
     const baseEntries = entries.filter(entry => !entry.variant)
-    const pool = baseEntries.length ? baseEntries : entries
+    const pool = maskEntries.length ? maskEntries : (baseEntries.length ? baseEntries : entries)
+
+    if (resolved.usePhase) {
+      const phaseEntry = this.pickPhaseEntry(pool, resolved.phaseIndex)
+      if (phaseEntry) return phaseEntry
+    }
+
     return pool[seed % pool.length]
   },
 
-  drawImageEntry(entry, x, y) {
+  entriesForMask(entries, mask) {
+    return entries.filter(entry => this.variantMatchesMask(entry.variant, mask))
+  },
+
+  variantMatchesMask(variant, mask) {
+    if (!variant) return false
+    const text = String(variant).toLowerCase()
+    const maskText = String(mask)
+    if (text === maskText || text === `mask_${maskText}`) return true
+    const regex = new RegExp(`(^|\\D)mask[_:-]?${maskText}(\\D|$)`)
+    return regex.test(text)
+  },
+
+  parsePhaseTag(variant) {
+    if (!variant) return null
+    const match = String(variant).match(/phase[_:-]?(\d+)/i)
+    if (!match) return null
+    const parsed = parseInt(match[1], 10)
+    return Number.isFinite(parsed) ? parsed : null
+  },
+
+  pickPhaseEntry(entries, phaseIndex) {
+    if (!entries || entries.length === 0) return null
+    if (entries.length === 1) return entries[0]
+
+    const phaseTagged = entries
+      .map(entry => ({entry, phase: this.parsePhaseTag(entry.variant)}))
+      .filter(item => item.phase !== null)
+
+    if (phaseTagged.length > 0) {
+      const phases = [...new Set(phaseTagged.map(item => item.phase))].sort((a, b) => a - b)
+      const phase = phases[phaseIndex % phases.length]
+      const match = phaseTagged.find(item => item.phase === phase)
+      return match ? match.entry : phaseTagged[0].entry
+    }
+
+    return entries[phaseIndex % entries.length]
+  },
+
+  drawImageEntry(entry, x, y, render) {
+    const {ctx, size} = this.resolveRender(render)
     const image = this.tileImages[entry.key]
     if (!image) return false
-    const size = this.deviceTileSize
-    this.ctx.drawImage(
+    ctx.drawImage(
       image.canvas,
       x * size,
       y * size,
@@ -387,6 +476,41 @@ const MapCanvas = {
       size
     )
     return true
+  },
+
+  exportSnapshot(payload) {
+    if (!this.hasTileAssets()) return
+    const phaseIndex = this.normalizePhaseIndex(payload.phase_index ?? payload.phaseIndex)
+    const filename = payload.filename || `mirror-snapshot-phase-${phaseIndex}.png`
+    const canvas = document.createElement("canvas")
+    const size = this.tileSize
+    canvas.width = this.mapWidth * size
+    canvas.height = this.mapHeight * size
+    const ctx = canvas.getContext("2d", {alpha: false})
+    ctx.imageSmoothingEnabled = false
+
+    this.renderSnapshotTiles(ctx, size, phaseIndex)
+
+    canvas.toBlob(blob => {
+      if (!blob) return
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    }, "image/png")
+  },
+
+  renderSnapshotTiles(ctx, size, phaseIndex) {
+    const render = {ctx, size, phaseIndex, usePhase: true}
+    for (let y = 0; y < this.mapHeight; y++) {
+      for (let x = 0; x < this.mapWidth; x++) {
+        this.drawTileArt(x, y, {includeMinerals: false, render})
+      }
+    }
   },
 
   adjMaskAt(x, y) {

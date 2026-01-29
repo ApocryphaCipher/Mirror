@@ -83,7 +83,9 @@ defmodule MirrorWeb.MapLive do
           redo: %{arcanus: [], myrror: []},
           save_path: save.path,
           dataset_id: save.dataset_id,
-          render_mode: socket.assigns.state.render_mode || :tiles
+          render_mode: socket.assigns.state.render_mode || :tiles,
+          phase_index: socket.assigns.state.phase_index || 0,
+          snapshot_mode: Map.get(socket.assigns.state, :snapshot_mode, true)
         }
 
         SessionStore.put(socket.assigns.session_id, state)
@@ -261,6 +263,25 @@ defmodule MirrorWeb.MapLive do
     end
   end
 
+  def handle_event("export_snapshot", _params, socket) do
+    state = socket.assigns.state
+    plane = socket.assigns.plane
+
+    if state.save do
+      socket =
+        socket
+        |> push_tile_assets(state)
+        |> push_event("snapshot_export", %{
+          filename: "mirror-snapshot-#{plane}-phase-#{state.phase_index}.png",
+          phase_index: state.phase_index
+        })
+
+      {:noreply, socket}
+    else
+      {:noreply, put_flash(socket, :error, "Load a save to export snapshots.")}
+    end
+  end
+
   def handle_event("update_load_path", %{"load" => %{"path" => path}}, socket) do
     {:noreply, assign(socket, :load_path, path)}
   end
@@ -295,6 +316,48 @@ defmodule MirrorWeb.MapLive do
         else
           socket
         end
+      else
+        socket
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_event("toggle_snapshot_mode", _params, socket) do
+    state = socket.assigns.state
+    snapshot_mode = not Map.get(state, :snapshot_mode, true)
+    state = %{state | snapshot_mode: snapshot_mode}
+    SessionStore.put(socket.assigns.session_id, state)
+
+    socket =
+      socket
+      |> assign_from_state(state)
+      |> assign_forms()
+
+    socket =
+      if connected?(socket) do
+        push_map_state(socket)
+      else
+        socket
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_event("set_phase_index", %{"phase" => %{"index" => index}}, socket) do
+    state = socket.assigns.state
+    phase_index = index |> parse_int(state.phase_index || 0) |> max(0)
+    state = %{state | phase_index: phase_index}
+    SessionStore.put(socket.assigns.session_id, state)
+
+    socket =
+      socket
+      |> assign_from_state(state)
+      |> assign_forms()
+
+    socket =
+      if connected?(socket) do
+        push_map_state(socket)
       else
         socket
       end
@@ -359,6 +422,27 @@ defmodule MirrorWeb.MapLive do
                     Render: {if @render_mode == :tiles, do: "Tiles", else: "Values"}
                   </button>
                   <button
+                    id="snapshot-mode-button"
+                    type="button"
+                    phx-click="toggle_snapshot_mode"
+                    class="rounded-full border border-sky-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-sky-100 transition hover:border-sky-200"
+                  >
+                    Snapshot: {if @snapshot_mode, do: "On", else: "Off"}
+                  </button>
+                  <.form
+                    for={@phase_form}
+                    id="phase-form"
+                    phx-change="set_phase_index"
+                    class="rounded-full border border-white/20 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200"
+                  >
+                    <.input
+                      field={@phase_form[:index]}
+                      type="number"
+                      label="Phase"
+                      class="w-20 rounded-2xl border border-white/10 bg-slate-950/70 text-slate-200"
+                    />
+                  </.form>
+                  <button
                     :if={@render_mode == :tiles}
                     id="reload-tiles-button"
                     type="button"
@@ -366,6 +450,14 @@ defmodule MirrorWeb.MapLive do
                     class="rounded-full border border-emerald-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100 transition hover:border-emerald-200"
                   >
                     Reload tiles
+                  </button>
+                  <button
+                    id="export-snapshot-button"
+                    type="button"
+                    phx-click="export_snapshot"
+                    class="rounded-full border border-indigo-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-indigo-100 transition hover:border-indigo-200"
+                  >
+                    Export snapshot
                   </button>
                   <button
                     id="export-stats-button"
@@ -533,6 +625,8 @@ defmodule MirrorWeb.MapLive do
                   data-terrain-flags={@terrain_flags_encoded}
                   data-minerals={@minerals_encoded}
                   data-render-mode={Atom.to_string(@render_mode)}
+                  data-phase-index={@phase_index}
+                  data-snapshot-mode={@snapshot_mode}
                   data-tile-size="32"
                   class="block"
                 >
@@ -1089,7 +1183,9 @@ defmodule MirrorWeb.MapLive do
       layer_labels: @layer_labels,
       map_width: MirrorMap.width(),
       map_height: MirrorMap.height(),
-      render_mode: state.render_mode
+      render_mode: state.render_mode,
+      phase_index: state.phase_index,
+      snapshot_mode: Map.get(state, :snapshot_mode, true)
     )
   end
 
@@ -1103,6 +1199,8 @@ defmodule MirrorWeb.MapLive do
 
     selection_form =
       to_form(%{"value" => Map.get(state.selection, state.active_layer, 0)}, as: :selection)
+
+    phase_form = to_form(%{"index" => state.phase_index || 0}, as: :phase)
 
     value_name_form =
       to_form(
@@ -1128,6 +1226,7 @@ defmodule MirrorWeb.MapLive do
       load_form: load_form,
       save_form: save_form,
       selection_form: selection_form,
+      phase_form: phase_form,
       value_name_form: value_name_form,
       bit_forms: bit_forms
     )
@@ -1184,7 +1283,9 @@ defmodule MirrorWeb.MapLive do
     push_event(socket, "map_state", %{
       layer: Atom.to_string(state.active_layer),
       layer_type: layer_type(state.active_layer),
-      render_mode: Atom.to_string(state.render_mode)
+      render_mode: Atom.to_string(state.render_mode),
+      phase_index: state.phase_index,
+      snapshot_mode: Map.get(state, :snapshot_mode, true)
     })
   end
 
@@ -1203,7 +1304,9 @@ defmodule MirrorWeb.MapLive do
       terrain: Base.encode64(plane_layers.terrain),
       terrain_flags: Base.encode64(plane_layers.terrain_flags),
       minerals: Base.encode64(plane_layers.minerals),
-      render_mode: Atom.to_string(state.render_mode)
+      render_mode: Atom.to_string(state.render_mode),
+      phase_index: state.phase_index,
+      snapshot_mode: Map.get(state, :snapshot_mode, true)
     })
   end
 
@@ -1223,24 +1326,28 @@ defmodule MirrorWeb.MapLive do
     state = socket.assigns.state
 
     if connected?(socket) and state.render_mode == :tiles do
-      socket =
-        case socket.assigns.tile_assets do
-          nil -> assign(socket, :tile_assets, TileAtlas.build())
-          _ -> socket
-        end
-
-      atlas = socket.assigns.tile_assets
-      terrain_names = terrain_name_map(state)
-
-      push_event(socket, "tile_assets", %{
-        images: atlas.images,
-        terrain_groups: atlas.terrain_groups,
-        overlay_groups: atlas.overlay_groups,
-        terrain_names: terrain_names
-      })
+      push_tile_assets(socket, state)
     else
       socket
     end
+  end
+
+  defp push_tile_assets(socket, state) do
+    socket =
+      case socket.assigns.tile_assets do
+        nil -> assign(socket, :tile_assets, TileAtlas.build())
+        _ -> socket
+      end
+
+    atlas = socket.assigns.tile_assets
+    terrain_names = terrain_name_map(state)
+
+    push_event(socket, "tile_assets", %{
+      images: atlas.images,
+      terrain_groups: atlas.terrain_groups,
+      overlay_groups: atlas.overlay_groups,
+      terrain_names: terrain_names
+    })
   end
 
   defp terrain_name_map(%{dataset_id: nil}), do: %{}
@@ -1308,7 +1415,9 @@ defmodule MirrorWeb.MapLive do
       redo: %{arcanus: [], myrror: []},
       save_path: nil,
       dataset_id: nil,
-      render_mode: :tiles
+      render_mode: :tiles,
+      phase_index: 0,
+      snapshot_mode: true
     }
   end
 
@@ -1318,6 +1427,8 @@ defmodule MirrorWeb.MapLive do
     |> Map.put_new(:history, %{arcanus: [], myrror: []})
     |> Map.put_new(:redo, %{arcanus: [], myrror: []})
     |> Map.put_new(:render_mode, :tiles)
+    |> Map.put_new(:phase_index, 0)
+    |> Map.put_new(:snapshot_mode, true)
   end
 
   defp default_load_path do
