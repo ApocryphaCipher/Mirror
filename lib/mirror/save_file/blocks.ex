@@ -37,7 +37,12 @@ defmodule Mirror.SaveFile.Blocks do
 
   def layer_offset(layer) do
     offsets = Application.get_env(:mirror, __MODULE__, %{})
-    Map.get(offsets, layer)
+
+    cond do
+      is_map(offsets) -> Map.get(offsets, layer)
+      is_list(offsets) -> Keyword.get(offsets, layer)
+      true -> nil
+    end
   end
 
   def plane_slice_offset(layer, plane_index) when plane_index in [0, 1] do

@@ -23,6 +23,18 @@ end
 config :mirror, MirrorWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+if mom_path = System.get_env("MIRROR_MOM_PATH") do
+  config :mirror, mom_path: mom_path
+end
+
+if asset_map_dir = System.get_env("MIRROR_ASSET_MAP") do
+  config :mirror, asset_map_dir: asset_map_dir
+end
+
+if tile_cache_dir = System.get_env("MIRROR_TILE_CACHE") do
+  config :mirror, tile_cache_dir: tile_cache_dir
+end
+
 parse_offset = fn value ->
   case value do
     nil -> nil

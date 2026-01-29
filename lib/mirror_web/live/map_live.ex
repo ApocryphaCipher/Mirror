@@ -1,7 +1,7 @@
 defmodule MirrorWeb.MapLive do
   use MirrorWeb, :live_view
 
-  alias Mirror.{SaveFile, SessionStore, Stats}
+  alias Mirror.{Paths, SaveFile, SessionStore, Stats, TileAtlas}
   alias Mirror.Map, as: MirrorMap
 
   @layers [
@@ -41,11 +41,16 @@ defmodule MirrorWeb.MapLive do
       |> assign_from_state(state)
       |> assign(:active_stroke, nil)
       |> assign(:hover, nil)
+      |> assign(:tile_assets, nil)
+      |> assign(:load_path, default_load_path())
+      |> assign(:save_path_input, state.save_path || "")
       |> assign_forms()
 
     if connected?(socket) and state.save do
       socket = push_map_state(socket)
-      {:ok, push_map_reload(socket)}
+      socket = push_map_reload(socket)
+      socket = maybe_push_tile_assets(socket)
+      {:ok, socket}
     else
       {:ok, socket}
     end
@@ -54,6 +59,10 @@ defmodule MirrorWeb.MapLive do
   @impl true
   def handle_event("load_save", %{"load" => %{"path" => path}}, socket) do
     path = String.trim(path || "")
+    socket =
+      socket
+      |> assign(:load_path, path)
+      |> assign_forms()
 
     case SaveFile.load(path) do
       {:ok, save} ->
@@ -72,7 +81,8 @@ defmodule MirrorWeb.MapLive do
           history: %{arcanus: [], myrror: []},
           redo: %{arcanus: [], myrror: []},
           save_path: save.path,
-          dataset_id: save.dataset_id
+          dataset_id: save.dataset_id,
+          render_mode: socket.assigns.state.render_mode || :tiles
         }
 
         SessionStore.put(socket.assigns.session_id, state)
@@ -84,8 +94,17 @@ defmodule MirrorWeb.MapLive do
           |> assign_forms()
           |> put_flash(:info, "Loaded save from #{path}.")
 
-        socket = if connected?(socket), do: push_map_state(socket), else: socket
-        {:noreply, if(connected?(socket), do: push_map_reload(socket), else: socket)}
+        socket =
+          if connected?(socket) do
+            socket
+            |> push_map_state()
+            |> push_map_reload()
+            |> maybe_push_tile_assets()
+          else
+            socket
+          end
+
+        {:noreply, socket}
 
       {:error, {:missing_offset, layer}} ->
         {:noreply,
@@ -104,6 +123,7 @@ defmodule MirrorWeb.MapLive do
     path = String.trim(path || "")
     target_path = if path == "", do: nil, else: path
     state = socket.assigns.state
+    socket = assign(socket, :save_path_input, path)
 
     with %SaveFile{} = save <- state.save,
          {:ok, save_path} <-
@@ -132,8 +152,17 @@ defmodule MirrorWeb.MapLive do
       |> assign_from_state(state)
       |> assign_forms()
 
-    socket = if connected?(socket), do: push_map_state(socket), else: socket
-    {:noreply, if(connected?(socket), do: push_map_reload(socket), else: socket)}
+    socket =
+      if connected?(socket) do
+        socket
+        |> push_map_state()
+        |> push_map_reload()
+        |> maybe_push_tile_assets()
+      else
+        socket
+      end
+
+    {:noreply, socket}
   end
 
   def handle_event("set_selection", %{"selection" => %{"value" => value}}, socket) do
@@ -231,6 +260,60 @@ defmodule MirrorWeb.MapLive do
     end
   end
 
+  def handle_event("update_load_path", %{"load" => %{"path" => path}}, socket) do
+    {:noreply, assign(socket, :load_path, path)}
+  end
+
+  def handle_event("update_save_path", %{"save" => %{"path" => path}}, socket) do
+    {:noreply, assign(socket, :save_path_input, path)}
+  end
+
+  def handle_event("toggle_render_mode", _params, socket) do
+    state = socket.assigns.state
+
+    render_mode =
+      case state.render_mode do
+        :tiles -> :values
+        _ -> :tiles
+      end
+
+    state = %{state | render_mode: render_mode}
+    SessionStore.put(socket.assigns.session_id, state)
+
+    socket =
+      socket
+      |> assign_from_state(state)
+      |> assign_forms()
+
+    socket =
+      if connected?(socket) do
+        socket = push_event(socket, "map_render_mode", %{mode: Atom.to_string(render_mode)})
+
+        if render_mode == :tiles do
+          maybe_push_tile_assets(socket)
+        else
+          socket
+        end
+      else
+        socket
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_event("reload_tiles", _params, socket) do
+    socket =
+      if connected?(socket) do
+        socket
+        |> assign(:tile_assets, nil)
+        |> maybe_push_tile_assets()
+      else
+        socket
+      end
+
+    {:noreply, socket}
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -264,6 +347,23 @@ defmodule MirrorWeb.MapLive do
               Redo
             </button>
             <button
+              id="render-mode-button"
+              type="button"
+              phx-click="toggle_render_mode"
+              class="rounded-full border border-amber-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-amber-100 transition hover:border-amber-200"
+            >
+              Render: {if @render_mode == :tiles, do: "Tiles", else: "Values"}
+            </button>
+            <button
+              :if={@render_mode == :tiles}
+              id="reload-tiles-button"
+              type="button"
+              phx-click="reload_tiles"
+              class="rounded-full border border-emerald-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100 transition hover:border-emerald-200"
+            >
+              Reload tiles
+            </button>
+            <button
               id="export-stats-button"
               type="button"
               phx-click="export_stats"
@@ -282,6 +382,7 @@ defmodule MirrorWeb.MapLive do
                 for={@load_form}
                 id="load-form"
                 phx-submit="load_save"
+                phx-change="update_load_path"
                 class="mt-4 grid gap-3 md:grid-cols-[1fr_auto]"
               >
                 <.input
@@ -310,6 +411,7 @@ defmodule MirrorWeb.MapLive do
                   for={@save_form}
                   id="save-form"
                   phx-submit="save_file"
+                  phx-change="update_save_path"
                   class="flex flex-wrap items-center gap-2"
                 >
                   <.input
@@ -395,7 +497,11 @@ defmodule MirrorWeb.MapLive do
                       data-map-height={@map_height}
                       data-layer-type={layer_type(@active_layer)}
                       data-tiles={@encoded_layer}
-                      data-tile-size="12"
+                      data-terrain={@terrain_encoded}
+                      data-terrain-flags={@terrain_flags_encoded}
+                      data-minerals={@minerals_encoded}
+                      data-render-mode={Atom.to_string(@render_mode)}
+                      data-tile-size="16"
                       class="h-auto w-full rounded-2xl border border-white/10 bg-slate-950"
                     >
                     </canvas>
@@ -940,24 +1046,49 @@ defmodule MirrorWeb.MapLive do
         ""
       end
 
+    terrain_encoded =
+      if plane_layers do
+        Base.encode64(plane_layers.terrain)
+      else
+        ""
+      end
+
+    terrain_flags_encoded =
+      if plane_layers do
+        Base.encode64(plane_layers.terrain_flags)
+      else
+        ""
+      end
+
+    minerals_encoded =
+      if plane_layers do
+        Base.encode64(plane_layers.minerals)
+      else
+        ""
+      end
+
     assign(socket,
       state: state,
       plane_layers: plane_layers,
       encoded_layer: encoded_layer,
+      terrain_encoded: terrain_encoded,
+      terrain_flags_encoded: terrain_flags_encoded,
+      minerals_encoded: minerals_encoded,
       active_layer: state.active_layer,
       selection_value: Map.get(state.selection, state.active_layer, 0),
       layers: @layers,
       layer_labels: @layer_labels,
       map_width: MirrorMap.width(),
-      map_height: MirrorMap.height()
+      map_height: MirrorMap.height(),
+      render_mode: state.render_mode
     )
   end
 
   defp assign_forms(socket) do
     state = socket.assigns.state
 
-    load_form = to_form(%{"path" => ""}, as: :load)
-    save_form = to_form(%{"path" => state.save_path || ""}, as: :save)
+    load_form = to_form(%{"path" => socket.assigns.load_path || ""}, as: :load)
+    save_form = to_form(%{"path" => socket.assigns.save_path_input || state.save_path || ""}, as: :save)
 
     selection_form =
       to_form(%{"value" => Map.get(state.selection, state.active_layer, 0)}, as: :selection)
@@ -1041,7 +1172,8 @@ defmodule MirrorWeb.MapLive do
 
     push_event(socket, "map_state", %{
       layer: Atom.to_string(state.active_layer),
-      layer_type: layer_type(state.active_layer)
+      layer_type: layer_type(state.active_layer),
+      render_mode: Atom.to_string(state.render_mode)
     })
   end
 
@@ -1056,7 +1188,11 @@ defmodule MirrorWeb.MapLive do
       plane: Atom.to_string(plane),
       layer: Atom.to_string(layer),
       layer_type: layer_type(layer),
-      values: values
+      values: values,
+      terrain: Base.encode64(plane_layers.terrain),
+      terrain_flags: Base.encode64(plane_layers.terrain_flags),
+      minerals: Base.encode64(plane_layers.minerals),
+      render_mode: Atom.to_string(state.render_mode)
     })
   end
 
@@ -1070,6 +1206,42 @@ defmodule MirrorWeb.MapLive do
     end
 
     socket
+  end
+
+  defp maybe_push_tile_assets(socket) do
+    state = socket.assigns.state
+
+    if connected?(socket) and state.render_mode == :tiles do
+      socket =
+        case socket.assigns.tile_assets do
+          nil -> assign(socket, :tile_assets, TileAtlas.build())
+          _ -> socket
+        end
+
+      atlas = socket.assigns.tile_assets
+      terrain_names = terrain_name_map(state)
+
+      push_event(socket, "tile_assets", %{
+        images: atlas.images,
+        terrain_groups: atlas.terrain_groups,
+        overlay_groups: atlas.overlay_groups,
+        terrain_names: terrain_names
+      })
+    else
+      socket
+    end
+  end
+
+  defp terrain_name_map(%{dataset_id: nil}), do: %{}
+
+  defp terrain_name_map(state) do
+    0..255
+    |> Enum.reduce(%{}, fn value, acc ->
+      case Stats.value_name(state.dataset_id, :terrain, value) do
+        nil -> acc
+        name -> Map.put(acc, Integer.to_string(value), name)
+      end
+    end)
   end
 
   defp layer_type(layer) do
@@ -1124,7 +1296,8 @@ defmodule MirrorWeb.MapLive do
       history: %{arcanus: [], myrror: []},
       redo: %{arcanus: [], myrror: []},
       save_path: nil,
-      dataset_id: nil
+      dataset_id: nil,
+      render_mode: :tiles
     }
   end
 
@@ -1133,6 +1306,15 @@ defmodule MirrorWeb.MapLive do
     |> Map.put_new(:selection, default_selection())
     |> Map.put_new(:history, %{arcanus: [], myrror: []})
     |> Map.put_new(:redo, %{arcanus: [], myrror: []})
+    |> Map.put_new(:render_mode, :tiles)
+  end
+
+  defp default_load_path do
+    case Paths.mom_path() do
+      nil -> ""
+      "" -> ""
+      path -> path |> Path.join("SAVE1.GAM") |> String.replace("/", "\\")
+    end
   end
 
   defp default_selection do

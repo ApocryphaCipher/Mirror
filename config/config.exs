@@ -9,7 +9,10 @@ import Config
 
 config :mirror,
   generators: [timestamp_type: :utc_datetime],
-  terrain_water_values: [0]
+  terrain_water_values: [0],
+  mom_path: nil,
+  asset_map_dir: Path.expand("../priv/asset_map", __DIR__),
+  tile_cache_dir: Path.expand("../priv/tile_cache", __DIR__)
 
 # Configure the endpoint
 config :mirror, MirrorWeb.Endpoint,
@@ -21,6 +24,14 @@ config :mirror, MirrorWeb.Endpoint,
   ],
   pubsub_server: Mirror.PubSub,
   live_view: [signing_salt: "bwCmSnKm"]
+
+# Classic save offsets (hard-coded defaults).
+config :mirror, Mirror.SaveFile.Blocks,
+  terrain: 0x002698,
+  landmass: 0x004D98,
+  minerals: 0x013554,
+  exploration: 0x014814,
+  terrain_flags: 0x01CBB8
 
 # Configure esbuild (the version is required)
 config :esbuild,

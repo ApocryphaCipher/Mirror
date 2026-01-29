@@ -21,6 +21,7 @@ defmodule MirrorWeb.Router do
     get "/", PageController, :home
     live "/arcanus", MapLive, :arcanus
     live "/myrror", MapLive, :myrror
+    live "/tile-probe", TileProbeLive, :index
   end
 
   # Other scopes may use custom stacks.
