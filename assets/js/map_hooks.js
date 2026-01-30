@@ -9,6 +9,40 @@ const ADJ_DIRS = [
   [-1, -1],
 ]
 
+const ADJ_DIR_LABELS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+
+const TERRAIN_KIND_BY_BASE_ID = {
+  0: "ocean",
+  1: "shore",
+  2: "grass",
+  3: "forest",
+  4: "hill",
+  5: "mountain",
+  6: "tundra",
+  7: "swamp",
+  8: "desert",
+  9: "grass",
+  10: "forest",
+  11: "hill",
+  12: "mountain",
+  13: "tundra",
+  14: "swamp",
+  15: "desert",
+}
+
+const TERRAIN_KIND_DEBUG_COLORS = {
+  ocean: "#0ea5e9",
+  shore: "#38bdf8",
+  grass: "#84cc16",
+  forest: "#22c55e",
+  hill: "#f97316",
+  mountain: "#94a3b8",
+  desert: "#f59e0b",
+  tundra: "#e2e8f0",
+  swamp: "#10b981",
+  unknown: "#ff00ff",
+}
+
 const LAYER_STACK = [
   "terrain",
   "terrain_flags",
@@ -44,11 +78,22 @@ const MapCanvas = {
     this.momimeFrames = {}
     this.momimeBaseUrl = ""
     this.momimeImageCache = {}
+    this.momimeMaskWhitelist = {}
     this.terrainNames = {}
     this.terrainWaterValues = [0]
     this.terrainWaterValueSet = new Set(this.terrainWaterValues)
     this.terrainFlagNames = {}
     this.terrainKindOverrides = {}
+    this.debugTerrainKinds = this.parseBool(this.el.dataset.debugTerrainKinds, false)
+    this.debugTerrainSamples = this.parseBool(this.el.dataset.debugTerrainSamples, false)
+    this.debugMomimeMask = this.parseBool(this.el.dataset.debugMomimeMask, false)
+    this.terrainSampleLogged = false
+    this.terrainBaseSource = "lo"
+    this.terrainBaseSourceStats = null
+    this.momimeMaskSampleCount = 0
+    this.momimeMaskSampleLimit = 12
+    this.momimeMaskRotationStats = {0: 0, 90: 0, 180: 0, 270: 0}
+    this.momimeMaskRotationLogEvery = 100
     this.layerVisibility = {}
     this.layerOpacity = {}
     this.lastTileKey = null
@@ -112,6 +157,18 @@ const MapCanvas = {
         this.snapshotMode = this.parseBool(payload.snapshot_mode, this.snapshotMode)
         needsRender = true
       }
+      if (Object.prototype.hasOwnProperty.call(payload, "debug_terrain_kinds")) {
+        this.debugTerrainKinds = this.parseBool(payload.debug_terrain_kinds, this.debugTerrainKinds)
+        this.maybeLogTerrainSamples()
+        needsRender = true
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, "debug_terrain_samples")) {
+        this.debugTerrainSamples = this.parseBool(payload.debug_terrain_samples, this.debugTerrainSamples)
+        this.maybeLogTerrainSamples()
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, "debug_momime_mask")) {
+        this.debugMomimeMask = this.parseBool(payload.debug_momime_mask, this.debugMomimeMask)
+      }
       if (needsRender) {
         this.renderAll()
       }
@@ -159,6 +216,19 @@ const MapCanvas = {
       if (Object.prototype.hasOwnProperty.call(payload, "snapshot_mode")) {
         this.snapshotMode = this.parseBool(payload.snapshot_mode, this.snapshotMode)
       }
+      if (Object.prototype.hasOwnProperty.call(payload, "debug_terrain_kinds")) {
+        this.debugTerrainKinds = this.parseBool(payload.debug_terrain_kinds, this.debugTerrainKinds)
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, "debug_terrain_samples")) {
+        this.debugTerrainSamples = this.parseBool(payload.debug_terrain_samples, this.debugTerrainSamples)
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, "debug_momime_mask")) {
+        this.debugMomimeMask = this.parseBool(payload.debug_momime_mask, this.debugMomimeMask)
+      }
+      if (payload.terrain) {
+        this.detectTerrainBaseSource()
+      }
+      this.maybeLogTerrainSamples()
       this.renderAll()
     })
 
@@ -253,6 +323,9 @@ const MapCanvas = {
 
     this.handleEvent("tile_assets", payload => {
       if (!payload) return
+      const prevBackend = this.tileBackend
+      const prevBaseUrl = this.momimeBaseUrl
+      const prevCache = this.momimeImageCache || {}
       this.tileBackend = payload.backend || this.tileBackend || "lbx"
       this.terrainGroups = payload.terrain_groups || {}
       this.overlayGroups = payload.overlay_groups || {}
@@ -263,12 +336,20 @@ const MapCanvas = {
       this.momimeIndex = momime.index || {}
       this.momimeFrames = momime.frames || {}
       this.momimeBaseUrl = momime.base_url || ""
-      this.momimeImageCache = {}
+      this.buildMomimeMaskWhitelist()
+      const shouldClearCache =
+        payload.clear_cache === true ||
+        prevBackend !== this.tileBackend ||
+        (this.tileBackend === "momime_png" && prevBaseUrl && prevBaseUrl !== this.momimeBaseUrl)
+      this.momimeImageCache = shouldClearCache ? {} : prevCache
       if (Array.isArray(payload.terrain_water_values)) {
         this.terrainWaterValues = payload.terrain_water_values
         this.terrainWaterValueSet = new Set(this.terrainWaterValues)
       }
       this.tileImages = this.buildTileImages(payload.images || {})
+      this.momimeMaskRotationStats = {0: 0, 90: 0, 180: 0, 270: 0}
+      this.detectTerrainBaseSource()
+      this.maybeLogTerrainSamples()
       this.renderAll()
     })
 
@@ -381,6 +462,144 @@ const MapCanvas = {
     const phaseIndex = this.normalizePhaseIndex(render?.phaseIndex ?? this.phaseIndex)
     const usePhase = render?.usePhase ?? this.snapshotMode
     return {ctx, size, phaseIndex, usePhase}
+  },
+
+  maybeLogTerrainSamples() {
+    if (!(this.debugTerrainSamples || this.debugTerrainKinds) || this.terrainSampleLogged) {
+      return
+    }
+    if (!this.terrainValues || this.terrainValues.length === 0) return
+    this.logTerrainSamples()
+  },
+
+  logTerrainSamples() {
+    const samples = []
+    const maxSamples = 50
+    const total = this.mapWidth * this.mapHeight
+    let attempts = 0
+    const maxAttempts = maxSamples * 20
+
+    this.detectTerrainBaseSource()
+
+    while (samples.length < maxSamples && attempts < maxAttempts) {
+      const idx = Math.floor(Math.random() * total)
+      const x = idx % this.mapWidth
+      const y = Math.floor(idx / this.mapWidth)
+      const value = this.terrainValues[idx] || 0
+      const baseKind = this.terrainBaseKindForValue(value)
+      if (baseKind === "ocean") {
+        attempts++
+        continue
+      }
+      const lo = value & 0xff
+      const hi = (value >> 8) & 0xff
+      const baseValue = this.terrainBaseValue(value)
+      const kind = this.terrainKindAt(x, y, value)
+      samples.push({
+        x,
+        y,
+        value,
+        lo,
+        hi,
+        base_value: baseValue,
+        kind,
+        base_kind: baseKind,
+        base_source: this.terrainBaseSourceForValue(value),
+      })
+      attempts++
+    }
+
+    if (samples.length > 0) {
+      console.info("[mirror] terrain u16 samples", samples)
+      if (this.terrainBaseSourceStats) {
+        console.info("[mirror] terrain base source", this.terrainBaseSourceStats)
+      }
+    }
+
+    this.terrainSampleLogged = true
+  },
+
+  detectTerrainBaseSource() {
+    if (!this.terrainValues || this.terrainValues.length === 0) return
+
+    const maxSamples = Math.min(800, this.terrainValues.length)
+    const sampleCount = Math.max(200, Math.floor(maxSamples))
+    const candidates = this.terrainBaseCandidates()
+    const results = candidates.map(candidate => {
+      return this.sampleTerrainBaseCandidate(candidate, sampleCount)
+    })
+
+    results.sort((a, b) => b.score - a.score)
+    const best = results[0] || {label: "lo"}
+
+    this.terrainBaseSource = best.label
+    this.terrainBaseSourceStats = {
+      source: best.label,
+      sampleCount,
+      candidates: results,
+    }
+  },
+
+  byteStats(map, total) {
+    let top = {value: null, count: 0}
+    let unique = 0
+    map.forEach((count, value) => {
+      unique += 1
+      if (count > top.count) top = {value, count}
+    })
+    const topRatio = total > 0 ? top.count / total : 0
+    return {
+      uniqueCount: unique,
+      topValue: top.value,
+      topCount: top.count,
+      topRatio: Number.isFinite(topRatio) ? Math.round(topRatio * 1000) / 1000 : 0,
+    }
+  },
+
+  terrainBaseCandidates() {
+    return [
+      {label: "lo", extract: value => value & 0xff},
+      {label: "hi", extract: value => (value >> 8) & 0xff},
+      {label: "lo_nibble", extract: value => value & 0x0f},
+      {label: "hi_nibble", extract: value => (value >> 8) & 0x0f},
+    ]
+  },
+
+  sampleTerrainBaseCandidate(candidate, sampleCount) {
+    const baseCounts = new Map()
+    const kindCounts = new Map()
+    let knownCount = 0
+    let unknownCount = 0
+
+    for (let i = 0; i < sampleCount; i++) {
+      const idx = Math.floor(Math.random() * this.terrainValues.length)
+      const value = this.terrainValues[idx] || 0
+      const base = candidate.extract(value)
+      baseCounts.set(base, (baseCounts.get(base) || 0) + 1)
+      const kind = this.terrainKindForBaseId(base, {allowWater: true})
+      if (kind) {
+        knownCount += 1
+        kindCounts.set(kind, (kindCounts.get(kind) || 0) + 1)
+      } else {
+        unknownCount += 1
+      }
+    }
+
+    const total = Math.max(1, sampleCount)
+    const knownRatio = knownCount / total
+    const baseStats = this.byteStats(baseCounts, total)
+    const distinctKinds = kindCounts.size
+    const score = knownRatio * 100 + distinctKinds * 8 - baseStats.topRatio * 30
+
+    return {
+      label: candidate.label,
+      score: Math.round(score * 100) / 100,
+      knownCount,
+      unknownCount,
+      knownRatio: Math.round(knownRatio * 1000) / 1000,
+      distinctKindCount: distinctKinds,
+      baseStats,
+    }
   },
 
   drawTile(x, y, value) {
@@ -553,6 +772,10 @@ const MapCanvas = {
     this.drawTileArt(x, y, {includeOverlays: false, render: resolved})
     this.drawFeatureOverlays(x, y, resolved)
     this.drawEmbeddedSpecialOverlay(x, y, resolved)
+    if (this.debugTerrainKinds) {
+      const kind = this.terrainKindAt(x, y)
+      this.drawTerrainKindDebug(x, y, kind, resolved)
+    }
   },
 
   drawStackedTile(x, y, render) {
@@ -592,6 +815,13 @@ const MapCanvas = {
     const idx = y * this.mapWidth + x
     const terrainValue = this.terrainValues[idx] || 0
     const kind = this.terrainKindAt(x, y, terrainValue)
+    if (!kind || kind === "unknown") {
+      this.drawMissingTile(x, y, render, "unknown")
+      if (includeOverlays) {
+        this.drawOverlays(x, y, render)
+      }
+      return
+    }
     const entry = this.terrainSpriteRef(kind, x, y, idx, render)
 
     if (!entry || !this.drawImageEntry(entry, x, y, render)) {
@@ -922,7 +1152,125 @@ const MapCanvas = {
 
   maskString(mask) {
     const value = Number.isFinite(mask) ? mask : 0
-    return value.toString(2).padStart(8, "0")
+    let result = ""
+    for (let i = 0; i < 8; i++) {
+      result += value & (1 << i) ? "1" : "0"
+    }
+    return result
+  },
+
+  maskStringFromDigits(digits) {
+    if (!digits || digits.length !== 8) return "00000000"
+    return digits.join("")
+  },
+
+  normalizeMaskString(maskString) {
+    return String(maskString || "").padStart(8, "0").slice(0, 8)
+  },
+
+  clearDiagonalMaskString(maskString) {
+    const chars = this.normalizeMaskString(maskString).split("")
+    chars[1] = "0"
+    chars[3] = "0"
+    chars[5] = "0"
+    chars[7] = "0"
+    return chars.join("")
+  },
+
+  gateDiagonalMask(mask) {
+    let value = Number.isFinite(mask) ? mask : 0
+    const has = bit => (value & (1 << bit)) !== 0
+    if (has(1) && !(has(0) && has(2))) value &= ~(1 << 1)
+    if (has(3) && !(has(2) && has(4))) value &= ~(1 << 3)
+    if (has(5) && !(has(4) && has(6))) value &= ~(1 << 5)
+    if (has(7) && !(has(6) && has(0))) value &= ~(1 << 7)
+    return value
+  },
+
+  gateDiagonalDigits(digits) {
+    const next = Array.isArray(digits) ? digits.slice(0, 8) : Array(8).fill("0")
+    const present = idx => (next[idx] ?? "0") !== "0"
+    if (present(1) && !(present(0) && present(2))) next[1] = "0"
+    if (present(3) && !(present(2) && present(4))) next[3] = "0"
+    if (present(5) && !(present(4) && present(6))) next[5] = "0"
+    if (present(7) && !(present(6) && present(0))) next[7] = "0"
+    return next
+  },
+
+  rotateMaskDigits(digits, shift) {
+    const list = Array.isArray(digits) ? digits : []
+    const offset = ((shift % 8) + 8) % 8
+    if (offset === 0) return list.slice(0, 8)
+    const rotated = Array(8).fill("0")
+    for (let i = 0; i < 8; i++) {
+      rotated[(i + offset) % 8] = list[i] ?? "0"
+    }
+    return rotated
+  },
+
+  shoreMaskDigits(x, y) {
+    const digits = Array(8).fill("0")
+    for (let i = 0; i < ADJ_DIRS.length; i++) {
+      const [dx, dy] = ADJ_DIRS[i]
+      let nx = x + dx
+      let ny = y + dy
+      if (ny < 0 || ny >= this.mapHeight) continue
+      if (nx < 0) nx += this.mapWidth
+      if (nx >= this.mapWidth) nx -= this.mapWidth
+
+      const baseKind = this.terrainBaseKindAt(nx, ny)
+      if (baseKind === "ocean") continue
+
+      if (i % 2 === 0) {
+        const neighborKind = this.terrainKindAt(nx, ny)
+        digits[i] = neighborKind === "shore" ? "2" : "1"
+      } else {
+        digits[i] = "1"
+      }
+    }
+    return this.gateDiagonalDigits(digits)
+  },
+
+  shoreMaskVariants(maskString) {
+    const base = String(maskString || "")
+    const variants = [base]
+    if (base.includes("2")) {
+      variants.push(base.replace(/2/g, "1"))
+      variants.push(base.replace(/2/g, "0"))
+    }
+    return Array.from(new Set(variants))
+  },
+
+  buildMomimeMaskWhitelist() {
+    const whitelist = {}
+    const frames = this.momimeFrames || {}
+    Object.keys(frames).forEach(key => {
+      const [plane, kind, mask] = String(key).split("|")
+      if (!plane || !kind || !mask) return
+      if (!whitelist[plane]) whitelist[plane] = {}
+      if (!whitelist[plane][kind]) whitelist[plane][kind] = new Set()
+      whitelist[plane][kind].add(mask)
+    })
+    this.momimeMaskWhitelist = whitelist
+  },
+
+  maskWhitelistFor(plane, kind) {
+    return this.momimeMaskWhitelist?.[plane]?.[kind] || null
+  },
+
+  maskSupported(plane, kind, maskString) {
+    const whitelist = this.maskWhitelistFor(plane, kind)
+    if (!whitelist) return true
+    return whitelist.has(this.normalizeMaskString(maskString))
+  },
+
+  canonicalizeMaskString(plane, kind, maskString) {
+    const normalized = this.normalizeMaskString(maskString)
+    const whitelist = this.maskWhitelistFor(plane, kind)
+    if (!whitelist || whitelist.has(normalized)) return normalized
+    const cleared = this.clearDiagonalMaskString(normalized)
+    if (whitelist.has(cleared)) return cleared
+    return normalized
   },
 
   momimeBaseKey(plane, kind, mask) {
@@ -972,6 +1320,61 @@ const MapCanvas = {
     return null
   },
 
+  resolveMomimePathForKind(plane, kind, mask, phaseIndex) {
+    if (kind === "shore") {
+      return this.resolveMomimePathForShore(plane, mask, phaseIndex)
+    }
+    const maskString = this.canonicalizeMaskString(plane, kind, this.maskString(mask))
+    const resolved = this.resolveMomimePath(plane, kind, maskString, phaseIndex)
+    return resolved ? {...resolved, maskString, rotation: 0} : null
+  },
+
+  resolveMomimePathForShore(plane, maskDigits, phaseIndex) {
+    const whitelist = this.maskWhitelistFor(plane, "shore")
+    const rotations = [
+      {digits: this.gateDiagonalDigits(maskDigits), rotation: 0},
+      {digits: this.gateDiagonalDigits(this.rotateMaskDigits(maskDigits, 2)), rotation: 90},
+      {digits: this.gateDiagonalDigits(this.rotateMaskDigits(maskDigits, 4)), rotation: 180},
+      {digits: this.gateDiagonalDigits(this.rotateMaskDigits(maskDigits, 6)), rotation: 270},
+    ]
+
+    for (let i = 0; i < rotations.length; i++) {
+      const attempt = rotations[i]
+      const baseMask = this.maskStringFromDigits(attempt.digits)
+      const variants = this.shoreMaskVariants(baseMask)
+        .map(mask => this.canonicalizeMaskString(plane, "shore", mask))
+        .filter(mask => !whitelist || whitelist.has(mask))
+      const uniqueVariants = Array.from(new Set(variants))
+      for (let v = 0; v < uniqueVariants.length; v++) {
+        const maskString = uniqueVariants[v]
+        const resolved = this.resolveMomimePath(plane, "shore", maskString, phaseIndex)
+        if (resolved) {
+          this.recordMomimeMaskRotation("shore", attempt.rotation)
+          return {...resolved, maskString, rotation: attempt.rotation}
+        }
+      }
+    }
+
+    return null
+  },
+
+  recordMomimeMaskRotation(kind, rotation) {
+    if (!this.momimeMaskRotationStats) return
+    const key = Number.isFinite(rotation) ? rotation : 0
+    const stats = this.momimeMaskRotationStats
+    stats[key] = (stats[key] || 0) + 1
+
+    const total = Object.values(stats).reduce((sum, value) => {
+      return sum + (Number.isFinite(value) ? value : 0)
+    }, 0)
+
+    if (!this.debugMomimeMask && total % this.momimeMaskRotationLogEvery !== 0) {
+      return
+    }
+
+    console.info(`[mirror] momime mask rotations (${kind})`, {...stats})
+  },
+
   momimeUrl(path) {
     if (!path) return null
     if (!this.momimeBaseUrl) return path
@@ -1014,12 +1417,22 @@ const MapCanvas = {
     const idx = y * this.mapWidth + x
     const terrainValue = this.terrainValues[idx] || 0
     const kind = this.terrainKindAt(x, y, terrainValue)
-    if (!kind || kind === "unknown") return false
+    if (!kind || kind === "unknown") {
+      this.drawMissingTile(x, y, resolved, "unknown")
+      return true
+    }
 
     const mask = kind === "ocean" ? 0 : this.adjMaskForKind(kind, x, y)
-    const maskString = this.maskString(mask)
+    let maskInput = mask
+    let shoreMaskString = null
+    if (kind === "shore") {
+      const shoreDigits = this.shoreMaskDigits(x, y)
+      maskInput = shoreDigits
+      shoreMaskString = this.maskStringFromDigits(shoreDigits)
+      this.logMomimeMaskSample(x, y, kind, mask, shoreMaskString)
+    }
     const plane = this.plane || "arcanus"
-    const resolvedPath = this.resolveMomimePath(plane, kind, maskString, resolved.phaseIndex)
+    const resolvedPath = this.resolveMomimePathForKind(plane, kind, maskInput, resolved.phaseIndex)
     if (!resolvedPath) return false
 
     const imageEntry = this.getMomimeImage(resolvedPath.path)
@@ -1034,6 +1447,26 @@ const MapCanvas = {
     }
     this.drawMomimeImage(imageEntry.img, x, y, resolved)
     return true
+  },
+
+  drawTerrainKindDebug(x, y, kind, render) {
+    const {ctx, size} = this.resolveRender(render)
+    const label = kind || "unknown"
+    const color = TERRAIN_KIND_DEBUG_COLORS[label] || TERRAIN_KIND_DEBUG_COLORS.unknown
+
+    ctx.save()
+    ctx.globalAlpha = 0.35
+    ctx.fillStyle = color
+    ctx.fillRect(x * size, y * size, size, size)
+    ctx.restore()
+
+    if (size >= 18) {
+      ctx.save()
+      ctx.font = `${Math.max(8, Math.floor(size / 4))}px sans-serif`
+      ctx.fillStyle = "#0f172a"
+      ctx.fillText(label, x * size + 2, y * size + size - 4)
+      ctx.restore()
+    }
   },
 
   drawMissingTile(x, y, render, label) {
@@ -1216,15 +1649,30 @@ const MapCanvas = {
 
   terrainBaseKindForValue(value) {
     if (!Number.isFinite(value)) return "unknown"
-    const base = value & 0xff
+    const base = this.terrainBaseValue(value)
+
+    const baseKind = this.terrainKindForBaseId(base, {allowWater: true})
+    if (baseKind) return baseKind
+
+    return "unknown"
+  },
+
+  terrainKindForBaseId(base, opts = {}) {
+    const allowWater = opts.allowWater !== false
     const override = this.terrainKindOverrides?.[String(base)]
     if (override) return this.normalizeKind(override)
-    if (this.terrainWaterValueSet && this.terrainWaterValueSet.has(base)) return "ocean"
+    if (allowWater && this.terrainWaterValueSet && this.terrainWaterValueSet.has(base)) {
+      return "ocean"
+    }
+
+    const mapped = this.terrainKindFromBaseId(base)
+    if (mapped) return mapped
 
     const name = String(this.terrainNames?.[String(base)] || "").toLowerCase()
     if (name) {
       if (this.matchesKeyword(name, ["ocean", "sea", "water"])) return "ocean"
       if (this.matchesKeyword(name, ["shore", "coast", "beach"])) return "shore"
+      if (this.matchesKeyword(name, ["forest", "woods", "jungle"])) return "forest"
       if (this.matchesKeyword(name, ["desert", "dune", "sand", "waste"])) return "desert"
       if (this.matchesKeyword(name, ["tundra", "snow", "ice"])) return "tundra"
       if (this.matchesKeyword(name, ["swamp", "marsh", "bog"])) return "swamp"
@@ -1232,10 +1680,38 @@ const MapCanvas = {
       if (this.matchesKeyword(name, ["mountain", "peak", "volcano", "crater"])) {
         return "mountain"
       }
-      if (this.matchesKeyword(name, ["grass", "plain", "prairie"])) return "grass"
+      if (this.matchesKeyword(name, ["grass", "plain", "prairie", "grassland"])) return "grass"
     }
 
-    return "grass"
+    return null
+  },
+
+  terrainBaseSourceForValue(value) {
+    if (!Number.isFinite(value)) return "unknown"
+    return this.terrainBaseSource || "lo"
+  },
+
+  terrainBaseValue(value) {
+    if (!Number.isFinite(value)) return 0
+    const lo = value & 0xff
+    const hi = (value >> 8) & 0xff
+    const source = this.terrainBaseSource || "lo"
+
+    switch (source) {
+      case "hi":
+        return hi
+      case "lo_nibble":
+        return lo & 0x0f
+      case "hi_nibble":
+        return hi & 0x0f
+      default:
+        return lo
+    }
+  },
+
+  terrainKindFromBaseId(base) {
+    const kind = TERRAIN_KIND_BY_BASE_ID[base]
+    return kind ? this.normalizeKind(kind) : null
   },
 
   normalizeKind(value) {
@@ -1246,6 +1722,7 @@ const MapCanvas = {
         "ocean",
         "shore",
         "grass",
+        "forest",
         "desert",
         "tundra",
         "swamp",
@@ -1255,6 +1732,10 @@ const MapCanvas = {
     ) {
       return normalized
     }
+    if (["grasslands", "grassland", "plains"].includes(normalized)) return "grass"
+    if (["hills"].includes(normalized)) return "hill"
+    if (["mountains"].includes(normalized)) return "mountain"
+    if (["woods"].includes(normalized)) return "forest"
     if (["water", "sea"].includes(normalized)) return "ocean"
     return "unknown"
   },
@@ -1298,7 +1779,66 @@ const MapCanvas = {
       }
     }
 
-    return mask
+    return this.gateDiagonalMask(mask)
+  },
+
+  rotateMask(mask, shift) {
+    const normalized = Number.isFinite(mask) ? mask : 0
+    const offset = ((shift % 8) + 8) % 8
+    if (offset === 0) return normalized
+    let result = 0
+    for (let i = 0; i < 8; i++) {
+      if (normalized & (1 << i)) {
+        const next = (i + offset) % 8
+        result |= 1 << next
+      }
+    }
+    return result
+  },
+
+  rotate90(mask) {
+    return this.rotateMask(mask, 2)
+  },
+
+  rotate180(mask) {
+    return this.rotateMask(mask, 4)
+  },
+
+  rotate270(mask) {
+    return this.rotateMask(mask, 6)
+  },
+
+  logMomimeMaskSample(x, y, kind, mask, maskString) {
+    if (!this.debugMomimeMask) return
+    if (this.momimeMaskSampleCount >= this.momimeMaskSampleLimit) return
+
+    const resolvedMaskString = maskString || this.maskString(mask)
+    const neighbors = ADJ_DIRS.map(([dx, dy], index) => {
+      let nx = x + dx
+      let ny = y + dy
+      if (ny < 0 || ny >= this.mapHeight) return null
+      if (nx < 0) nx += this.mapWidth
+      if (nx >= this.mapWidth) nx -= this.mapWidth
+      const neighborKind = this.terrainBaseKindAt(nx, ny)
+      return {
+        dir: ADJ_DIR_LABELS[index],
+        x: nx,
+        y: ny,
+        kind: neighborKind,
+        ocean: neighborKind === "ocean",
+      }
+    }).filter(Boolean)
+
+    console.info("[mirror] momime mask sample", {
+      x,
+      y,
+      kind,
+      mask,
+      maskString: resolvedMaskString,
+      neighbors,
+    })
+
+    this.momimeMaskSampleCount += 1
   },
 
   adjMaskForFlag(bit, x, y) {
@@ -1421,7 +1961,7 @@ const MapCanvas = {
     const resolved = this.resolveRender(render)
     const idx = y * this.mapWidth + x
     const terrainValue = this.terrainValues[idx] || 0
-    const embedded = (terrainValue >> 8) & 0xff
+    const embedded = this.terrainEmbeddedSpecialForValue(terrainValue)
     if (embedded <= 0) return
 
     const groupNames = this.overlayGroupNames(`special_${embedded}`, "interior").concat(
@@ -1431,6 +1971,14 @@ const MapCanvas = {
     if (overlayEntry) {
       this.drawImageEntry(overlayEntry, x, y, resolved)
     }
+  },
+
+  terrainEmbeddedSpecialForValue(value) {
+    if (!Number.isFinite(value)) return 0
+    const lo = value & 0xff
+    const hi = (value >> 8) & 0xff
+    const source = this.terrainBaseSourceForValue(value)
+    return String(source).startsWith("hi") ? lo : hi
   },
 
   redrawNeighborhood(x, y) {

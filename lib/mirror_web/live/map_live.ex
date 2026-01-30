@@ -465,6 +465,27 @@ defmodule MirrorWeb.MapLive do
     {:noreply, socket}
   end
 
+  def handle_event("toggle_debug_terrain_kinds", _params, socket) do
+    state = socket.assigns.state
+    debug = not Map.get(state, :debug_terrain_kinds, false)
+    state = %{state | debug_terrain_kinds: debug}
+    SessionStore.put(socket.assigns.session_id, state)
+
+    socket =
+      socket
+      |> assign_from_state(state)
+      |> assign_forms()
+
+    socket =
+      if connected?(socket) do
+        push_map_state(socket)
+      else
+        socket
+      end
+
+    {:noreply, socket}
+  end
+
   def handle_event("detect_phase_loop", _params, socket) do
     state = socket.assigns.state
 
@@ -647,6 +668,14 @@ defmodule MirrorWeb.MapLive do
                     class="rounded-full border border-sky-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-sky-100 transition hover:border-sky-200"
                   >
                     Snapshot: {if @snapshot_mode, do: "On", else: "Off"}
+                  </button>
+                  <button
+                    id="debug-terrain-kinds-button"
+                    type="button"
+                    phx-click="toggle_debug_terrain_kinds"
+                    class="rounded-full border border-rose-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-rose-100 transition hover:border-rose-200"
+                  >
+                    Kinds: {if @debug_terrain_kinds, do: "On", else: "Off"}
                   </button>
                   <div class="flex flex-col gap-1">
                     <.form
@@ -920,6 +949,7 @@ defmodule MirrorWeb.MapLive do
                   data-render-mode={Atom.to_string(@render_mode)}
                   data-phase-index={@phase_index}
                   data-snapshot-mode={@snapshot_mode}
+                  data-debug-terrain-kinds={@debug_terrain_kinds}
                   data-tile-size="32"
                   class="block"
                 >
@@ -1729,6 +1759,7 @@ defmodule MirrorWeb.MapLive do
       phase_loop_status: phase_loop_status,
       phase_loop_detecting: Map.get(state, :phase_loop_detecting, false),
       snapshot_mode: Map.get(state, :snapshot_mode, true),
+      debug_terrain_kinds: Map.get(state, :debug_terrain_kinds, false),
       engine_session_id: Map.get(state, :engine_session_id)
     )
   end
@@ -1998,6 +2029,7 @@ defmodule MirrorWeb.MapLive do
       render_mode: Atom.to_string(state.render_mode),
       phase_index: effective_phase_index(state),
       snapshot_mode: Map.get(state, :snapshot_mode, true),
+      debug_terrain_kinds: Map.get(state, :debug_terrain_kinds, false),
       layer_visibility: stringify_layer_map(layer_visibility),
       layer_opacity: stringify_layer_map(layer_opacity)
     })
@@ -2029,6 +2061,7 @@ defmodule MirrorWeb.MapLive do
       render_mode: Atom.to_string(state.render_mode),
       phase_index: effective_phase_index(state),
       snapshot_mode: Map.get(state, :snapshot_mode, true),
+      debug_terrain_kinds: Map.get(state, :debug_terrain_kinds, false),
       layer_visibility: stringify_layer_map(layer_visibility),
       layer_opacity: stringify_layer_map(layer_opacity)
     })
@@ -2096,10 +2129,10 @@ defmodule MirrorWeb.MapLive do
   end
 
   defp push_tile_assets(socket, state) do
-    socket =
+    {socket, clear_cache?} =
       case socket.assigns.tile_assets do
-        nil -> assign(socket, :tile_assets, TileAtlas.build())
-        _ -> socket
+        nil -> {assign(socket, :tile_assets, TileAtlas.build()), true}
+        _ -> {socket, false}
       end
 
     atlas = socket.assigns.tile_assets
@@ -2115,7 +2148,8 @@ defmodule MirrorWeb.MapLive do
       momime: atlas.momime,
       terrain_names: terrain_names,
       terrain_flag_names: terrain_flag_names,
-      terrain_water_values: terrain_water_values
+      terrain_water_values: terrain_water_values,
+      clear_cache: clear_cache?
     })
   end
 
@@ -2313,6 +2347,7 @@ defmodule MirrorWeb.MapLive do
       phase_loop_len: nil,
       phase_loop_status: :unknown,
       phase_loop_detecting: false,
+      debug_terrain_kinds: false,
       layer_visibility: default_layer_visibility(:terrain),
       layer_opacity: default_layer_opacity(),
       engine_session_id: nil,
@@ -2336,6 +2371,7 @@ defmodule MirrorWeb.MapLive do
       |> Map.put_new(:phase_loop_status, :unknown)
       |> Map.update(:phase_loop_status, :unknown, &normalize_phase_loop_status/1)
       |> Map.put_new(:phase_loop_detecting, false)
+      |> Map.put_new(:debug_terrain_kinds, false)
       |> Map.put_new(:engine_session_id, nil)
       |> Map.put_new(:engine_player_id, :observer)
 
