@@ -10,6 +10,16 @@ const ADJ_DIRS = [
 ]
 
 const ADJ_DIR_LABELS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+const SHORE_MASK_DIRS = [
+  [1, -1],  // NE
+  [1, 0],   // E
+  [1, 1],   // SE
+  [0, 1],   // S
+  [-1, 1],  // SW
+  [-1, 0],  // W
+  [-1, -1], // NW
+  [0, -1],  // N
+]
 
 const TERRAIN_KIND_BY_BASE_ID = {
   0: "ocean",
@@ -1190,10 +1200,18 @@ const MapCanvas = {
   gateDiagonalDigits(digits) {
     const next = Array.isArray(digits) ? digits.slice(0, 8) : Array(8).fill("0")
     const present = idx => (next[idx] ?? "0") !== "0"
-    if (present(1) && !(present(0) && present(2))) next[1] = "0"
-    if (present(3) && !(present(2) && present(4))) next[3] = "0"
-    if (present(5) && !(present(4) && present(6))) next[5] = "0"
-    if (present(7) && !(present(6) && present(0))) next[7] = "0"
+    const rewriteDiagonal = (diag, a, b) => {
+      if (!present(diag)) return
+      if (!(present(a) && present(b))) {
+        next[diag] = "2"
+      } else if (next[diag] !== "2") {
+        next[diag] = "1"
+      }
+    }
+    rewriteDiagonal(0, 7, 1)
+    rewriteDiagonal(2, 1, 3)
+    rewriteDiagonal(4, 3, 5)
+    rewriteDiagonal(6, 5, 7)
     return next
   },
 
@@ -1210,8 +1228,10 @@ const MapCanvas = {
 
   shoreMaskDigits(x, y) {
     const digits = Array(8).fill("0")
-    for (let i = 0; i < ADJ_DIRS.length; i++) {
-      const [dx, dy] = ADJ_DIRS[i]
+    const land = Array(8).fill(false)
+
+    for (let i = 0; i < SHORE_MASK_DIRS.length; i++) {
+      const [dx, dy] = SHORE_MASK_DIRS[i]
       let nx = x + dx
       let ny = y + dy
       if (ny < 0 || ny >= this.mapHeight) continue
@@ -1219,16 +1239,27 @@ const MapCanvas = {
       if (nx >= this.mapWidth) nx -= this.mapWidth
 
       const baseKind = this.terrainBaseKindAt(nx, ny)
-      if (baseKind === "ocean") continue
+      land[i] = baseKind !== "ocean"
+    }
 
-      if (i % 2 === 0) {
-        const neighborKind = this.terrainKindAt(nx, ny)
-        digits[i] = neighborKind === "shore" ? "2" : "1"
-      } else {
+    for (let i = 0; i < land.length; i++) {
+      if (i % 2 === 1) {
+        digits[i] = land[i] ? "1" : "0"
+        continue
+      }
+
+      const left = (i + 7) % 8
+      const right = (i + 1) % 8
+      if (land[left] && land[right]) {
         digits[i] = "1"
+      } else if (land[i]) {
+        digits[i] = "2"
+      } else {
+        digits[i] = "0"
       }
     }
-    return this.gateDiagonalDigits(digits)
+
+    return digits
   },
 
   shoreMaskVariants(maskString) {
@@ -1267,7 +1298,7 @@ const MapCanvas = {
   canonicalizeMaskString(plane, kind, maskString) {
     const normalized = this.normalizeMaskString(maskString)
     const whitelist = this.maskWhitelistFor(plane, kind)
-    if (!whitelist || whitelist.has(normalized)) return normalized
+    if (!whitelist || whitelist.has(normalized) || kind === "shore") return normalized
     const cleared = this.clearDiagonalMaskString(normalized)
     if (whitelist.has(cleared)) return cleared
     return normalized
@@ -1310,13 +1341,6 @@ const MapCanvas = {
       if (path) return {path, frame: anyFrame}
     }
 
-    const zeroMask = "00000000"
-    path = this.momimeIndex?.[this.momimeKey(plane, kind, zeroMask, frame)]
-    if (path) return {path, frame}
-
-    path = this.momimeIndex?.[this.momimeKey(plane, kind, zeroMask, "0")]
-    if (path) return {path, frame: "0"}
-
     return null
   },
 
@@ -1330,32 +1354,12 @@ const MapCanvas = {
   },
 
   resolveMomimePathForShore(plane, maskDigits, phaseIndex) {
-    const whitelist = this.maskWhitelistFor(plane, "shore")
-    const rotations = [
-      {digits: this.gateDiagonalDigits(maskDigits), rotation: 0},
-      {digits: this.gateDiagonalDigits(this.rotateMaskDigits(maskDigits, 2)), rotation: 90},
-      {digits: this.gateDiagonalDigits(this.rotateMaskDigits(maskDigits, 4)), rotation: 180},
-      {digits: this.gateDiagonalDigits(this.rotateMaskDigits(maskDigits, 6)), rotation: 270},
-    ]
+    const baseMask = this.maskStringFromDigits(maskDigits)
+    const maskString = this.canonicalizeMaskString(plane, "shore", baseMask)
+    if (!this.maskSupported(plane, "shore", maskString)) return null
 
-    for (let i = 0; i < rotations.length; i++) {
-      const attempt = rotations[i]
-      const baseMask = this.maskStringFromDigits(attempt.digits)
-      const variants = this.shoreMaskVariants(baseMask)
-        .map(mask => this.canonicalizeMaskString(plane, "shore", mask))
-        .filter(mask => !whitelist || whitelist.has(mask))
-      const uniqueVariants = Array.from(new Set(variants))
-      for (let v = 0; v < uniqueVariants.length; v++) {
-        const maskString = uniqueVariants[v]
-        const resolved = this.resolveMomimePath(plane, "shore", maskString, phaseIndex)
-        if (resolved) {
-          this.recordMomimeMaskRotation("shore", attempt.rotation)
-          return {...resolved, maskString, rotation: attempt.rotation}
-        }
-      }
-    }
-
-    return null
+    const resolved = this.resolveMomimePath(plane, "shore", maskString, phaseIndex)
+    return resolved ? {...resolved, maskString, rotation: 0} : null
   },
 
   recordMomimeMaskRotation(kind, rotation) {
