@@ -507,6 +507,27 @@ defmodule MirrorWeb.MapLive do
     {:noreply, socket}
   end
 
+  def handle_event("toggle_debug_shore_semantics", _params, socket) do
+    state = socket.assigns.state
+    debug = not Map.get(state, :debug_shore_semantics, false)
+    state = %{state | debug_shore_semantics: debug}
+    SessionStore.put(socket.assigns.session_id, state)
+
+    socket =
+      socket
+      |> assign_from_state(state)
+      |> assign_forms()
+
+    socket =
+      if connected?(socket) do
+        push_map_state(socket)
+      else
+        socket
+      end
+
+    {:noreply, socket}
+  end
+
   def handle_event("detect_phase_loop", _params, socket) do
     state = socket.assigns.state
 
@@ -708,6 +729,14 @@ defmodule MirrorWeb.MapLive do
                     class="rounded-full border border-fuchsia-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-fuchsia-100 transition hover:border-fuchsia-200"
                   >
                     Coast Audit: {if @debug_coast_audit, do: "On", else: "Off"}
+                  </button>
+                  <button
+                    id="debug-shore-semantics-button"
+                    type="button"
+                    phx-click="toggle_debug_shore_semantics"
+                    class="rounded-full border border-cyan-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-100 transition hover:border-cyan-200"
+                  >
+                    Shore Semantics: {if @debug_shore_semantics, do: "On", else: "Off"}
                   </button>
                   <div class="flex flex-col gap-1">
                     <.form
@@ -992,6 +1021,7 @@ defmodule MirrorWeb.MapLive do
                   data-snapshot-mode={@snapshot_mode}
                   data-debug-terrain-kinds={@debug_terrain_kinds}
                   data-debug-coast-audit={@debug_coast_audit}
+                  data-debug-shore-semantics={@debug_shore_semantics}
                   data-tile-size="32"
                   class="block"
                 >
@@ -1819,6 +1849,7 @@ defmodule MirrorWeb.MapLive do
       snapshot_mode: Map.get(state, :snapshot_mode, true),
       debug_terrain_kinds: Map.get(state, :debug_terrain_kinds, false),
       debug_coast_audit: Map.get(state, :debug_coast_audit, false),
+      debug_shore_semantics: Map.get(state, :debug_shore_semantics, false),
       engine_session_id: Map.get(state, :engine_session_id)
     )
   end
@@ -2090,6 +2121,7 @@ defmodule MirrorWeb.MapLive do
       snapshot_mode: Map.get(state, :snapshot_mode, true),
       debug_terrain_kinds: Map.get(state, :debug_terrain_kinds, false),
       debug_coast_audit: Map.get(state, :debug_coast_audit, false),
+      debug_shore_semantics: Map.get(state, :debug_shore_semantics, false),
       layer_visibility: stringify_layer_map(layer_visibility),
       layer_opacity: stringify_layer_map(layer_opacity)
     })
@@ -2123,6 +2155,7 @@ defmodule MirrorWeb.MapLive do
       snapshot_mode: Map.get(state, :snapshot_mode, true),
       debug_terrain_kinds: Map.get(state, :debug_terrain_kinds, false),
       debug_coast_audit: Map.get(state, :debug_coast_audit, false),
+      debug_shore_semantics: Map.get(state, :debug_shore_semantics, false),
       layer_visibility: stringify_layer_map(layer_visibility),
       layer_opacity: stringify_layer_map(layer_opacity)
     })
@@ -2410,6 +2443,7 @@ defmodule MirrorWeb.MapLive do
       phase_loop_detecting: false,
       debug_terrain_kinds: false,
       debug_coast_audit: false,
+      debug_shore_semantics: false,
       layer_visibility: default_layer_visibility(:terrain),
       layer_opacity: default_layer_opacity(),
       engine_session_id: nil,
@@ -2435,6 +2469,7 @@ defmodule MirrorWeb.MapLive do
       |> Map.put_new(:phase_loop_detecting, false)
       |> Map.put_new(:debug_terrain_kinds, false)
       |> Map.put_new(:debug_coast_audit, false)
+      |> Map.put_new(:debug_shore_semantics, false)
       |> Map.put_new(:engine_session_id, nil)
       |> Map.put_new(:engine_player_id, :observer)
 

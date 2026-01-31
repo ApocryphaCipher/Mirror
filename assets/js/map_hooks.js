@@ -53,6 +53,26 @@ const TERRAIN_KIND_DEBUG_COLORS = {
   unknown: "#ff00ff",
 }
 
+const SHORE_SEMANTIC_COLORS = {
+  straight_edge: "#38bdf8",
+  convex_corner: "#f59e0b",
+  concave_inlet: "#f472b6",
+  peninsula: "#a3e635",
+  island_tip: "#22d3ee",
+  channel: "#cbd5f5",
+  unknown: "#facc15",
+}
+
+const SHORE_SEMANTIC_LABELS = {
+  straight_edge: "edge",
+  convex_corner: "convex",
+  concave_inlet: "inlet",
+  peninsula: "pen",
+  island_tip: "tip",
+  channel: "chan",
+  unknown: "shore",
+}
+
 const LAYER_STACK = [
   "terrain",
   "terrain_flags",
@@ -98,7 +118,8 @@ const MapCanvas = {
     this.debugTerrainSamples = this.parseBool(this.el.dataset.debugTerrainSamples, false)
     this.debugCoastAudit = this.parseBool(this.el.dataset.debugCoastAudit, false)
     this.debugMomimeMask = this.parseBool(this.el.dataset.debugMomimeMask, this.debugCoastAudit)
-    this.coastDiagonalReduction = this.parseBool(this.el.dataset.coastDiagonalReduction, false)
+    this.debugShoreSemantics = this.parseBool(this.el.dataset.debugShoreSemantics, false)
+    this.coastDiagonalReduction = this.parseBool(this.el.dataset.coastDiagonalReduction, true)
     this.terrainSampleLogged = false
     this.terrainBaseSource = "lo"
     this.terrainBaseSourceStats = null
@@ -180,6 +201,10 @@ const MapCanvas = {
         this.debugCoastAudit = this.parseBool(payload.debug_coast_audit, this.debugCoastAudit)
         this.debugMomimeMask = this.debugCoastAudit
       }
+      if (Object.prototype.hasOwnProperty.call(payload, "debug_shore_semantics")) {
+        this.debugShoreSemantics = this.parseBool(payload.debug_shore_semantics, this.debugShoreSemantics)
+        needsRender = true
+      }
       if (Object.prototype.hasOwnProperty.call(payload, "debug_terrain_samples")) {
         this.debugTerrainSamples = this.parseBool(payload.debug_terrain_samples, this.debugTerrainSamples)
         this.maybeLogTerrainSamples()
@@ -241,6 +266,9 @@ const MapCanvas = {
       if (Object.prototype.hasOwnProperty.call(payload, "debug_coast_audit")) {
         this.debugCoastAudit = this.parseBool(payload.debug_coast_audit, this.debugCoastAudit)
         this.debugMomimeMask = this.debugCoastAudit
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, "debug_shore_semantics")) {
+        this.debugShoreSemantics = this.parseBool(payload.debug_shore_semantics, this.debugShoreSemantics)
       }
       if (Object.prototype.hasOwnProperty.call(payload, "debug_terrain_samples")) {
         this.debugTerrainSamples = this.parseBool(payload.debug_terrain_samples, this.debugTerrainSamples)
@@ -796,9 +824,15 @@ const MapCanvas = {
     this.drawTileArt(x, y, {includeOverlays: false, render: resolved})
     this.drawFeatureOverlays(x, y, resolved)
     this.drawEmbeddedSpecialOverlay(x, y, resolved)
-    if (this.debugTerrainKinds) {
+    if (this.debugTerrainKinds || this.debugShoreSemantics) {
       const kind = this.terrainKindAt(x, y)
-      this.drawTerrainKindDebug(x, y, kind, resolved)
+      if (this.debugTerrainKinds) {
+        this.drawTerrainKindDebug(x, y, kind, resolved)
+      }
+      if (this.debugShoreSemantics && kind === "shore") {
+        const shoreDigits = this.shoreMaskDigits(x, y)
+        this.drawShoreSemanticsDebug(x, y, shoreDigits, resolved)
+      }
     }
   },
 
@@ -1313,6 +1347,155 @@ const MapCanvas = {
     return digits
   },
 
+  normalizeShoreMaskDigits(maskDigits) {
+    if (Array.isArray(maskDigits)) {
+      const next = maskDigits.slice(0, 8).map(value => String(value ?? "0"))
+      while (next.length < 8) next.push("0")
+      return next.map(value => (value === "1" || value === "2" ? value : "0"))
+    }
+    const normalized = this.normalizeMaskString(maskDigits)
+    return normalized.split("").map(value => (value === "1" || value === "2" ? value : "0"))
+  },
+
+  cardinalAdjacent(a, b) {
+    return (a + 1) % 4 === b || (b + 1) % 4 === a
+  },
+
+  cornerDiagonalForCardinals(a, b) {
+    const min = Math.min(a, b)
+    const max = Math.max(a, b)
+    if (min === 0 && max === 1) return 1
+    if (min === 1 && max === 2) return 3
+    if (min === 2 && max === 3) return 5
+    if (min === 0 && max === 3) return 7
+    return null
+  },
+
+  classifyShoreSemantics(maskDigits) {
+    const digits = this.normalizeShoreMaskDigits(maskDigits)
+    const cardinalDigits = [digits[0], digits[2], digits[4], digits[6]]
+    const cardinalLand = cardinalDigits.map(value => value !== "0")
+    const waterCardinals = cardinalLand.map(value => !value)
+    const waterIndices = []
+    waterCardinals.forEach((isWater, index) => {
+      if (isWater) waterIndices.push(index)
+    })
+    const waterCount = waterIndices.length
+    const diagonalWater = [digits[1], digits[3], digits[5], digits[7]].some(value => value === "0")
+    let semantic = "straight_edge"
+    let cornerDiagonal = null
+
+    if (waterCount === 0) {
+      semantic = diagonalWater ? "convex_corner" : "straight_edge"
+    } else if (waterCount === 1) {
+      semantic = "straight_edge"
+    } else if (waterCount === 2) {
+      const [a, b] = waterIndices
+      if (!this.cardinalAdjacent(a, b)) {
+        semantic = "channel"
+      } else {
+        cornerDiagonal = this.cornerDiagonalForCardinals(a, b)
+        const diagDigit = cornerDiagonal === null ? "0" : digits[cornerDiagonal] ?? "0"
+        semantic = diagDigit !== "0" ? "concave_inlet" : "convex_corner"
+      }
+    } else if (waterCount === 3) {
+      semantic = "peninsula"
+    } else if (waterCount === 4) {
+      semantic = "island_tip"
+    }
+
+    return {
+      class: semantic,
+      waterCount,
+      waterIndices,
+      cornerDiagonal,
+      digits,
+    }
+  },
+
+  shoreSemanticFallbacks(maskString, semanticClass) {
+    const normalized = this.normalizeMaskString(maskString)
+    const baseDigits = normalized.split("")
+    const seen = new Set([normalized])
+    const variants = []
+    const diagLabels = {1: "ne", 3: "se", 5: "sw", 7: "nw"}
+    const diagOrder = [1, 3, 5, 7]
+
+    const pushVariant = (digits, step) => {
+      const candidate = digits.join("")
+      if (seen.has(candidate)) return
+      const candidateClass = this.classifyShoreSemantics(candidate).class
+      if (candidateClass !== semanticClass) return
+      variants.push({maskString: candidate, step})
+      seen.add(candidate)
+    }
+
+    diagOrder.forEach(index => {
+      if (baseDigits[index] === "2") {
+        const next = baseDigits.slice(0)
+        next[index] = "1"
+        pushVariant(next, `relax_diag_2_to_1_${diagLabels[index]}`)
+      }
+    })
+
+    diagOrder.forEach(index => {
+      if (baseDigits[index] === "2") {
+        const next = baseDigits.slice(0)
+        next[index] = "0"
+        pushVariant(next, `relax_diag_2_to_0_${diagLabels[index]}`)
+      }
+    })
+
+    diagOrder.forEach(index => {
+      if (baseDigits[index] === "1") {
+        const next = baseDigits.slice(0)
+        next[index] = "0"
+        pushVariant(next, `relax_diag_1_to_0_${diagLabels[index]}`)
+      }
+    })
+
+    const reduced2to1 = this.reduceDiagonalMaskString(normalized, "2", "1")
+    if (reduced2to1 !== normalized) {
+      pushVariant(reduced2to1.split(""), "relax_diagonals_2_to_1")
+    }
+
+    const reduced2to0 = this.reduceDiagonalMaskString(normalized, "2", "0")
+    if (reduced2to0 !== normalized) {
+      pushVariant(reduced2to0.split(""), "relax_diagonals_2_to_0")
+    }
+
+    const reduced1to0 = this.reduceDiagonalMaskString(normalized, "1", "0")
+    if (reduced1to0 !== normalized) {
+      pushVariant(reduced1to0.split(""), "relax_diagonals_1_to_0")
+    }
+
+    return variants
+  },
+
+  shoreSemanticLabel(semantic) {
+    return SHORE_SEMANTIC_LABELS[semantic] || SHORE_SEMANTIC_LABELS.unknown
+  },
+
+  drawShoreSemanticsDebug(x, y, maskDigits, render) {
+    const {ctx, size} = this.resolveRender(render)
+    const semantic = this.classifyShoreSemantics(maskDigits)
+    const color = SHORE_SEMANTIC_COLORS[semantic.class] || SHORE_SEMANTIC_COLORS.unknown
+
+    ctx.save()
+    ctx.globalAlpha = 0.35
+    ctx.fillStyle = color
+    ctx.fillRect(x * size, y * size, size, size)
+    ctx.restore()
+
+    if (size >= 18) {
+      ctx.save()
+      ctx.font = `${Math.max(8, Math.floor(size / 4))}px sans-serif`
+      ctx.fillStyle = "#0f172a"
+      ctx.fillText(this.shoreSemanticLabel(semantic.class), x * size + 2, y * size + size - 4)
+      ctx.restore()
+    }
+  },
+
   shoreMaskVariants(maskString) {
     const base = String(maskString || "")
     const variants = [base]
@@ -1434,6 +1617,8 @@ const MapCanvas = {
     const audit = opts.audit === true
     const recordMissing = opts.recordMissing ?? this.debugCoastAudit
     const rawMaskString = this.normalizeMaskString(this.maskStringFromDigits(maskDigits))
+    const semantic = this.classifyShoreSemantics(maskDigits)
+    const semanticClass = semantic.class
     const canonical = this.canonicalMaskString(rawMaskString)
 
     const attemptMask = (maskString, rotation, step) => {
@@ -1463,25 +1648,28 @@ const MapCanvas = {
       resolved = attemptMask(canonical.maskString, canonical.rotation, "canonical")
     }
 
-    let reduced2 = null
     if (!resolved && this.coastDiagonalReduction) {
-      reduced2 = this.reduceDiagonalMaskString(rawMaskString, "2", "0")
-      if (reduced2 !== rawMaskString) {
-        resolved = attemptWithCanonical(reduced2, "reduce_diagonals_2")
-      }
-    }
-
-    if (!resolved && this.coastDiagonalReduction) {
-      const base = reduced2 || rawMaskString
-      const reduced1 = this.reduceDiagonalMaskString(base, "1", "0")
-      if (reduced1 !== base) {
-        resolved = attemptWithCanonical(reduced1, "reduce_diagonals_1")
+      const variants = this.shoreSemanticFallbacks(rawMaskString, semanticClass)
+      for (let i = 0; i < variants.length; i++) {
+        const variant = variants[i]
+        resolved = attemptWithCanonical(variant.maskString, variant.step)
+        if (resolved) break
       }
     }
 
     if (!resolved) {
       const fallback = this.resolveMomimePathWithFrame(plane, "shore", "00000000", "0")
       if (fallback) {
+        if (this.debugCoastAudit) {
+          const fallbackClass = this.classifyShoreSemantics("00000000").class
+          if (fallbackClass !== semanticClass) {
+            console.info("[mirror] coast semantic fallback crossed class", {
+              rawMaskString,
+              semantic_class: semanticClass,
+              fallback_class: fallbackClass,
+            })
+          }
+        }
         resolved = {
           ...fallback,
           maskString: "00000000",
@@ -1496,6 +1684,7 @@ const MapCanvas = {
       rawMaskString,
       canonicalMaskString: canonical.maskString,
       canonicalRotation: canonical.rotation,
+      semanticClass,
     }
 
     if (!resolved) {
@@ -1604,6 +1793,7 @@ const MapCanvas = {
     const shoreDigits = this.shoreMaskDigits(x, y)
     const rawMaskString = this.maskStringFromDigits(shoreDigits)
     const canonical = this.canonicalMaskString(rawMaskString)
+    const semantic = this.classifyShoreSemantics(shoreDigits)
     const plane = this.plane || "arcanus"
     const resolved = this.resolveMomimePathForShore(plane, shoreDigits, this.phaseIndex, {
       audit: true,
@@ -1615,6 +1805,7 @@ const MapCanvas = {
       neighbors,
       raw_adjacency_digits: shoreDigits,
       raw_mask: rawMaskString,
+      semantic_class: semantic.class,
       canonical_mask: canonical.maskString,
       canonical_rotation: canonical.rotation,
       used_mask: resolved?.maskString ?? null,
