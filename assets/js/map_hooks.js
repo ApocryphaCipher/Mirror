@@ -129,6 +129,13 @@ const MapCanvas = {
     this.momimeMaskRotationLogEvery = 100
     this.coastAuditMissingStats = {}
     this.coastAuditMissingLogEvery = 50
+    this.coastFallbackStats = {
+      total: 0,
+      costSum: 0,
+      cardinalFlips: 0,
+      bitFlips: Array(8).fill(0),
+    }
+    this.coastFallbackLogEvery = 100
     this.layerVisibility = {}
     this.layerOpacity = {}
     this.lastTileKey = null
@@ -389,6 +396,7 @@ const MapCanvas = {
       this.momimeFrames = momime.frames || {}
       this.momimeBaseUrl = momime.base_url || ""
       this.buildMomimeMaskWhitelist()
+      this.buildMomimeMaskCandidates()
       const shouldClearCache =
         payload.clear_cache === true ||
         prevBackend !== this.tileBackend ||
@@ -1519,6 +1527,112 @@ const MapCanvas = {
     this.momimeMaskWhitelist = whitelist
   },
 
+  buildMomimeMaskCandidates() {
+    const candidates = {}
+    const frames = this.momimeFrames || {}
+    Object.keys(frames).forEach(key => {
+      const [plane, kind, mask] = String(key).split("|")
+      if (!plane || !kind || !mask) return
+      if (!candidates[plane]) candidates[plane] = {}
+      if (!candidates[plane][kind]) {
+        candidates[plane][kind] = {all: [], bySemantic: {}}
+      }
+      const entry = {
+        maskString: this.normalizeMaskString(mask),
+      }
+      if (kind === "shore") {
+        const semantic = this.classifyShoreSemantics(entry.maskString)
+        entry.semanticClass = semantic.class
+        entry.digits = semantic.digits
+        const bySemantic = candidates[plane][kind].bySemantic
+        if (!bySemantic[entry.semanticClass]) bySemantic[entry.semanticClass] = []
+        bySemantic[entry.semanticClass].push(entry)
+      }
+      candidates[plane][kind].all.push(entry)
+    })
+    this.momimeMaskCandidates = candidates
+  },
+
+  shoreMaskCandidates(plane, semanticClass) {
+    const planeCandidates = this.momimeMaskCandidates?.[plane]?.shore
+    if (!planeCandidates) return []
+    if (semanticClass && planeCandidates.bySemantic?.[semanticClass]) {
+      return planeCandidates.bySemantic[semanticClass]
+    }
+    return planeCandidates.all || []
+  },
+
+  shoreMaskFallbackCost(sourceDigits, targetDigits) {
+    let cost = 0
+    let cardinalFlips = 0
+    const bitFlips = Array(8).fill(0)
+    for (let i = 0; i < 8; i++) {
+      const a = sourceDigits[i] ?? "0"
+      const b = targetDigits[i] ?? "0"
+      if (a === b) continue
+      bitFlips[i] += 1
+      if (i % 2 === 0) {
+        cost += 10
+        cardinalFlips += 1
+        continue
+      }
+      const pair = `${a}${b}`
+      if (pair === "12" || pair === "21") {
+        cost += 2
+      } else {
+        cost += 3
+      }
+    }
+    return {cost, cardinalFlips, bitFlips}
+  },
+
+  nearestShoreMask(plane, rawMaskString, semanticClass) {
+    const candidates = this.shoreMaskCandidates(plane, semanticClass)
+    if (!candidates || candidates.length === 0) return null
+    const sourceDigits = this.normalizeShoreMaskDigits(rawMaskString)
+    let best = null
+
+    for (let i = 0; i < candidates.length; i++) {
+      const candidate = candidates[i]
+      const targetDigits = candidate.digits || this.normalizeShoreMaskDigits(candidate.maskString)
+      const score = this.shoreMaskFallbackCost(sourceDigits, targetDigits)
+      if (!best || score.cost < best.cost || (score.cost === best.cost && score.cardinalFlips < best.cardinalFlips)) {
+        best = {
+          maskString: candidate.maskString,
+          cost: score.cost,
+          cardinalFlips: score.cardinalFlips,
+          bitFlips: score.bitFlips,
+        }
+      }
+    }
+
+    return best
+  },
+
+  recordCoastFallbackStats(fallback) {
+    if (!fallback) return
+    const stats = this.coastFallbackStats
+    if (!stats) return
+    stats.total += 1
+    stats.costSum += fallback.cost || 0
+    stats.cardinalFlips += fallback.cardinalFlips || 0
+    if (Array.isArray(fallback.bitFlips)) {
+      for (let i = 0; i < fallback.bitFlips.length; i++) {
+        stats.bitFlips[i] = (stats.bitFlips[i] || 0) + (fallback.bitFlips[i] || 0)
+      }
+    }
+
+    if (!this.debugCoastAudit) return
+    if (!this.coastFallbackLogEvery || stats.total % this.coastFallbackLogEvery !== 0) return
+    const avgCost = stats.total > 0 ? Math.round((stats.costSum / stats.total) * 100) / 100 : 0
+    console.info("[mirror] coast fallback stats", {
+      total: stats.total,
+      avg_cost: avgCost,
+      cardinal_flips: stats.cardinalFlips,
+      bit_flips: stats.bitFlips.slice(0),
+    })
+  },
+
   maskWhitelistFor(plane, kind) {
     return this.momimeMaskWhitelist?.[plane]?.[kind] || null
   },
@@ -1654,6 +1768,19 @@ const MapCanvas = {
         const variant = variants[i]
         resolved = attemptWithCanonical(variant.maskString, variant.step)
         if (resolved) break
+      }
+    }
+
+    if (!resolved) {
+      const nearest = this.nearestShoreMask(plane, rawMaskString, semanticClass)
+      if (nearest) {
+        resolved = attemptMask(nearest.maskString, 0, "nearest_cost")
+        if (resolved) {
+          resolved.fallbackCost = nearest.cost
+          resolved.fallbackCardinalFlips = nearest.cardinalFlips
+          resolved.fallbackBitFlips = nearest.bitFlips
+          this.recordCoastFallbackStats(nearest)
+        }
       }
     }
 
