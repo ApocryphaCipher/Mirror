@@ -486,6 +486,27 @@ defmodule MirrorWeb.MapLive do
     {:noreply, socket}
   end
 
+  def handle_event("toggle_debug_coast_audit", _params, socket) do
+    state = socket.assigns.state
+    debug = not Map.get(state, :debug_coast_audit, false)
+    state = %{state | debug_coast_audit: debug}
+    SessionStore.put(socket.assigns.session_id, state)
+
+    socket =
+      socket
+      |> assign_from_state(state)
+      |> assign_forms()
+
+    socket =
+      if connected?(socket) do
+        push_map_state(socket)
+      else
+        socket
+      end
+
+    {:noreply, socket}
+  end
+
   def handle_event("detect_phase_loop", _params, socket) do
     state = socket.assigns.state
 
@@ -629,13 +650,16 @@ defmodule MirrorWeb.MapLive do
               <div class="flex flex-wrap items-end justify-between gap-4">
                 <div>
                   <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Plane view</p>
+
                   <h2 class="text-3xl font-semibold text-white">
                     {if @plane == :arcanus, do: "Arcanus", else: "Myrror"}
                   </h2>
+
                   <p class="text-sm text-slate-400">
                     {if @state.save_path, do: @state.save_path, else: "No save loaded yet."}
                   </p>
                 </div>
+
                 <div class="flex flex-wrap gap-3">
                   <button
                     id="undo-button"
@@ -677,6 +701,14 @@ defmodule MirrorWeb.MapLive do
                   >
                     Kinds: {if @debug_terrain_kinds, do: "On", else: "Off"}
                   </button>
+                  <button
+                    id="debug-coast-audit-button"
+                    type="button"
+                    phx-click="toggle_debug_coast_audit"
+                    class="rounded-full border border-fuchsia-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-fuchsia-100 transition hover:border-fuchsia-200"
+                  >
+                    Coast Audit: {if @debug_coast_audit, do: "On", else: "Off"}
+                  </button>
                   <div class="flex flex-col gap-1">
                     <.form
                       for={@phase_form}
@@ -691,12 +723,10 @@ defmodule MirrorWeb.MapLive do
                         class="w-20 rounded-2xl border border-white/10 bg-slate-950/70 text-slate-200"
                       />
                     </.form>
+
                     <div class="flex flex-wrap items-center gap-2 text-[0.65rem] uppercase tracking-[0.2em] text-slate-400">
-                      <span>Input: {@phase_input}</span>
-                      <span>Effective: {@phase_index}</span>
-                      <span>
-                        Loop: {if(@phase_loop_len, do: @phase_loop_len, else: "Unknown")}
-                      </span>
+                      <span>Input: {@phase_input}</span> <span>Effective: {@phase_index}</span>
+                      <span>Loop: {if(@phase_loop_len, do: @phase_loop_len, else: "Unknown")}</span>
                       <%= case @phase_loop_status do %>
                         <% :detected -> %>
                           <span class="text-emerald-300/80">Detected</span>
@@ -707,6 +737,7 @@ defmodule MirrorWeb.MapLive do
                       <% end %>
                     </div>
                   </div>
+
                   <button
                     :if={@render_mode == :tiles}
                     id="detect-phase-loop-button"
@@ -748,6 +779,7 @@ defmodule MirrorWeb.MapLive do
                 </div>
               </div>
             </div>
+
             <div class="mt-4 grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
               <.form
                 for={@load_form}
@@ -770,6 +802,7 @@ defmodule MirrorWeb.MapLive do
                   Load save
                 </button>
               </.form>
+
               <.form
                 for={@save_form}
                 id="save-form"
@@ -801,6 +834,7 @@ defmodule MirrorWeb.MapLive do
                   <div class="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Map editor</p>
+
                       <h3 class="text-lg font-semibold text-white">Layer stack + tools</h3>
                     </div>
                   </div>
@@ -809,6 +843,7 @@ defmodule MirrorWeb.MapLive do
                     <div class="space-y-4">
                       <div class="space-y-2">
                         <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Layers</p>
+
                         <div class="space-y-3">
                           <%= for layer <- @layers do %>
                             <div
@@ -877,6 +912,7 @@ defmodule MirrorWeb.MapLive do
 
                       <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
                         <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Selection</p>
+
                         <.form
                           for={@selection_form}
                           id="selection-form"
@@ -896,6 +932,7 @@ defmodule MirrorWeb.MapLive do
                             Apply value
                           </button>
                         </.form>
+
                         <p class="mt-3 text-xs text-slate-500">
                           Scroll to cycle values. Right-click to sample.
                         </p>
@@ -905,19 +942,23 @@ defmodule MirrorWeb.MapLive do
                     <div class="space-y-4">
                       <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-4 text-xs text-slate-400">
                         <p class="uppercase tracking-[0.3em] text-slate-500">Controls</p>
+
                         <div class="mt-3 grid gap-2 sm:grid-cols-2">
                           <div class="flex items-start gap-2">
                             <.icon name="hero-hand-raised" class="size-4 text-amber-300" />
                             <span>Left drag paints with the current selection.</span>
                           </div>
+
                           <div class="flex items-start gap-2">
                             <.icon name="hero-eye" class="size-4 text-sky-300" />
                             <span>Right click samples the current layer.</span>
                           </div>
+
                           <div class="flex items-start gap-2">
                             <.icon name="hero-adjustments-horizontal" class="size-4 text-emerald-300" />
                             <span>Alt/Shift modify the scroll step size.</span>
                           </div>
+
                           <div class="flex items-start gap-2">
                             <.icon name="hero-command-line" class="size-4 text-indigo-300" />
                             <span>Ctrl toggles sampling mode.</span>
@@ -950,6 +991,7 @@ defmodule MirrorWeb.MapLive do
                   data-phase-index={@phase_index}
                   data-snapshot-mode={@snapshot_mode}
                   data-debug-terrain-kinds={@debug_terrain_kinds}
+                  data-debug-coast-audit={@debug_coast_audit}
                   data-tile-size="32"
                   class="block"
                 >
@@ -959,7 +1001,9 @@ defmodule MirrorWeb.MapLive do
               <aside class="flex h-full flex-col gap-6 overflow-y-auto border-l border-white/10 bg-slate-950/90 p-4">
                 <div class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-lg shadow-black/60 backdrop-blur pointer-events-auto">
                   <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Research</p>
+
                   <h3 class="mt-2 text-lg font-semibold text-white">Value intel</h3>
+
                   <div class="mt-4 space-y-3">
                     <.form
                       for={@value_name_form}
@@ -980,6 +1024,7 @@ defmodule MirrorWeb.MapLive do
                           class="rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200 placeholder:text-slate-500"
                         />
                       </div>
+
                       <button
                         id="save-value-name-button"
                         type="submit"
@@ -991,6 +1036,7 @@ defmodule MirrorWeb.MapLive do
 
                     <div class="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
                       <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Histogram</p>
+
                       <div class="mt-3 space-y-2">
                         <%= for entry <- hist_entries(@state, @active_layer) do %>
                           <button
@@ -1012,21 +1058,24 @@ defmodule MirrorWeb.MapLive do
 
                 <div class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-lg shadow-black/60 backdrop-blur pointer-events-auto">
                   <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Tile inspector</p>
+
                   <h3 class="mt-2 text-lg font-semibold text-white">Bit flag lab</h3>
+
                   <div class="mt-4 space-y-4 text-sm text-slate-300">
                     <%= if @state.save && @hover do %>
-                      <% value = @hover.layer_value || 0 %>
-                      <% original_value = @hover.original_value %>
-                      <% snapshot_value = snapshot_value(@state, @plane, @active_layer) %>
-                      <% unsupported_layer = not u8_layer?(@active_layer) %>
+                      <% value = @hover.layer_value || 0 %> <% original_value = @hover.original_value %> <% snapshot_value =
+                        snapshot_value(@state, @plane, @active_layer) %> <% unsupported_layer =
+                        not u8_layer?(@active_layer) %>
                       <div class="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
                         <div class="flex flex-wrap items-center justify-between gap-3 text-[0.65rem] uppercase tracking-[0.2em] text-slate-500">
                           <span>Tile ({@hover.x}, {@hover.y})</span>
                           <span>{@layer_labels[@active_layer]}</span>
                         </div>
+
                         <div class="mt-3 flex flex-wrap items-end justify-between gap-4">
                           <div>
                             <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Current</p>
+
                             <div class="flex items-baseline gap-3">
                               <span class="text-3xl font-semibold text-white">{value}</span>
                               <span class="text-sm font-semibold text-slate-400">
@@ -1034,9 +1083,11 @@ defmodule MirrorWeb.MapLive do
                               </span>
                             </div>
                           </div>
+
                           <div class="text-xs text-slate-500">
                             <%= if is_integer(original_value) do %>
                               <p class="uppercase tracking-[0.2em] text-slate-500">Original</p>
+
                               <p class="text-sm text-slate-300">
                                 {original_value} ({hex_byte(original_value)})
                               </p>
@@ -1055,8 +1106,7 @@ defmodule MirrorWeb.MapLive do
                       <% else %>
                         <div class="grid gap-2 sm:grid-cols-2">
                           <%= for bit <- 0..7 do %>
-                            <% bit_on = bit_set?(value, bit) %>
-                            <% bit_name = Map.get(@bit_names, bit) %>
+                            <% bit_on = bit_set?(value, bit) %> <% bit_name = Map.get(@bit_names, bit) %>
                             <button
                               id={"inspect-bit-#{bit}"}
                               type="button"
@@ -1084,11 +1134,13 @@ defmodule MirrorWeb.MapLive do
                                   <p class="text-[0.65rem] uppercase tracking-[0.2em] text-slate-400">
                                     Bit {bit}
                                   </p>
+
                                   <p class="text-xs text-slate-500">
                                     {if bit_name in [nil, ""], do: "Unlabeled", else: bit_name}
                                   </p>
                                 </div>
                               </div>
+
                               <span class="text-[0.6rem] uppercase tracking-[0.2em] text-slate-500">
                                 Toggle
                               </span>
@@ -1166,6 +1218,7 @@ defmodule MirrorWeb.MapLive do
                               Restore A
                             </button>
                           </div>
+
                           <%= if is_integer(snapshot_value) do %>
                             <p class="mt-2 text-[0.65rem] uppercase tracking-[0.2em] text-slate-500">
                               A: {snapshot_value} ({hex_byte(snapshot_value)})
@@ -1189,6 +1242,7 @@ defmodule MirrorWeb.MapLive do
 
                 <div class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-lg shadow-black/60 backdrop-blur pointer-events-auto">
                   <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Bit names</p>
+
                   <div class="mt-4 space-y-3">
                     <%= for {bit, form} <- @bit_forms do %>
                       <.form
@@ -1218,11 +1272,15 @@ defmodule MirrorWeb.MapLive do
 
                 <div class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-lg shadow-black/60 backdrop-blur pointer-events-auto">
                   <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Hover vision</p>
+
                   <div class="mt-4 space-y-2 text-sm text-slate-300">
                     <%= if @hover do %>
                       <p>Tile: ({@hover.x}, {@hover.y})</p>
+
                       <p>Terrain: {@hover.terrain} ({@hover.terrain_class})</p>
+
                       <p>Adj mask: {@hover.adj_mask}</p>
+
                       <div class="mt-3 grid gap-2 text-xs">
                         <%= for ray <- @hover.rays do %>
                           <div class="flex items-center justify-between rounded-lg border border-white/10 px-3 py-2">
@@ -1760,6 +1818,7 @@ defmodule MirrorWeb.MapLive do
       phase_loop_detecting: Map.get(state, :phase_loop_detecting, false),
       snapshot_mode: Map.get(state, :snapshot_mode, true),
       debug_terrain_kinds: Map.get(state, :debug_terrain_kinds, false),
+      debug_coast_audit: Map.get(state, :debug_coast_audit, false),
       engine_session_id: Map.get(state, :engine_session_id)
     )
   end
@@ -2030,6 +2089,7 @@ defmodule MirrorWeb.MapLive do
       phase_index: effective_phase_index(state),
       snapshot_mode: Map.get(state, :snapshot_mode, true),
       debug_terrain_kinds: Map.get(state, :debug_terrain_kinds, false),
+      debug_coast_audit: Map.get(state, :debug_coast_audit, false),
       layer_visibility: stringify_layer_map(layer_visibility),
       layer_opacity: stringify_layer_map(layer_opacity)
     })
@@ -2062,6 +2122,7 @@ defmodule MirrorWeb.MapLive do
       phase_index: effective_phase_index(state),
       snapshot_mode: Map.get(state, :snapshot_mode, true),
       debug_terrain_kinds: Map.get(state, :debug_terrain_kinds, false),
+      debug_coast_audit: Map.get(state, :debug_coast_audit, false),
       layer_visibility: stringify_layer_map(layer_visibility),
       layer_opacity: stringify_layer_map(layer_opacity)
     })
@@ -2348,6 +2409,7 @@ defmodule MirrorWeb.MapLive do
       phase_loop_status: :unknown,
       phase_loop_detecting: false,
       debug_terrain_kinds: false,
+      debug_coast_audit: false,
       layer_visibility: default_layer_visibility(:terrain),
       layer_opacity: default_layer_opacity(),
       engine_session_id: nil,
@@ -2372,6 +2434,7 @@ defmodule MirrorWeb.MapLive do
       |> Map.update(:phase_loop_status, :unknown, &normalize_phase_loop_status/1)
       |> Map.put_new(:phase_loop_detecting, false)
       |> Map.put_new(:debug_terrain_kinds, false)
+      |> Map.put_new(:debug_coast_audit, false)
       |> Map.put_new(:engine_session_id, nil)
       |> Map.put_new(:engine_player_id, :observer)
 

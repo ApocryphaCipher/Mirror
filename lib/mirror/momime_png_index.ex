@@ -119,15 +119,15 @@ defmodule Mirror.MomimePngIndex do
     base = Path.rootname(filename)
 
     cond do
-      match = Regex.run(~r/^(\d{8})-frame(\d+)$/i, base) ->
+      match = Regex.run(~r/^([0-2]{8})-frame(\d+)$/i, base) ->
         [_, mask, frame] = match
         {:ok, {mask, frame}}
 
-      match = Regex.run(~r/^(\d{8})([a-z])$/i, base) ->
+      match = Regex.run(~r/^([0-2]{8})([a-z])$/i, base) ->
         [_, mask, frame] = match
         {:ok, {mask, String.downcase(frame)}}
 
-      match = Regex.run(~r/^(\d{8})$/i, base) ->
+      match = Regex.run(~r/^([0-2]{8})$/i, base) ->
         [_, mask] = match
         {:ok, {mask, "0"}}
 

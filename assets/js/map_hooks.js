@@ -11,6 +11,7 @@ const ADJ_DIRS = [
 
 const ADJ_DIR_LABELS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
 const SHORE_MASK_DIRS = [
+  [0, -1],  // N
   [1, -1],  // NE
   [1, 0],   // E
   [1, 1],   // SE
@@ -18,7 +19,6 @@ const SHORE_MASK_DIRS = [
   [-1, 1],  // SW
   [-1, 0],  // W
   [-1, -1], // NW
-  [0, -1],  // N
 ]
 
 const TERRAIN_KIND_BY_BASE_ID = {
@@ -96,7 +96,9 @@ const MapCanvas = {
     this.terrainKindOverrides = {}
     this.debugTerrainKinds = this.parseBool(this.el.dataset.debugTerrainKinds, false)
     this.debugTerrainSamples = this.parseBool(this.el.dataset.debugTerrainSamples, false)
-    this.debugMomimeMask = this.parseBool(this.el.dataset.debugMomimeMask, false)
+    this.debugCoastAudit = this.parseBool(this.el.dataset.debugCoastAudit, false)
+    this.debugMomimeMask = this.parseBool(this.el.dataset.debugMomimeMask, this.debugCoastAudit)
+    this.coastDiagonalReduction = this.parseBool(this.el.dataset.coastDiagonalReduction, false)
     this.terrainSampleLogged = false
     this.terrainBaseSource = "lo"
     this.terrainBaseSourceStats = null
@@ -104,6 +106,8 @@ const MapCanvas = {
     this.momimeMaskSampleLimit = 12
     this.momimeMaskRotationStats = {0: 0, 90: 0, 180: 0, 270: 0}
     this.momimeMaskRotationLogEvery = 100
+    this.coastAuditMissingStats = {}
+    this.coastAuditMissingLogEvery = 50
     this.layerVisibility = {}
     this.layerOpacity = {}
     this.lastTileKey = null
@@ -172,12 +176,17 @@ const MapCanvas = {
         this.maybeLogTerrainSamples()
         needsRender = true
       }
+      if (Object.prototype.hasOwnProperty.call(payload, "debug_coast_audit")) {
+        this.debugCoastAudit = this.parseBool(payload.debug_coast_audit, this.debugCoastAudit)
+        this.debugMomimeMask = this.debugCoastAudit
+      }
       if (Object.prototype.hasOwnProperty.call(payload, "debug_terrain_samples")) {
         this.debugTerrainSamples = this.parseBool(payload.debug_terrain_samples, this.debugTerrainSamples)
         this.maybeLogTerrainSamples()
       }
       if (Object.prototype.hasOwnProperty.call(payload, "debug_momime_mask")) {
         this.debugMomimeMask = this.parseBool(payload.debug_momime_mask, this.debugMomimeMask)
+        this.debugCoastAudit = this.debugMomimeMask
       }
       if (needsRender) {
         this.renderAll()
@@ -229,11 +238,16 @@ const MapCanvas = {
       if (Object.prototype.hasOwnProperty.call(payload, "debug_terrain_kinds")) {
         this.debugTerrainKinds = this.parseBool(payload.debug_terrain_kinds, this.debugTerrainKinds)
       }
+      if (Object.prototype.hasOwnProperty.call(payload, "debug_coast_audit")) {
+        this.debugCoastAudit = this.parseBool(payload.debug_coast_audit, this.debugCoastAudit)
+        this.debugMomimeMask = this.debugCoastAudit
+      }
       if (Object.prototype.hasOwnProperty.call(payload, "debug_terrain_samples")) {
         this.debugTerrainSamples = this.parseBool(payload.debug_terrain_samples, this.debugTerrainSamples)
       }
       if (Object.prototype.hasOwnProperty.call(payload, "debug_momime_mask")) {
         this.debugMomimeMask = this.parseBool(payload.debug_momime_mask, this.debugMomimeMask)
+        this.debugCoastAudit = this.debugMomimeMask
       }
       if (payload.terrain) {
         this.detectTerrainBaseSource()
@@ -1178,6 +1192,43 @@ const MapCanvas = {
     return String(maskString || "").padStart(8, "0").slice(0, 8)
   },
 
+  rotateMaskString(maskString, shift) {
+    const digits = this.normalizeMaskString(maskString).split("")
+    return this.rotateMaskDigits(digits, shift).join("")
+  },
+
+  maskRotations(maskString) {
+    const normalized = this.normalizeMaskString(maskString)
+    const rotations = [
+      {maskString: normalized, rotation: 0, shift: 0},
+      {maskString: this.rotateMaskString(normalized, 2), rotation: 90, shift: 2},
+      {maskString: this.rotateMaskString(normalized, 4), rotation: 180, shift: 4},
+      {maskString: this.rotateMaskString(normalized, 6), rotation: 270, shift: 6},
+    ]
+    const seen = new Set()
+    return rotations.filter(entry => {
+      if (seen.has(entry.maskString)) return false
+      seen.add(entry.maskString)
+      return true
+    })
+  },
+
+  canonicalMaskString(maskString) {
+    const rotations = this.maskRotations(maskString)
+    rotations.sort((a, b) => a.maskString.localeCompare(b.maskString))
+    return rotations[0] || {maskString: this.normalizeMaskString(maskString), rotation: 0}
+  },
+
+  reduceDiagonalMaskString(maskString, fromDigit, toDigit) {
+    const chars = this.normalizeMaskString(maskString).split("")
+    const from = String(fromDigit)
+    const to = String(toDigit)
+    ;[1, 3, 5, 7].forEach(index => {
+      if (chars[index] === from) chars[index] = to
+    })
+    return chars.join("")
+  },
+
   clearDiagonalMaskString(maskString) {
     const chars = this.normalizeMaskString(maskString).split("")
     chars[1] = "0"
@@ -1208,10 +1259,10 @@ const MapCanvas = {
         next[diag] = "1"
       }
     }
-    rewriteDiagonal(0, 7, 1)
-    rewriteDiagonal(2, 1, 3)
-    rewriteDiagonal(4, 3, 5)
-    rewriteDiagonal(6, 5, 7)
+    rewriteDiagonal(1, 0, 2)
+    rewriteDiagonal(3, 2, 4)
+    rewriteDiagonal(5, 4, 6)
+    rewriteDiagonal(7, 6, 0)
     return next
   },
 
@@ -1239,11 +1290,11 @@ const MapCanvas = {
       if (nx >= this.mapWidth) nx -= this.mapWidth
 
       const baseKind = this.terrainBaseKindAt(nx, ny)
-      land[i] = baseKind !== "ocean"
+      land[i] = !this.isWaterKind(baseKind)
     }
 
     for (let i = 0; i < land.length; i++) {
-      if (i % 2 === 1) {
+      if (i % 2 === 0) {
         digits[i] = land[i] ? "1" : "0"
         continue
       }
@@ -1295,15 +1346,6 @@ const MapCanvas = {
     return whitelist.has(this.normalizeMaskString(maskString))
   },
 
-  canonicalizeMaskString(plane, kind, maskString) {
-    const normalized = this.normalizeMaskString(maskString)
-    const whitelist = this.maskWhitelistFor(plane, kind)
-    if (!whitelist || whitelist.has(normalized) || kind === "shore") return normalized
-    const cleared = this.clearDiagonalMaskString(normalized)
-    if (whitelist.has(cleared)) return cleared
-    return normalized
-  },
-
   momimeBaseKey(plane, kind, mask) {
     return `${plane}|${kind}|${mask}`
   },
@@ -1344,22 +1386,141 @@ const MapCanvas = {
     return null
   },
 
+  resolveMomimePathWithFrame(plane, kind, mask, frame) {
+    const path = this.momimeIndex?.[this.momimeKey(plane, kind, mask, frame)]
+    return path ? {path, frame} : null
+  },
+
   resolveMomimePathForKind(plane, kind, mask, phaseIndex) {
     if (kind === "shore") {
       return this.resolveMomimePathForShore(plane, mask, phaseIndex)
     }
-    const maskString = this.canonicalizeMaskString(plane, kind, this.maskString(mask))
-    const resolved = this.resolveMomimePath(plane, kind, maskString, phaseIndex)
-    return resolved ? {...resolved, maskString, rotation: 0} : null
+    const rawMaskString = this.normalizeMaskString(this.maskString(mask))
+    let resolved = this.resolveMomimePath(plane, kind, rawMaskString, phaseIndex)
+    if (resolved) {
+      return {...resolved, maskString: rawMaskString, rotation: 0, fallbackStep: "exact"}
+    }
+
+    const canonical = this.canonicalMaskString(rawMaskString)
+    if (canonical.maskString !== rawMaskString) {
+      resolved = this.resolveMomimePath(plane, kind, canonical.maskString, phaseIndex)
+      if (resolved) {
+        return {
+          ...resolved,
+          maskString: canonical.maskString,
+          rotation: canonical.rotation,
+          fallbackStep: "canonical",
+        }
+      }
+    }
+
+    const cleared = this.clearDiagonalMaskString(canonical.maskString)
+    if (cleared !== canonical.maskString) {
+      resolved = this.resolveMomimePath(plane, kind, cleared, phaseIndex)
+      if (resolved) {
+        return {
+          ...resolved,
+          maskString: cleared,
+          rotation: canonical.rotation,
+          fallbackStep: "clear_diagonals",
+        }
+      }
+    }
+
+    return null
   },
 
-  resolveMomimePathForShore(plane, maskDigits, phaseIndex) {
-    const baseMask = this.maskStringFromDigits(maskDigits)
-    const maskString = this.canonicalizeMaskString(plane, "shore", baseMask)
-    if (!this.maskSupported(plane, "shore", maskString)) return null
+  resolveMomimePathForShore(plane, maskDigits, phaseIndex, opts = {}) {
+    const audit = opts.audit === true
+    const recordMissing = opts.recordMissing ?? this.debugCoastAudit
+    const rawMaskString = this.normalizeMaskString(this.maskStringFromDigits(maskDigits))
+    const canonical = this.canonicalMaskString(rawMaskString)
 
-    const resolved = this.resolveMomimePath(plane, "shore", maskString, phaseIndex)
-    return resolved ? {...resolved, maskString, rotation: 0} : null
+    const attemptMask = (maskString, rotation, step) => {
+      const resolved = this.resolveMomimePath(plane, "shore", maskString, phaseIndex)
+      if (!resolved) return null
+      return {
+        ...resolved,
+        maskString,
+        rotation,
+        fallbackStep: step,
+        fallbackApplied: step !== "exact",
+      }
+    }
+
+    const attemptWithCanonical = (maskString, step) => {
+      let resolved = attemptMask(maskString, 0, step)
+      if (resolved) return resolved
+      const canonicalVariant = this.canonicalMaskString(maskString)
+      if (canonicalVariant.maskString !== maskString) {
+        resolved = attemptMask(canonicalVariant.maskString, canonicalVariant.rotation, step)
+      }
+      return resolved
+    }
+
+    let resolved = attemptMask(rawMaskString, 0, "exact")
+    if (!resolved && canonical.maskString !== rawMaskString) {
+      resolved = attemptMask(canonical.maskString, canonical.rotation, "canonical")
+    }
+
+    let reduced2 = null
+    if (!resolved && this.coastDiagonalReduction) {
+      reduced2 = this.reduceDiagonalMaskString(rawMaskString, "2", "0")
+      if (reduced2 !== rawMaskString) {
+        resolved = attemptWithCanonical(reduced2, "reduce_diagonals_2")
+      }
+    }
+
+    if (!resolved && this.coastDiagonalReduction) {
+      const base = reduced2 || rawMaskString
+      const reduced1 = this.reduceDiagonalMaskString(base, "1", "0")
+      if (reduced1 !== base) {
+        resolved = attemptWithCanonical(reduced1, "reduce_diagonals_1")
+      }
+    }
+
+    if (!resolved) {
+      const fallback = this.resolveMomimePathWithFrame(plane, "shore", "00000000", "0")
+      if (fallback) {
+        resolved = {
+          ...fallback,
+          maskString: "00000000",
+          rotation: 0,
+          fallbackStep: "fallback_zero",
+          fallbackApplied: true,
+        }
+      }
+    }
+
+    const auditInfo = {
+      rawMaskString,
+      canonicalMaskString: canonical.maskString,
+      canonicalRotation: canonical.rotation,
+    }
+
+    if (!resolved) {
+      if (recordMissing) {
+        this.recordCoastAuditMissing(plane, "shore", rawMaskString)
+      }
+      if (audit) {
+        return {
+          path: null,
+          frame: null,
+          maskString: null,
+          rotation: 0,
+          fallbackStep: "missing",
+          fallbackApplied: true,
+          ...auditInfo,
+        }
+      }
+      return null
+    }
+
+    if (recordMissing && resolved.fallbackStep !== "exact") {
+      this.recordCoastAuditMissing(plane, "shore", rawMaskString)
+    }
+
+    return {...resolved, ...auditInfo}
   },
 
   recordMomimeMaskRotation(kind, rotation) {
@@ -1377,6 +1538,91 @@ const MapCanvas = {
     }
 
     console.info(`[mirror] momime mask rotations (${kind})`, {...stats})
+  },
+
+  recordCoastAuditMissing(plane, kind, maskString) {
+    if (!plane || !kind) return
+    const normalized = this.normalizeMaskString(maskString)
+    const key = `${plane}|${kind}`
+    let stats = this.coastAuditMissingStats[key]
+    if (!stats) {
+      stats = new Map()
+      this.coastAuditMissingStats[key] = stats
+    }
+    stats.set(normalized, (stats.get(normalized) || 0) + 1)
+
+    if (!this.debugCoastAudit) return
+    const total = Array.from(stats.values()).reduce((sum, count) => sum + count, 0)
+    if (!this.coastAuditMissingLogEvery || total % this.coastAuditMissingLogEvery !== 0) {
+      return
+    }
+    this.logCoastAuditMissingStats(plane, kind, stats)
+  },
+
+  logCoastAuditMissingStats(plane, kind, stats) {
+    if (!stats) return
+    const top = Array.from(stats.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 20)
+      .map(([mask, count]) => ({mask, count}))
+    console.info(`[mirror] shore missing masks (${plane}/${kind})`, top)
+  },
+
+  logCoastAudit(x, y) {
+    if (!this.debugCoastAudit) return
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return
+    if (x < 0 || y < 0 || x >= this.mapWidth || y >= this.mapHeight) return
+
+    const idx = y * this.mapWidth + x
+    const terrainValue = this.terrainValues[idx] || 0
+    const kind = this.terrainKindAt(x, y, terrainValue)
+    const baseKind = this.terrainBaseKindAt(x, y)
+    if (kind !== "shore") {
+      console.info("[mirror] coast audit", {x, y, kind, base_kind: baseKind, note: "not shore"})
+      return
+    }
+
+    const neighbors = ADJ_DIRS.map(([dx, dy], index) => {
+      let nx = x + dx
+      let ny = y + dy
+      if (ny < 0 || ny >= this.mapHeight) return null
+      if (nx < 0) nx += this.mapWidth
+      if (nx >= this.mapWidth) nx -= this.mapWidth
+      const neighborValue = this.terrainValues[ny * this.mapWidth + nx] || 0
+      const neighborKind = this.terrainKindAt(nx, ny, neighborValue)
+      const neighborBase = this.terrainBaseKindAt(nx, ny)
+      return {
+        dir: ADJ_DIR_LABELS[index],
+        x: nx,
+        y: ny,
+        kind: neighborKind,
+        base_kind: neighborBase,
+        water: this.isWaterKind(neighborBase),
+      }
+    }).filter(Boolean)
+
+    const shoreDigits = this.shoreMaskDigits(x, y)
+    const rawMaskString = this.maskStringFromDigits(shoreDigits)
+    const canonical = this.canonicalMaskString(rawMaskString)
+    const plane = this.plane || "arcanus"
+    const resolved = this.resolveMomimePathForShore(plane, shoreDigits, this.phaseIndex, {
+      audit: true,
+      recordMissing: false,
+    })
+
+    console.info("[mirror] coast audit", {
+      tile: {x, y, kind, base_kind: baseKind},
+      neighbors,
+      raw_adjacency_digits: shoreDigits,
+      raw_mask: rawMaskString,
+      canonical_mask: canonical.maskString,
+      canonical_rotation: canonical.rotation,
+      used_mask: resolved?.maskString ?? null,
+      used_rotation: resolved?.rotation ?? null,
+      fallback_step: resolved?.fallbackStep ?? "missing",
+      fallback_applied: resolved?.fallbackApplied ?? true,
+      path: resolved?.path ?? null,
+    })
   },
 
   momimeUrl(path) {
@@ -1645,6 +1891,10 @@ const MapCanvas = {
     return baseKind
   },
 
+  isWaterKind(kind) {
+    return kind === "ocean" || kind === "shore"
+  },
+
   terrainBaseKindAt(x, y) {
     const idx = y * this.mapWidth + x
     const value = this.terrainValues[idx] ?? 0
@@ -1829,7 +2079,7 @@ const MapCanvas = {
         x: nx,
         y: ny,
         kind: neighborKind,
-        ocean: neighborKind === "ocean",
+        water: this.isWaterKind(neighborKind),
       }
     }).filter(Boolean)
 
@@ -2053,6 +2303,10 @@ const MapCanvas = {
     const tileKey = `${tile.x}:${tile.y}`
     if (this.lastTileKey === tileKey && !this.isPointerDown) return
     this.lastTileKey = tileKey
+
+    if (!this.isPointerDown && this.debugCoastAudit) {
+      this.logCoastAudit(tile.x, tile.y)
+    }
 
     this.pushEvent("map_pointer", {
       action: this.isPointerDown ? "drag" : "hover",
