@@ -1747,40 +1747,84 @@ const MapCanvas = {
       }
     }
 
-    const attemptWithCanonical = (maskString, step) => {
-      let resolved = attemptMask(maskString, 0, step)
-      if (resolved) return resolved
-      const canonicalVariant = this.canonicalMaskString(maskString)
-      if (canonicalVariant.maskString !== maskString) {
-        resolved = attemptMask(canonicalVariant.maskString, canonicalVariant.rotation, step)
-      }
-      return resolved
-    }
-
     let resolved = attemptMask(rawMaskString, 0, "exact")
     if (!resolved && canonical.maskString !== rawMaskString) {
       resolved = attemptMask(canonical.maskString, canonical.rotation, "canonical")
     }
 
-    if (!resolved && this.coastDiagonalReduction) {
-      const variants = this.shoreSemanticFallbacks(rawMaskString, semanticClass)
-      for (let i = 0; i < variants.length; i++) {
-        const variant = variants[i]
-        resolved = attemptWithCanonical(variant.maskString, variant.step)
-        if (resolved) break
-      }
-    }
-
     if (!resolved) {
+      const sourceDigits = this.normalizeShoreMaskDigits(rawMaskString)
+      const candidates = []
+      const seen = new Set()
+
+      const addCandidate = (maskString, rotation, step, meta = {}) => {
+        const normalized = this.normalizeMaskString(maskString)
+        if (seen.has(normalized)) return
+        seen.add(normalized)
+        const resolvedPath = this.resolveMomimePath(plane, "shore", normalized, phaseIndex)
+        if (!resolvedPath) return
+        const score =
+          meta.cost !== undefined
+            ? {
+                cost: meta.cost,
+                cardinalFlips: meta.cardinalFlips || 0,
+                bitFlips: meta.bitFlips || Array(8).fill(0),
+              }
+            : this.shoreMaskFallbackCost(sourceDigits, this.normalizeShoreMaskDigits(normalized))
+
+        candidates.push({
+          ...resolvedPath,
+          maskString: normalized,
+          rotation,
+          fallbackStep: step,
+          fallbackApplied: true,
+          fallbackCost: score.cost,
+          fallbackCardinalFlips: score.cardinalFlips,
+          fallbackBitFlips: score.bitFlips,
+          fromNearest: meta.fromNearest === true,
+        })
+      }
+
+      if (this.coastDiagonalReduction) {
+        const variants = this.shoreSemanticFallbacks(rawMaskString, semanticClass)
+        for (let i = 0; i < variants.length; i++) {
+          const variant = variants[i]
+          addCandidate(variant.maskString, 0, variant.step)
+          const canonicalVariant = this.canonicalMaskString(variant.maskString)
+          if (canonicalVariant.maskString !== variant.maskString) {
+            addCandidate(canonicalVariant.maskString, canonicalVariant.rotation, variant.step)
+          }
+        }
+      }
+
       const nearest = this.nearestShoreMask(plane, rawMaskString, semanticClass)
       if (nearest) {
-        resolved = attemptMask(nearest.maskString, 0, "nearest_cost")
-        if (resolved) {
-          resolved.fallbackCost = nearest.cost
-          resolved.fallbackCardinalFlips = nearest.cardinalFlips
-          resolved.fallbackBitFlips = nearest.bitFlips
-          this.recordCoastFallbackStats(nearest)
+        addCandidate(nearest.maskString, 0, "nearest_cost", {
+          cost: nearest.cost,
+          cardinalFlips: nearest.cardinalFlips,
+          bitFlips: nearest.bitFlips,
+          fromNearest: true,
+        })
+      }
+
+      resolved = candidates.reduce((best, candidate) => {
+        if (!best) return candidate
+        if (candidate.fallbackCost < best.fallbackCost) return candidate
+        if (candidate.fallbackCost === best.fallbackCost) {
+          if (candidate.fallbackCardinalFlips < best.fallbackCardinalFlips) return candidate
+          if (candidate.fallbackCardinalFlips === best.fallbackCardinalFlips) {
+            return candidate.maskString < best.maskString ? candidate : best
+          }
         }
+        return best
+      }, null)
+
+      if (resolved && resolved.fromNearest) {
+        this.recordCoastFallbackStats({
+          cost: resolved.fallbackCost,
+          cardinalFlips: resolved.fallbackCardinalFlips,
+          bitFlips: resolved.fallbackBitFlips,
+        })
       }
     }
 

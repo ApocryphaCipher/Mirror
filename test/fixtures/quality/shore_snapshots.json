@@ -1,0 +1,58 @@
+[
+  {
+    "name": "exact_match",
+    "raw": "11111111",
+    "available": ["11111111", "00000000"],
+    "expected_mask": "11111111",
+    "expected_step": "exact"
+  },
+  {
+    "name": "canonical_match",
+    "raw": "01000000",
+    "available": ["00000001"],
+    "expected_mask": "00000001",
+    "expected_step": "canonical"
+  },
+  {
+    "name": "semantic_fallback",
+    "raw": "12100000",
+    "available": ["11100000"],
+    "expected_mask": "11100000",
+    "expected_step": "relax_diag_2_to_1_ne"
+  },
+  {
+    "name": "nearest_beats_semantic",
+    "raw": "11000000",
+    "available": ["10000000", "12000000"],
+    "expected_mask": "12000000",
+    "expected_step": "nearest_cost"
+  },
+  {
+    "name": "nearest_only",
+    "raw": "10100000",
+    "available": ["10100001"],
+    "expected_mask": "10100001",
+    "expected_step": "nearest_cost"
+  },
+  {
+    "name": "fallback_zero",
+    "raw": "10001000",
+    "available": ["00000000"],
+    "expected_mask": "00000000",
+    "expected_step": "fallback_zero"
+  },
+  {
+    "name": "missing",
+    "raw": "11000000",
+    "available": [],
+    "expected_mask": null,
+    "expected_step": null
+  },
+  {
+    "name": "canonical_from_semantic_variant",
+    "raw": "12000000",
+    "available": ["00000011"],
+    "expected_mask": "00000011",
+    "expected_step": "relax_diag_2_to_1_ne"
+  }
+]
