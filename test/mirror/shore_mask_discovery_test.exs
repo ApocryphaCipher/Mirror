@@ -71,7 +71,7 @@ defmodule Mirror.ShoreMaskDiscoveryTest do
   end
 
   defp shore_mask_from_bitset(bitset) do
-    land = for i <- 0..7, do: (bitset &&& (1 <<< i)) != 0
+    land = for i <- 0..7, do: (bitset &&& 1 <<< i) != 0
 
     digits =
       Enum.with_index(land)
