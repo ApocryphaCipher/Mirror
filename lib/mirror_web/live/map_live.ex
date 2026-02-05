@@ -816,7 +816,7 @@ defmodule MirrorWeb.MapLive do
                 for={@load_form}
                 id="load-form"
                 phx-submit="load_save"
-                phx-change="update_load_path"
+                phx-input="update_load_path"
                 class="grid gap-3 md:grid-cols-[1fr_auto]"
               >
                 <.input
@@ -838,7 +838,7 @@ defmodule MirrorWeb.MapLive do
                 for={@save_form}
                 id="save-form"
                 phx-submit="save_file"
-                phx-change="update_save_path"
+                phx-input="update_save_path"
                 class="grid gap-3 md:grid-cols-[1fr_auto]"
               >
                 <.input
