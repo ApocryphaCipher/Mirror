@@ -28,12 +28,8 @@ defmodule Mirror.Map do
     y * @width + x
   end
 
-  def wrap_x(x) do
-    cond do
-      x < 0 -> rem(x + @width * 1000, @width)
-      x >= @width -> rem(x, @width)
-      true -> x
-    end
+  def wrap_x(x) when is_integer(x) do
+    Integer.mod(x, @width)
   end
 
   def clamp_y(y) when y < 0, do: :off
