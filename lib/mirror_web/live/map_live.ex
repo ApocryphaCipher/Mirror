@@ -404,11 +404,13 @@ defmodule MirrorWeb.MapLive do
   end
 
   def handle_event("update_load_path", %{"load" => %{"path" => path}}, socket) do
-    {:noreply, assign(socket, :load_path, path)}
+    load_form = to_form(%{"path" => path || ""}, as: :load)
+    {:noreply, assign(socket, load_path: path, load_form: load_form)}
   end
 
   def handle_event("update_save_path", %{"save" => %{"path" => path}}, socket) do
-    {:noreply, assign(socket, :save_path_input, path)}
+    save_form = to_form(%{"path" => path || ""}, as: :save)
+    {:noreply, assign(socket, save_path_input: path, save_form: save_form)}
   end
 
   def handle_event("toggle_render_mode", _params, socket) do
@@ -820,8 +822,8 @@ defmodule MirrorWeb.MapLive do
                 <.input
                   field={@load_form[:path]}
                   type="text"
-                  placeholder="C:\\games\\MOM\\SAVES\\SAVE1.SAV"
-                  class="rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200 placeholder:text-slate-500"
+                  placeholder="C:\\games\\MOM\\SAVES\\SAVE1.GAM"
+                  class="w-full rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200 placeholder:text-slate-500"
                 />
                 <button
                   id="load-save-button"
@@ -843,7 +845,7 @@ defmodule MirrorWeb.MapLive do
                   field={@save_form[:path]}
                   type="text"
                   placeholder="Output path (optional)"
-                  class="rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200 placeholder:text-slate-500"
+                  class="w-full rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200 placeholder:text-slate-500"
                 />
                 <button
                   id="save-button"
