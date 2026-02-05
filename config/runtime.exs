@@ -43,12 +43,20 @@ parse_offset = fn value ->
   end
 end
 
-config :mirror, Mirror.SaveFile.Blocks,
-  terrain: parse_offset.(System.get_env("MIRROR_TERRAIN_OFFSET")),
-  terrain_flags: parse_offset.(System.get_env("MIRROR_TERRAIN_FLAGS_OFFSET")),
-  minerals: parse_offset.(System.get_env("MIRROR_MINERALS_OFFSET")),
-  exploration: parse_offset.(System.get_env("MIRROR_EXPLORATION_OFFSET")),
-  landmass: parse_offset.(System.get_env("MIRROR_LANDMASS_OFFSET"))
+offset_envs = [
+  terrain: "MIRROR_TERRAIN_OFFSET",
+  terrain_flags: "MIRROR_TERRAIN_FLAGS_OFFSET",
+  minerals: "MIRROR_MINERALS_OFFSET",
+  exploration: "MIRROR_EXPLORATION_OFFSET",
+  landmass: "MIRROR_LANDMASS_OFFSET"
+]
+
+Enum.each(offset_envs, fn {key, env} ->
+  case System.get_env(env) do
+    nil -> :ok
+    value -> config :mirror, Mirror.SaveFile.Blocks, [{key, parse_offset.(value)}]
+  end
+end)
 
 if config_env() == :prod do
   # The secret key base is used to sign/encrypt cookies and other secrets.

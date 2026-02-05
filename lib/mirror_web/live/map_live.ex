@@ -70,7 +70,7 @@ defmodule MirrorWeb.MapLive do
 
   @impl true
   def handle_event("load_save", %{"load" => %{"path" => path}}, socket) do
-    path = String.trim(path || "")
+    path = normalize_path(path)
 
     socket =
       socket
@@ -147,13 +147,19 @@ defmodule MirrorWeb.MapLive do
            "Missing block offset for #{layer}. Set config before loading."
          )}
 
+      {:error, :enoent} when path in [nil, ""] ->
+        {:noreply, put_flash(socket, :error, "Provide a save path before loading.")}
+
+      {:error, :enoent} ->
+        {:noreply, put_flash(socket, :error, "Save file not found at #{path}. Check the path.")}
+
       {:error, reason} ->
         {:noreply, put_flash(socket, :error, "Unable to load save: #{inspect(reason)}")}
     end
   end
 
   def handle_event("save_file", %{"save" => %{"path" => path}}, socket) do
-    path = String.trim(path || "")
+    path = normalize_path(path)
     target_path = if path == "", do: nil, else: path
     state = socket.assigns.state
     socket = assign(socket, :save_path_input, path)
@@ -816,13 +822,14 @@ defmodule MirrorWeb.MapLive do
                 for={@load_form}
                 id="load-form"
                 phx-submit="load_save"
-                phx-input="update_load_path"
+                phx-change="update_load_path"
                 class="grid gap-3 md:grid-cols-[1fr_auto]"
               >
                 <.input
                   field={@load_form[:path]}
                   type="text"
                   placeholder="C:\\games\\MOM\\SAVES\\SAVE1.GAM"
+                  phx-hook="StableInput"
                   class="w-full rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200 placeholder:text-slate-500"
                 />
                 <button
@@ -838,13 +845,14 @@ defmodule MirrorWeb.MapLive do
                 for={@save_form}
                 id="save-form"
                 phx-submit="save_file"
-                phx-input="update_save_path"
+                phx-change="update_save_path"
                 class="grid gap-3 md:grid-cols-[1fr_auto]"
               >
                 <.input
                   field={@save_form[:path]}
                   type="text"
                   placeholder="Output path (optional)"
+                  phx-hook="StableInput"
                   class="w-full rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200 placeholder:text-slate-500"
                 />
                 <button
@@ -2530,6 +2538,23 @@ defmodule MirrorWeb.MapLive do
       nil -> ""
       "" -> ""
       path -> path |> Path.join("SAVE1.GAM") |> String.replace("/", "\\")
+    end
+  end
+
+  defp normalize_path(nil), do: ""
+
+  defp normalize_path(path) do
+    path = String.trim(path || "")
+
+    case path do
+      "" ->
+        ""
+
+      _ ->
+        path
+        |> String.trim("\"")
+        |> String.trim("'")
+        |> Path.expand()
     end
   end
 

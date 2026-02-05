@@ -729,3 +729,17 @@ This will trigger a full recompilation in order to re-index your codebase.
 18:11:38.302 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 410µs
 
 18:11:38.554 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 205µs
+
+07:43:04.067 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 308µs
+
+07:43:24.926 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 307µs
+
+07:43:29.433 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 205µs
+
+07:43:40.096 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 307µs
+
+07:43:56.085 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 409µs
+
+07:52:22.123 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 409µs
+
+07:56:56.256 [debug] handled notification client -> server workspace/didChangeWatchedFiles in 410µs

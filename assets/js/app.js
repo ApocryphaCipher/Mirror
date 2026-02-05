@@ -27,11 +27,32 @@ import {MapCanvas} from "./map_hooks"
 import {RgbaCanvas} from "./lbx_hooks"
 import topbar from "../vendor/topbar"
 
+const StableInput = {
+  mounted() {
+    this.lastValue = this.el.value
+    this.onInput = () => {
+      this.lastValue = this.el.value
+    }
+    this.el.addEventListener("input", this.onInput)
+  },
+  beforeUpdate() {
+    this.lastValue = this.el.value
+  },
+  updated() {
+    if (document.activeElement === this.el) {
+      this.el.value = this.lastValue
+    }
+  },
+  destroyed() {
+    this.el.removeEventListener("input", this.onInput)
+  },
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, MapCanvas, RgbaCanvas},
+  hooks: {...colocatedHooks, MapCanvas, RgbaCanvas, StableInput},
 })
 
 // Show progress bar on live navigation and form submits
