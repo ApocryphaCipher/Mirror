@@ -95,6 +95,13 @@ defmodule Mirror.Map do
     :erlang.list_to_binary(bytes)
   end
 
+  @doc """
+  Per-direction bitmask matching MOMIME's real convention: bit is `1` when
+  the neighbor's raw terrain type DIFFERS from the center tile's, `0` when
+  it's the same. This is the opposite of what you'd guess from the name
+  "adjacency match" — see `TileSetBitmaskGeneratorImpl` in
+  docs/reference/momime-source for the real algorithm this mirrors.
+  """
   def adj_mask(terrain_bin, x, y) do
     center = terrain_type(get_tile_u16_le(terrain_bin, x, y))
 
@@ -103,17 +110,17 @@ defmodule Mirror.Map do
       nx = wrap_x(x + dx)
       ny = clamp_y(y + dy)
 
-      match? =
+      different? =
         case ny do
           :off ->
             false
 
           _ ->
             neighbor = terrain_type(get_tile_u16_le(terrain_bin, nx, ny))
-            neighbor == center
+            neighbor != center
         end
 
-      if match?, do: acc ||| 1 <<< bit_index, else: acc
+      if different?, do: acc ||| 1 <<< bit_index, else: acc
     end)
   end
 

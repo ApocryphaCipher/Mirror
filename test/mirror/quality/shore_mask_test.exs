@@ -1,7 +1,31 @@
 defmodule Mirror.Quality.ShoreMaskTest do
   use ExUnit.Case, async: true
 
+  alias Mirror.Map, as: MirrorMap
   alias Mirror.Quality.ShoreMask
+
+  defp all_ocean_plane do
+    :binary.copy(<<0::little-16>>, MirrorMap.width() * MirrorMap.height())
+  end
+
+  test "shore_mask_digits/3 marks land the same way in every direction, cardinal or diagonal" do
+    terrain =
+      [{0, -1}, {1, -1}, {1, 0}]
+      |> Enum.reduce(all_ocean_plane(), fn {dx, dy}, acc ->
+        {updated, _old} = MirrorMap.put_tile_u16_le(acc, 10 + dx, 10 + dy, 2)
+        updated
+      end)
+
+    assert ShoreMask.shore_mask_digits(terrain, 10, 10) ==
+             ["1", "1", "1", "0", "0", "0", "0", "0"]
+  end
+
+  test "shore_mask_digits/3 never emits the old ternary '2' for a lone diagonal land tile" do
+    {terrain, _old} = MirrorMap.put_tile_u16_le(all_ocean_plane(), 11, 9, 2)
+
+    assert ShoreMask.shore_mask_digits(terrain, 10, 10) ==
+             ["0", "1", "0", "0", "0", "0", "0", "0"]
+  end
 
   test "prefers lowest-cost nearest candidate over semantic fallback" do
     candidates = ShoreMask.build_mask_candidates(["10000000", "12000000"])

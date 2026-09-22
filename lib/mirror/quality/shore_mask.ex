@@ -68,12 +68,25 @@ defmodule Mirror.Quality.ShoreMask do
     end
   end
 
-  def shore_mask_digits(terrain_bin, x, y) do
-    land =
-      Enum.map(@dirs, fn {dx, dy} ->
-        nx = MirrorMap.wrap_x(x + dx)
-        ny = MirrorMap.clamp_y(y + dy)
+  @doc """
+  Per-direction land/water mask for a shore/ocean tile, matching MOMIME's
+  `TileSetBitmaskGeneratorImpl.generateOverlandMapBitmask`: for each of the 8
+  directions, the digit is `0` if the neighbor is the same type-group as the
+  center tile (water, which includes both ocean and shore), `1` otherwise.
+  Applies uniformly to all 8 directions — there is no special-cased diagonal
+  rule in the real game.
 
+  This does not yet produce `"2"` (MOMIME reserves that for river-exit
+  directions, decided by the tile's own river data, not by neighbor
+  inspection) since Mirror doesn't have river data wired up yet. Masks from
+  this function are always binary until that lands.
+  """
+  def shore_mask_digits(terrain_bin, x, y) do
+    Enum.map(@dirs, fn {dx, dy} ->
+      nx = MirrorMap.wrap_x(x + dx)
+      ny = MirrorMap.clamp_y(y + dy)
+
+      is_land =
         case ny do
           :off ->
             false
@@ -82,22 +95,8 @@ defmodule Mirror.Quality.ShoreMask do
             kind = terrain_base_kind_at(terrain_bin, nx, ny)
             not water_kind?(kind)
         end
-      end)
 
-    Enum.with_index(land)
-    |> Enum.map(fn {is_land, idx} ->
-      if rem(idx, 2) == 0 do
-        if is_land, do: "1", else: "0"
-      else
-        left = Enum.at(land, rem(idx + 7, 8))
-        right = Enum.at(land, rem(idx + 1, 8))
-
-        cond do
-          left && right -> "1"
-          is_land -> "2"
-          true -> "0"
-        end
-      end
+      if is_land, do: "1", else: "0"
     end)
   end
 

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mirror-dev",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["scripts/dev_server.sh"],
+      "port": 4000
+    }
+  ]
+}
