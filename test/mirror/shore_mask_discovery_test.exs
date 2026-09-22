@@ -71,25 +71,9 @@ defmodule Mirror.ShoreMaskDiscoveryTest do
   end
 
   defp shore_mask_from_bitset(bitset) do
-    land = for i <- 0..7, do: (bitset &&& 1 <<< i) != 0
-
-    digits =
-      Enum.with_index(land)
-      |> Enum.map(fn {is_land, idx} ->
-        if rem(idx, 2) == 0 do
-          if is_land, do: "1", else: "0"
-        else
-          left = Enum.at(land, rem(idx + 7, 8))
-          right = Enum.at(land, rem(idx + 1, 8))
-
-          cond do
-            left && right -> "1"
-            is_land -> "2"
-            true -> "0"
-          end
-        end
-      end)
-
-    Enum.join(digits)
+    for i <- 0..7 do
+      if (bitset &&& 1 <<< i) != 0, do: "1", else: "0"
+    end
+    |> Enum.join()
   end
 end

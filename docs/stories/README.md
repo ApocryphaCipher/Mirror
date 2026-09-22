@@ -1,0 +1,1 @@
+- [STORY-001](STORY-001-jagged-shorelines.md) — shorelines still look jagged/toothy after the rotation fix (PR #3), not yet root-caused

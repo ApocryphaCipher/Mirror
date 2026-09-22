@@ -1280,34 +1280,6 @@ const MapCanvas = {
     return chars.join("")
   },
 
-  gateDiagonalMask(mask) {
-    let value = Number.isFinite(mask) ? mask : 0
-    const has = bit => (value & (1 << bit)) !== 0
-    if (has(1) && !(has(0) && has(2))) value &= ~(1 << 1)
-    if (has(3) && !(has(2) && has(4))) value &= ~(1 << 3)
-    if (has(5) && !(has(4) && has(6))) value &= ~(1 << 5)
-    if (has(7) && !(has(6) && has(0))) value &= ~(1 << 7)
-    return value
-  },
-
-  gateDiagonalDigits(digits) {
-    const next = Array.isArray(digits) ? digits.slice(0, 8) : Array(8).fill("0")
-    const present = idx => (next[idx] ?? "0") !== "0"
-    const rewriteDiagonal = (diag, a, b) => {
-      if (!present(diag)) return
-      if (!(present(a) && present(b))) {
-        next[diag] = "2"
-      } else if (next[diag] !== "2") {
-        next[diag] = "1"
-      }
-    }
-    rewriteDiagonal(1, 0, 2)
-    rewriteDiagonal(3, 2, 4)
-    rewriteDiagonal(5, 4, 6)
-    rewriteDiagonal(7, 6, 0)
-    return next
-  },
-
   rotateMaskDigits(digits, shift) {
     const list = Array.isArray(digits) ? digits : []
     const offset = ((shift % 8) + 8) % 8
@@ -1319,9 +1291,14 @@ const MapCanvas = {
     return rotated
   },
 
+  // Matches MOMIME's TileSetBitmaskGeneratorImpl.generateOverlandMapBitmask:
+  // digit is "0" if the neighbor is the same type-group as the center tile
+  // (water, which includes ocean and shore), "1" otherwise — uniformly for
+  // all 8 directions. No special-cased diagonal rule in the real game.
+  // Doesn't yet produce "2" (MOMIME reserves that for river-exit directions
+  // from the tile's own river data, which Mirror doesn't have wired up yet).
   shoreMaskDigits(x, y) {
     const digits = Array(8).fill("0")
-    const land = Array(8).fill(false)
 
     for (let i = 0; i < SHORE_MASK_DIRS.length; i++) {
       const [dx, dy] = SHORE_MASK_DIRS[i]
@@ -1332,24 +1309,7 @@ const MapCanvas = {
       if (nx >= this.mapWidth) nx -= this.mapWidth
 
       const baseKind = this.terrainBaseKindAt(nx, ny)
-      land[i] = !this.isWaterKind(baseKind)
-    }
-
-    for (let i = 0; i < land.length; i++) {
-      if (i % 2 === 0) {
-        digits[i] = land[i] ? "1" : "0"
-        continue
-      }
-
-      const left = (i + 7) % 8
-      const right = (i + 1) % 8
-      if (land[left] && land[right]) {
-        digits[i] = "1"
-      } else if (land[i]) {
-        digits[i] = "2"
-      } else {
-        digits[i] = "0"
-      }
+      digits[i] = this.isWaterKind(baseKind) ? "0" : "1"
     }
 
     return digits
@@ -1721,6 +1681,17 @@ const MapCanvas = {
           rotation: canonical.rotation,
           fallbackStep: "clear_diagonals",
         }
+      }
+    }
+
+    // Some tile types (grasslands, forest, swamp in the real game) are
+    // configured with no smoothing at all — every tile always uses the same
+    // "00000000" image regardless of neighbors (MOMIME's NoSmooth concept).
+    // Try it as a last resort before giving up.
+    if (rawMaskString !== "00000000") {
+      resolved = this.resolveMomimePath(plane, kind, "00000000", phaseIndex)
+      if (resolved) {
+        return {...resolved, maskString: "00000000", rotation: 0, fallbackStep: "no_smooth"}
       }
     }
 
@@ -2374,6 +2345,10 @@ const MapCanvas = {
     return false
   },
 
+  // Matches MOMIME's real bit convention (see shoreMaskDigits above): the bit
+  // is 1 when the neighbor is DIFFERENT from the center tile's kind, 0 when
+  // it's the same — uniformly for all 8 directions, no corner-support gating
+  // (that gating was an invented rule, not something the real game does).
   adjMaskForKind(kind, x, y) {
     if (!kind || kind === "unknown") return 0
     const useOceanMask = kind === "shore"
@@ -2390,12 +2365,12 @@ const MapCanvas = {
       const neighborKind = useOceanMask ? this.terrainBaseKindAt(nx, ny) : this.terrainKindAt(nx, ny)
       const match = useOceanMask ? neighborKind === "ocean" : neighborKind === kind
 
-      if (match) {
+      if (!match) {
         mask |= 1 << i
       }
     }
 
-    return this.gateDiagonalMask(mask)
+    return mask
   },
 
   rotateMask(mask, shift) {
