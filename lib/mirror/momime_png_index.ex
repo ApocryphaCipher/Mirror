@@ -41,6 +41,16 @@ defmodule Mirror.MomimePngIndex do
     "/momime/momime.client.graphics/overland"
   end
 
+  # Kinds whose smoothed art is looked up via a real MOMIME smoothing-system
+  # reduction table rather than the shore-specific or NoSmooth paths.
+  @smoothing_system_for_kind %{
+    "hill" => "SS16",
+    "mountain" => "SS16",
+    "desert" => "SS161",
+    "tundra" => "SS161",
+    "shore" => "SS161EX"
+  }
+
   defp build_assets do
     with true <- resources_available?(),
          {:ok, {index, frames}} <- build_index() do
@@ -53,12 +63,21 @@ defmodule Mirror.MomimePngIndex do
          momime: %{
            base_url: base_url(),
            index: index,
-           frames: frames
+           frames: frames,
+           smoothing_lookups: build_smoothing_lookups(),
+           smoothing_kind_systems: @smoothing_system_for_kind
          }
        }}
     else
       _ -> :error
     end
+  end
+
+  defp build_smoothing_lookups do
+    @smoothing_system_for_kind
+    |> Map.values()
+    |> Enum.uniq()
+    |> Map.new(fn system_id -> {system_id, Mirror.Quality.SmoothingRules.build_lookup(system_id)} end)
   end
 
   defp build_index do

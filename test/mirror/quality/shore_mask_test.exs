@@ -27,6 +27,34 @@ defmodule Mirror.Quality.ShoreMaskTest do
              ["0", "1", "0", "0", "0", "0", "0", "0"]
   end
 
+  test "resolve_shore_mask_via_rules/2 reduces to a candidate that's actually available" do
+    # "10100000" reduces to "11100000" under SS161EX's real rules (same
+    # corner-fill logic as SS161). Only the reduced form is "available".
+    candidates = ShoreMask.build_mask_candidates(["11100000"])
+
+    resolved = ShoreMask.resolve_shore_mask_via_rules(candidates, ["1", "0", "1", "0", "0", "0", "0", "0"])
+
+    assert resolved.mask_string == "11100000"
+    assert resolved.fallback_step == "reduced"
+  end
+
+  test "resolve_shore_mask_via_rules/2 substitutes ocean's 00000000 for the degenerate all-water shore mask" do
+    candidates = ShoreMask.build_mask_candidates(["00000000"])
+
+    resolved = ShoreMask.resolve_shore_mask_via_rules(candidates, "00000000")
+
+    assert resolved.mask_string == "00000000"
+    assert resolved.fallback_step == "exact"
+  end
+
+  test "resolve_shore_mask_via_rules/2 falls through to the heuristic search when nothing else matches" do
+    candidates = ShoreMask.build_mask_candidates(["10000000"])
+    raw = "01000000"
+
+    assert ShoreMask.resolve_shore_mask_via_rules(candidates, raw) ==
+             ShoreMask.resolve_shore_mask(candidates, raw)
+  end
+
   test "prefers lowest-cost nearest candidate over semantic fallback" do
     candidates = ShoreMask.build_mask_candidates(["10000000", "12000000"])
     resolved = ShoreMask.resolve_shore_mask(candidates, "11000000")

@@ -6,6 +6,7 @@ defmodule Mirror.Quality.ShoreMask do
   import Bitwise
 
   alias Mirror.Map, as: MirrorMap
+  alias Mirror.Quality.SmoothingRules
 
   @dirs [
     {0, -1},
@@ -378,6 +379,35 @@ defmodule Mirror.Quality.ShoreMask do
       end)
 
     %{all: all, by_semantic: by_semantic}
+  end
+
+  @doc """
+  Reduces a raw shore mask to its real MOMIME-smoothed form via
+  `Mirror.Quality.SmoothingRules` (smoothing system SS161EX) and returns it
+  if available; otherwise falls back to ocean's "00000000" (a shore tile
+  surrounded entirely by water on all 8 sides isn't something the real game
+  has art for either — it's just ocean), and only then to the heuristic
+  cost search in `resolve_shore_mask/3` below.
+
+  This is the authoritative resolution path — prefer it over
+  `resolve_shore_mask/3` directly, which exists mainly for its cost-search
+  machinery and existing test coverage.
+  """
+  def resolve_shore_mask_via_rules(candidates, mask_digits, opts \\ []) do
+    raw_mask = normalize_mask_string(mask_string_from_digits(mask_digits))
+    reduced = SmoothingRules.reduce_mask(raw_mask, "SS161EX")
+
+    cond do
+      mask_available?(candidates, reduced) ->
+        step = if reduced == raw_mask, do: "exact", else: "reduced"
+        %{mask_string: reduced, rotation: 0, fallback_step: step, fallback_applied: reduced != raw_mask}
+
+      reduced == "00000000" && mask_available?(candidates, "00000000") ->
+        %{mask_string: "00000000", rotation: 0, fallback_step: "reduced_ocean", fallback_applied: true}
+
+      true ->
+        resolve_shore_mask(candidates, mask_digits, opts)
+    end
   end
 
   def resolve_shore_mask(candidates, mask_digits, opts \\ []) do

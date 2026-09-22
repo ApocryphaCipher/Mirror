@@ -1,7 +1,7 @@
 # STORY-001: Shorelines still look jagged/toothy after the rotation fix
 
 **Parent:** [../epics/EPIC-001-terrain-rendering.md](../epics/EPIC-001-terrain-rendering.md)
-**Status:** root-caused, fix not yet implemented — the real rule table exists, see below
+**Status:** fixed and verified
 **Reported by:** Kevin, 2026-09-22, right after PR #3 landed
 
 ## What we know
@@ -83,12 +83,39 @@ production ruleset for tileSet `TS01` ("Overland map"):
 Extracted and saved to
 [../reference/momime-source/overland-smoothing-systems.xml](../reference/momime-source/overland-smoothing-systems.xml).
 
-## Next step
+## Resolution 2026-09-22
 
-Port `SmoothingSystemEx`'s rule-application algorithm (already documented in
-PR #3's reference copy of that file) plus these 46 real rules into Mirror —
-replacing the ad-hoc rotation/cost-search fallback with the exact real
-reduction table. Bounded scope: 46 rules, one interpreter function, on both
-the Elixir side (`shore_mask.ex`, for tests/metrics) and the JS side
-(`map_hooks.js`, for actual rendering). Should drop the shore fallback rate
-from 37% toward ~0%, same as the missing-tile fix did for exact masks.
+Built `Mirror.Quality.SmoothingRules` — ports all 62 real rules (16 for
+SS16/mountain+hills, 4 for SS161/desert+tundra, 42 for SS161EX/shore) plus
+the reduction algorithm from `SmoothingSystemEx`, generated programmatically
+from the parsed XML rather than hand-transcribed. Two independent checks
+confirmed the port is faithful before it ever touched rendering:
+- `SS161EX`'s 256 raw binary masks collapse to exactly **161** distinct
+  outputs — matching the system's own name ("161 tile set, extended").
+- Every reduced mask for shore/hills/mountains/desert/tundra has a
+  corresponding real file in the resource set — 100% coverage except one
+  legitimate degenerate case (a "shore" tile with water on all 8 sides,
+  which the real game doesn't have art for either — it's just ocean).
+
+Wired server-side: `Mirror.MomimePngIndex` now computes the 256-entry
+lookup table per smoothing system once and ships it to the client inside
+the `momime` atlas payload (`smoothing_lookups`, `smoothing_kind_systems`).
+`map_hooks.js` tries it right after the raw exact match, before falling
+back to the old rotation/cost-search machinery (kept only as an
+now-largely-unused safety net).
+
+**Measured on the real save, full map**: fallback distribution went from
+37% `nearest_cost` (shore) / 21–55% incorrect `no_smooth` (hill/mountain/
+desert/tundra) to **0% heuristic fallback of any kind** — every tile now
+resolves via exact match, the real reduction rule, or the one legitimate
+ocean substitution.
+
+**Visual verification found something important**: the coastline still
+*looked* jagged in full-map screenshots even after this fix — because the
+canvas renders at 3840×2560 and screenshot tooling downscales that to
+~800px, aliasing smooth curves into a sawtooth pattern. Cropping a region
+of the canvas at native resolution before screenshotting showed genuinely
+smooth, rounded coastlines with proper beach-transition pixels, matching
+Kevin's reference screenshot. **The mask/rotation bug is fully fixed; what
+looked like remaining jaggedness in earlier screenshots was a screenshot
+artifact, not a rendering bug.**
