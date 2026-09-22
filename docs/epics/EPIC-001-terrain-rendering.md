@@ -1,6 +1,6 @@
 # EPIC-001: Correct terrain tile rendering (rotation/layering)
 
-**Status:** unblocked — real assets + real algorithm in hand, ready to implement
+**Status:** mostly fixed (PR #3) — missing-tile bug resolved, jagged shorelines still open, see [STORY-001](../stories/STORY-001-jagged-shorelines.md)
 **Owner:** Kevin
 
 ## Goal
