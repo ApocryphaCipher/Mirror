@@ -395,6 +395,8 @@ const MapCanvas = {
       this.momimeIndex = momime.index || {}
       this.momimeFrames = momime.frames || {}
       this.momimeBaseUrl = momime.base_url || ""
+      this.momimeSmoothingLookups = momime.smoothing_lookups || {}
+      this.momimeSmoothingKindSystems = momime.smoothing_kind_systems || {}
       this.buildMomimeMaskWhitelist()
       this.buildMomimeMaskCandidates()
       const shouldClearCache =
@@ -1658,6 +1660,27 @@ const MapCanvas = {
       return {...resolved, maskString: rawMaskString, rotation: 0, fallbackStep: "exact"}
     }
 
+    // Real MOMIME smoothing-reduction table (see Mirror.Quality.SmoothingRules)
+    // — collapses the raw mask to the one canonical form the real game's own
+    // art was authored for. This should hit almost every time; the
+    // rotation/cost-search below is a safety net, not the primary path.
+    const systemId = this.momimeSmoothingKindSystems[kind]
+    if (systemId) {
+      const reduced = this.momimeSmoothingLookups[systemId]?.[rawMaskString]
+      if (reduced) {
+        resolved = this.resolveMomimePath(plane, kind, reduced, phaseIndex)
+        if (resolved) {
+          return {
+            ...resolved,
+            maskString: reduced,
+            rotation: 0,
+            fallbackStep: "reduced",
+            fallbackApplied: reduced !== rawMaskString,
+          }
+        }
+      }
+    }
+
     const canonical = this.canonicalMaskString(rawMaskString)
     if (canonical.maskString !== rawMaskString) {
       resolved = this.resolveMomimePath(plane, kind, canonical.maskString, phaseIndex)
@@ -1719,6 +1742,31 @@ const MapCanvas = {
     }
 
     let resolved = attemptMask(rawMaskString, 0, "exact")
+
+    // Real MOMIME smoothing-reduction table for shore (SS161EX) — see
+    // Mirror.Quality.SmoothingRules. Should resolve almost every tile;
+    // everything below is a safety net for the one degenerate case the
+    // real game doesn't have shore art for either (a "shore" tile with
+    // water on all 8 sides, which is just ocean) plus genuine gaps.
+    if (!resolved) {
+      const reducedMask = this.momimeSmoothingLookups.SS161EX?.[rawMaskString]
+      if (reducedMask) {
+        resolved = attemptMask(reducedMask, 0, "reduced")
+        if (!resolved && reducedMask === "00000000") {
+          const oceanResolved = this.resolveMomimePath(plane, "ocean", "00000000", phaseIndex)
+          if (oceanResolved) {
+            resolved = {
+              ...oceanResolved,
+              maskString: "00000000",
+              rotation: 0,
+              fallbackStep: "reduced_ocean",
+              fallbackApplied: true,
+            }
+          }
+        }
+      }
+    }
+
     if (!resolved && canonical.maskString !== rawMaskString) {
       resolved = attemptMask(canonical.maskString, canonical.rotation, "canonical")
     }

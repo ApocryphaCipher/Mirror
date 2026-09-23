@@ -1,6 +1,6 @@
 # EPIC-001: Correct terrain tile rendering (rotation/layering)
 
-**Status:** mostly fixed (PR #3) — missing-tile bug resolved, jagged shorelines still open, see [STORY-001](../stories/STORY-001-jagged-shorelines.md)
+**Status:** rotation/smoothing fully fixed (PR #3 + STORY-001) — real MOMIME reduction rules ported and verified against the real resource set and a real save. Remaining work is asset-pipeline, not algorithm: see [EPIC-002](EPIC-002-remove-momime-dependency.md) for getting off the MOMIME PNG dependency entirely.
 **Owner:** Kevin
 
 ## Goal
