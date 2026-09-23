@@ -21,3 +21,4 @@
 - [STORY-021](STORY-021-save-round-trip-safety.md): save round-trip safety (EPIC-006)
 - [STORY-022](STORY-022-bug-raw-value-paint-artifacts.md): **bug**: stray raw-value paint shows up as map artifacts (EPIC-006)
 - [STORY-023](STORY-023-bug-edit-paint-no-live-redraw.md): **bug**: painting in edit mode doesn't redraw the tile until reload (EPIC-006)
+- [STORY-024](STORY-024-tile-hover-highlight.md): highlight the tile under the cursor (glow / lift; brush ghost in edit mode) (EPIC-006, nice-to-have)
