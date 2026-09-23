@@ -36,13 +36,18 @@ const MapViewport = {
 
     // Edit mode: Space held turns left-drag back into panning; Esc finishes.
     this.onKeyDown = event => {
+      // Esc always finishes editing, even from the tile number box (STORY-026).
+      if (event.key === "Escape" && this.editing) {
+        if (isTyping(event)) event.target.blur()
+        this.pushEvent("exit_edit", {})
+        return
+      }
       if (isTyping(event)) return
       if (event.code === "Space" && this.editing) {
         window.__mirrorSpaceHeld = true
         this.el.style.cursor = "grab"
         event.preventDefault()
       }
-      if (event.key === "Escape" && this.editing) this.pushEvent("exit_edit", {})
     }
     this.onKeyUp = event => {
       if (event.code !== "Space") return

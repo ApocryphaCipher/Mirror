@@ -52,6 +52,9 @@ defmodule MirrorWeb.MapLive do
       |> assign(:plane, plane)
       |> assign(:lab?, lab?)
       |> assign(:edit, nil)
+      |> assign(:tool, :cycle)
+      |> assign(:discard_armed, false)
+      |> assign(:fresh_mount, true)
 
     state = ensure_engine_session(state, session_id, connected?(socket))
 
@@ -78,8 +81,23 @@ defmodule MirrorWeb.MapLive do
   # `?edit=terrain` turns on edit mode on the map pages (never in the Lab).
   @impl true
   def handle_params(params, _uri, socket) do
-    edit = if not socket.assigns.lab? and params["edit"] == "terrain", do: :terrain, else: nil
-    socket = socket |> assign(:edit, edit) |> assign_forms()
+    requested = not socket.assigns.lab? and params["edit"] == "terrain"
+
+    # A fresh page load (including reload) always opens in view mode; edits
+    # are kept as a draft and shown by the unsaved-changes notice (STORY-026).
+    if requested and socket.assigns.fresh_mount and connected?(socket) do
+      {:noreply,
+       socket
+       |> assign(:fresh_mount, false)
+       |> push_patch(to: map_path(socket.assigns.plane), replace: true)}
+    else
+      handle_edit_params(requested, assign(socket, :fresh_mount, not connected?(socket)))
+    end
+  end
+
+  defp handle_edit_params(requested, socket) do
+    edit = if requested, do: :terrain, else: nil
+    socket = socket |> assign(:edit, edit) |> assign(:discard_armed, false) |> assign_forms()
 
     # Edits go through the terrain layer; keep the session's active layer in
     # step so stroke updates reach the canvas.
@@ -122,6 +140,20 @@ defmodule MirrorWeb.MapLive do
     end
   end
 
+  def handle_event("set_tool", %{"tool" => tool}, socket) when tool in ["cycle", "paint"] do
+    {:noreply, assign(socket, :tool, String.to_existing_atom(tool))}
+  end
+
+  # Discard is a two-step in-page confirmation: native confirm() dialogs are
+  # silently cancelled in some embedded browsers (STORY-026).
+  def handle_event("arm_discard", _params, socket) do
+    {:noreply, assign(socket, :discard_armed, socket.assigns.changed_tiles > 0)}
+  end
+
+  def handle_event("cancel_discard", _params, socket) do
+    {:noreply, assign(socket, :discard_armed, false)}
+  end
+
   def handle_event("set_brush", %{"brush" => %{"tile" => tile}}, socket) do
     state = socket.assigns.state
 
@@ -135,6 +167,7 @@ defmodule MirrorWeb.MapLive do
   end
 
   def handle_event("discard_edits", _params, socket) do
+    socket = assign(socket, :discard_armed, false)
     state = socket.assigns.state
 
     if state.save do
@@ -1442,167 +1475,203 @@ defmodule MirrorWeb.MapLive do
             </div>
           </header>
 
-          <div
-            :if={@edit}
-            id="edit-toolbar"
-            class="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-emerald-300/20 bg-emerald-950/40 px-4 py-2 text-sm text-slate-200"
-          >
+          <%!-- Notice and toolbar float over the map so their size never shifts
+               the map under the pointer (a click would land on another tile). --%>
+          <div class="relative">
             <div
-              class="flex rounded-lg border border-white/10 p-0.5"
-              role="group"
-              aria-label="Edit layer"
+              :if={!@edit && @changed_tiles > 0}
+              id="unsaved-notice"
+              class="absolute inset-x-0 top-0 z-20 flex flex-wrap items-center gap-3 border-b border-amber-300/20 bg-amber-950/85 px-4 py-1.5 text-sm text-amber-100 backdrop-blur"
             >
-              <span class="rounded-md bg-white/10 px-2.5 py-0.5 font-semibold text-white">
-                Terrain
+              <span>
+                {@changed_tiles} unsaved {if @changed_tiles == 1, do: "change", else: "changes"} (not in the save file yet)
               </span>
-              <span
-                :for={label <- ["Roads", "Structures", "Units"]}
-                class="px-2.5 py-0.5 text-slate-500"
-                title="Coming once this data is decoded (EPIC-004)"
+              <button
+                type="button"
+                phx-click="toggle_edit"
+                class="rounded-lg border border-amber-200/40 px-2.5 py-0.5 hover:border-amber-100"
               >
-                {label}
-              </span>
+                Review in edit mode
+              </button>
+              <.discard_control changed_tiles={@changed_tiles} armed={@discard_armed} />
             </div>
 
-            <.form
-              for={@brush_form}
-              id="brush-form"
-              phx-change="set_brush"
-              phx-submit="set_brush"
-              class="flex items-center gap-2"
+            <div
+              :if={@edit}
+              id="edit-toolbar"
+              class="absolute inset-x-0 top-0 z-20 flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-emerald-300/20 bg-emerald-950/85 px-4 py-2 text-sm text-slate-200 backdrop-blur"
             >
-              <span class="text-slate-400">Tile</span>
-              <canvas
-                id="brush-preview"
-                phx-update="ignore"
-                width="20"
-                height="18"
-                class="h-[27px] w-[30px] rounded border border-white/20"
-                style="image-rendering: pixelated"
+              <div
+                class="flex rounded-lg border border-white/10 p-0.5"
+                role="group"
+                aria-label="Edit layer"
               >
-              </canvas>
-              <.input
-                field={@brush_form[:tile]}
-                type="number"
-                min="0"
-                max="761"
-                phx-debounce="200"
-                class="w-20 rounded-lg border border-white/10 bg-slate-950/60 py-0.5 text-sm text-slate-200"
-              />
-            </.form>
+                <span class="rounded-md bg-white/10 px-2.5 py-0.5 font-semibold text-white">
+                  Terrain
+                </span>
+                <span
+                  :for={label <- ["Roads", "Structures", "Units"]}
+                  class="px-2.5 py-0.5 text-slate-500"
+                  title="Coming once this data is decoded (EPIC-004)"
+                >
+                  {label}
+                </span>
+              </div>
 
-            <span class="text-xs text-slate-400">
-              Left-click paint · right-click pick · space-drag or middle-drag to pan · Esc to finish
-            </span>
+              <div class="flex rounded-lg border border-white/10 p-0.5" role="group" aria-label="Tool">
+                <button
+                  :for={{tool, label} <- [cycle: "🔄 Cycle", paint: "🎨 Paint"]}
+                  id={"tool-#{tool}"}
+                  type="button"
+                  phx-click="set_tool"
+                  phx-value-tool={tool}
+                  aria-pressed={to_string(@tool == tool)}
+                  class={[
+                    "rounded-md px-2.5 py-0.5 transition",
+                    @tool == tool && "bg-emerald-300 font-semibold text-slate-950",
+                    @tool != tool && "text-slate-300 hover:text-white"
+                  ]}
+                >
+                  {label}
+                </button>
+              </div>
 
-            <div class="ml-auto flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                phx-click="undo"
-                class="rounded-lg border border-white/15 px-2.5 py-0.5 hover:border-white/40"
-              >
-                Undo
-              </button>
-              <button
-                type="button"
-                phx-click="redo"
-                class="rounded-lg border border-white/15 px-2.5 py-0.5 hover:border-white/40"
-              >
-                Redo
-              </button>
-              <span
-                id="changed-tiles"
-                class={[
-                  @changed_tiles > 0 && "text-amber-200",
-                  @changed_tiles == 0 && "text-slate-500"
-                ]}
-              >
-                {@changed_tiles} {if @changed_tiles == 1, do: "tile", else: "tiles"} changed
-              </span>
-              <button
-                :if={@changed_tiles > 0}
-                id="discard-edits-button"
-                type="button"
-                phx-click="discard_edits"
-                data-confirm={"Discard #{@changed_tiles} changed tiles?"}
-                class="rounded-lg border border-rose-300/40 px-2.5 py-0.5 text-rose-100 hover:border-rose-200"
-              >
-                Discard
-              </button>
               <.form
-                for={@save_form}
-                id="save-form"
-                phx-submit="save_file"
-                phx-change="update_save_path"
+                :if={@tool == :paint}
+                for={@brush_form}
+                id="brush-form"
+                phx-change="set_brush"
+                phx-submit="set_brush"
                 class="flex items-center gap-2"
               >
-                <.input
-                  field={@save_form[:path]}
-                  type="text"
-                  placeholder="Save as… (new file path)"
-                  phx-hook="StableInput"
-                  class="w-72 rounded-lg border border-white/10 bg-slate-950/60 py-0.5 text-sm text-slate-200 placeholder:text-slate-500"
-                />
-                <button
-                  id="save-button"
-                  type="submit"
-                  class="rounded-lg bg-emerald-300 px-3 py-0.5 font-semibold text-slate-950 hover:bg-emerald-200"
+                <span class="text-slate-400">Tile</span>
+                <canvas
+                  id="brush-preview"
+                  phx-update="ignore"
+                  width="20"
+                  height="18"
+                  class="h-[27px] w-[30px] rounded border border-white/20"
+                  style="image-rendering: pixelated"
                 >
-                  Save as
-                </button>
+                </canvas>
+                <.input
+                  field={@brush_form[:tile]}
+                  type="number"
+                  min="0"
+                  max="761"
+                  phx-debounce="200"
+                  class="w-20 rounded-lg border border-white/10 bg-slate-950/60 py-0.5 text-sm text-slate-200"
+                />
               </.form>
+
+              <span class="text-xs text-slate-400">
+                {if @tool == :cycle,
+                  do:
+                    "Click: next tile · right-click or shift-click: previous · space-drag or middle-drag to pan · Esc to finish",
+                  else:
+                    "Click or drag: paint · right-click: pick tile · space-drag or middle-drag to pan · Esc to finish"}
+              </span>
+
+              <div class="ml-auto flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  phx-click="undo"
+                  class="rounded-lg border border-white/15 px-2.5 py-0.5 hover:border-white/40"
+                >
+                  Undo
+                </button>
+                <button
+                  type="button"
+                  phx-click="redo"
+                  class="rounded-lg border border-white/15 px-2.5 py-0.5 hover:border-white/40"
+                >
+                  Redo
+                </button>
+                <span
+                  id="changed-tiles"
+                  class={[
+                    @changed_tiles > 0 && "text-amber-200",
+                    @changed_tiles == 0 && "text-slate-500"
+                  ]}
+                >
+                  {@changed_tiles} {if @changed_tiles == 1, do: "tile", else: "tiles"} changed
+                </span>
+                <.discard_control changed_tiles={@changed_tiles} armed={@discard_armed} />
+                <.form
+                  for={@save_form}
+                  id="save-form"
+                  phx-submit="save_file"
+                  phx-change="update_save_path"
+                  class="flex items-center gap-2"
+                >
+                  <.input
+                    field={@save_form[:path]}
+                    type="text"
+                    placeholder="Save as… (new file path)"
+                    phx-hook="StableInput"
+                    class="w-72 rounded-lg border border-white/10 bg-slate-950/60 py-0.5 text-sm text-slate-200 placeholder:text-slate-500"
+                  />
+                  <button
+                    id="save-button"
+                    type="submit"
+                    class="rounded-lg bg-emerald-300 px-3 py-0.5 font-semibold text-slate-950 hover:bg-emerald-200"
+                  >
+                    Save as
+                  </button>
+                </.form>
+              </div>
             </div>
-          </div>
 
-          <div
-            id="map-viewport"
-            phx-hook="MapViewport"
-            phx-update="ignore"
-            class="relative touch-none select-none overflow-hidden bg-slate-950"
-          >
-            <.map_canvas
-              plane={@plane}
-              interaction={if @edit, do: "edit", else: "view"}
-              map_width={@map_width}
-              map_height={@map_height}
-              active_layer={@active_layer}
-              encoded_layer={@encoded_layer}
-              terrain_encoded={@terrain_encoded}
-              terrain_flags_encoded={@terrain_flags_encoded}
-              minerals_encoded={@minerals_encoded}
-              exploration_encoded={@exploration_encoded}
-              landmass_encoded={@landmass_encoded}
-              adj_mask_encoded={@adj_mask_encoded}
-              render_mode={@render_mode}
-              phase_index={@phase_index}
-              snapshot_mode={@snapshot_mode}
-            />
+            <div
+              id="map-viewport"
+              phx-hook="MapViewport"
+              phx-update="ignore"
+              class="relative touch-none select-none overflow-hidden bg-slate-950"
+            >
+              <.map_canvas
+                plane={@plane}
+                interaction={if @edit, do: "edit", else: "view"}
+                map_width={@map_width}
+                map_height={@map_height}
+                active_layer={@active_layer}
+                encoded_layer={@encoded_layer}
+                terrain_encoded={@terrain_encoded}
+                terrain_flags_encoded={@terrain_flags_encoded}
+                minerals_encoded={@minerals_encoded}
+                exploration_encoded={@exploration_encoded}
+                landmass_encoded={@landmass_encoded}
+                adj_mask_encoded={@adj_mask_encoded}
+                render_mode={@render_mode}
+                phase_index={@phase_index}
+                snapshot_mode={@snapshot_mode}
+              />
 
-            <div class="absolute bottom-4 right-4 flex items-center gap-1 rounded-xl border border-white/10 bg-slate-950/85 p-1 text-sm text-slate-200 shadow-lg">
-              <button
-                type="button"
-                data-zoom="out"
-                class="rounded-lg px-2.5 py-1 hover:bg-white/10"
-                aria-label="Zoom out"
-              >
-                −
-              </button>
-              <button
-                type="button"
-                data-zoom="fit"
-                class="rounded-lg px-2 py-1 font-mono text-xs hover:bg-white/10"
-                aria-label="Fit map to window"
-              >
-                <span data-zoom-label>100%</span>
-              </button>
-              <button
-                type="button"
-                data-zoom="in"
-                class="rounded-lg px-2.5 py-1 hover:bg-white/10"
-                aria-label="Zoom in"
-              >
-                +
-              </button>
+              <div class="absolute bottom-4 right-4 flex items-center gap-1 rounded-xl border border-white/10 bg-slate-950/85 p-1 text-sm text-slate-200 shadow-lg">
+                <button
+                  type="button"
+                  data-zoom="out"
+                  class="rounded-lg px-2.5 py-1 hover:bg-white/10"
+                  aria-label="Zoom out"
+                >
+                  −
+                </button>
+                <button
+                  type="button"
+                  data-zoom="fit"
+                  class="rounded-lg px-2 py-1 font-mono text-xs hover:bg-white/10"
+                  aria-label="Fit map to window"
+                >
+                  <span data-zoom-label>100%</span>
+                </button>
+                <button
+                  type="button"
+                  data-zoom="in"
+                  class="rounded-lg px-2.5 py-1 hover:bg-white/10"
+                  aria-label="Zoom in"
+                >
+                  +
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1613,10 +1682,51 @@ defmodule MirrorWeb.MapLive do
           >
             {plane_name(@plane)} ({@hover.x}, {@hover.y}) · tile {@hover.terrain}
             <span class="text-slate-500">({hex_word(@hover.terrain)})</span>
+            <span :if={@edit && @tool == :cycle} class="text-emerald-300">
+              → {Integer.mod(@hover.terrain + 1, TerrainLbx.tiles_per_plane())}
+            </span>
           </div>
         </div>
       <% end %>
     </Layouts.app>
+    """
+  end
+
+  attr :changed_tiles, :integer, required: true
+  attr :armed, :boolean, required: true
+
+  defp discard_control(assigns) do
+    ~H"""
+    <span :if={@changed_tiles > 0} id="discard-control" class="inline-flex items-center gap-2">
+      <button
+        :if={!@armed}
+        id="discard-edits-button"
+        type="button"
+        phx-click="arm_discard"
+        class="rounded-lg border border-rose-300/40 px-2.5 py-0.5 text-rose-100 hover:border-rose-200"
+      >
+        Discard
+      </button>
+      <span :if={@armed} class="text-rose-100">Discard {@changed_tiles} changes?</span>
+      <button
+        :if={@armed}
+        id="confirm-discard-button"
+        type="button"
+        phx-click="discard_edits"
+        class="rounded-lg bg-rose-300 px-2.5 py-0.5 font-semibold text-slate-950 hover:bg-rose-200"
+      >
+        Yes, discard
+      </button>
+      <button
+        :if={@armed}
+        id="cancel-discard-button"
+        type="button"
+        phx-click="cancel_discard"
+        class="rounded-lg border border-white/15 px-2.5 py-0.5 hover:border-white/40"
+      >
+        Cancel
+      </button>
+    </span>
     """
   end
 
@@ -1694,6 +1804,17 @@ defmodule MirrorWeb.MapLive do
     {:noreply, socket}
   end
 
+  defp handle_pointer_start(
+         %{assigns: %{edit: :terrain, tool: :cycle}} = socket,
+         x,
+         y,
+         button,
+         mods
+       ) do
+    direction = if button == 2 or truthy?(mods["shift"]), do: -1, else: 1
+    cycle_tile(socket, x, y, direction)
+  end
+
   defp handle_pointer_start(socket, x, y, button, mods) do
     {tool, layer} = tool_and_layer(socket, button, mods)
 
@@ -1754,8 +1875,27 @@ defmodule MirrorWeb.MapLive do
     |> assign_forms()
   end
 
-  defp start_stroke(socket, layer, x, y) do
-    {socket, change} = apply_tile_change(socket, layer, x, y)
+  # Cycle tool: step the tile's number by ±1 (wrapping 0..761). Each click
+  # is its own one-tile stroke, so each click is one undo step.
+  defp cycle_tile(socket, x, y, direction) do
+    tiles = TerrainLbx.tiles_per_plane()
+
+    case tile_value(socket.assigns.state, socket.assigns.plane, :terrain, x, y) do
+      nil ->
+        socket
+
+      current ->
+        value = Integer.mod(current + direction, tiles)
+
+        socket
+        |> start_stroke(:terrain, x, y, value)
+        |> then(&finalize_stroke(&1, &1.assigns.active_stroke))
+        |> assign_hover(x, y)
+    end
+  end
+
+  defp start_stroke(socket, layer, x, y, value \\ nil) do
+    {socket, change} = apply_tile_change(socket, layer, x, y, value)
 
     case change do
       nil ->
@@ -1802,6 +1942,7 @@ defmodule MirrorWeb.MapLive do
     socket
     |> assign(:active_stroke, nil)
     |> assign_state(socket.assigns.state)
+    |> refresh_hover()
   end
 
   # Cheap state update (no re-encoding of layers) that keeps the
@@ -1858,7 +1999,7 @@ defmodule MirrorWeb.MapLive do
     end
   end
 
-  defp apply_tile_change(socket, layer, x, y) do
+  defp apply_tile_change(socket, layer, x, y, value \\ nil) do
     state = socket.assigns.state
     plane = socket.assigns.plane
 
@@ -1870,7 +2011,7 @@ defmodule MirrorWeb.MapLive do
         {socket, nil}
 
       true ->
-        value = Map.get(state.selection, layer, 0)
+        value = value || Map.get(state.selection, layer, 0)
         {updated_state, change, updates} = do_apply_change(state, plane, layer, x, y, value)
         changes = change && [{x, y, elem(change, 0), elem(change, 1)}]
 
@@ -1941,6 +2082,7 @@ defmodule MirrorWeb.MapLive do
         |> assign_state(state)
         |> maybe_push_updates(layer, updates, changes)
         |> emit_engine_delta(plane, layer, changes)
+        |> refresh_hover()
 
       [] ->
         socket
@@ -1970,6 +2112,7 @@ defmodule MirrorWeb.MapLive do
         |> assign_state(state)
         |> maybe_push_updates(layer, updates, changes)
         |> emit_engine_delta(plane, layer, changes)
+        |> refresh_hover()
 
       [] ->
         socket
@@ -2326,8 +2469,9 @@ defmodule MirrorWeb.MapLive do
       if state.save && valid_coord?(x, y) do
         plane_layers = Map.fetch!(state.planes, plane)
         engine_tile = engine_tile(state, plane, x, y)
-        engine_terrain = engine_tile && Map.get(engine_tile, :terrain_u16)
-        terrain_value = engine_terrain || MirrorMap.get_tile_u16_le(plane_layers.terrain, x, y)
+        # The session's planes are authoritative and updated synchronously;
+        # the engine mirrors them via async deltas, so it can lag an edit.
+        terrain_value = MirrorMap.get_tile_u16_le(plane_layers.terrain, x, y)
         adj = MirrorMap.get_tile_u8(plane_layers.computed_adj_mask, x, y)
         layer = state.active_layer
 
