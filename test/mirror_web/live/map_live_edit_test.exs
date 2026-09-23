@@ -251,7 +251,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       assert length(items) == 16
       assert %{x: 38, y: 21, size: 1, banner: :yellow, name: "Deventor"} in items
 
-      assert_push_event(view, "overlay_sprites", %{cities: %{unwalled: %{width: 32, height: 30}}})
+      assert_push_event(view, "overlay_sprites", %{cities: %{city: %{width: 32, height: 30}}})
     end
   end
 end
