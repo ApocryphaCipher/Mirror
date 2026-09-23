@@ -57,7 +57,7 @@ Key facts, all confirmed straight from source:
   values}, then set direction X to value Y") loaded from the graphics XML,
   applied deterministically to every possible raw bitmask up front. Mirror's
   `shore_semantic_fallbacks`/`shore_mask_fallback_cost` in
-  [shore_mask.ex](../../lib/mirror/quality/shore_mask.ex) reinvents this as a generic
+  shore_mask.ex (removed in #13) reinvents this as a generic
   cost-minimization search — which will sometimes land on a plausible-looking
   but *wrong* tile, because it isn't using the game's actual rules. If the
   `resources/` MOMIME client graphics dump Kevin has includes the graphics

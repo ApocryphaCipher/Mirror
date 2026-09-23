@@ -1,8 +1,28 @@
-# STORY-013: Roads, minerals and corruption
+# STORY-013: Specials and bonuses (ores, gems, nightshade, wild game…), roads and corruption
 
 **Parent:** [EPIC-004](../epics/EPIC-004-overland-map-features.md)
-**Status:** open, blocked on STORY-006. Lower priority.
+**Status:** open, blocked on STORY-006. **Don't lose the specials:** Kevin
+(2026-09-23) flagged the bonus tiles as easy to forget next to lairs and
+towers. They get their own map layer and toggle (STORY-009), their own
+editing tool later (STORY-018/028), and a place in the edit checker
+(STORY-029).
 **Size:** medium
+
+## The specials / bonuses (map resources)
+
+The classic game's terrain specials, drawn from the `MAPBACK.LBX` `SITES`
+icons (see the sprite reference):
+
+- **Ores and metals:** iron, coal, silver, gold, mithril, adamantium
+- **Crystals and gems:** gems, quork crystals, crysx crystals (the
+  "power" specials)
+- **Food and herbs:** wild game, nightshade
+- **Worked-site overlays:** mine, lumber camp, hunter's lodge (verify
+  whether these are specials or city-worked markers)
+
+Source data is most likely the **minerals map** (`0x013554`, 1 byte per
+tile). Decode which value means which special, and check it against a
+known save, the same way the terrain offsets were verified.
 
 ## What to do
 
