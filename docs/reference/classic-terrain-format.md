@@ -51,9 +51,10 @@ animated = (w & 0x80) != 0     # 4 consecutive records = 4 animation frames
 79 of the 1524 pointers are animated (water-type tiles).
 
 **Palette**: `FONTS.LBX` entry 2, first 768 bytes — 256 × RGB, 6-bit VGA
-(scale by 255/63, as `Mirror.LBX.Palette` does). This is the palette that makes terrain render correctly;
-it's very likely the missing piece behind the earlier "colored noise"
-results in `Mirror.LBX.Palette` (EPIC-002), not yet confirmed there.
+(scale by 255/63, as `Mirror.LBX.Palette` does). This is the palette for
+every classic image, not just terrain. The earlier "colored noise" in
+`Mirror.LBX` turned out to be a decoder bug, not the palette (STORY-006;
+see [overland-sprites-and-save-blocks.md](overland-sprites-and-save-blocks.md#lbx-formats-as-implemented-in-mirrorlbx)).
 
 ## `TERRTYPE.LBX` — the original game's own smoothing table
 

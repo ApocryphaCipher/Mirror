@@ -17,12 +17,15 @@ All work is merged to `main` (PRs #3–#23); nothing is open.
   histograms, raw painter). **`/tile-probe`**: LBX explorer.
 - The stories index is [../stories/README.md](../stories/README.md); epics are in [../epics/](../epics/).
 
-## Next task: STORY-006, sprite groundwork
+## Next task: pick an overlay story (STORY-006 is done)
 
-[../stories/STORY-006-sprite-groundwork.md](../stories/STORY-006-sprite-groundwork.md). It's the critical path:
-cities (010), units and plaques (012), sites (011), specials and roads
-(013), node auras (008) and safe editing (029) all wait on it.
-Survey so far: [../reference/overland-sprites-and-save-blocks.md](../reference/overland-sprites-and-save-blocks.md).
+STORY-006 landed the sprite catalog:
+[../reference/overland-sprites-and-save-blocks.md](../reference/overland-sprites-and-save-blocks.md). Cities, plaques,
+units, sites, specials, roads and sparkles are mapped to `FILE.LBX #entry/frame`.
+`Mirror.LBX` decodes all of them correctly now. Next up, each needs its
+save block decoded first: STORY-009 (layer toggles), then STORY-010
+(cities) → STORY-012 (units + plaques) → STORY-011 (sites) → STORY-013
+(roads/specials), and STORY-008 (node auras).
 
 Smaller alternatives: STORY-007 (ocean twinkle), STORY-024 (hover
 highlight).
@@ -30,18 +33,17 @@ highlight).
 ## Dev setup
 
 - Game files live outside the repo (copyrighted; never commit them):
-  - `~/.mirror_assets/MAGIC`: the old CD-era install plus the saves
-    (`SAVE1/2/9.GAM`). `TERRAIN.LBX` was copied in from GOG; its
-    `Fonts.lbx` is byte-identical to GOG's.
-  - `~/.mirror_assets/GOG`: so far only `TERRAIN.LBX`, `FONTS.LBX`,
-    `MAIN.LBX` and `render_map.py`. **The full GOG install is on Kevin's
-    Google Drive** (folder "Master of Magic Official Release"). Pull the
-    rest of the LBX files from there (the Drive connector saves big files
-    to disk; decode with `jq -r .content … | base64 -d`).
-- Run the app: `bash scripts/dev_server.sh` (port 4000). Load
-  `~/.mirror_assets/MAGIC/SAVE1.GAM` via the header's Load box.
+  - `~/.mirror_assets/GOG`: **the dev server's `MIRROR_MOM_PATH`**. 61 GOG
+    LBX files plus copies of `SAVE1/2/9.GAM` and `render_map.py`. About 36
+    small LBX files (< 75 KB, none of them overland art) are still only on
+    Kevin's Google Drive ("Master of Magic Official Release"). The Drive
+    connector saves big files to disk but returns small ones inline (see
+    the backlog).
+  - `~/.mirror_assets/MAGIC`: the old CD-era install plus the original saves.
+- Run the app: `bash scripts/dev_server.sh` (port 4000). The Load box
+  defaults to `…/GOG/SAVE1.GAM`.
 - Tests: `mix test` skips the real-file tests; **`bash scripts/test_game.sh`**
-  runs everything with the game-file env (35 tests).
+  runs everything with the game-file env (44 tests).
 - Reference renderer: `python3 scripts/mom_map_render.py SAVE1.GAM --lbx ~/.mirror_assets/GOG`.
 
 ## Gotchas learned the hard way
@@ -57,12 +59,15 @@ highlight).
   overlays.
 - **Stacked PRs:** don't target another PR's branch (#8 merged into a stale
   branch and never reached `main`). Branch from it but target `main`.
-- **LBX files** have a readable name table at `0x200` (32-byte rows). Images
-  in `TERRAIN.LBX` and the cursors are column-major; the palette is
-  `FONTS.LBX` entry 2, 6-bit VGA (scale 255/63).
-- **The dev server runs from a previous session** (unnamed node) and
-  live-reloads. Kevin's session state lives in its ETS; don't leave test
-  edits behind (undo or discard them).
+- **LBX files** have a readable name table at `0x200` (32-byte rows) and
+  entry offsets at byte 8. Every image is column-major (RLE for sprites).
+  The palette is `FONTS.LBX` entry 2, 6-bit VGA (scale 255/63), with index
+  0 transparent. Format details are in the reference doc's "LBX formats".
+- **Sessions own their dev server.** Start it with `scripts/dev_server.sh`
+  and stop it when you're done. A leftover server from an earlier session
+  is a mistake, not Kevin's (Kevin, 2026-09-23), so check first:
+  `lsof -iTCP:4000 -sTCP:LISTEN`. Session state lives in its
+  ETS, so still don't leave test edits in a save you're sharing.
 
 ## Working agreement with Kevin
 

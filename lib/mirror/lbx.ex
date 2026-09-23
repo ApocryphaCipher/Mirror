@@ -1,9 +1,29 @@
 defmodule Mirror.LBX do
   @moduledoc """
-  LBX container reader and image decoder.
-  """
+  LBX container reader and image decoder for classic Master of Magic files.
 
-  require Logger
+  Container: `u16 count`, `u16 0xFEAD`, 4 bytes, then `count + 1` u32 entry
+  offsets from byte 8. Most files also carry a name table at `0x200`: one
+  32-byte row per entry, a 9-byte NUL-padded name (`SITES`) then a
+  NUL-terminated description (`blue`). See `names/1`.
+
+  Image entries (see docs/reference/overland-sprites-and-save-blocks.md):
+
+    * header: `u16 width, height, 0, frames, delay, ?, ?, palette_info, flags`,
+      then `frames + 1` u32 frame offsets at `0x12`
+    * each frame starts with a byte: `1` = fresh frame, `0` = drawn over the
+      previous frame (animation deltas)
+    * then one record per column, left to right: `0xFF` = empty column, else
+      a mode byte (`0x00` copy, `0x80` RLE), a size byte, and `size` bytes of
+      runs: `count, skip` then `count` encoded bytes starting `skip` rows
+      below the previous run. In RLE mode a byte `> 0xDF` repeats the next
+      byte `b - 0xDF` times.
+    * `palette_info` (when non-zero) points at `u16 offset, first, count`: a
+      6-bit RGB patch over colours `first..first+count-1`.
+
+  Colours come from the game palette (`FONTS.LBX` entry 2, see
+  `game_palette/1`), where index 0 is transparent.
+  """
 
   alias Mirror.LBX.{Image, Palette}
 
@@ -18,6 +38,10 @@ defmodule Mirror.LBX do
           raw: binary(),
           entry_offsets: [non_neg_integer()]
         }
+
+  @name_table 0x200
+  @name_row 32
+  @frame_table 0x12
 
   def open(path) do
     with {:ok, raw} <- File.read(path),
@@ -36,15 +60,42 @@ defmodule Mirror.LBX do
     _ -> []
   end
 
-  def entries(%__MODULE__{entry_offsets: offsets, raw: raw}) do
+  def entries(%__MODULE__{entry_offsets: offsets, raw: raw} = lbx) do
+    names = names(lbx)
+
     offsets
     |> Enum.with_index()
     |> Enum.drop(-1)
     |> Enum.map(fn {offset, index} ->
       size = Enum.at(offsets, index + 1) - offset
-      %{index: index, offset: offset, size: size, type: entry_type(raw, offset, size)}
+      label = Enum.at(names, index)
+
+      %{
+        index: index,
+        offset: offset,
+        size: size,
+        type: entry_type(raw, offset, size),
+        name: label && label.name,
+        description: label && label.description
+      }
     end)
   end
+
+  @doc """
+  The name table at `0x200`: one `%{name, description}` per entry, or `nil`
+  where the file has no (readable) row for it. Files without a table (the
+  sound banks, `TERRAIN.LBX`) give all `nil`s.
+  """
+  def names(%__MODULE__{raw: raw, entry_offsets: [first | _] = offsets}) do
+    count = length(offsets) - 1
+    rows_fit = max(div(first - @name_table, @name_row), 0)
+
+    for index <- 0..(count - 1)//1 do
+      if index < rows_fit, do: name_row(raw, @name_table + index * @name_row)
+    end
+  end
+
+  def names(_lbx), do: []
 
   def read_entry(%__MODULE__{raw: raw, entry_offsets: offsets}, index) do
     with {:ok, {offset, size}} <- entry_slice(offsets, index),
@@ -56,29 +107,71 @@ defmodule Mirror.LBX do
     end
   end
 
-  def decode_image(%__MODULE__{} = lbx, index) do
-    decode_image(lbx, index, [])
-  end
-
-  def decode_image(%__MODULE__{} = lbx, index, opts) when is_list(opts) do
-    palette_opt = Keyword.get(opts, :palette, :auto)
-
+  @doc """
+  Decode an image entry. `palette:` is `:auto` (the game palette from the
+  file's own directory, patched by the entry's embedded colours),
+  `:grayscale` (raw indices as grey levels), or an explicit palette list.
+  """
+  def decode_image(%__MODULE__{} = lbx, index, opts \\ []) when is_list(opts) do
     with {:ok, entry} <- read_entry(lbx, index),
-         {entry_data, embedded_palette} <- extract_embedded_palette(entry),
-         {palette, _source} <- select_palette(lbx, embedded_palette, palette_opt),
-         palette_hash <- Palette.hash(palette),
-         {:ok, image} <- decode_image_data(entry_data, palette, palette_hash) do
-      {:ok, image}
+         {:ok, header} <- parse_image_header(entry),
+         {:ok, palette, _source} <- resolve_palette(lbx, index, opts),
+         {:ok, frames} <- decode_frames(entry, header) do
+      palette_hash = Palette.hash(palette)
+
+      frames =
+        Enum.map(frames, fn {frame_index, indices} ->
+          %{
+            index: frame_index,
+            width: header.width,
+            height: header.height,
+            indices: indices,
+            rgba: indices_to_rgba(indices, palette)
+          }
+        end)
+
+      {:ok,
+       %Image{
+         width: header.width,
+         height: header.height,
+         frame_count: header.frames,
+         frames: frames,
+         rgba: frames |> List.first() |> Map.get(:rgba),
+         palette_hash: palette_hash
+       }}
+    else
+      :error -> {:error, :not_an_image}
+      error -> error
     end
   end
 
+  @doc """
+  The palette `decode_image/3` would use, and where it came from:
+  `:game`, `:game_embedded` (game palette + this entry's patch),
+  `:grayscale`, `:explicit`, or `:explicit_embedded`.
+  """
   def resolve_palette(%__MODULE__{} = lbx, index, opts \\ []) when is_list(opts) do
-    palette_opt = Keyword.get(opts, :palette, :auto)
-
     with {:ok, entry} <- read_entry(lbx, index) do
-      {_entry_data, embedded_palette} = extract_embedded_palette(entry)
-      {palette, source} = select_palette(lbx, embedded_palette, palette_opt)
-      {:ok, palette, source}
+      {base, source} =
+        case Keyword.get(opts, :palette, :auto) do
+          palette when is_list(palette) ->
+            {palette, :explicit}
+
+          :grayscale ->
+            {Palette.default(), :grayscale}
+
+          _auto ->
+            case game_palette(Path.dirname(lbx.path)) do
+              {:ok, palette} -> {palette, :game}
+              {:error, _} -> {Palette.default(), :grayscale}
+            end
+        end
+
+      case {source, embedded_palette(entry)} do
+        {:grayscale, _} -> {:ok, base, source}
+        {_, nil} -> {:ok, base, source}
+        {_, patch} -> {:ok, Palette.patch(base, patch), :"#{source}_embedded"}
+      end
     end
   end
 
@@ -88,73 +181,53 @@ defmodule Mirror.LBX do
     end
   end
 
-  defp parse_offsets(raw) do
-    size = byte_size(raw)
+  @doc """
+  The game's shared palette: first 768 bytes of `FONTS.LBX` entry 2 in `dir`
+  (6-bit VGA), with index 0 transparent.
+  """
+  def game_palette(dir) when dir in [nil, ""], do: {:error, :no_mom_path}
 
-    if size < 8 do
-      {:error, :short_header}
-    else
-      <<count32::little-unsigned-integer-size(32), hint::little-unsigned-integer-size(32),
-        _::binary>> = raw
-
-      <<count16::little-unsigned-integer-size(16), _::binary>> = raw
-
-      candidates =
-        [
-          %{count: count32, table: hint},
-          %{count: count32, table: 4},
-          %{count: count32, table: 8},
-          %{count: count16, table: hint},
-          %{count: count16, table: 4},
-          %{count: count16, table: 8}
-        ]
-        |> Enum.uniq()
-
-      Enum.find_value(candidates, {:error, :invalid_header}, fn candidate ->
-        with {:ok, offsets} <- offsets_from_candidate(raw, candidate),
-             true <- offsets_valid?(offsets, size, candidate.table) do
-          {:ok, offsets}
-        else
-          _ -> false
-        end
-      end)
+  def game_palette(dir) do
+    with {:ok, name} <- find_file(dir, "FONTS.LBX"),
+         {:ok, fonts} <- open(Path.join(dir, name)),
+         {:ok, entry} <- read_entry(fonts, 2),
+         true <- byte_size(entry) >= 768 || {:error, :short_palette} do
+      {:ok, Palette.game(binary_part(entry, 0, 768))}
     end
   end
 
-  defp offsets_from_candidate(raw, %{count: count, table: table}) do
-    size = byte_size(raw)
-
-    cond do
-      count < 0 ->
-        {:error, :invalid_count}
-
-      table < 0 ->
-        {:error, :invalid_table}
-
-      table + (count + 1) * 4 > size ->
-        {:error, :table_oob}
-
-      true ->
-        offsets =
-          for i <- 0..count do
-            <<_::binary-size(table + i * 4), offset::little-unsigned-integer-size(32), _::binary>> =
-              raw
-
-            offset
-          end
-
-        {:ok, offsets}
+  defp find_file(dir, name) do
+    case Enum.find(list_files(dir), &(String.upcase(&1) == name)) do
+      nil -> {:error, {:missing, name}}
+      found -> {:ok, found}
     end
   end
 
-  defp offsets_valid?(offsets, size, table) do
-    offsets
-    |> Enum.with_index()
-    |> Enum.all?(fn {offset, idx} ->
-      offset >= 0 and offset <= size and (idx == 0 or offset >= Enum.at(offsets, idx - 1))
-    end) and
-      Enum.any?(offsets, &(&1 >= table))
+  defp name_row(raw, offset) do
+    <<name::binary-size(9), description::binary-size(23)>> = binary_part(raw, offset, @name_row)
+    name = cstring(name)
+    description = cstring(description)
+
+    if name != "" and printable?(name) and printable?(description),
+      do: %{name: name, description: description}
   end
+
+  defp cstring(bin), do: bin |> :binary.split(<<0>>) |> hd()
+  defp printable?(bin), do: for(<<c <- bin>>, reduce: true, do: (acc -> acc and c in 32..126))
+
+  # `u16 count`, `u16 0xFEAD`, 4 bytes, then `count + 1` u32 offsets at 8.
+  defp parse_offsets(
+         <<count::little-16, 0xFEAD::little-16, _::binary-size(4), rest::binary>> = raw
+       )
+       when byte_size(rest) >= (count + 1) * 4 do
+    offsets = for <<offset::little-32 <- binary_part(rest, 0, (count + 1) * 4)>>, do: offset
+
+    if offsets == Enum.sort(offsets) and List.last(offsets) <= byte_size(raw),
+      do: {:ok, offsets},
+      else: {:error, :invalid_offsets}
+  end
+
+  defp parse_offsets(_raw), do: {:error, :invalid_header}
 
   defp entry_slice(offsets, index) do
     count = length(offsets) - 1
@@ -176,542 +249,156 @@ defmodule Mirror.LBX do
   end
 
   defp entry_type(raw, offset, size) do
-    entry = binary_part(raw, offset, min(size, 16))
-
-    case entry do
-      <<width::little-unsigned-integer-size(16), height::little-unsigned-integer-size(16),
-        _frames::little-unsigned-integer-size(16), _flags::little-unsigned-integer-size(16),
-        _::binary>>
-      when width in 1..1024 and height in 1..1024 ->
-        :image
-
-      _ ->
-        :binary
+    case parse_image_header(binary_part(raw, offset, size)) do
+      {:ok, _} -> :image
+      :error -> :binary
     end
   end
 
-  defp decode_image_data(entry_data, palette, palette_hash) do
-    case parse_image_header(entry_data) do
-      {:ok, header} ->
-        decode_frames(entry_data, header, palette, palette_hash)
+  defp parse_image_header(
+         <<width::little-16, height::little-16, 0::little-16, frames::little-16,
+           _delay::little-16, _::binary-size(4), palette_info::little-16, _flags::little-16,
+           _::binary>> = entry
+       )
+       when width in 1..320 and height in 1..200 and frames in 1..256 do
+    table_end = @frame_table + (frames + 1) * 4
 
-      :error ->
-        decode_raw_image(entry_data, palette, palette_hash)
-    end
-  end
-
-  defp parse_image_header(entry) do
-    if byte_size(entry) < 8 do
-      :error
-    else
-      <<width::little-unsigned-integer-size(16), height::little-unsigned-integer-size(16),
-        frames::little-unsigned-integer-size(16), flags::little-unsigned-integer-size(16),
-        rest::binary>> = entry
-
-      cond do
-        width < 1 or height < 1 ->
-          :error
-
-        width > 1024 or height > 1024 ->
-          :error
-
-        frames < 1 or frames > 1024 ->
-          :error
-
-        byte_size(rest) < frames * 4 ->
-          :error
-
-        true ->
-          {:ok, %{width: width, height: height, frames: frames, flags: flags}}
-      end
-    end
-  end
-
-  defp decode_frames(
-         entry_data,
-         %{width: width, height: height, frames: frames},
-         palette,
-         palette_hash
-       ) do
-    offsets = frame_offsets(entry_data, frames)
-    size = byte_size(entry_data)
-
-    if offsets == [] do
-      decode_raw_image(entry_data, palette, palette_hash)
-    else
-      frame_offsets = offsets ++ [size]
-
-      decoded_frames =
-        frame_offsets
-        |> Enum.with_index()
-        |> Enum.drop(-1)
-        |> Enum.map(fn {offset, frame_index} ->
-          next_offset = Enum.at(frame_offsets, frame_index + 1)
-          frame_data = binary_part(entry_data, offset, max(next_offset - offset, 0))
-
-          case decode_frame(frame_data, width, height) do
-            {:ok, indices} ->
-              rgba = indices_to_rgba(indices, palette)
-              %{index: frame_index, width: width, height: height, rgba: rgba, indices: indices}
-
-            {:error, reason} ->
-              Logger.warning("LBX frame decode failed: #{inspect(reason)}")
-
-              %{
-                index: frame_index,
-                width: width,
-                height: height,
-                rgba: empty_rgba(width, height),
-                indices: <<>>
-              }
-          end
-        end)
-
-      primary = List.first(decoded_frames)
-
+    with true <- byte_size(entry) >= table_end,
+         offsets = frame_offsets(entry, frames),
+         true <- offsets == Enum.sort(offsets),
+         true <- hd(offsets) >= table_end and List.last(offsets) <= byte_size(entry) do
       {:ok,
-       %Image{
+       %{
          width: width,
          height: height,
-         frame_count: frames,
-         frames: decoded_frames,
-         rgba: primary && primary.rgba,
-         palette_hash: palette_hash
+         frames: frames,
+         offsets: offsets,
+         palette_info: palette_info
        }}
+    else
+      _ -> :error
     end
   end
+
+  defp parse_image_header(_entry), do: :error
 
   defp frame_offsets(entry, frames) do
-    data_start = 8 + frames * 4
-    size = byte_size(entry)
+    for <<offset::little-32 <- binary_part(entry, @frame_table, (frames + 1) * 4)>>, do: offset
+  end
 
-    offsets =
-      for i <- 0..(frames - 1) do
-        <<_::binary-size(8 + i * 4), offset::little-unsigned-integer-size(32), _::binary>> = entry
+  defp decode_frames(entry, %{width: width, height: height, offsets: offsets}) do
+    blank = List.duplicate(:binary.copy(<<0>>, height), width)
 
-        offset
+    offsets
+    |> Enum.chunk_every(2, 1, :discard)
+    |> Enum.with_index()
+    |> Enum.reduce_while({:ok, [], blank}, fn {[from, to], index}, {:ok, acc, previous} ->
+      frame = binary_part(entry, from, to - from)
+
+      case decode_frame(frame, width, height, previous, blank) do
+        {:ok, columns} ->
+          {:cont, {:ok, [{index, columns_to_rows(columns, height)} | acc], columns}}
+
+        {:error, reason} ->
+          {:halt, {:error, {:frame, index, reason}}}
       end
-
-    if Enum.all?(offsets, &(&1 >= data_start and &1 < size)) and
-         Enum.sort(offsets) == offsets do
-      offsets
-    else
-      []
+    end)
+    |> case do
+      {:ok, frames, _last} -> {:ok, Enum.reverse(frames)}
+      error -> error
     end
   end
 
-  defp decode_raw_image(entry_data, palette, palette_hash) do
-    size = byte_size(entry_data)
+  # A frame starting with 0 is a delta over the previous frame; anything
+  # else starts from a transparent canvas.
+  defp decode_frame(<<0, rest::binary>>, width, height, previous, _blank),
+    do: decode_columns(rest, width, height, previous, [])
 
-    if size >= 4 do
-      <<width::little-unsigned-integer-size(16), height::little-unsigned-integer-size(16),
-        rest::binary>> = entry_data
+  defp decode_frame(<<_, rest::binary>>, width, height, _previous, blank),
+    do: decode_columns(rest, width, height, blank, [])
 
-      if width > 0 and height > 0 and byte_size(rest) >= width * height do
-        indices = binary_part(rest, 0, width * height)
-        rgba = indices_to_rgba(indices, palette)
+  defp decode_frame(<<>>, _width, _height, _previous, _blank), do: {:error, :empty_frame}
 
-        {:ok,
-         %Image{
-           width: width,
-           height: height,
-           frame_count: 1,
-           frames: [%{index: 0, width: width, height: height, rgba: rgba, indices: indices}],
-           rgba: rgba,
-           palette_hash: palette_hash
-         }}
-      else
-        {:error, :unknown_image_format}
-      end
-    else
-      {:error, :unknown_image_format}
-    end
-  end
+  defp decode_columns(_data, 0, _height, _base, acc), do: {:ok, Enum.reverse(acc)}
 
-  defp decode_frame(data, width, height) do
-    case decode_row_rle(data, width, height) do
-      {:ok, indices} ->
-        ensure_pixel_count(indices, width, height)
+  defp decode_columns(<<0xFF, rest::binary>>, width, height, [base | bases], acc),
+    do: decode_columns(rest, width - 1, height, bases, [base | acc])
 
-      :error ->
-        case decode_stream_rle(data, width, height) do
-          {:ok, indices} -> ensure_pixel_count(indices, width, height)
-          :error -> decode_raw_frame(data, width, height)
-        end
-    end
-  end
-
-  defp decode_raw_frame(data, width, height) do
-    if byte_size(data) >= width * height do
-      ensure_pixel_count(binary_part(data, 0, width * height), width, height)
-    else
-      {:error, :frame_too_small}
-    end
-  end
-
-  defp decode_row_rle(data, width, height) do
-    cond do
-      byte_size(data) < height * 2 ->
-        :error
-
-      true ->
-        case row_offsets(data, height, 2) do
-          {:ok, offsets} ->
-            decode_rows_with_offsets(data, offsets, width, height * 2)
-
-          _ ->
-            case row_offsets(data, height, 4) do
-              {:ok, offsets} -> decode_rows_with_offsets(data, offsets, width, height * 4)
-              _ -> :error
-            end
-        end
-    end
-  end
-
-  defp decode_rows_with_offsets(data, offsets, width, table_size) do
-    if offsets_valid?(offsets, byte_size(data), table_size) and
-         Enum.all?(offsets, &(&1 >= table_size)) do
-      offsets = offsets ++ [byte_size(data)]
-
-      rows =
-        offsets
-        |> Enum.with_index()
-        |> Enum.drop(-1)
-        |> Enum.map(fn {offset, row_index} ->
-          next_offset = Enum.at(offsets, row_index + 1)
-          row_data = binary_part(data, offset, max(next_offset - offset, 0))
-          decode_row(row_data, width)
-        end)
-
-      if Enum.any?(rows, &(&1 == :error)) do
-        :error
-      else
-        {:ok, IO.iodata_to_binary(rows)}
-      end
-    else
-      :error
-    end
-  end
-
-  defp row_offsets(data, height, size) do
-    limit = height * size
-
-    if byte_size(data) < limit do
-      {:error, :short_offsets}
-    else
-      offsets =
-        for i <- 0..(height - 1) do
-          case size do
-            2 ->
-              <<_::binary-size(i * 2), offset::little-unsigned-integer-size(16), _::binary>> =
-                data
-
-              offset
-
-            4 ->
-              <<_::binary-size(i * 4), offset::little-unsigned-integer-size(32), _::binary>> =
-                data
-
-              offset
-          end
-        end
-
-      {:ok, offsets}
-    end
-  end
-
-  defp decode_row(row_data, width) do
-    decode_row(row_data, width, 0, <<>>)
-  end
-
-  defp decode_row(_row_data, width, _pixels, acc) when byte_size(acc) >= width do
-    binary_part(acc, 0, width)
-  end
-
-  defp decode_row(<<>>, width, _pixels, acc) do
-    pad = max(width - byte_size(acc), 0)
-    <<acc::binary, :binary.copy(<<0>>, pad)::binary>>
-  end
-
-  defp decode_row(
-         <<skip::unsigned-integer-size(8), count::unsigned-integer-size(8), rest::binary>>,
-         width,
-         _pixels,
-         acc
-       ) do
-    cond do
-      skip == 255 and count == 255 ->
-        pad = max(width - byte_size(acc), 0)
-        <<acc::binary, :binary.copy(<<0>>, pad)::binary>>
-
-      skip == 0 and count == 0 ->
-        pad = max(width - byte_size(acc), 0)
-        <<acc::binary, :binary.copy(<<0>>, pad)::binary>>
-
-      byte_size(rest) < count ->
-        :error
-
-      true ->
-        transparent = :binary.copy(<<0>>, skip)
-        <<pixels::binary-size(count), tail::binary>> = rest
-        next = <<acc::binary, transparent::binary, pixels::binary>>
-
-        if byte_size(next) >= width do
-          binary_part(next, 0, width)
-        else
-          decode_row(tail, width, byte_size(next), next)
-        end
-    end
-  end
-
-  defp decode_row(_row_data, _width, _pixels, _acc), do: :error
-
-  defp decode_stream_rle(data, width, height) do
-    case decode_stream_rle(data, width, height, 0, 0, <<>>) do
-      {:ok, indices} -> {:ok, indices}
-      :error -> :error
-    end
-  end
-
-  defp decode_stream_rle(_data, _width, height, _x, y, acc) when y >= height do
-    {:ok, acc}
-  end
-
-  defp decode_stream_rle(<<>>, _width, _height, _x, _y, _acc), do: :error
-
-  defp decode_stream_rle(
-         <<skip::unsigned-integer-size(8), count::unsigned-integer-size(8), rest::binary>>,
+  defp decode_columns(
+         <<mode, size, runs::binary-size(size), rest::binary>>,
          width,
          height,
-         x,
+         [base | bases],
+         acc
+       )
+       when mode in [0x00, 0x80] do
+    case decode_runs(runs, mode == 0x80, height, base, 0, []) do
+      {:ok, column} -> decode_columns(rest, width - 1, height, bases, [column | acc])
+      error -> error
+    end
+  end
+
+  defp decode_columns(_data, _width, _height, _bases, _acc), do: {:error, :bad_column}
+
+  # Builds one column: untouched rows come from `base`, runs overwrite.
+  defp decode_runs(<<>>, _rle?, height, base, y, acc) do
+    {:ok, IO.iodata_to_binary(Enum.reverse([binary_part(base, y, height - y) | acc]))}
+  end
+
+  defp decode_runs(
+         <<count, skip, data::binary-size(count), rest::binary>>,
+         rle?,
+         height,
+         base,
          y,
          acc
        ) do
-    cond do
-      (skip == 255 and count == 255) or (skip == 0 and count == 0) ->
-        {acc, x, y} = pad_row(acc, x, y, width, height)
-        decode_stream_rle(rest, width, height, x, y, acc)
+    start = y + skip
+    pixels = if rle?, do: expand_rle(data, []), else: data
+    stop = start + byte_size(pixels)
 
-      byte_size(rest) < count ->
-        :error
-
-      true ->
-        {acc, x, y} = write_fill(acc, x, y, width, height, skip, 0)
-
-        if y >= height do
-          {:ok, acc}
-        else
-          <<pixels::binary-size(count), tail::binary>> = rest
-          {acc, x, y} = write_bytes(acc, x, y, width, height, pixels)
-          decode_stream_rle(tail, width, height, x, y, acc)
-        end
-    end
-  end
-
-  defp write_fill(acc, x, y, _width, _height, count, _value) when count <= 0 do
-    {acc, x, y}
-  end
-
-  defp write_fill(acc, x, y, width, height, count, value) do
-    bytes = :binary.copy(<<value>>, count)
-    write_bytes(acc, x, y, width, height, bytes)
-  end
-
-  defp write_bytes(acc, x, y, _width, _height, <<>>) do
-    {acc, x, y}
-  end
-
-  defp write_bytes(acc, _x, y, _width, height, _bytes) when y >= height do
-    {acc, 0, y}
-  end
-
-  defp write_bytes(acc, x, y, width, height, bytes) do
-    row_space = width - x
-    take = min(byte_size(bytes), row_space)
-    <<chunk::binary-size(take), rest::binary>> = bytes
-    next = <<acc::binary, chunk::binary>>
-    x = x + take
-
-    if x == width do
-      write_bytes(next, 0, y + 1, width, height, rest)
+    if stop > height do
+      {:error, :column_overflow}
     else
-      write_bytes(next, x, y, width, height, rest)
+      acc = [pixels, binary_part(base, y, skip) | acc]
+      decode_runs(rest, rle?, height, base, stop, acc)
     end
   end
 
-  defp pad_row(acc, x, y, width, height) do
-    if y >= height do
-      {acc, 0, y}
+  defp decode_runs(_runs, _rle?, _height, _base, _y, _acc), do: {:error, :bad_run}
+
+  defp expand_rle(<<>>, acc), do: IO.iodata_to_binary(Enum.reverse(acc))
+
+  defp expand_rle(<<repeat, value, rest::binary>>, acc) when repeat > 0xDF,
+    do: expand_rle(rest, [:binary.copy(<<value>>, repeat - 0xDF) | acc])
+
+  defp expand_rle(<<value, rest::binary>>, acc), do: expand_rle(rest, [value | acc])
+
+  defp columns_to_rows(columns, height) do
+    columns = List.to_tuple(columns)
+    width = tuple_size(columns)
+
+    for y <- 0..(height - 1), x <- 0..(width - 1), into: <<>> do
+      <<:binary.at(elem(columns, x), y)>>
+    end
+  end
+
+  defp embedded_palette(entry) do
+    with {:ok, %{palette_info: info}} when info > 0 <- parse_image_header(entry),
+         <<_::binary-size(^info), offset::little-16, first::little-16, count::little-16,
+           _::binary>> <- entry,
+         true <- first + count <= 256 and offset + count * 3 <= byte_size(entry) do
+      {first, binary_part(entry, offset, count * 3)}
     else
-      remaining = max(width - x, 0)
-      acc = <<acc::binary, :binary.copy(<<0>>, remaining)::binary>>
-      {acc, 0, y + 1}
+      _ -> nil
     end
-  end
-
-  defp ensure_pixel_count(indices, width, height) do
-    expected = width * height
-
-    if byte_size(indices) == expected do
-      {:ok, indices}
-    else
-      {:error, :pixel_count_mismatch}
-    end
-  end
-
-  defp extract_embedded_palette(entry) do
-    case parse_image_header(entry) do
-      {:ok, header} ->
-        case split_embedded_palette(entry, header) do
-          {:ok, entry_data, palette} -> {entry_data, palette}
-          :error -> {entry, nil}
-        end
-
-      :error ->
-        case split_embedded_palette_raw(entry) do
-          {:ok, entry_data, palette} -> {entry_data, palette}
-          :error -> {entry, nil}
-        end
-    end
-  end
-
-  defp split_embedded_palette(entry, %{frames: frames}) do
-    size = byte_size(entry)
-    data_start = 8 + frames * 4
-    offsets = frame_offsets(entry, frames)
-
-    if offsets == [] do
-      :error
-    else
-      Enum.find_value([1024, 768], :error, fn palette_size ->
-        data_end = size - palette_size
-
-        cond do
-          data_end <= data_start ->
-            false
-
-          not Enum.all?(offsets, &(&1 >= data_start and &1 < data_end)) ->
-            false
-
-          true ->
-            palette_bin = binary_part(entry, data_end, palette_size)
-
-            if palette_valid?(palette_bin) do
-              entry_data = binary_part(entry, 0, data_end)
-              {:ok, entry_data, Palette.from_binary(palette_bin)}
-            else
-              false
-            end
-        end
-      end)
-    end
-  end
-
-  defp split_embedded_palette_raw(entry) do
-    if byte_size(entry) < 4 do
-      :error
-    else
-      <<width::little-unsigned-integer-size(16), height::little-unsigned-integer-size(16),
-        rest::binary>> = entry
-
-      pixel_count = width * height
-
-      cond do
-        width < 1 or height < 1 ->
-          :error
-
-        byte_size(rest) < pixel_count ->
-          :error
-
-        true ->
-          tail_size = byte_size(rest) - pixel_count
-
-          if tail_size in [768, 1024] do
-            <<pixels::binary-size(pixel_count), palette_bin::binary>> = rest
-
-            if palette_valid?(palette_bin) do
-              entry_data =
-                <<width::little-unsigned-integer-size(16),
-                  height::little-unsigned-integer-size(16), pixels::binary>>
-
-              {:ok, entry_data, Palette.from_binary(palette_bin)}
-            else
-              :error
-            end
-          else
-            :error
-          end
-      end
-    end
-  end
-
-  defp palette_valid?(bin) when byte_size(bin) == 1024, do: true
-
-  defp palette_valid?(bin) when byte_size(bin) == 768 do
-    bin
-    |> :binary.bin_to_list()
-    |> Enum.max(fn -> 0 end)
-    |> Kernel.<=(63)
-  end
-
-  defp palette_valid?(_bin), do: false
-
-  defp select_palette(_lbx, _embedded, palette) when is_list(palette) do
-    {palette, :explicit}
-  end
-
-  # Forces the file-wide-scan-or-hardcoded fallback even when this entry has
-  # its own embedded palette — useful for testing whether an entry's
-  # embedded palette is itself the thing producing wrong colors (tile probe
-  # "Force default" mode).
-  defp select_palette(lbx, _embedded, :force_default) do
-    {default_palette(lbx), :default}
-  end
-
-  defp select_palette(_lbx, embedded, _palette_opt) when is_list(embedded) do
-    {embedded, :embedded}
-  end
-
-  defp select_palette(lbx, _embedded, _palette_opt) do
-    {default_palette(lbx), :default}
-  end
-
-  defp default_palette(%__MODULE__{} = lbx) do
-    case find_palette_entry(lbx) do
-      {:ok, palette} -> palette
-      {:error, _} -> Palette.default()
-    end
-  end
-
-  defp find_palette_entry(%__MODULE__{} = lbx) do
-    lbx
-    |> entries()
-    |> Enum.reduce_while({:error, :no_palette}, fn entry, _acc ->
-      if entry.size in [768, 1024] do
-        case read_entry(lbx, entry.index) do
-          {:ok, data} -> {:halt, {:ok, Palette.from_binary(data)}}
-          {:error, _} -> {:cont, {:error, :no_palette}}
-        end
-      else
-        {:cont, {:error, :no_palette}}
-      end
-    end)
   end
 
   defp indices_to_rgba(indices, palette) do
-    palette_bin = Palette.to_binary(palette)
+    lookup = palette |> Palette.to_binary()
 
-    for <<idx::unsigned-integer-size(8) <- indices>>, into: <<>> do
-      <<r::unsigned-integer-size(8), g::unsigned-integer-size(8), b::unsigned-integer-size(8),
-        a::unsigned-integer-size(8)>> =
-        :binary.part(palette_bin, idx * 4, 4)
-
-      <<b::unsigned-integer-size(8), g::unsigned-integer-size(8), r::unsigned-integer-size(8),
-        a::unsigned-integer-size(8)>>
+    for <<idx <- indices>>, into: <<>> do
+      binary_part(lookup, idx * 4, 4)
     end
-  end
-
-  defp empty_rgba(width, height) do
-    :binary.copy(<<0, 0, 0, 0>>, width * height)
   end
 end

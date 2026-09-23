@@ -1,7 +1,7 @@
 # STORY-006: Sprite groundwork: full GOG install + named-sprite catalog
 
 **Parent:** [EPIC-004](../epics/EPIC-004-overland-map-features.md), shared with [EPIC-005](../epics/EPIC-005-animated-terrain-and-magic.md)
-**Status:** open, ready to start. **Do this first.** Every other overlay story needs it.
+**Status:** done 2026-09-23. Catalog: [../reference/overland-sprites-and-save-blocks.md](../reference/overland-sprites-and-save-blocks.md#sprite-catalog-verified-2026-09-23-story-006).
 **Size:** small–medium
 
 ## Why
@@ -32,3 +32,23 @@ way to see *which* entry is *what* before wiring anything.
   correct colours.
 - The catalog table exists and later stories reference it instead of
   guessing entry numbers.
+
+## Outcome (2026-09-23)
+
+- 61 of the GOG LBX files are in `~/.mirror_assets/GOG`, with the saves
+  copied alongside, and `scripts/dev_server.sh` points `MIRROR_MOM_PATH`
+  there. Not pulled: ~36 small files (< 75 KB: `CMB*` combat terrain,
+  `ITEM*`, `SPELLS`, `SPECIAL/2`, `VORTEX`, `PORTRAIT`, `HIRE`, etc.). The
+  Drive connector returns those inline rather than to disk, and none of
+  them are overland art.
+- `Mirror.LBX` reads the name table (`names/1`, and `entries/1` carries
+  `name`/`description`), decodes the real image format, and defaults to
+  the `FONTS.LBX` #2 palette with index 0 transparent (alpha 0).
+- The `:auto` "colored noise" bug was the **decoder**, not the palette. The
+  write-up is in the reference doc. Forcing the palette alone did not fix
+  it; fixing the header and frame parsing did.
+- `/tile-probe` shows names, uses the game palette by default ("Grayscale"
+  and "Borrow" remain), draws transparency on a checkerboard, and counts
+  index-0 pixels.
+- Also fixed: the entry-offset parser was off by one for files whose bytes
+  4–7 are zero (e.g. MAPBACK), and RGBA was written as BGRA.

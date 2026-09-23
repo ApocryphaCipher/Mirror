@@ -28,8 +28,8 @@ defmodule MirrorWeb.TileProbeLive do
       |> assign(:selected_entry, nil)
       |> assign(:selected_frame, 0)
       |> assign(:preview, nil)
-      |> assign(:palette_source, "auto")
-      |> assign(:palette_mode, "auto")
+      |> assign(:palette_source, "game")
+      |> assign(:palette_mode, "game")
       |> assign(:borrow_lbx, "")
       |> assign(:borrow_index, "0")
       |> assign(:palette_scan, nil)
@@ -91,7 +91,7 @@ defmodule MirrorWeb.TileProbeLive do
   def handle_event("set_palette_mode", %{"palette" => params}, socket) do
     socket =
       socket
-      |> assign(:palette_mode, params["mode"] || "auto")
+      |> assign(:palette_mode, params["mode"] || "game")
       |> assign(:borrow_lbx, params["borrow_lbx"] || "")
       |> assign(:borrow_index, params["borrow_index"] || "0")
       |> reload_preview()
@@ -225,6 +225,14 @@ defmodule MirrorWeb.TileProbeLive do
                     ]}
                   >
                     <span class="font-semibold">#{entry.index}</span>
+                    <%= if entry.name do %>
+                      <span class="truncate text-[0.7rem] text-amber-200" title={entry_label(entry)}>
+                        {entry.name}
+                      </span>
+                      <span class="truncate text-[0.65rem] text-slate-300" title={entry_label(entry)}>
+                        {entry.description}
+                      </span>
+                    <% end %>
                     <span class="text-[0.6rem] uppercase tracking-[0.2em] text-slate-500">
                       #{entry.type}
                     </span>
@@ -243,7 +251,10 @@ defmodule MirrorWeb.TileProbeLive do
                   <div class="grid gap-3 sm:grid-cols-2">
                     <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-3 text-xs text-slate-300">
                       <p class="uppercase tracking-[0.2em] text-slate-500">Metadata</p>
-                      <p class="mt-2">Entry #{@selected_entry}</p>
+                      <p class="mt-2">
+                        {@selected_lbx} #{@selected_entry}
+                        <span :if={@preview.label} class="text-amber-200">· {@preview.label}</span>
+                      </p>
                       <p>Frames: {@preview.frame_count}</p>
                       <p>Size: {@preview.width}×{@preview.height}</p>
                     </div>
@@ -262,18 +273,18 @@ defmodule MirrorWeb.TileProbeLive do
                     class="rounded-2xl border border-white/10 bg-slate-950/40 p-3"
                   >
                     <p class="text-xs uppercase tracking-[0.2em] text-slate-500">
-                      Palette mode <span class="text-slate-600">(tinker tool — see EPIC-002)</span>
+                      Palette mode
                     </p>
                     <div class="mt-2 grid gap-2 sm:grid-cols-3">
                       <select
                         name="palette[mode]"
                         class="rounded-xl border border-white/10 bg-slate-950/60 px-2 py-1 text-xs text-slate-200"
                       >
-                        <option value="auto" selected={@palette_mode == "auto"}>
-                          Auto (embedded → default)
+                        <option value="game" selected={@palette_mode == "game"}>
+                          Game palette (FONTS.LBX #2 + embedded)
                         </option>
-                        <option value="default" selected={@palette_mode == "default"}>
-                          Force default fallback
+                        <option value="grayscale" selected={@palette_mode == "grayscale"}>
+                          Grayscale (raw indices)
                         </option>
                         <option value="borrow" selected={@palette_mode == "borrow"}>
                           Borrow from another LBX entry
@@ -316,7 +327,8 @@ defmodule MirrorWeb.TileProbeLive do
                           data-width={frame.width}
                           data-height={frame.height}
                           data-rgba={frame.rgba}
-                          class="h-auto w-full rounded-xl bg-slate-900"
+                          class="h-auto w-full rounded-xl"
+                          style="image-rendering: pixelated; background: repeating-conic-gradient(#475569 0 25%, #1e293b 0 50%) 0 0 / 16px 16px;"
                         >
                         </canvas>
                         <div class="mt-2 text-xs text-slate-300">
@@ -334,8 +346,7 @@ defmodule MirrorWeb.TileProbeLive do
                       </p>
                       <%= if active_frame.index_summary do %>
                         <p class="mt-2">
-                          {active_frame.index_summary.count} pixels,
-                          {active_frame.index_summary.distinct_count} distinct value(s):
+                          {active_frame.index_summary.count} pixels, {active_frame.index_summary.distinct_count} distinct value(s), {active_frame.index_summary.transparent} transparent (index 0):
                           <span class="font-mono">
                             {Enum.join(active_frame.index_summary.distinct_values, ", ")}{if active_frame.index_summary.distinct_truncated,
                               do: ", …"}
@@ -348,8 +359,7 @@ defmodule MirrorWeb.TileProbeLive do
                         <pre class="mt-2 rounded-xl bg-black/40 p-2 font-mono text-[0.65rem] leading-snug text-slate-300 max-h-64 overflow-auto">{Enum.join(active_frame.index_grid, "\n")}</pre>
                       <% else %>
                         <p class="mt-2 text-slate-500">
-                          Grid too large to display ({active_frame.width}×{active_frame.height} — cap is {@max_index_grid_cells}
-                          cells, summary above still applies).
+                          Grid too large to display ({active_frame.width}×{active_frame.height} — cap is {@max_index_grid_cells} cells, summary above still applies).
                         </p>
                       <% end %>
                     </div>
@@ -534,8 +544,8 @@ defmodule MirrorWeb.TileProbeLive do
   # Translates the UI's palette_mode/borrow_lbx/borrow_index assigns into
   # whatever Mirror.LBX.resolve_palette/3's `:palette` option expects — either
   # one of its own atoms, or an explicit decoded palette list "borrowed" from
-  # a different LBX file/entry, for testing where the real shared palette
-  # for a given file might actually live (see EPIC-002).
+  # a different LBX file/entry. The game palette (FONTS.LBX #2) is right for
+  # every image checked so far; borrowing is for probing exceptions.
   defp resolve_palette_opt(%{assigns: %{palette_mode: "borrow"} = assigns}) do
     path = resolve_lbx_path(assigns.mom_path, assigns.borrow_lbx)
     borrow_index = parse_int(assigns.borrow_index, 0)
@@ -548,7 +558,7 @@ defmodule MirrorWeb.TileProbeLive do
     end
   end
 
-  defp resolve_palette_opt(%{assigns: %{palette_mode: "default"}}), do: :force_default
+  defp resolve_palette_opt(%{assigns: %{palette_mode: "grayscale"}}), do: :grayscale
   defp resolve_palette_opt(_socket), do: :auto
 
   defp load_entry_preview(mom_path, lbx_name, index, palette_opt) do
@@ -556,6 +566,7 @@ defmodule MirrorWeb.TileProbeLive do
 
     with {:ok, lbx} <- LBX.open(path),
          {:ok, raw_entry} <- LBX.read_entry(lbx, index),
+         label = lbx |> LBX.names() |> Enum.at(index) |> entry_label(),
          {:ok, palette, source} <- LBX.resolve_palette(lbx, index, palette: palette_opt),
          {:ok, image} <- LBX.decode_image(lbx, index, palette: palette) do
       frames =
@@ -576,6 +587,7 @@ defmodule MirrorWeb.TileProbeLive do
          height: image.height,
          frame_count: image.frame_count,
          frames: frames,
+         label: label,
          entry_size: byte_size(raw_entry),
          hex_dump: hex_dump(raw_entry)
        }, Atom.to_string(source)}
@@ -592,6 +604,7 @@ defmodule MirrorWeb.TileProbeLive do
 
     %{
       count: length(values),
+      transparent: Enum.count(values, &(&1 == 0)),
       distinct_count: length(distinct),
       distinct_values: Enum.take(distinct, 64),
       distinct_truncated: length(distinct) > 64
@@ -635,11 +648,8 @@ defmodule MirrorWeb.TileProbeLive do
   defp printable_byte(_), do: "."
 
   # Scans every LBX file for entries whose size matches a classic 256-color
-  # palette (768 bytes = RGB triples, 1024 = RGBA quads) — candidates for
-  # "where does the real shared palette for this game actually live",
-  # since Mirror.LBX currently falls back to a hardcoded default whenever a
-  # file has neither its own embedded palette nor another palette-sized
-  # entry in the *same* file (see EPIC-002).
+  # palette (768 bytes = RGB triples, 1024 = RGBA quads). Kept from the
+  # palette hunt (EPIC-002); the answer turned out to be FONTS.LBX #2.
   defp scan_palette_candidates(mom_path, lbx_files) do
     Enum.flat_map(lbx_files, fn lbx_name ->
       path = resolve_lbx_path(mom_path, lbx_name)
@@ -665,6 +675,10 @@ defmodule MirrorWeb.TileProbeLive do
       true -> Path.join(mom_path, lbx_name)
     end
   end
+
+  defp entry_label(%{name: name, description: ""}), do: name
+  defp entry_label(%{name: name, description: description}), do: "#{name} · #{description}"
+  defp entry_label(_), do: nil
 
   defp page_entries(entries, page, page_size) do
     Enum.slice(entries, page * page_size, page_size)
