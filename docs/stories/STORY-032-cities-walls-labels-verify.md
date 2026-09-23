@@ -26,3 +26,25 @@
 
 - Walled cities show walls; names are visible; the three guesses above are
   confirmed or corrected in the catalog.
+
+## Debug save and checkpoints
+
+`~/DOS/MAGIC/SAVE3.GAM` ("Freya - God mode" in the Load menu) is SAVE1
+with 30,000 gold and 30,000 mana (wizard 0 `+0x356` / `+0x25c`). Play it
+in DOSBox, and at each checkpoint save to a spare slot **and** take a
+screenshot of the overland map around the city. Then Mirror can compare
+the save's bytes with what the game drew. Record each result here.
+
+| # | Checkpoint | What it settles |
+| --- | --- | --- |
+| 1 | Starting city at pop 5K (Village) | frame for size 2 (Mirror assumes frame 1) |
+| 2 | Buy **City Walls** | how walls look on the overland map; which building flag (record `+34…`) is City Walls |
+| 3 | Pop 9K, 13K, 17K+ (Town, City, Capital) | frames 2–4 and the size byte for each |
+| 4 | Found a new city with Settlers (pop 1K) | the smallest size byte and its frame |
+| 5 | Meet each rival wizard's city (explore, or cast a detection spell) | flag colours for red, purple, blue, green |
+| 6 | See a neutral city (e.g. Steyr, 47, 16, size 2) | neutral flag colour; a size-2 frame from the start |
+| 7 | Build a road; cast **Enchant Road** | road pieces and animated enchanted roads (STORY-013) |
+| 8 | Visit a tower, a lair or ruins, and a node | site icons (STORY-011) and node auras (STORY-008) |
+| 9 | Units standing on the map, own and enemy | unit figures and banner plaques (STORY-012) |
+| 10 | Anything showing `MAPBACK #21` (`CITYNOWA`) | what that sprite is for |
+
