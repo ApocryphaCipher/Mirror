@@ -80,41 +80,10 @@ wrong, not the fix itself.
 
 ## Stories
 
-### STORY: Stop the circular auto-detect heuristic
-Small, immediate. Remove or gate `detectTerrainBaseSource()`'s scoring
-against the current lookup table (or just delete it and hardcode full-value
-reads, matching what's actually correct once STORY below lands). Cheap, but
-don't expect it to fix anything on its own — it just stops actively hiding
-the real gap.
-
-### STORY: Find or derive the complete real terrain-value table
-The actual research task. Options, roughly cheapest-first:
-1. Decode `Terrstat.lbx` (5,400 bytes, in `~/.mirror_assets/MAGIC`) — name
-   suggests "terrain stats," never actually inspected this session. Could
-   be exactly the value→type table, or per-type stats keyed by a smaller
-   type ID (worth 20 minutes before anything else).
-2. Check other classic-MoM community modding tools/docs beyond momedit and
-   the Fandom wiki (the pattern that's worked all session: go find primary
-   sources instead of reverse-engineering blind).
-3. Empirical derivation: use `Mirror.Stats`' existing bit/value-naming
-   tooling (already built, never used — see the 2026-09-22 recon notes) to
-   correlate raw values against the in-game minimap/actual screenshots
-   Kevin can provide from the real game running.
-
-### STORY: Add river/river-mouth/volcano/node kinds once the table is known
-Wire the corrected table into both `Mirror.Map`/`Mirror.Quality.ShoreMask`
-(Elixir) and `map_hooks.js` (JS, the one that actually renders). River
-smoothing uses `SS16` per the real MOMIME ruleset (already ported in PR #4)
-— the `overland/terrain/{plane}/river/` art is already sitting in
-`resources/` from the PR #4 work, just currently unreachable because no
-tile ever classifies as `"river"`.
-
-### STORY: Re-verify the shoreline after the terrain fix lands
-Don't re-litigate PR #4's algorithm — re-run the same
-`fallbackStep`-counting check plus a fresh native-resolution canvas crop
-(same method used in PR #4) once terrain classification is fixed, to see
-how much of the saw-tooth look was actually this bug. Closes or reopens
-STORY-001 depending on the result.
+- [STORY-002](../stories/STORY-002-stop-circular-terrain-source-heuristic.md) — stop the circular auto-detect heuristic (small, ~30–60 min, but low value alone — see the story for why it's best paired with STORY-003)
+- [STORY-003](../stories/STORY-003-find-real-terrain-value-table.md) — find or derive the complete real terrain-value table (the actual research task; size unknown, cheapest lead is decoding `Terrstat.lbx`)
+- [STORY-004](../stories/STORY-004-add-river-volcano-node-kinds.md) — add river/river-mouth/volcano/node kinds once the table is known (blocked on STORY-003; mechanical once unblocked, since the algorithm and art already exist from PR #4)
+- [STORY-001](../stories/STORY-001-jagged-shorelines.md) (lives under EPIC-001, blocked here too) — re-verify the shoreline once STORY-003/004 land, using the same `fallbackStep`-counting + native-resolution-crop method from PR #4
 
 ## Dependency note for EPIC-004
 

@@ -1,1 +1,4 @@
-- [STORY-001](STORY-001-jagged-shorelines.md) — shorelines still look jagged/toothy after the rotation fix (PR #3), not yet root-caused
+- [STORY-001](STORY-001-jagged-shorelines.md) — shorelines still look jagged/toothy; reopened, likely entangled with EPIC-003
+- [STORY-002](STORY-002-stop-circular-terrain-source-heuristic.md) — stop the circular terrain-base-source auto-detect heuristic (EPIC-003)
+- [STORY-003](STORY-003-find-real-terrain-value-table.md) — find or derive the complete real terrain-value table (EPIC-003, the actual research task)
+- [STORY-004](STORY-004-add-river-volcano-node-kinds.md) — add river/river-mouth/volcano/node kinds once STORY-003 lands (EPIC-003)
