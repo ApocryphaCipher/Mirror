@@ -1,8 +1,8 @@
 # STORY-022 (bug): Stray raw-value paint shows up as map artifacts
 
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
-**Status:** open. The map pages are already protected (#13 made view mode
-hover-only); **the Lab still has the footgun**.
+**Status:** mostly fixed by #16 (STORY-016); **the Lab's wheel/click
+footgun remains** (items 2–3 below).
 **Size:** small–medium
 **Reported by:** Kevin, 2026-09-23 (screenshot: `/lab/arcanus`, broken
 shore fragments floating in the ocean near the top-left of Arcanus)
@@ -28,6 +28,24 @@ on disk is fine. The artifacts exist only in the running session.
   in a dev server running since 17:54 that day. The session lives in ETS in
   that unnamed node, so its undo history couldn't be inspected without
   touching Kevin's session.
+
+## Update 2026-09-23: what building edit mode (#16) found
+
+- **Undo/Redo on terrain always crashed.** `maybe_update_adj_mask_batch`
+  iterated the stroke map instead of `stroke.changes` (bug from the
+  original code). Every Undo click killed the LiveView, and the reconnect
+  looked like "nothing happened". Fixed in #16.
+- **With Undo working, the Arcanus edits are real, recorded paint strokes**
+  (Undo peeled off a 1-tile stroke, then a 6-tile one; Redo restored
+  both). That supports the stray-click explanation below.
+- **A separate latent gap:** a stroke only entered the undo history on
+  pointer-up, so a LiveView restart mid-drag left painted tiles that could
+  never be undone. #16 records strokes as they're painted, and a test
+  covers it.
+- **Done in #16:** terrain values clamped to 0–761; an "N tiles changed"
+  counter plus Discard in edit mode; view mode can't paint. **Still open:**
+  the Lab's wheel changes the brush silently, and a bare click paints there
+  (items 2–3); the counter isn't shown in view mode yet (part of item 4).
 
 ## Most likely cause: two silent behaviours combined
 
