@@ -332,7 +332,7 @@ defmodule MirrorWeb.MapLive do
   def handle_event("map_pointer", params, socket) do
     state = socket.assigns.state
 
-    if state.save and (socket.assigns.lab? or params["action"] == "hover") do
+    if state.save && (socket.assigns.lab? or params["action"] == "hover") do
       action = params["action"]
       {x, y} = {parse_int(params["x"], -1), parse_int(params["y"], -1)}
       button = parse_int(params["button"], 0)
