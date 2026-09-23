@@ -2,9 +2,8 @@
 
 **Parent:** [../epics/EPIC-003-terrain-value-classification.md](../epics/EPIC-003-terrain-value-classification.md)
 **Status:** open — research spike, the actual hard part of this epic
-**Size:** unknown — could be 20 minutes (if `Terrstat.lbx` is exactly this
-table) or multi-session (if it requires empirical correlation against a
-running game)
+**Size:** unknown — the cheap 20-minute lead (`Terrstat.lbx`) is ruled out
+(see below), so this is more likely a multi-session research task now
 **Blocks:** STORY-004 (river/volcano/node classification), STORY-001
 (shoreline re-verification)
 
@@ -25,13 +24,19 @@ still needs to come from somewhere.
 
 ## Where to look, cheapest first
 
-1. **`Terrstat.lbx`** (`~/.mirror_assets/MAGIC/Terrstat.lbx`, 5,400 bytes).
-   Never actually inspected this session — the name ("terrain stats")
-   strongly suggests this could be exactly the value→type table, or a
-   per-type stats table keyed by a smaller type ID that the raw value maps
-   into. Use the Tile Bit Inspector (`/tile-probe`) or a quick throwaway
-   script against `Mirror.LBX` to look at its raw structure. Cheapest
-   possible next step — do this first.
+1. ~~**`Terrstat.lbx`**~~ — **checked, dead end.** 2 entries: a 770×6 image
+   (almost certainly a decorative icon strip — 4,624 bytes ≈ 770×6 pixels,
+   1 byte/pixel) and a 1×196 image. The 1×196 shape looked promising
+   (one row per lookup entry), but decoded to only 6 distinct **raw
+   palette indices** (`[0, 1, 2, 3, 4, 254]`, checked by inverting the
+   palette lookup, not just eyeballing colors) — a small per-type stat
+   array (movement cost or similar, `254` likely a section-break
+   sentinel), not a 196-entry type table. Also reconfirmed: `Mirror.LBX`'s
+   `:auto`/`:default` palette resolution produces near-black garbage here
+   too, same as the earlier `Compix.lbx` problem — a real, separate bug
+   worth its own story under EPIC-002 (raw LBX art can't be trusted until
+   palette resolution is fixed, independent of this terrain-value
+   question).
 2. **More classic-MoM community modding resources.** The pattern that's
    worked all session (wiki for save offsets, `momedit` for cross-check):
    there may be a more complete reference than either of those. Look for

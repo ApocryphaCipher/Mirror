@@ -60,7 +60,10 @@ tile art.
    references (the same kind of source that gave us the save-file layout)
    likely already document this — check there before guessing from bytes.
 2. **Fix LBX palette resolution.** `Mirror.LBX`/`Mirror.LBX.Palette`
-   already exist; the "auto" palette mode produced noise for `Compix.lbx`.
+   already exist; the "auto" palette mode produced noise for `Compix.lbx`,
+   and reconfirmed against `Terrstat.lbx` during EPIC-003's STORY-003
+   (decoded to near-black RGBA across the board — verified by inverting
+   the palette lookup to recover raw indices, not just eyeballing colors).
    Classic DOS VGA games often need an externally-supplied or
    per-file-embedded 256-color palette rather than a guessed one — figure
    out which, and fix `Mirror.LBX.Palette` to resolve it correctly. This is
