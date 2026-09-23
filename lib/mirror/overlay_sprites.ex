@@ -9,11 +9,13 @@ defmodule Mirror.OverlaySprites do
   alias Mirror.LBX
   alias Mirror.LBX.Palette
 
-  @cities %{walled: 20, unwalled: 21}
+  # #20 MAPCITY is what the game draws for an ordinary (unwalled) city,
+  # checked in-game on SAVE1 (2026-09-23). #21 CITYNOWA's use is unknown.
+  @cities %{city: 20, citynowa: 21}
 
   @doc """
-  `%{palette: base64 RGBA (index 0 transparent), cities: %{walled: sprite,
-  unwalled: sprite}}`, each sprite `%{width, height, frames: [base64
+  `%{palette: base64 RGBA (index 0 transparent), cities: %{city: sprite,
+  citynowa: sprite}}`, each sprite `%{width, height, frames: [base64
   indices]}`, or `{:error, reason}` when `MAPBACK.LBX` isn't in `dir`.
   """
   def load(dir) when dir in [nil, ""], do: {:error, :no_mom_path}

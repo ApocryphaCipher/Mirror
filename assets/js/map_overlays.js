@@ -37,17 +37,18 @@ function flagRemap(banner) {
 // data (STORY-013 roads/specials, 008 auras, 011 sites, 010 cities, 012
 // units). Each receives (ctx, items, geometry) and draws every item.
 const DRAWERS = {
-  // STORY-010. Frame = the city's size class (clamped); walled cities
-  // (MAPBACK #20) are a follow-up, so every city uses the unwalled sprite.
+  // STORY-010/032. The game draws MAPBACK #20 for an ordinary city; in
+  // SAVE1 a size-byte-1 hamlet shows frame 0, so frame = size - 1 (sizes 0
+  // and 1 both frame 0). One data point: *guess* for the other sizes.
   cities(ctx, items, {tileSize, sprites}) {
-    const sprite = sprites?.cities?.unwalled
+    const sprite = sprites?.cities?.city
     if (!sprite) return
     const w = Math.round((sprite.width * tileSize) / TILE_ART_W)
     const h = Math.round((sprite.height * tileSize) / TILE_ART_H)
 
     for (const city of items) {
-      const frame = Math.max(0, Math.min(city.size, sprite.frames.length - 1))
-      const image = sprites.image("cities.unwalled", sprite, frame, city.banner)
+      const frame = Math.max(0, Math.min(city.size - 1, sprite.frames.length - 1))
+      const image = sprites.image("cities.city", sprite, frame, city.banner)
       const left = Math.round((city.x + 0.5) * tileSize - w / 2)
       const top = Math.round((city.y + 0.5) * tileSize - h / 2)
       ctx.drawImage(image, left, top, w, h)
