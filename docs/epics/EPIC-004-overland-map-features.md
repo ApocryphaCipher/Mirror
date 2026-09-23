@@ -47,7 +47,11 @@ These need their own verification before trusting the byte layout.
    plane/name/owner at minimum to start) and encounter zones/towers
    (X/Y/plane/type at minimum). Cities is the safer starting point — two
    sources agree on its layout; encounter zones only has one.
-2. **Get the icon art.** The MOMIME resource pack (same source as PR #4's
+2. **Get the icon art.** *Update 2026-09-22:* prefer classic art now that
+   the full GOG install is available (see EPIC-002). City/tower/lair
+   sprites are most likely in `MAPBACK.LBX` (unverified, from memory; check
+   with `/tile-probe` and the `FONTS.LBX` palette). The MOMIME fallback
+   below still works. The MOMIME resource pack (same source as PR #4's
    terrain art) has `overland/cities` and `overland/mapFeatures` folders —
    **not yet copied** into `resources/` (PR #4 only pulled
    `overland/terrain`). Need to pull those in and extend

@@ -1,7 +1,11 @@
 # STORY-002: Stop the circular terrain-base-source auto-detect heuristic
 
 **Parent:** [../epics/EPIC-003-terrain-value-classification.md](../epics/EPIC-003-terrain-value-classification.md)
-**Status:** open — small, ready to start, but low value on its own
+**Status:** rescoped 2026-09-22, folded into STORY-005. The fix is **not**
+`value & 0xff` as written below: terrain values are full `u16` tile numbers
+(0–761), and ~27% of `SAVE1.GAM` tiles are `> 0xFF`. Both the JS heuristic
+*and* the Elixir low-byte read are wrong. See
+[../reference/classic-terrain-format.md](../reference/classic-terrain-format.md).
 **Size:** small (~30–60 min)
 
 ## The bug

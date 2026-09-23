@@ -5,13 +5,16 @@ overland map — terrain, coastlines, both planes (Arcanus/Myrror) — using the
 game's own logic for which tile art goes where. It's a Phoenix/LiveView app;
 the map renders live in the browser from a save you load in.
 
-**Status, honestly:** terrain rendering (base tiles, coastline shape,
-rotation/smoothing) is correct and verified against the real game's own
-production rule data — not guessed. Rivers, cities, towers, and other
-overland map features are not implemented yet. See
-[docs/epics/EPIC-001-terrain-rendering.md](docs/epics/EPIC-001-terrain-rendering.md) for how the rendering got
-fixed and [docs/backlog.md](docs/backlog.md) / [docs/epics/](docs/epics/) for what's still open. That's the
-living status — this paragraph is a summary, not the source of truth.
+**Status, honestly:** the app currently renders terrain through a
+MOMIME-derived PNG asset pack plus a ported smoothing algorithm. That works,
+but it's being replaced: on 2026-09-22 we found that save terrain values
+are tile numbers straight into the game's own `TERRAIN.LBX`, and a small
+script ([scripts/mom_map_render.py](scripts/mom_map_render.py)) renders a complete, correct map
+from classic art with no smoothing at all. See
+[docs/reference/classic-terrain-format.md](docs/reference/classic-terrain-format.md). Moving the app onto that path
+is [STORY-005](docs/stories/STORY-005-render-from-terrain-lbx.md). Cities, towers, and other overland features
+are not implemented yet ([EPIC-004](docs/epics/EPIC-004-overland-map-features.md)). [docs/epics/](docs/epics/) is the living
+status. This paragraph is a summary, not the source of truth.
 
 ## Quick start
 
@@ -19,7 +22,9 @@ You need:
 
 - Elixir/Erlang (see `mix.exs` for version constraints)
 - Your own copy of the classic *Master of Magic* game files (LBX files) —
-  Mirror doesn't ship these, you provide them
+  Mirror doesn't ship these, you provide them. It needs a **complete**
+  install (the GOG release works); some CD-era installs leave
+  `TERRAIN.LBX` and friends on the disc.
 - A save file (`.GAM`) from that install
 
 ```bash

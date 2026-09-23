@@ -1,7 +1,10 @@
 # STORY-003: Find or derive the complete real terrain-value table
 
 **Parent:** [../epics/EPIC-003-terrain-value-classification.md](../epics/EPIC-003-terrain-value-classification.md)
-**Status:** open — research spike, the actual hard part of this epic
+**Status:** done 2026-09-22. The table is `TERRAIN.LBX` entry 1: save value →
+tile record, per plane. Values are tile numbers, not types. Written up in
+[../reference/classic-terrain-format.md](../reference/classic-terrain-format.md), found via the GOG release
+(`TERRAIN.LBX` was missing from `MAGIC.zip`).
 **Size:** unknown — the cheap 20-minute lead (`Terrstat.lbx`) is ruled out
 (see below), so this is more likely a multi-session research task now
 **Blocks:** STORY-004 (river/volcano/node classification), STORY-001
