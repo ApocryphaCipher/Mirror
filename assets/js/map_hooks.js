@@ -52,12 +52,17 @@ const MapCanvas = {
     }
     window.addEventListener("resize", this.handleResize)
 
+    // In view mode the surrounding MapViewport owns drag (pan) and wheel
+    // (zoom); the canvas only reports hover.
+    const viewOnly = this.el.dataset.interaction === "view"
     this.el.addEventListener("contextmenu", event => event.preventDefault())
-    this.el.addEventListener("pointerdown", this.onPointerDown.bind(this))
     this.el.addEventListener("pointermove", this.onPointerMove.bind(this))
-    this.el.addEventListener("pointerup", this.onPointerUp.bind(this))
-    this.el.addEventListener("pointerleave", this.onPointerLeave.bind(this))
-    this.el.addEventListener("wheel", this.onWheel.bind(this), {passive: false})
+    if (!viewOnly) {
+      this.el.addEventListener("pointerdown", this.onPointerDown.bind(this))
+      this.el.addEventListener("pointerup", this.onPointerUp.bind(this))
+      this.el.addEventListener("pointerleave", this.onPointerLeave.bind(this))
+      this.el.addEventListener("wheel", this.onWheel.bind(this), {passive: false})
+    }
 
     this.handleEvent("map_state", payload => {
       let needsRender = false
