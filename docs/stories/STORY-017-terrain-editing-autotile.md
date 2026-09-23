@@ -34,6 +34,13 @@ retired `SmoothingRules` work may come back, as a cross-check.
 4. Rivers and node/volcano tiles: check how the game encodes them in
    `TERRTYPE`, and handle them or explicitly exclude them.
 
+## Continents (landmass layer)
+
+Type painting changes land ↔ water constantly, so it must also maintain
+the save's **landmass** IDs (`0x004d98`) using the game's rule, which
+isn't decoded yet (see STORY-029). Don't ship type painting that writes
+terrain without updating landmass.
+
 ## Definition of done
 
 - Recomputing `SAVE1.GAM` from types reproduces its stored tiles (with

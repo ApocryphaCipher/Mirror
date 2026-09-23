@@ -23,6 +23,38 @@ one, is only safe if you can see what the terrain supports:
     a warning, not an error: "truly magic!";
   - specials or bonuses (below) left on terrain that can't hold them.
 
+## Continents: the landmass layer must follow terrain edits
+
+Kevin (2026-09-23): besides fog of war there's a **continents layer**, so
+changing land means also setting the right continent on the tile. That's
+the save's **landmass** block (`0x004d98`, 1 byte per tile per plane),
+which Mirror already reads as the `landmass` layer.
+
+First look at `SAVE1.GAM` (quick script, not yet rigorous):
+
+- Few IDs: **6 distinct on Arcanus, 10 on Myrror**; `0` is by far the
+  most common (1,666 tiles on Arcanus).
+- Every tile classed as water has ID `0`, but so do roughly 340 tiles
+  classed as land. (The land/water split used here is a first guess, since
+  terrain types aren't mapped yet; see STORY-017.)
+- A naive flood fill finds about 85 connected land regions per plane,
+  many sharing an ID, so it's **not simply "one ID per connected
+  landmass"**. Maybe only continents above some size get their own ID,
+  small islands get `0`, and/or the IDs come from map generation and are
+  never recomputed.
+
+**Research first:** work out the real rule (MoM modding docs; momedit; and
+compare several saves, including one straight after map creation). Also
+find out **what the game uses it for** (AI expansion, pathing, settler
+targeting?), because that decides how much a wrong ID matters.
+
+**Then the editor must keep it consistent:** any edit that turns land into
+water or water into land (Cycle, Paint, STORY-017 type painting, big
+brushes) updates the landmass IDs of the changed tile. If the edit joins
+or splits land regions, it recomputes the affected regions using the
+game's rule. The edit checker (below) flags any tile whose ID doesn't
+match that rule.
+
 ## What to do (once unblocked)
 
 1. **"Show everything" toggle** in edit mode: ignore exploration/fog, show
@@ -39,5 +71,5 @@ one, is only safe if you can see what the terrain supports:
 ## Order of work
 
 EPIC-004 decode and draw (cities → units → sites → roads and specials) →
-exploration layer decoded → this story → big brushes in STORY-028 and
+exploration layer and **landmass rule** decoded → this story → big brushes in STORY-028 and
 STORY-017's type painting.
