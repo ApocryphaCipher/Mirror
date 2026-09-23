@@ -36,7 +36,7 @@ agrees on all 4800 tiles.
 
 ## As built (2026-09-22)
 
-- **Backend choice:** `MIRROR_TILE_BACKEND` = `auto` (default) |
+- **Backend choice** (removed in STORY-014; `terrain_lbx` is now the only backend): `MIRROR_TILE_BACKEND` = `auto` (default) |
   `terrain_lbx` | `momime`. `auto` uses `TERRAIN.LBX` when found, otherwise
   MOMIME PNGs, otherwise the tagged-LBX fallback.
 - **Payload:** only the referenced records (1761), as indexed pixels plus

@@ -32,10 +32,15 @@ Unsorted, not yet promoted to a story.
   the tailwind hex package (v0.5.1). The `assets.*` aliases in `mix.exs`
   now re-sign the binary ad-hoc when verification fails. PR #5's inline
   `style=` workarounds were replaced with real classes.
-- Remove the MOMIME-PNG render path (`MomimePngIndex`, `ShoreMask`,
-  `SmoothingRules` on the render path, `detectTerrainBaseSource`, the kind
-  tables, `resources/`) now that `terrain_lbx` is the default and verified.
-  Keep `SmoothingRules` only if terrain editing is ever planned.
+- ~~Remove the MOMIME-PNG render path~~ — done 2026-09-22 with STORY-014.
+  Deleted `MomimePngIndex`, `Quality.ShoreMask` (+ tests, fixture,
+  `shore_metrics.exs`), `build_momime_resources_index.sh`, the
+  `MIRROR_TILE_BACKEND` switch, the tagged-LBX atlas fallback, and ~2,000
+  lines of client-side MOMIME/shore/kind code. `Quality.SmoothingRules`
+  is kept (standalone, tested) as a possible cross-check for STORY-017.
+- `/tile-probe`'s "Label tile" tagging (writes `priv/asset_map/*.json`
+  via `AssetMap`) no longer feeds rendering. Decide in STORY-006 whether
+  to repurpose it for the sprite catalog or delete it.
 - ~~App renders with no CSS at all~~ — same root cause as above, fixed.
 - Draw tiles at native 20×18 aspect instead of stretched into square cells
   (canvas geometry change; see `Canvas_Geometry_Invariants` in codex-notes).

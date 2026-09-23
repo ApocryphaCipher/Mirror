@@ -9,9 +9,7 @@ the map renders live in the browser from a save you load in.
 `TERRAIN.LBX`. A save's terrain value is a tile number into that file, so
 there's no classification or smoothing step. Both planes match a
 reference decode pixel for pixel. See
-[docs/reference/classic-terrain-format.md](docs/reference/classic-terrain-format.md). The older MOMIME-PNG path
-still exists behind `MIRROR_TILE_BACKEND=momime` until it's removed.
-Cities, towers, and other overland features are not implemented yet
+[docs/reference/classic-terrain-format.md](docs/reference/classic-terrain-format.md). Cities, towers, and other overland features are not implemented yet
 ([EPIC-004](docs/epics/EPIC-004-overland-map-features.md)). [docs/epics/](docs/epics/) is the living status. This
 paragraph is a summary, not the source of truth.
 
@@ -47,7 +45,9 @@ bash scripts/dev_server.sh
 Visit `localhost:4000`:
 
 - `/arcanus`, `/myrror` — the map viewer for each plane. Load a save via the
-  path field in the UI.
+  path field in the header.
+- `/lab/arcanus`, `/lab/myrror` — the research workbench: raw layers,
+  value/bit labelling, histograms, the raw-value painter, snapshots, save.
 - `/tile-probe` — the LBX explorer/tinker tool: browse raw LBX entries,
   inspect decoded palette indices, hex-dump entries, test palette sources
   against each other. Built for exactly the kind of format archaeology this
