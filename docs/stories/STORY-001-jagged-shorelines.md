@@ -1,14 +1,9 @@
 # STORY-001: Shorelines still look jagged/toothy after the rotation fix
 
 **Parent:** [../epics/EPIC-001-terrain-rendering.md](../epics/EPIC-001-terrain-rendering.md)
-**Status:** reopened — the mask/rotation fix (PR #4) is verified correct in
-isolation, but Kevin reports the live map still shows a "saw-tooth"
-coastline. Investigation found a separate, likely-contributing bug
-(terrain value misclassification, see
-[EPIC-003](../epics/EPIC-003-terrain-value-classification.md)) — the native-resolution
-crop that looked clean earlier may have been a lucky sample region, not a
-representative one. Re-verify after EPIC-003's terrain-table fix lands
-before considering this closed again.
+**Status:** closed 2026-09-22 — obsolete. On the `TERRAIN.LBX` path the save
+stores the finished coastline tiles, so there is no mask computation to get
+wrong. See [../reference/classic-terrain-format.md](../reference/classic-terrain-format.md).
 **Reported by:** Kevin, 2026-09-22, right after PR #3 landed
 
 ## What we know

@@ -1,6 +1,6 @@
 # EPIC-001: Correct terrain tile rendering (rotation/layering)
 
-**Status:** rotation/smoothing algorithm fixed and verified (PR #3 + PR #4) — but the map is still visibly wrong for other reasons. STORY-001 (shoreline) is reopened pending [EPIC-003](EPIC-003-terrain-value-classification.md) (terrain values are being misread beneath the algorithm). Rivers/cities/towers are separately out of scope here — see EPIC-003 (rivers) and [EPIC-004](EPIC-004-overland-map-features.md) (cities/towers/lairs). [EPIC-002](EPIC-002-remove-momime-dependency.md) (asset pipeline) is unaffected and still open.
+**Status:** done on the MOMIME-PNG path (PR #3 + PR #4 — rotation/smoothing verified against MOMIME's real rule data). **Superseded 2026-09-22** by the discovery that save terrain values are `TERRAIN.LBX` tile numbers — see [../reference/classic-terrain-format.md](../reference/classic-terrain-format.md). The classic-art path needs none of this epic's smoothing machinery; the in-app switch is tracked under [EPIC-002](EPIC-002-remove-momime-dependency.md).
 **Owner:** Kevin
 
 ## Goal
@@ -11,14 +11,10 @@ variants, and both planes (Arcanus/Myrror).
 
 ## Where it stands
 
-Ocean and land base tiles render, on both planes, on canvas. Shoreline/edge tile
-**rotation is wrong** — the game picks a specific edge/corner/coast tile variant
-per-tile based on its 8 neighbors, and Mirror isn't selecting the right variant
-consistently.
-
-Prior attempt (~7 months ago, via Gemini) got partway there but never nailed the
-neighbor-mask → correct-tile mapping. See [../notes/2026-09-22-repo-recon.md](../notes/2026-09-22-repo-recon.md)
-for what's actually in the code today.
+Historical record of how the MOMIME-PNG rendering path got fixed. Kept
+because the investigation (and `Mirror.Quality.SmoothingRules`) is correct
+and may still matter if Mirror ever *edits* terrain — but for drawing a
+save, see [../reference/classic-terrain-format.md](../reference/classic-terrain-format.md).
 
 ## Update 2026-09-22: found the real algorithm + got a working dev setup
 
@@ -46,17 +42,11 @@ and produced a coherent, recognizable map when tested against `SAVE1.GAM`).
 
 ## What's left
 
-1. Fix `Mirror.Map.adj_mask/3` bit polarity + same-type semantics (not
-   land/water).
-2. Fix the ternary/river handling in `shore_mask_digits/3` to match the real
-   per-direction river logic instead of assuming diagonals.
-3. Check whether Kevin's MOMIME `resources/` dump includes the graphics XML
-   (not just the flattened `resources-map.txt`) — if so, parse the real
-   `smoothingReduction` rules instead of keeping the cost-search fallback.
-4. Get actual tile art rendering (LBX tagging via the Tile Bit Inspector, or
-   wire up MOMIME PNG resources) so rotation fixes are visually checkable.
+Nothing on this epic. Items 1–3 of the original list (bit polarity,
+same-type semantics, real `smoothingReduction` rules) landed in PR #3/#4;
+item 4 (actual tile art) landed via MOMIME PNGs and is now being replaced
+by direct `TERRAIN.LBX` rendering (EPIC-002).
 
 ## Stories
 
-- (none carved out yet — this is still small enough to do as one pass through
-  `map.ex` + `shore_mask.ex` + their JS mirror in `map_hooks.js`)
+- [STORY-001](../stories/STORY-001-jagged-shorelines.md) — closed (obsolete on the `TERRAIN.LBX` path)

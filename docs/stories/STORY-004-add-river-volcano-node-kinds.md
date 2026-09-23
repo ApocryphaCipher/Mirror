@@ -1,7 +1,10 @@
 # STORY-004: Add river/river-mouth/volcano/node kinds to classification and rendering
 
 **Parent:** [../epics/EPIC-003-terrain-value-classification.md](../epics/EPIC-003-terrain-value-classification.md)
-**Status:** blocked on STORY-003 (need the real value table first)
+**Status:** obsolete for rendering (2026-09-22). Rivers, volcanoes and nodes
+are ordinary `TERRAIN.LBX` tile numbers and render with no special handling.
+A value → kind mapping may still be wanted for debug overlays and stats. If
+so, derive it from tile-number ranges, not the approach below.
 **Size:** medium — mechanical once STORY-003 lands, since the smoothing
 algorithm and art are already in place
 

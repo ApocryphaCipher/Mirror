@@ -148,6 +148,11 @@ fallback.
 
 ## Next steps (concrete now, not speculative)
 
+> **Update, later the same day:** all four done (PR #3/#4), then made moot
+> for rendering by
+> [../reference/classic-terrain-format.md](../reference/classic-terrain-format.md). The save stores
+> finished tile numbers, so none of this is needed to draw a map.
+
 1. Fix `Mirror.Map.adj_mask/3` bit polarity (currently inverted vs. the real
    game).
 2. Rewrite the bitmask computation to match

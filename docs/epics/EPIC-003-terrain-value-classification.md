@@ -1,10 +1,32 @@
 # EPIC-003: Fix terrain value classification (the real root cause under rivers + the shoreline)
 
-**Status:** scoped, not started
+**Status:** resolved 2026-09-22 — the "missing table" is `TERRAIN.LBX` itself: terrain values are tile numbers, not types. See [../reference/classic-terrain-format.md](../reference/classic-terrain-format.md). Code fix folds into EPIC-002's STORY-005.
 **Owner:** Kevin
 **Found:** 2026-09-22, while investigating Kevin's report that rivers/towns/
 forts/towers/tombs don't render and the shoreline still looks "saw-tooth"
 after PR #3/#4.
+
+## Resolution (2026-09-22)
+
+Every hypothesis below was circling the right problem from the wrong end.
+The raw `u16` isn't a type code with some unknown encoding — it's an index
+(0–761 per plane) into the game's own tile table. momedit's odd-looking
+ranges (`< 0x40` = ocean, tundra = `0xA7`, `0x25A`, …) are just "which tile
+numbers happen to depict ocean/tundra". Rivers were never missing from the
+data; they're ordinary tile numbers Mirror truncated to a low byte and then
+mis-typed.
+
+Story outcomes:
+
+- STORY-002 — rescoped: stop the heuristic *and* read the full `u16` (not
+  low byte). Folded into STORY-005.
+- STORY-003 — done: the table is `TERRAIN.LBX` entry 1.
+- STORY-004 — obsolete for rendering: rivers/volcanoes/nodes are just tiles.
+- STORY-001 — obsolete on the `TERRAIN.LBX` path.
+
+The original investigation is kept below for the record.
+
+---
 
 ## Why this is its own epic, not a bullet under EPIC-001
 

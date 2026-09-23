@@ -6,10 +6,19 @@ Unsorted, not yet promoted to a story.
   source~~ — done, see [epics/EPIC-001-terrain-rendering.md](epics/EPIC-001-terrain-rendering.md) and
   [notes/2026-09-22-momime-source-findings.md](notes/2026-09-22-momime-source-findings.md). Now it's an
   implementation task, not a research task.
-- Decide raw-LBX vs MOMIME-PNG as the primary asset path (see EPIC-001) —
-  right now both are half-built and neither is documented as "the" path.
-  Doesn't block fixing the bitmask math itself, which is shared by both
-  paths.
+- ~~Decide raw-LBX vs MOMIME-PNG as the primary asset path~~ — decided
+  2026-09-22: raw `TERRAIN.LBX`. See
+  [reference/classic-terrain-format.md](reference/classic-terrain-format.md) and STORY-005.
+- Pull the rest of the GOG install down from Drive into
+  `~/.mirror_assets/GOG` (only `TERRAIN.LBX` + `FONTS.LBX` are local so
+  far) and make it the default `MIRROR_MOM_PATH`. `MAGIC.zip` is missing
+  ~47 LBX files. Keep `MAGIC`'s save files, which are what the offsets were
+  verified against.
+- Check whether the `FONTS.LBX` entry-2 palette also fixes
+  `Mirror.LBX.Palette`'s `:auto` mode for non-terrain LBX files (the old
+  "colored noise" bug).
+- Decode `TERRTYPE.LBX` properly (the original game's mask → tile table).
+  Only needed if Mirror ever edits terrain.
 - `MIRROR_TERRAIN_OFFSET` etc. offsets are currently only set in
   `scripts/dev_server.sh`, sourced from a community wiki rather than
   anything Kevin/Gemini derived themselves — worth a sanity pass (e.g.

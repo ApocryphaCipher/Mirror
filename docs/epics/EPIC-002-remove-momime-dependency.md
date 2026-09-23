@@ -1,6 +1,6 @@
 # EPIC-002: Get off the MOMIME PNG dependency — render from Mirror's own pipeline
 
-**Status:** spike — not started, scoping only
+**Status:** spike succeeded 2026-09-22 — full map renders from raw `TERRAIN.LBX` outside the app; in-app implementation not started (see "Next" below)
 **Owner:** Kevin
 **Requested:** 2026-09-22, right after PR #4 (real smoothing rules) landed
 
@@ -27,99 +27,50 @@ a real dependency risk (licensing unclear for the upscaled art specifically;
 availability depends on Kevin's own MOMIME checkout existing) and it's a
 gap between the project's stated purpose and what it actually does.
 
-## What's now different from when this looked intractable
+## Spike result (2026-09-22)
 
-The reason Mirror leaned on MOMIME's PNGs in the first place (per the Codex
-history in `docs/reference/codex-notes/`) was that decoding LBX terrain
-tiles directly never got past "renders as colored noise" — likely a palette
-problem, and nobody had the real rotation/smoothing algorithm either, so
-even correctly-decoded tiles couldn't have been assembled into a coastline.
+The spike's "one recognizable tile" goal was overshot: **the entire map of
+`SAVE1.GAM`, both planes, renders correctly from classic art** using
+[scripts/mom_map_render.py](../../scripts/mom_map_render.py). Full format writeup:
+[../reference/classic-terrain-format.md](../reference/classic-terrain-format.md).
 
-Both blockers are gone now:
-- The real smoothing/rotation algorithm is known and ported
-  (`Mirror.Quality.SmoothingRules`, PR #4) — this is asset-agnostic, it just
-  needs *some* tile image per `(kind, reduced_mask)` pair.
-- We know exactly which real classic files exist (`~/.mirror_assets/MAGIC`,
-  from `MAGIC.zip`) and roughly what's in them (LBX listing from the Tile
-  Bit Inspector).
+Answers to the original open questions:
 
-What's still unsolved: getting real pixel art out of the classic LBX files
-at all. One earlier attempt this session (`Compix.lbx` via the Tile Bit
-Inspector, "auto" palette) produced unrecognizable colored noise, not
-tile art.
+1. **Where do terrain tiles live?** `TERRAIN.LBX` — which was simply
+   *missing* from `MAGIC.zip` (a CD-era install with ~23 of ~70 LBX files).
+   The GOG release Kevin uploaded has it. That's why nothing in the old
+   install looked like terrain.
+2. **Palette?** `FONTS.LBX` entry 2, 6-bit VGA ×4. Not yet checked whether
+   this alone fixes `Mirror.LBX.Palette`'s `:auto` mode for other files
+   (the `Halofam.lbx #6` / `Compix.lbx #23` candidates are moot for
+   terrain).
+3. **Per-mask variants in DOS?** Yes — 762 tiles per plane, and the save
+   already stores which one. The game did the smoothing at map generation
+   (via `TERRTYPE.LBX`'s mask → tile table); a viewer does none.
+4. **Tile ↔ mask mapping?** Not needed. `TERRAIN.LBX` entry 1 maps save
+   value → tile record directly. No tagging workflow required.
+5. **Does `SmoothingRules` apply?** Not on this path at all. It becomes
+   dead code for rendering once the switch is made.
 
-## Open questions (spike goals, in rough priority order)
+## Next: STORY-005 — render from `TERRAIN.LBX` in the app
 
-1. **Where do overland terrain tiles actually live in the classic files?**
-   The install has 23 `.LBX` files (`BOOK`, `Builddat`, `Chriver`,
-   `Cityscap`, `Citywall`, `Cmbgrasc`, `Cmbtcity`, `Cmbtsnd`, `Compix`,
-   `Desc`, `Figure13`, `Figures9`, `Fonts`, `Halofam`, `Help`, `Hlpentry`,
-   `Listdat`, `Message`, `Newsound`, `Resource`, `Spelldat`, `Terrstat`,
-   `Vortex`) — notably no obvious "Terrain.lbx". Need to identify which
-   file(s) hold the actual overland map tile sprites. Community MoM-modding
-   references (the same kind of source that gave us the save-file layout)
-   likely already document this — check there before guessing from bytes.
-2. **Fix LBX palette resolution.** `Mirror.LBX`/`Mirror.LBX.Palette`
-   already exist; the "auto" palette mode produced noise for `Compix.lbx`,
-   and reconfirmed against `Terrstat.lbx` during EPIC-003's STORY-003
-   (decoded to near-black RGBA across the board — verified by inverting
-   the palette lookup to recover raw indices, not just eyeballing colors).
-   Classic DOS VGA games often need an externally-supplied or
-   per-file-embedded 256-color palette rather than a guessed one — figure
-   out which, and fix `Mirror.LBX.Palette` to resolve it correctly.
+Roughly:
 
-   The Tile Bit Inspector (`/tile-probe`) now has a "Palette scan" tool
-   (finds every 768/1024-byte entry across all LBX files — candidate
-   shared palettes) and a "borrow palette from another entry" mode to test
-   candidates interactively without writing throwaway scripts. First scan
-   turned up two candidates worth checking first: `Halofam.lbx` entry #6
-   and `Compix.lbx` entry #23 (both 1024 bytes). Not yet verified whether
-   either actually renders other files correctly — next step for whoever
-   picks this up.
-
-   This is the same kind of "go find the real answer instead of guessing" work that
-   unblocked EPIC-001 — likely worth checking actual DOS MoM file-format
-   documentation rather than trial-and-error against palette bytes.
-3. **Does the classic DOS game even have per-mask tile variants**, or did
-   the original game use a *simpler* scheme than what MOMIME's remaster
-   uses (192 shore variants etc.)? DOS-era MoM shipped on much tighter
-   storage/memory budgets than a Java remake — the real answer might be
-   "fewer masks, more heuristic fallback was actually correct for the
-   *original* game," which would change how much of PR #4's rule table
-   even applies to LBX-sourced art. Needs checking, not assuming either way.
-4. **Tile-to-mask mapping for raw LBX**: even with tiles correctly decoded,
-   Mirror needs to know which LBX index/frame corresponds to which
-   `(kind, mask)` pair. This might be manual (extend the Tile Bit Inspector
-   tagging workflow, `priv/asset_map/terrain_tiles.json`) or might be
-   derivable if the classic game's own data files encode it (worth checking
-   `Listdat.lbx`/`Builddat.lbx` — names suggest they might be exactly this
-   kind of index).
-5. **Scope the migration**: once real tiles decode correctly, does
-   `Mirror.Quality.SmoothingRules` just work as-is against them (swap the
-   asset backend, keep the algorithm), or does the LBX tile set need its
-   own rule table (see question 3)? If the classic tiles turn out to use
-   the *same* MOMIME-documented smoothing systems (plausible — MOMIME is a
-   faithful behavioral reimplementation, so its `Original Master of Magic
-   1.31 rules.momime.xml` describes the *original* game's actual rules, not
-   invented ones), this could be close to a drop-in swap of the asset
-   lookup layer only.
-
-## Suggested first step
-
-Don't start with a big rewrite. Start with the cheapest possible answer to
-"can we get ONE recognizable tile out of raw LBX at all": fix the palette
-for one known-terrain LBX file (once identified) and visually confirm a
-single tile via the Tile Bit Inspector. That's a small, falsifiable
-spike — if it doesn't work quickly, the palette problem is bigger than
-expected and worth a dedicated investigation before committing to the rest
-of this epic.
+1. Elixir: decode `TERRAIN.LBX` entries 0/1/2 + `FONTS.LBX` palette
+   (extend `Mirror.LBX` or a small `Mirror.TerrainLbx` module), build a
+   tile atlas (762 × 2 planes, + animation frames) once at load.
+2. Read terrain as full `u16` (fixes the low-byte truncation in both
+   `Mirror.Map` and `map_hooks.js`).
+3. `map_hooks.js`: draw `atlas[plane][value]` per tile — no mask, no kind
+   dispatch. Water animation via the 4-frame records if wanted.
+4. Keep the MOMIME path behind a toggle until the LBX path is verified in
+   the browser against the script's output, then delete MOMIME PNG index,
+   `ShoreMask`, `SmoothingRules`, and the kind tables from the render path.
+5. Config: `MIRROR_MOM_PATH` should point at a full install (e.g.
+   `~/.mirror_assets/GOG` once the rest of the GOG files are pulled down).
 
 ## Non-goals (for now)
 
-- Don't rip out the MOMIME PNG backend while this is unresolved — it's the
-  only backend that currently produces correct output, and EPIC-001 is
-  freshly fixed and worth not regressing while this spike is in progress.
-- Don't assume the answer is "abandon MOMIME PNGs entirely" — it's
-  possible the right long-term shape is "LBX for base tiles, keep
-  leaning on the known-correct algorithm regardless of asset source." The
-  point of this epic is finding out, not committing to an outcome yet.
+- Don't delete the MOMIME path until the LBX path is verified *in the app*.
+- Terrain editing (would need `TERRTYPE.LBX` + `SmoothingRules`-style
+  logic) is out of scope.
