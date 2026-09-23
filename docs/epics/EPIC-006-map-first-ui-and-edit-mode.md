@@ -1,7 +1,7 @@
 # EPIC-006: Map-first UI, with an edit mode
 
 **Status:** scoped, not started
-**Owner:** Kevin
+**Owner:** [Kevin](https://github.com/KevinAsbury)
 **Requested:** 2026-09-22. Kevin: "too many gadgets, gizmos, and levers
 assaulting my eyes." Now that the map renders correctly, `/arcanus` and
 `/myrror` should mainly *show the map*, with editing available on demand

@@ -1,7 +1,7 @@
 # STORY-013: Specials and bonuses (ores, gems, nightshade, wild game…), roads and corruption
 
 **Parent:** [EPIC-004](../epics/EPIC-004-overland-map-features.md)
-**Status:** open, blocked on STORY-006. **Don't lose the specials:** Kevin
+**Status:** open, blocked on STORY-006. **Don't lose the specials:** [Kevin](https://github.com/KevinAsbury)
 (2026-09-23) flagged the bonus tiles as easy to forget next to lairs and
 towers. They get their own map layer and toggle (STORY-009), their own
 editing tool later (STORY-018/028), and a place in the edit checker

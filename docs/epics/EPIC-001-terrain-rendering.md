@@ -1,7 +1,7 @@
 # EPIC-001: Correct terrain tile rendering (rotation/layering)
 
 **Status:** done on the MOMIME-PNG path (PR #3 + PR #4 — rotation/smoothing verified against MOMIME's real rule data). **Superseded 2026-09-22** by the discovery that save terrain values are `TERRAIN.LBX` tile numbers — see [../reference/classic-terrain-format.md](../reference/classic-terrain-format.md). The classic-art path needs none of this epic's smoothing machinery; the in-app switch is tracked under [EPIC-002](EPIC-002-remove-momime-dependency.md).
-**Owner:** Kevin
+**Owner:** [Kevin](https://github.com/KevinAsbury)
 
 ## Goal
 

@@ -63,7 +63,7 @@ highlight).
   0 transparent. Format details are in the reference doc's "LBX formats".
 - **Sessions own their dev server.** Start it with `scripts/dev_server.sh`
   and stop it when you're done. A leftover server from an earlier session
-  is a mistake, not Kevin's (Kevin, 2026-09-23), so check first:
+  is a mistake, not [Kevin](https://github.com/KevinAsbury)'s (Kevin, 2026-09-23), so check first:
   `lsof -iTCP:4000 -sTCP:LISTEN`. Session state lives in its
   ETS, so still don't leave test edits in a save you're sharing.
 

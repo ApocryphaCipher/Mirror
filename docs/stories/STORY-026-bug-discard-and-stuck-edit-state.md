@@ -16,7 +16,7 @@
 - Not done: making Discard itself undoable (the in-page confirm made it
   unnecessary for now).
 **Size:** small
-**Reported by:** Kevin, 2026-09-23: "Discard button does not work. I am
+**Reported by:** [Kevin](https://github.com/KevinAsbury), 2026-09-23: "Discard button does not work. I am
 permanently stuck in an edit state with undo/redo and X tiles changed. I
 can't exit the mode. Reloading does not clear the edit mode and the changed
 tile state persists."

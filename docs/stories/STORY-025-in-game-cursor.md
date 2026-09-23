@@ -3,7 +3,7 @@
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
 **Status:** open, nice-to-have (design polish), no dependencies
 **Size:** small
-**Requested by:** Kevin, 2026-09-23
+**Requested by:** [Kevin](https://github.com/KevinAsbury), 2026-09-23
 
 ## Goal
 

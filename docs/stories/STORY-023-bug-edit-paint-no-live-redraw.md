@@ -11,7 +11,7 @@ only redraws what's visible). A test asserts the push for paint, undo and
 redo. Verified in the browser: the painted tile changes on screen at once,
 and Undo reverts it.
 **Size:** small
-**Reported by:** Kevin, 2026-09-23
+**Reported by:** [Kevin](https://github.com/KevinAsbury), 2026-09-23
 
 ## Symptom
 

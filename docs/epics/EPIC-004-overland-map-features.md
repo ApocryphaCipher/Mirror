@@ -1,7 +1,7 @@
 # EPIC-004: Render towns, forts, towers, tombs, and other overland features
 
 **Status:** scoped into stories 2026-09-22 (STORY-006, STORY-009–013).
-Scope widened by Kevin to include **units** (figure on a banner-colour
+Scope widened by [Kevin](https://github.com/KevinAsbury) to include **units** (figure on a banner-colour
 plaque) and **per-layer on/off toggles**. Sprite and save-block survey:
 [../reference/overland-sprites-and-save-blocks.md](../reference/overland-sprites-and-save-blocks.md).
 **Owner:** Kevin

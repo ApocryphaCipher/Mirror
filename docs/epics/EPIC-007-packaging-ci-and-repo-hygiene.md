@@ -1,7 +1,7 @@
 # EPIC-007: Packaging, CI and repo hygiene
 
 **Status:** in progress
-**Owner:** Kevin
+**Owner:** [Kevin](https://github.com/KevinAsbury)
 **Requested:** 2026-09-23 (Kevin's "laundry list": Docker, README,
 AGENTS.md, branch protection).
 

@@ -3,7 +3,7 @@
 **Parent:** [EPIC-007](../epics/EPIC-007-packaging-ci-and-repo-hygiene.md)
 **Status:** open, spike (time-boxed research, then a go/no-go)
 **Size:** small (spike)
-**Requested by:** Kevin, 2026-09-23 ("a new user just has to buy the game
+**Requested by:** [Kevin](https://github.com/KevinAsbury), 2026-09-23 ("a new user just has to buy the game
 on GOG"; automate everything after that)
 
 ## Goal

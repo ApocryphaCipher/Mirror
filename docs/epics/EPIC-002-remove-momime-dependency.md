@@ -1,7 +1,7 @@
 # EPIC-002: Get off the MOMIME PNG dependency — render from Mirror's own pipeline
 
 **Status:** spike succeeded 2026-09-22 — full map renders from raw `TERRAIN.LBX` outside the app; in-app implementation done (STORY-005). Remaining: delete the MOMIME path once Kevin has used the new one
-**Owner:** Kevin
+**Owner:** [Kevin](https://github.com/KevinAsbury)
 **Requested:** 2026-09-22, right after PR #4 (real smoothing rules) landed
 
 ## Why

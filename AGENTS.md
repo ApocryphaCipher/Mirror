@@ -3,7 +3,7 @@
 Engineering standards for anyone, human or AI agent, working on **Mirror**:
 a Phoenix/LiveView viewer and editor for classic *Master of Magic* save
 files. More specific instructions (a story's acceptance criteria, an explicit
-request from Kevin) override these when they conflict.
+request from [Kevin](https://github.com/KevinAsbury)) override these when they conflict.
 
 The short version: make the smallest change that solves the task, ground
 every claim about the game's formats in the real files, keep the checks

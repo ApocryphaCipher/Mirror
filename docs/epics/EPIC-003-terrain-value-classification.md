@@ -1,7 +1,7 @@
 # EPIC-003: Fix terrain value classification (the real root cause under rivers + the shoreline)
 
 **Status:** resolved 2026-09-22 — the "missing table" is `TERRAIN.LBX` itself: terrain values are tile numbers, not types. See [../reference/classic-terrain-format.md](../reference/classic-terrain-format.md). Code fix folds into EPIC-002's STORY-005.
-**Owner:** Kevin
+**Owner:** [Kevin](https://github.com/KevinAsbury)
 **Found:** 2026-09-22, while investigating Kevin's report that rivers/towns/
 forts/towers/tombs don't render and the shoreline still looks "saw-tooth"
 after PR #3/#4.

@@ -4,7 +4,7 @@
 **Status:** closed 2026-09-22 — obsolete. On the `TERRAIN.LBX` path the save
 stores the finished coastline tiles, so there is no mask computation to get
 wrong. See [../reference/classic-terrain-format.md](../reference/classic-terrain-format.md).
-**Reported by:** Kevin, 2026-09-22, right after PR #3 landed
+**Reported by:** [Kevin](https://github.com/KevinAsbury), 2026-09-22, right after PR #3 landed
 
 ## What we know
 
