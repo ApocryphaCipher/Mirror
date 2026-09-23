@@ -3,7 +3,7 @@ defmodule MirrorWeb.MapLive do
   import Bitwise
 
   alias Mirror.Engine.{Delta, Session, SessionSupervisor, View}
-  alias Mirror.{Paths, SaveFile, SessionStore, Stats, TileAtlas}
+  alias Mirror.{Paths, SaveFile, SessionStore, Stats, TerrainLbx, TileAtlas}
   alias Mirror.Map, as: MirrorMap
 
   @layers [
@@ -51,6 +51,7 @@ defmodule MirrorWeb.MapLive do
       |> assign(:session_id, session_id)
       |> assign(:plane, plane)
       |> assign(:lab?, lab?)
+      |> assign(:edit, nil)
 
     state = ensure_engine_session(state, session_id, connected?(socket))
 
@@ -74,6 +75,101 @@ defmodule MirrorWeb.MapLive do
     end
   end
 
+  # `?edit=terrain` turns on edit mode on the map pages (never in the Lab).
+  @impl true
+  def handle_params(params, _uri, socket) do
+    edit = if not socket.assigns.lab? and params["edit"] == "terrain", do: :terrain, else: nil
+    socket = socket |> assign(:edit, edit) |> assign_forms()
+
+    # Edits go through the terrain layer; keep the session's active layer in
+    # step so stroke updates reach the canvas.
+    socket =
+      if edit && socket.assigns.state.active_layer != :terrain do
+        state = ensure_layer_visible(%{socket.assigns.state | active_layer: :terrain}, :terrain)
+        SessionStore.put(socket.assigns.session_id, state)
+        socket |> assign_from_state(state) |> assign_forms()
+      else
+        socket
+      end
+
+    socket =
+      if connected?(socket) do
+        socket
+        |> push_event("edit_mode", %{mode: if(edit, do: "edit", else: "view")})
+        |> push_brush()
+      else
+        socket
+      end
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("toggle_edit", _params, socket) do
+    to =
+      if socket.assigns.edit,
+        do: map_path(socket.assigns.plane),
+        else: edit_path(socket.assigns.plane)
+
+    {:noreply, push_patch(socket, to: to)}
+  end
+
+  def handle_event("exit_edit", _params, socket) do
+    if socket.assigns.edit do
+      {:noreply, push_patch(socket, to: map_path(socket.assigns.plane))}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("set_brush", %{"brush" => %{"tile" => tile}}, socket) do
+    state = socket.assigns.state
+
+    value =
+      tile |> parse_int(Map.get(state.selection, :terrain, 0)) |> then(&clamp_value(:terrain, &1))
+
+    state = %{state | selection: Map.put(state.selection, :terrain, value)}
+    SessionStore.put(socket.assigns.session_id, state)
+
+    {:noreply, socket |> assign_from_state(state) |> assign_forms() |> push_brush()}
+  end
+
+  def handle_event("discard_edits", _params, socket) do
+    state = socket.assigns.state
+
+    if state.save do
+      state = %{
+        state
+        | planes: with_computed_layers(state.original_planes),
+          history: %{arcanus: [], myrror: []},
+          redo: %{arcanus: [], myrror: []}
+      }
+
+      # The engine session mirrors edits via deltas; restart it from the file
+      # so hover (which reads the engine first) matches the restored map.
+      state =
+        case start_engine_session(state.save.path) do
+          {:ok, engine_session_id} -> %{state | engine_session_id: engine_session_id}
+          {:error, _reason} -> state
+        end
+
+      SessionStore.put(socket.assigns.session_id, state)
+
+      socket =
+        socket
+        |> assign_from_state(state)
+        |> assign_forms()
+        |> put_flash(:info, "Edits discarded.")
+
+      socket =
+        if connected?(socket), do: socket |> push_map_state() |> push_map_reload(), else: socket
+
+      {:noreply, socket}
+    else
+      {:noreply, socket}
+    end
+  end
+
   @impl true
   def handle_event("load_save", %{"load" => %{"path" => path}}, socket) do
     path = normalize_path(path)
@@ -85,12 +181,7 @@ defmodule MirrorWeb.MapLive do
 
     case SaveFile.load(path) do
       {:ok, save} ->
-        planes =
-          save.planes
-          |> Enum.into(%{}, fn {plane_key, plane_layers} ->
-            computed = MirrorMap.computed_adj_mask(plane_layers.terrain)
-            {plane_key, Map.put(plane_layers, :computed_adj_mask, computed)}
-          end)
+        planes = with_computed_layers(save.planes)
 
         state = %{
           save: save,
@@ -171,14 +262,23 @@ defmodule MirrorWeb.MapLive do
     socket = assign(socket, :save_path_input, path)
 
     with %SaveFile{} = save <- state.save,
+         :ok <- guard_original(socket, save, target_path),
          {:ok, save_path} <-
            SaveFile.write(%{save | planes: strip_computed(state.planes)}, target_path) do
-      state = %{state | save_path: save_path}
+      state = %{state | save_path: save_path, original_planes: strip_computed(state.planes)}
       SessionStore.put(socket.assigns.session_id, state)
-      {:noreply, put_flash(assign(socket, :state, state), :info, "Saved to #{save_path}.")}
+      {:noreply, put_flash(assign_state(socket, state), :info, "Saved to #{save_path}.")}
     else
       nil ->
         {:noreply, put_flash(socket, :error, "Load a save before saving.")}
+
+      {:error, :would_overwrite_original} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "Choose a new file name: Save as won't overwrite the file you loaded."
+         )}
 
       {:error, reason} ->
         {:noreply, put_flash(socket, :error, "Save failed: #{inspect(reason)}")}
@@ -332,7 +432,7 @@ defmodule MirrorWeb.MapLive do
   def handle_event("map_pointer", params, socket) do
     state = socket.assigns.state
 
-    if state.save && (socket.assigns.lab? or params["action"] == "hover") do
+    if state.save && pointer_allowed?(socket, params["action"]) do
       action = params["action"]
       {x, y} = {parse_int(params["x"], -1), parse_int(params["y"], -1)}
       button = parse_int(params["button"], 0)
@@ -1318,6 +1418,20 @@ defmodule MirrorWeb.MapLive do
                 </button>
               </.form>
 
+              <button
+                id="toggle-edit-button"
+                type="button"
+                phx-click="toggle_edit"
+                disabled={is_nil(@state.save)}
+                class={[
+                  "rounded-lg px-3 py-1 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40",
+                  @edit && "bg-emerald-300 text-slate-950 hover:bg-emerald-200",
+                  !@edit && "border border-emerald-300/50 text-emerald-100 hover:border-emerald-200"
+                ]}
+              >
+                {if @edit, do: "Done", else: "✎ Edit"}
+              </button>
+
               <.link
                 id="open-lab-link"
                 navigate={~p"/lab/#{@plane}"}
@@ -1329,6 +1443,118 @@ defmodule MirrorWeb.MapLive do
           </header>
 
           <div
+            :if={@edit}
+            id="edit-toolbar"
+            class="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-emerald-300/20 bg-emerald-950/40 px-4 py-2 text-sm text-slate-200"
+          >
+            <div
+              class="flex rounded-lg border border-white/10 p-0.5"
+              role="group"
+              aria-label="Edit layer"
+            >
+              <span class="rounded-md bg-white/10 px-2.5 py-0.5 font-semibold text-white">
+                Terrain
+              </span>
+              <span
+                :for={label <- ["Roads", "Structures", "Units"]}
+                class="px-2.5 py-0.5 text-slate-500"
+                title="Coming once this data is decoded (EPIC-004)"
+              >
+                {label}
+              </span>
+            </div>
+
+            <.form
+              for={@brush_form}
+              id="brush-form"
+              phx-change="set_brush"
+              phx-submit="set_brush"
+              class="flex items-center gap-2"
+            >
+              <span class="text-slate-400">Tile</span>
+              <canvas
+                id="brush-preview"
+                phx-update="ignore"
+                width="20"
+                height="18"
+                class="h-[27px] w-[30px] rounded border border-white/20"
+                style="image-rendering: pixelated"
+              >
+              </canvas>
+              <.input
+                field={@brush_form[:tile]}
+                type="number"
+                min="0"
+                max="761"
+                phx-debounce="200"
+                class="w-20 rounded-lg border border-white/10 bg-slate-950/60 py-0.5 text-sm text-slate-200"
+              />
+            </.form>
+
+            <span class="text-xs text-slate-400">
+              Left-click paint · right-click pick · space-drag or middle-drag to pan · Esc to finish
+            </span>
+
+            <div class="ml-auto flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                phx-click="undo"
+                class="rounded-lg border border-white/15 px-2.5 py-0.5 hover:border-white/40"
+              >
+                Undo
+              </button>
+              <button
+                type="button"
+                phx-click="redo"
+                class="rounded-lg border border-white/15 px-2.5 py-0.5 hover:border-white/40"
+              >
+                Redo
+              </button>
+              <span
+                id="changed-tiles"
+                class={[
+                  @changed_tiles > 0 && "text-amber-200",
+                  @changed_tiles == 0 && "text-slate-500"
+                ]}
+              >
+                {@changed_tiles} {if @changed_tiles == 1, do: "tile", else: "tiles"} changed
+              </span>
+              <button
+                :if={@changed_tiles > 0}
+                id="discard-edits-button"
+                type="button"
+                phx-click="discard_edits"
+                data-confirm={"Discard #{@changed_tiles} changed tiles?"}
+                class="rounded-lg border border-rose-300/40 px-2.5 py-0.5 text-rose-100 hover:border-rose-200"
+              >
+                Discard
+              </button>
+              <.form
+                for={@save_form}
+                id="save-form"
+                phx-submit="save_file"
+                phx-change="update_save_path"
+                class="flex items-center gap-2"
+              >
+                <.input
+                  field={@save_form[:path]}
+                  type="text"
+                  placeholder="Save as… (new file path)"
+                  phx-hook="StableInput"
+                  class="w-72 rounded-lg border border-white/10 bg-slate-950/60 py-0.5 text-sm text-slate-200 placeholder:text-slate-500"
+                />
+                <button
+                  id="save-button"
+                  type="submit"
+                  class="rounded-lg bg-emerald-300 px-3 py-0.5 font-semibold text-slate-950 hover:bg-emerald-200"
+                >
+                  Save as
+                </button>
+              </.form>
+            </div>
+          </div>
+
+          <div
             id="map-viewport"
             phx-hook="MapViewport"
             phx-update="ignore"
@@ -1336,7 +1562,7 @@ defmodule MirrorWeb.MapLive do
           >
             <.map_canvas
               plane={@plane}
-              interaction="view"
+              interaction={if @edit, do: "edit", else: "view"}
               map_width={@map_width}
               map_height={@map_height}
               active_layer={@active_layer}
@@ -1395,7 +1621,7 @@ defmodule MirrorWeb.MapLive do
   end
 
   attr :plane, :atom, required: true
-  attr :interaction, :string, default: "edit"
+  attr :interaction, :string, default: "lab"
   attr :map_width, :integer, required: true
   attr :map_height, :integer, required: true
   attr :active_layer, :atom, required: true
@@ -1541,7 +1767,9 @@ defmodule MirrorWeb.MapLive do
           changes: %{{x, y} => {prev, new}}
         }
 
-        assign(socket, :active_stroke, stroke)
+        socket
+        |> assign(:active_stroke, stroke)
+        |> record_stroke(stroke, :new)
     end
   end
 
@@ -1560,28 +1788,55 @@ defmodule MirrorWeb.MapLive do
             {old_prev, new}
           end)
 
-        assign(socket, :active_stroke, %{stroke | changes: changes})
+        stroke = %{stroke | changes: changes}
+
+        socket
+        |> assign(:active_stroke, stroke)
+        |> record_stroke(stroke, :update)
     end
   end
 
-  defp finalize_stroke(socket, stroke) do
+  # The stroke is already in the undo history (record_stroke/3 writes it as
+  # it's painted), so finishing just closes it.
+  defp finalize_stroke(socket, _stroke) do
+    socket
+    |> assign(:active_stroke, nil)
+    |> assign_state(socket.assigns.state)
+  end
+
+  # Cheap state update (no re-encoding of layers) that keeps the
+  # unsaved-edits counter honest.
+  defp assign_state(socket, state) do
+    assign(socket, state: state, changed_tiles: changed_tile_count(state))
+  end
+
+  # Write the in-progress stroke into the plane's undo history on every tile,
+  # not only at pointer-up: if the LiveView restarts mid-stroke (code reload,
+  # crash, navigation), the painted tiles are already in the session and must
+  # stay undoable (STORY-022).
+  defp record_stroke(socket, stroke, mode) do
     state = socket.assigns.state
     plane = socket.assigns.plane
-    history = Map.get(state.history, plane, [])
-    redo = Map.put(state.redo, plane, [])
+    entry = %{layer: stroke.layer, changes: stroke_change_list(stroke)}
 
-    changes =
-      stroke.changes
-      |> Enum.map(fn {{x, y}, {prev, new}} -> {x, y, prev, new} end)
+    history =
+      case {mode, Map.get(state.history, plane, [])} do
+        {:update, [_current | rest]} -> [entry | rest]
+        {_, history} -> [entry | history]
+      end
 
-    history = [%{layer: stroke.layer, changes: changes} | history]
+    state = %{
+      state
+      | history: Map.put(state.history, plane, history),
+        redo: Map.put(state.redo, plane, [])
+    }
 
-    state = %{state | history: Map.put(state.history, plane, history), redo: redo}
     SessionStore.put(socket.assigns.session_id, state)
+    assign(socket, :state, state)
+  end
 
-    socket
-    |> assign(:state, state)
-    |> assign(:active_stroke, nil)
+  defp stroke_change_list(stroke) do
+    Enum.map(stroke.changes, fn {{x, y}, {prev, new}} -> {x, y, prev, new} end)
   end
 
   defp sample_tile(socket, layer, x, y) do
@@ -1683,7 +1938,7 @@ defmodule MirrorWeb.MapLive do
         SessionStore.put(socket.assigns.session_id, state)
 
         socket
-        |> assign(:state, state)
+        |> assign_state(state)
         |> maybe_push_updates(layer, updates, changes)
         |> emit_engine_delta(plane, layer, changes)
 
@@ -1712,7 +1967,7 @@ defmodule MirrorWeb.MapLive do
         SessionStore.put(socket.assigns.session_id, state)
 
         socket
-        |> assign(:state, state)
+        |> assign_state(state)
         |> maybe_push_updates(layer, updates, changes)
         |> emit_engine_delta(plane, layer, changes)
 
@@ -1832,7 +2087,7 @@ defmodule MirrorWeb.MapLive do
   defp maybe_update_adj_mask_batch(plane_layers, stroke, layer) do
     if layer == :terrain do
       coords =
-        stroke
+        stroke.changes
         |> Enum.flat_map(fn {x, y, _prev, _new} -> MirrorMap.adj_update_coords(x, y) end)
         |> Enum.uniq()
 
@@ -1962,7 +2217,9 @@ defmodule MirrorWeb.MapLive do
       phase_loop_status: phase_loop_status,
       phase_loop_detecting: Map.get(state, :phase_loop_detecting, false),
       snapshot_mode: Map.get(state, :snapshot_mode, true),
-      engine_session_id: Map.get(state, :engine_session_id)
+      engine_session_id: Map.get(state, :engine_session_id),
+      changed_tiles: changed_tile_count(state),
+      brush: Map.get(state.selection, :terrain, 0)
     )
   end
 
@@ -1971,13 +2228,26 @@ defmodule MirrorWeb.MapLive do
 
     load_form = to_form(%{"path" => socket.assigns.load_path || ""}, as: :load)
 
-    save_form =
-      to_form(%{"path" => socket.assigns.save_path_input || state.save_path || ""}, as: :save)
+    save_input = socket.assigns.save_path_input || state.save_path || ""
+
+    # In edit mode, never offer the loaded file itself: suggest the next free
+    # SAVEn.GAM slot beside it (MoM only loads SAVE1..SAVE9.GAM).
+    save_input =
+      with true <- socket.assigns[:edit] != nil,
+           %SaveFile{path: original} when is_binary(original) <- state.save,
+           true <- save_input in ["", original] do
+        suggested_save_path(original)
+      else
+        _ -> save_input
+      end
+
+    save_form = to_form(%{"path" => save_input}, as: :save)
 
     selection_form =
       to_form(%{"value" => Map.get(state.selection, state.active_layer, 0)}, as: :selection)
 
     phase_form = to_form(%{"index" => state.phase_index || 0}, as: :phase)
+    brush_form = to_form(%{"tile" => Map.get(state.selection, :terrain, 0)}, as: :brush)
 
     layer_forms = layer_forms(state)
 
@@ -2006,6 +2276,7 @@ defmodule MirrorWeb.MapLive do
       save_form: save_form,
       selection_form: selection_form,
       phase_form: phase_form,
+      brush_form: brush_form,
       layer_forms: layer_forms,
       value_name_form: value_name_form,
       bit_forms: bit_forms,
@@ -2358,6 +2629,85 @@ defmodule MirrorWeb.MapLive do
     end
   end
 
+  defp pointer_allowed?(socket, action) do
+    cond do
+      socket.assigns.lab? -> true
+      action == "hover" -> true
+      socket.assigns.edit -> action in ["start", "drag", "end"]
+      true -> false
+    end
+  end
+
+  defp guard_original(socket, %SaveFile{path: original}, target_path) do
+    target = target_path || socket.assigns.state.save_path
+
+    if (not socket.assigns.lab? and target) && Path.expand(target) == Path.expand(original) do
+      {:error, :would_overwrite_original}
+    else
+      :ok
+    end
+  end
+
+  defp push_brush(socket) do
+    push_event(socket, "brush", %{tile: Map.get(socket.assigns.state.selection, :terrain, 0)})
+  end
+
+  defp with_computed_layers(planes) do
+    Enum.into(planes, %{}, fn {plane_key, plane_layers} ->
+      computed = MirrorMap.computed_adj_mask(plane_layers.terrain)
+      {plane_key, Map.put(plane_layers, :computed_adj_mask, computed)}
+    end)
+  end
+
+  # Tiles (either plane, any saved layer) that differ from the loaded or
+  # last-saved version.
+  defp changed_tile_count(%{save: nil}), do: 0
+
+  defp changed_tile_count(%{planes: planes, original_planes: originals})
+       when is_map(planes) and is_map(originals) do
+    for {plane, original_layers} <- originals, reduce: 0 do
+      acc ->
+        current_layers = Map.get(planes, plane, %{})
+
+        changed =
+          for {layer, original} <- original_layers,
+              current = Map.get(current_layers, layer),
+              is_binary(current) and is_binary(original),
+              current != original,
+              width = if(layer in @u16_layers, do: 2, else: 1),
+              idx <- 0..(div(byte_size(original), width) - 1),
+              binary_part(original, idx * width, width) !=
+                binary_part(current, idx * width, width),
+              into: MapSet.new(),
+              do: idx
+
+        acc + MapSet.size(changed)
+    end
+  end
+
+  defp changed_tile_count(_state), do: 0
+
+  defp suggested_save_path(original) do
+    dir = Path.dirname(original)
+
+    taken =
+      dir
+      |> File.ls()
+      |> then(fn
+        {:ok, files} -> files
+        _ -> []
+      end)
+      |> MapSet.new(&String.upcase/1)
+
+    case Enum.find(1..9, &(not MapSet.member?(taken, "SAVE#{&1}.GAM"))) do
+      nil -> Path.join(dir, Path.basename(original, Path.extname(original)) <> "-edited.GAM")
+      n -> Path.join(dir, "SAVE#{n}.GAM")
+    end
+  end
+
+  defp edit_path(:arcanus), do: ~p"/arcanus?edit=terrain"
+  defp edit_path(:myrror), do: ~p"/myrror?edit=terrain"
+
   defp parse_plane("myrror"), do: :myrror
   defp parse_plane(_), do: :arcanus
 
@@ -2415,7 +2765,7 @@ defmodule MirrorWeb.MapLive do
   end
 
   defp tool_and_layer(socket, button, mods) do
-    layer = socket.assigns.state.active_layer
+    layer = if socket.assigns.edit, do: :terrain, else: socket.assigns.state.active_layer
 
     tool =
       cond do
@@ -2430,6 +2780,8 @@ defmodule MirrorWeb.MapLive do
   defp valid_coord?(x, y) do
     x in 0..(MirrorMap.width() - 1) and y in 0..(MirrorMap.height() - 1)
   end
+
+  defp clamp_value(:terrain, value), do: value |> max(0) |> min(TerrainLbx.tiles_per_plane() - 1)
 
   defp clamp_value(layer, value) do
     if layer in @u16_layers do
