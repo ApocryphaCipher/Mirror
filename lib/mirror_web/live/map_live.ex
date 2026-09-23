@@ -16,7 +16,7 @@ defmodule MirrorWeb.MapLive do
   ]
 
   @u16_layers [:terrain]
-  @u8_layers @layers -- @u16_layers -- [:computed_adj_mask]
+  @u8_layers @layers -- (@u16_layers -- [:computed_adj_mask])
 
   @layer_labels %{
     terrain: "Terrain (u16)",
@@ -32,9 +32,14 @@ defmodule MirrorWeb.MapLive do
   @phase_loop_threshold 0
 
   @impl true
-  def mount(_params, session, socket) do
+  def mount(params, session, socket) do
     session_id = session["mirror_session_id"] || "local"
-    plane = socket.assigns.live_action || :arcanus
+
+    {plane, lab?} =
+      case socket.assigns.live_action do
+        :lab -> {parse_plane(params["plane"]), true}
+        action -> {action || :arcanus, false}
+      end
 
     state =
       session_id
@@ -45,6 +50,7 @@ defmodule MirrorWeb.MapLive do
       socket
       |> assign(:session_id, session_id)
       |> assign(:plane, plane)
+      |> assign(:lab?, lab?)
 
     state = ensure_engine_session(state, session_id, connected?(socket))
 
@@ -326,7 +332,7 @@ defmodule MirrorWeb.MapLive do
   def handle_event("map_pointer", params, socket) do
     state = socket.assigns.state
 
-    if state.save do
+    if state.save && (socket.assigns.lab? or params["action"] == "hover") do
       action = params["action"]
       {x, y} = {parse_int(params["x"], -1), parse_int(params["y"], -1)}
       button = parse_int(params["button"], 0)
@@ -473,69 +479,6 @@ defmodule MirrorWeb.MapLive do
     {:noreply, socket}
   end
 
-  def handle_event("toggle_debug_terrain_kinds", _params, socket) do
-    state = socket.assigns.state
-    debug = not Map.get(state, :debug_terrain_kinds, false)
-    state = %{state | debug_terrain_kinds: debug}
-    SessionStore.put(socket.assigns.session_id, state)
-
-    socket =
-      socket
-      |> assign_from_state(state)
-      |> assign_forms()
-
-    socket =
-      if connected?(socket) do
-        push_map_state(socket)
-      else
-        socket
-      end
-
-    {:noreply, socket}
-  end
-
-  def handle_event("toggle_debug_coast_audit", _params, socket) do
-    state = socket.assigns.state
-    debug = not Map.get(state, :debug_coast_audit, false)
-    state = %{state | debug_coast_audit: debug}
-    SessionStore.put(socket.assigns.session_id, state)
-
-    socket =
-      socket
-      |> assign_from_state(state)
-      |> assign_forms()
-
-    socket =
-      if connected?(socket) do
-        push_map_state(socket)
-      else
-        socket
-      end
-
-    {:noreply, socket}
-  end
-
-  def handle_event("toggle_debug_shore_semantics", _params, socket) do
-    state = socket.assigns.state
-    debug = not Map.get(state, :debug_shore_semantics, false)
-    state = %{state | debug_shore_semantics: debug}
-    SessionStore.put(socket.assigns.session_id, state)
-
-    socket =
-      socket
-      |> assign_from_state(state)
-      |> assign_forms()
-
-    socket =
-      if connected?(socket) do
-        push_map_state(socket)
-      else
-        socket
-      end
-
-    {:noreply, socket}
-  end
-
   def handle_event("detect_phase_loop", _params, socket) do
     state = socket.assigns.state
 
@@ -656,8 +599,6 @@ defmodule MirrorWeb.MapLive do
   def handle_event("reload_tiles", _params, socket) do
     socket =
       if connected?(socket) do
-        Mirror.MomimePngIndex.reset()
-
         socket
         |> assign(:tile_assets, nil)
         |> maybe_push_tile_assets()
@@ -672,677 +613,791 @@ defmodule MirrorWeb.MapLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} full_bleed>
-      <div class="relative min-h-[100svh]">
-        <div class="relative flex min-h-[100svh] flex-col">
-          <header class="pointer-events-auto border-b border-white/10 bg-slate-950/80 px-6 py-5 shadow-lg shadow-black/60 backdrop-blur">
-            <div class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-xl shadow-black/60 backdrop-blur">
-              <div class="flex flex-wrap items-end justify-between gap-4">
-                <div>
-                  <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Plane view</p>
+      <%= if @lab? do %>
+        <div class="relative min-h-[100svh]">
+          <div class="relative flex min-h-[100svh] flex-col">
+            <header class="pointer-events-auto border-b border-white/10 bg-slate-950/80 px-6 py-5 shadow-lg shadow-black/60 backdrop-blur">
+              <div class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-xl shadow-black/60 backdrop-blur">
+                <div class="flex flex-wrap items-end justify-between gap-4">
+                  <div>
+                    <p class="text-xs uppercase tracking-[0.3em] text-slate-400">
+                      Lab ·
+                      <.link
+                        navigate={~p"/lab/#{other_plane(@plane)}"}
+                        class="underline decoration-dotted hover:text-white"
+                      >
+                        switch to {plane_name(other_plane(@plane))}
+                      </.link>
+                      ·
+                      <.link
+                        navigate={map_path(@plane)}
+                        class="underline decoration-dotted hover:text-white"
+                      >
+                        back to map
+                      </.link>
+                    </p>
 
-                  <h2 class="text-3xl font-semibold text-white">
-                    {if @plane == :arcanus, do: "Arcanus", else: "Myrror"}
-                  </h2>
+                    <h2 class="text-3xl font-semibold text-white">
+                      {plane_name(@plane)}
+                    </h2>
 
-                  <p class="text-sm text-slate-400">
-                    {if @state.save_path, do: @state.save_path, else: "No save loaded yet."}
-                  </p>
+                    <p class="text-sm text-slate-400">
+                      {if @state.save_path, do: @state.save_path, else: "No save loaded yet."}
+                    </p>
+                  </div>
+
+                  <div class="flex flex-wrap gap-3">
+                    <button
+                      id="undo-button"
+                      type="button"
+                      phx-click="undo"
+                      class="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
+                    >
+                      Undo
+                    </button>
+                    <button
+                      id="redo-button"
+                      type="button"
+                      phx-click="redo"
+                      class="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
+                    >
+                      Redo
+                    </button>
+                    <button
+                      id="render-mode-button"
+                      type="button"
+                      phx-click="toggle_render_mode"
+                      class="rounded-full border border-amber-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-amber-100 transition hover:border-amber-200"
+                    >
+                      Render: {if @render_mode == :tiles, do: "Tiles", else: "Values"}
+                    </button>
+                    <button
+                      id="snapshot-mode-button"
+                      type="button"
+                      phx-click="toggle_snapshot_mode"
+                      class="rounded-full border border-sky-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-sky-100 transition hover:border-sky-200"
+                    >
+                      Snapshot: {if @snapshot_mode, do: "On", else: "Off"}
+                    </button>
+                    <div class="flex flex-col gap-1">
+                      <.form
+                        for={@phase_form}
+                        id="phase-form"
+                        phx-change="set_phase_index"
+                        class="rounded-full border border-white/20 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200"
+                      >
+                        <.input
+                          field={@phase_form[:index]}
+                          type="number"
+                          label="Phase"
+                          class="w-20 rounded-2xl border border-white/10 bg-slate-950/70 text-slate-200"
+                        />
+                      </.form>
+
+                      <div class="flex flex-wrap items-center gap-2 text-[0.65rem] uppercase tracking-[0.2em] text-slate-400">
+                        <span>Input: {@phase_input}</span> <span>Effective: {@phase_index}</span>
+                        <span>Loop: {if(@phase_loop_len, do: @phase_loop_len, else: "Unknown")}</span>
+                        <%= case @phase_loop_status do %>
+                          <% :detected -> %>
+                            <span class="text-emerald-300/80">Detected</span>
+                          <% :assumed -> %>
+                            <span class="text-amber-300/80">Assumed</span>
+                          <% _ -> %>
+                            <span class="text-slate-500">Unknown</span>
+                        <% end %>
+                      </div>
+                    </div>
+
+                    <button
+                      :if={@render_mode == :tiles}
+                      id="detect-phase-loop-button"
+                      type="button"
+                      phx-click="detect_phase_loop"
+                      disabled={@phase_loop_detecting}
+                      class={[
+                        "rounded-full border border-fuchsia-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-fuchsia-100 transition hover:border-fuchsia-200",
+                        @phase_loop_detecting && "cursor-not-allowed opacity-60"
+                      ]}
+                    >
+                      {if @phase_loop_detecting, do: "Detecting...", else: "Detect loop"}
+                    </button>
+                    <button
+                      :if={@render_mode == :tiles}
+                      id="reload-tiles-button"
+                      type="button"
+                      phx-click="reload_tiles"
+                      class="rounded-full border border-emerald-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100 transition hover:border-emerald-200"
+                    >
+                      Reload tiles
+                    </button>
+                    <button
+                      id="export-snapshot-button"
+                      type="button"
+                      phx-click="export_snapshot"
+                      class="rounded-full border border-indigo-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-indigo-100 transition hover:border-indigo-200"
+                    >
+                      Export snapshot
+                    </button>
+                    <button
+                      id="export-stats-button"
+                      type="button"
+                      phx-click="export_stats"
+                      class="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
+                    >
+                      Export stats
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-4 grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
+                <.form
+                  for={@load_form}
+                  id="load-form"
+                  phx-submit="load_save"
+                  phx-change="update_load_path"
+                  class="grid gap-3 md:grid-cols-[1fr_auto]"
+                >
+                  <.input
+                    field={@load_form[:path]}
+                    type="text"
+                    placeholder="C:\\games\\MOM\\SAVES\\SAVE1.GAM"
+                    phx-hook="StableInput"
+                    class="w-full rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200 placeholder:text-slate-500"
+                  />
+                  <button
+                    id="load-save-button"
+                    type="submit"
+                    class="rounded-2xl bg-amber-300 px-5 py-2 text-sm font-semibold text-slate-950 shadow-lg shadow-amber-500/30 transition hover:-translate-y-0.5 hover:bg-amber-200"
+                  >
+                    Load save
+                  </button>
+                </.form>
+
+                <.form
+                  for={@save_form}
+                  id="save-form"
+                  phx-submit="save_file"
+                  phx-change="update_save_path"
+                  class="grid gap-3 md:grid-cols-[1fr_auto]"
+                >
+                  <.input
+                    field={@save_form[:path]}
+                    type="text"
+                    placeholder="Output path (optional)"
+                    phx-hook="StableInput"
+                    class="w-full rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200 placeholder:text-slate-500"
+                  />
+                  <button
+                    id="save-button"
+                    type="submit"
+                    class="rounded-2xl border border-emerald-300/40 px-5 py-2 text-sm font-semibold text-emerald-100 transition hover:border-emerald-200"
+                  >
+                    Save
+                  </button>
+                </.form>
+              </div>
+            </header>
+
+            <div class="flex-1 min-h-0">
+              <div class="grid h-full gap-0 lg:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)_minmax(18rem,24rem)]">
+                <div class="flex h-full flex-col gap-6 overflow-y-auto border-r border-white/10 bg-slate-950/90 p-4">
+                  <div class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-lg shadow-black/60 backdrop-blur">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Map editor</p>
+
+                        <h3 class="text-lg font-semibold text-white">Layer stack + tools</h3>
+                      </div>
+                    </div>
+
+                    <div class="mt-6 grid gap-6 lg:grid-cols-[0.5fr_1fr]">
+                      <div class="space-y-4">
+                        <div class="space-y-2">
+                          <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Layers</p>
+
+                          <div class="space-y-3">
+                            <%= for layer <- @layers do %>
+                              <div
+                                id={"layer-row-#{layer}"}
+                                class={[
+                                  "rounded-2xl border p-3",
+                                  layer == @active_layer && "border-amber-300/40 bg-amber-300/10",
+                                  layer != @active_layer && "border-white/10 bg-slate-950/40"
+                                ]}
+                              >
+                                <div class="flex items-center justify-between gap-3">
+                                  <button
+                                    id={"layer-#{layer}"}
+                                    type="button"
+                                    phx-click="set_active_layer"
+                                    phx-value-layer={Atom.to_string(layer)}
+                                    class={[
+                                      "text-left text-sm transition",
+                                      layer == @active_layer && "text-white",
+                                      layer != @active_layer && "text-slate-300 hover:text-white"
+                                    ]}
+                                  >
+                                    <span class="font-semibold">{@layer_labels[layer]}</span>
+                                    <%= if layer == :computed_adj_mask do %>
+                                      <span class="ml-2 text-[0.65rem] uppercase tracking-[0.2em] text-slate-500">
+                                        Derived
+                                      </span>
+                                    <% end %>
+                                  </button>
+                                  <span class="text-xs text-slate-400">
+                                    {Map.get(@layer_opacity, layer, 100)}%
+                                  </span>
+                                </div>
+
+                                <.form
+                                  for={@layer_forms[layer]}
+                                  id={"layer-form-#{layer}"}
+                                  phx-change="set_layer_setting"
+                                  phx-value-layer={Atom.to_string(layer)}
+                                  class="mt-3 grid gap-2"
+                                >
+                                  <.input
+                                    field={@layer_forms[layer][:visible]}
+                                    type="checkbox"
+                                    label={
+                                      if(layer == :terrain,
+                                        do: "Base (always on)",
+                                        else: "Show layer"
+                                      )
+                                    }
+                                    disabled={layer == :terrain}
+                                    class="h-4 w-4 rounded border border-white/20 bg-slate-950 text-amber-300 focus:ring-2 focus:ring-amber-300/40"
+                                  />
+                                  <.input
+                                    field={@layer_forms[layer][:opacity]}
+                                    type="range"
+                                    label="Opacity"
+                                    min="0"
+                                    max="100"
+                                    step="5"
+                                    phx-debounce="100"
+                                    class="h-2 w-full cursor-pointer appearance-none rounded-full bg-white/10 accent-amber-300"
+                                  />
+                                </.form>
+                              </div>
+                            <% end %>
+                          </div>
+                        </div>
+
+                        <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
+                          <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Selection</p>
+
+                          <.form
+                            for={@selection_form}
+                            id="selection-form"
+                            phx-submit="set_selection"
+                            class="mt-3 space-y-3"
+                          >
+                            <.input
+                              field={@selection_form[:value]}
+                              type="number"
+                              class="rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200"
+                            />
+                            <button
+                              id="apply-selection-button"
+                              type="submit"
+                              class="w-full rounded-2xl border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
+                            >
+                              Apply value
+                            </button>
+                          </.form>
+
+                          <p class="mt-3 text-xs text-slate-500">
+                            Scroll to cycle values. Right-click to sample.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div class="space-y-4">
+                        <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-4 text-xs text-slate-400">
+                          <p class="uppercase tracking-[0.3em] text-slate-500">Controls</p>
+
+                          <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                            <div class="flex items-start gap-2">
+                              <.icon name="hero-hand-raised" class="size-4 text-amber-300" />
+                              <span>Left drag paints with the current selection.</span>
+                            </div>
+
+                            <div class="flex items-start gap-2">
+                              <.icon name="hero-eye" class="size-4 text-sky-300" />
+                              <span>Right click samples the current layer.</span>
+                            </div>
+
+                            <div class="flex items-start gap-2">
+                              <.icon
+                                name="hero-adjustments-horizontal"
+                                class="size-4 text-emerald-300"
+                              />
+                              <span>Alt/Shift modify the scroll step size.</span>
+                            </div>
+
+                            <div class="flex items-start gap-2">
+                              <.icon name="hero-command-line" class="size-4 text-indigo-300" />
+                              <span>Ctrl toggles sampling mode.</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div class="flex flex-wrap gap-3">
-                  <button
-                    id="undo-button"
-                    type="button"
-                    phx-click="undo"
-                    class="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
-                  >
-                    Undo
-                  </button>
-                  <button
-                    id="redo-button"
-                    type="button"
-                    phx-click="redo"
-                    class="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
-                  >
-                    Redo
-                  </button>
-                  <button
-                    id="render-mode-button"
-                    type="button"
-                    phx-click="toggle_render_mode"
-                    class="rounded-full border border-amber-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-amber-100 transition hover:border-amber-200"
-                  >
-                    Render: {if @render_mode == :tiles, do: "Tiles", else: "Values"}
-                  </button>
-                  <button
-                    id="snapshot-mode-button"
-                    type="button"
-                    phx-click="toggle_snapshot_mode"
-                    class="rounded-full border border-sky-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-sky-100 transition hover:border-sky-200"
-                  >
-                    Snapshot: {if @snapshot_mode, do: "On", else: "Off"}
-                  </button>
-                  <button
-                    id="debug-terrain-kinds-button"
-                    type="button"
-                    phx-click="toggle_debug_terrain_kinds"
-                    class="rounded-full border border-rose-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-rose-100 transition hover:border-rose-200"
-                  >
-                    Kinds: {if @debug_terrain_kinds, do: "On", else: "Off"}
-                  </button>
-                  <button
-                    id="debug-coast-audit-button"
-                    type="button"
-                    phx-click="toggle_debug_coast_audit"
-                    class="rounded-full border border-fuchsia-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-fuchsia-100 transition hover:border-fuchsia-200"
-                  >
-                    Coast Audit: {if @debug_coast_audit, do: "On", else: "Off"}
-                  </button>
-                  <button
-                    id="debug-shore-semantics-button"
-                    type="button"
-                    phx-click="toggle_debug_shore_semantics"
-                    class="rounded-full border border-cyan-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-100 transition hover:border-cyan-200"
-                  >
-                    Shore Semantics: {if @debug_shore_semantics, do: "On", else: "Off"}
-                  </button>
-                  <div class="flex flex-col gap-1">
-                    <.form
-                      for={@phase_form}
-                      id="phase-form"
-                      phx-change="set_phase_index"
-                      class="rounded-full border border-white/20 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200"
-                    >
-                      <.input
-                        field={@phase_form[:index]}
-                        type="number"
-                        label="Phase"
-                        class="w-20 rounded-2xl border border-white/10 bg-slate-950/70 text-slate-200"
-                      />
-                    </.form>
+                <div class="relative overflow-auto bg-slate-950">
+                  <.map_canvas
+                    plane={@plane}
+                    map_width={@map_width}
+                    map_height={@map_height}
+                    active_layer={@active_layer}
+                    encoded_layer={@encoded_layer}
+                    terrain_encoded={@terrain_encoded}
+                    terrain_flags_encoded={@terrain_flags_encoded}
+                    minerals_encoded={@minerals_encoded}
+                    exploration_encoded={@exploration_encoded}
+                    landmass_encoded={@landmass_encoded}
+                    adj_mask_encoded={@adj_mask_encoded}
+                    render_mode={@render_mode}
+                    phase_index={@phase_index}
+                    snapshot_mode={@snapshot_mode}
+                  />
+                </div>
 
-                    <div class="flex flex-wrap items-center gap-2 text-[0.65rem] uppercase tracking-[0.2em] text-slate-400">
-                      <span>Input: {@phase_input}</span> <span>Effective: {@phase_index}</span>
-                      <span>Loop: {if(@phase_loop_len, do: @phase_loop_len, else: "Unknown")}</span>
-                      <%= case @phase_loop_status do %>
-                        <% :detected -> %>
-                          <span class="text-emerald-300/80">Detected</span>
-                        <% :assumed -> %>
-                          <span class="text-amber-300/80">Assumed</span>
-                        <% _ -> %>
-                          <span class="text-slate-500">Unknown</span>
+                <aside class="flex h-full flex-col gap-6 overflow-y-auto border-l border-white/10 bg-slate-950/90 p-4">
+                  <div class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-lg shadow-black/60 backdrop-blur pointer-events-auto">
+                    <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Research</p>
+
+                    <h3 class="mt-2 text-lg font-semibold text-white">Value intel</h3>
+
+                    <div class="mt-4 space-y-3">
+                      <.form
+                        for={@value_name_form}
+                        id="value-name-form"
+                        phx-submit="set_value_name"
+                        class="grid gap-3"
+                      >
+                        <div class="grid gap-3 sm:grid-cols-2">
+                          <.input
+                            field={@value_name_form[:value]}
+                            type="number"
+                            class="rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200"
+                          />
+                          <.input
+                            field={@value_name_form[:name]}
+                            type="text"
+                            placeholder="Label this value"
+                            class="rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200 placeholder:text-slate-500"
+                          />
+                        </div>
+
+                        <button
+                          id="save-value-name-button"
+                          type="submit"
+                          class="rounded-2xl border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
+                        >
+                          Save label
+                        </button>
+                      </.form>
+
+                      <div class="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+                        <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Histogram</p>
+
+                        <div class="mt-3 space-y-2">
+                          <%= for entry <- hist_entries(@state, @active_layer) do %>
+                            <button
+                              id={"hist-#{entry.value}"}
+                              type="button"
+                              phx-click="set_selection"
+                              phx-value-value={entry.value}
+                              class="flex w-full items-center justify-between rounded-xl border border-white/10 px-3 py-2 text-xs text-slate-200 transition hover:border-white/30"
+                            >
+                              <span class="font-semibold">#{entry.value}</span>
+                              <span class="text-slate-500">{entry.name || "???"}</span>
+                              <span class="text-slate-400">{entry.count}</span>
+                            </button>
+                          <% end %>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-lg shadow-black/60 backdrop-blur pointer-events-auto">
+                    <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Tile inspector</p>
+
+                    <h3 class="mt-2 text-lg font-semibold text-white">Bit flag lab</h3>
+
+                    <div class="mt-4 space-y-4 text-sm text-slate-300">
+                      <%= if @state.save && @hover do %>
+                        <% value = @hover.layer_value || 0 %> <% original_value =
+                          @hover.original_value %> <% snapshot_value =
+                          snapshot_value(@state, @plane, @active_layer) %> <% unsupported_layer =
+                          not u8_layer?(@active_layer) %>
+                        <div class="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+                          <div class="flex flex-wrap items-center justify-between gap-3 text-[0.65rem] uppercase tracking-[0.2em] text-slate-500">
+                            <span>Tile ({@hover.x}, {@hover.y})</span>
+                            <span>{@layer_labels[@active_layer]}</span>
+                          </div>
+
+                          <div class="mt-3 flex flex-wrap items-end justify-between gap-4">
+                            <div>
+                              <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Current</p>
+
+                              <div class="flex items-baseline gap-3">
+                                <span class="text-3xl font-semibold text-white">{value}</span>
+                                <span class="text-sm font-semibold text-slate-400">
+                                  {hex_byte(value)}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div class="text-xs text-slate-500">
+                              <%= if is_integer(original_value) do %>
+                                <p class="uppercase tracking-[0.2em] text-slate-500">Original</p>
+
+                                <p class="text-sm text-slate-300">
+                                  {original_value} ({hex_byte(original_value)})
+                                </p>
+                              <% else %>
+                                <p class="text-slate-600">Original value unavailable</p>
+                              <% end %>
+                            </div>
+                          </div>
+                        </div>
+
+                        <%= if unsupported_layer do %>
+                          <p class="text-xs text-slate-500">
+                            Bit toggles only apply to u8 layers. Switch to Terrain Flags, Minerals,
+                            Exploration, or Landmass.
+                          </p>
+                        <% else %>
+                          <div class="grid gap-2 sm:grid-cols-2">
+                            <%= for bit <- 0..7 do %>
+                              <% bit_on = bit_set?(value, bit) %> <% bit_name =
+                                Map.get(@bit_names, bit) %>
+                              <button
+                                id={"inspect-bit-#{bit}"}
+                                type="button"
+                                phx-click="inspect_toggle_bit"
+                                phx-value-bit={bit}
+                                class={[
+                                  "group flex items-center justify-between rounded-xl border px-3 py-2 text-xs transition",
+                                  bit_on &&
+                                    "border-emerald-300/50 bg-emerald-300/10 text-emerald-100",
+                                  not bit_on &&
+                                    "border-white/10 text-slate-300 hover:border-white/30"
+                                ]}
+                                aria-pressed={bit_on}
+                              >
+                                <div class="flex items-center gap-3">
+                                  <span class={[
+                                    "inline-flex h-6 w-6 items-center justify-center rounded-lg border text-[0.65rem] font-semibold",
+                                    bit_on &&
+                                      "border-emerald-300/60 bg-emerald-300/20 text-emerald-100",
+                                    not bit_on && "border-white/10 text-slate-400"
+                                  ]}>
+                                    {if bit_on, do: "1", else: "0"}
+                                  </span>
+                                  <div>
+                                    <p class="text-[0.65rem] uppercase tracking-[0.2em] text-slate-400">
+                                      Bit {bit}
+                                    </p>
+
+                                    <p class="text-xs text-slate-500">
+                                      {if bit_name in [nil, ""], do: "Unlabeled", else: bit_name}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <span class="text-[0.6rem] uppercase tracking-[0.2em] text-slate-500">
+                                  Toggle
+                                </span>
+                              </button>
+                            <% end %>
+                          </div>
+
+                          <div class="grid gap-2 sm:grid-cols-2">
+                            <button
+                              id="inspect-set-zero"
+                              type="button"
+                              phx-click="inspect_set_value"
+                              phx-value-value="0"
+                              class="rounded-xl border border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200 transition hover:border-white/30"
+                            >
+                              Set 0
+                            </button>
+                            <button
+                              id="inspect-set-255"
+                              type="button"
+                              phx-click="inspect_set_value"
+                              phx-value-value="255"
+                              class="rounded-xl border border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200 transition hover:border-white/30"
+                            >
+                              Set 255
+                            </button>
+                            <button
+                              id="inspect-invert"
+                              type="button"
+                              phx-click="inspect_invert"
+                              class="rounded-xl border border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200 transition hover:border-white/30"
+                            >
+                              Invert
+                            </button>
+                            <button
+                              id="inspect-revert"
+                              type="button"
+                              phx-click="inspect_revert"
+                              disabled={is_nil(original_value)}
+                              class={[
+                                "rounded-xl border px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition",
+                                is_nil(original_value) &&
+                                  "cursor-not-allowed border-white/5 text-slate-600",
+                                not is_nil(original_value) &&
+                                  "border-white/10 text-slate-200 hover:border-white/30"
+                              ]}
+                            >
+                              Revert tile
+                            </button>
+                          </div>
+
+                          <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-3">
+                            <div class="grid gap-2 sm:grid-cols-2">
+                              <button
+                                id="inspect-snapshot-a"
+                                type="button"
+                                phx-click="inspect_snapshot_a"
+                                class="rounded-xl border border-white/10 px-3 py-2 text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-200 transition hover:border-white/30"
+                              >
+                                Snapshot A
+                              </button>
+                              <button
+                                id="inspect-restore-a"
+                                type="button"
+                                phx-click="inspect_restore_a"
+                                disabled={is_nil(snapshot_value)}
+                                class={[
+                                  "rounded-xl border px-3 py-2 text-[0.65rem] font-semibold uppercase tracking-[0.2em] transition",
+                                  is_nil(snapshot_value) &&
+                                    "cursor-not-allowed border-white/5 text-slate-600",
+                                  not is_nil(snapshot_value) &&
+                                    "border-white/10 text-slate-200 hover:border-white/30"
+                                ]}
+                              >
+                                Restore A
+                              </button>
+                            </div>
+
+                            <%= if is_integer(snapshot_value) do %>
+                              <p class="mt-2 text-[0.65rem] uppercase tracking-[0.2em] text-slate-500">
+                                A: {snapshot_value} ({hex_byte(snapshot_value)})
+                              </p>
+                            <% else %>
+                              <p class="mt-2 text-[0.65rem] uppercase tracking-[0.2em] text-slate-600">
+                                A: Empty
+                              </p>
+                            <% end %>
+                          </div>
+                        <% end %>
+                      <% else %>
+                        <%= if @state.save do %>
+                          <p class="text-slate-500">Hover a tile to inspect bit flags.</p>
+                        <% else %>
+                          <p class="text-slate-500">Load a save to inspect tile flags.</p>
+                        <% end %>
                       <% end %>
                     </div>
                   </div>
 
-                  <button
-                    :if={@render_mode == :tiles}
-                    id="detect-phase-loop-button"
-                    type="button"
-                    phx-click="detect_phase_loop"
-                    disabled={@phase_loop_detecting}
-                    class={[
-                      "rounded-full border border-fuchsia-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-fuchsia-100 transition hover:border-fuchsia-200",
-                      @phase_loop_detecting && "cursor-not-allowed opacity-60"
-                    ]}
-                  >
-                    {if @phase_loop_detecting, do: "Detecting...", else: "Detect loop"}
-                  </button>
-                  <button
-                    :if={@render_mode == :tiles}
-                    id="reload-tiles-button"
-                    type="button"
-                    phx-click="reload_tiles"
-                    class="rounded-full border border-emerald-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100 transition hover:border-emerald-200"
-                  >
-                    Reload tiles
-                  </button>
-                  <button
-                    id="export-snapshot-button"
-                    type="button"
-                    phx-click="export_snapshot"
-                    class="rounded-full border border-indigo-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-indigo-100 transition hover:border-indigo-200"
-                  >
-                    Export snapshot
-                  </button>
-                  <button
-                    id="export-stats-button"
-                    type="button"
-                    phx-click="export_stats"
-                    class="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
-                  >
-                    Export stats
-                  </button>
-                </div>
+                  <div class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-lg shadow-black/60 backdrop-blur pointer-events-auto">
+                    <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Bit names</p>
+
+                    <div class="mt-4 space-y-3">
+                      <%= for {bit, form} <- @bit_forms do %>
+                        <.form
+                          for={form}
+                          id={"bit-form-#{bit}"}
+                          phx-submit="set_bit_name"
+                          class="flex items-center gap-3"
+                        >
+                          <.input field={form[:bit]} type="hidden" />
+                          <span class="text-xs font-semibold text-slate-300">Bit {bit}</span>
+                          <.input
+                            field={form[:name]}
+                            type="text"
+                            placeholder="Name"
+                            class="flex-1 rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200 placeholder:text-slate-500"
+                          />
+                          <button
+                            type="submit"
+                            class="rounded-full border border-white/20 px-3 py-2 text-[0.6rem] font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
+                          >
+                            Save
+                          </button>
+                        </.form>
+                      <% end %>
+                    </div>
+                  </div>
+
+                  <div class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-lg shadow-black/60 backdrop-blur pointer-events-auto">
+                    <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Hover vision</p>
+
+                    <div class="mt-4 space-y-2 text-sm text-slate-300">
+                      <%= if @hover do %>
+                        <p>Tile: ({@hover.x}, {@hover.y})</p>
+
+                        <p>Terrain: {@hover.terrain} ({@hover.terrain_class})</p>
+
+                        <p>Adj mask: {@hover.adj_mask}</p>
+
+                        <div class="mt-3 grid gap-2 text-xs">
+                          <%= for ray <- @hover.rays do %>
+                            <div class="flex items-center justify-between rounded-lg border border-white/10 px-3 py-2">
+                              <span class="uppercase text-slate-400">{ray.dir}</span>
+                              <span class="text-slate-200">{ray.hit}</span>
+                              <span class="text-slate-500">d{ray.dist}</span>
+                            </div>
+                          <% end %>
+                        </div>
+                      <% else %>
+                        <p class="text-slate-500">Hover a tile to inspect adjacency and ray hits.</p>
+                      <% end %>
+                    </div>
+                  </div>
+                </aside>
               </div>
             </div>
+          </div>
+        </div>
+      <% else %>
+        <div class="flex min-h-[100svh] flex-col">
+          <header class="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 bg-slate-950/80 px-6 py-3">
+            <div class="flex items-baseline gap-3">
+              <h2 class="text-2xl font-semibold text-white">{plane_name(@plane)}</h2>
+              <span class="text-sm text-slate-400">
+                {if @state.save_path, do: Path.basename(@state.save_path), else: "No save loaded"}
+              </span>
+            </div>
 
-            <div class="mt-4 grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
+            <div class="flex flex-wrap items-center gap-3">
               <.form
                 for={@load_form}
                 id="load-form"
                 phx-submit="load_save"
                 phx-change="update_load_path"
-                class="grid gap-3 md:grid-cols-[1fr_auto]"
+                class="flex items-center gap-2"
               >
                 <.input
                   field={@load_form[:path]}
                   type="text"
-                  placeholder="C:\\games\\MOM\\SAVES\\SAVE1.GAM"
+                  placeholder="Path to SAVEn.GAM"
                   phx-hook="StableInput"
-                  class="w-full rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200 placeholder:text-slate-500"
+                  class="w-80 rounded-xl border border-white/10 bg-slate-950/60 py-1.5 text-sm text-slate-200 placeholder:text-slate-500"
                 />
                 <button
                   id="load-save-button"
                   type="submit"
-                  class="rounded-2xl bg-amber-300 px-5 py-2 text-sm font-semibold text-slate-950 shadow-lg shadow-amber-500/30 transition hover:-translate-y-0.5 hover:bg-amber-200"
+                  class="rounded-xl bg-amber-300 px-4 py-1.5 text-sm font-semibold text-slate-950 transition hover:bg-amber-200"
                 >
-                  Load save
+                  Load
                 </button>
               </.form>
 
-              <.form
-                for={@save_form}
-                id="save-form"
-                phx-submit="save_file"
-                phx-change="update_save_path"
-                class="grid gap-3 md:grid-cols-[1fr_auto]"
+              <.link
+                id="open-lab-link"
+                navigate={~p"/lab/#{@plane}"}
+                class="rounded-xl border border-white/15 px-4 py-1.5 text-sm text-slate-300 transition hover:border-white/40 hover:text-white"
               >
-                <.input
-                  field={@save_form[:path]}
-                  type="text"
-                  placeholder="Output path (optional)"
-                  phx-hook="StableInput"
-                  class="w-full rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200 placeholder:text-slate-500"
-                />
-                <button
-                  id="save-button"
-                  type="submit"
-                  class="rounded-2xl border border-emerald-300/40 px-5 py-2 text-sm font-semibold text-emerald-100 transition hover:border-emerald-200"
-                >
-                  Save
-                </button>
-              </.form>
+                Lab
+              </.link>
             </div>
           </header>
 
-          <div class="flex-1 min-h-0">
-            <div class="grid h-full gap-0 lg:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)_minmax(18rem,24rem)]">
-              <div class="flex h-full flex-col gap-6 overflow-y-auto border-r border-white/10 bg-slate-950/90 p-4">
-                <div class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-lg shadow-black/60 backdrop-blur">
-                  <div class="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Map editor</p>
+          <div class="relative flex-1 overflow-auto bg-slate-950">
+            <.map_canvas
+              plane={@plane}
+              map_width={@map_width}
+              map_height={@map_height}
+              active_layer={@active_layer}
+              encoded_layer={@encoded_layer}
+              terrain_encoded={@terrain_encoded}
+              terrain_flags_encoded={@terrain_flags_encoded}
+              minerals_encoded={@minerals_encoded}
+              exploration_encoded={@exploration_encoded}
+              landmass_encoded={@landmass_encoded}
+              adj_mask_encoded={@adj_mask_encoded}
+              render_mode={@render_mode}
+              phase_index={@phase_index}
+              snapshot_mode={@snapshot_mode}
+            />
 
-                      <h3 class="text-lg font-semibold text-white">Layer stack + tools</h3>
-                    </div>
-                  </div>
-
-                  <div class="mt-6 grid gap-6 lg:grid-cols-[0.5fr_1fr]">
-                    <div class="space-y-4">
-                      <div class="space-y-2">
-                        <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Layers</p>
-
-                        <div class="space-y-3">
-                          <%= for layer <- @layers do %>
-                            <div
-                              id={"layer-row-#{layer}"}
-                              class={[
-                                "rounded-2xl border p-3",
-                                layer == @active_layer && "border-amber-300/40 bg-amber-300/10",
-                                layer != @active_layer && "border-white/10 bg-slate-950/40"
-                              ]}
-                            >
-                              <div class="flex items-center justify-between gap-3">
-                                <button
-                                  id={"layer-#{layer}"}
-                                  type="button"
-                                  phx-click="set_active_layer"
-                                  phx-value-layer={Atom.to_string(layer)}
-                                  class={[
-                                    "text-left text-sm transition",
-                                    layer == @active_layer && "text-white",
-                                    layer != @active_layer && "text-slate-300 hover:text-white"
-                                  ]}
-                                >
-                                  <span class="font-semibold">{@layer_labels[layer]}</span>
-                                  <%= if layer == :computed_adj_mask do %>
-                                    <span class="ml-2 text-[0.65rem] uppercase tracking-[0.2em] text-slate-500">
-                                      Derived
-                                    </span>
-                                  <% end %>
-                                </button>
-                                <span class="text-xs text-slate-400">
-                                  {Map.get(@layer_opacity, layer, 100)}%
-                                </span>
-                              </div>
-
-                              <.form
-                                for={@layer_forms[layer]}
-                                id={"layer-form-#{layer}"}
-                                phx-change="set_layer_setting"
-                                phx-value-layer={Atom.to_string(layer)}
-                                class="mt-3 grid gap-2"
-                              >
-                                <.input
-                                  field={@layer_forms[layer][:visible]}
-                                  type="checkbox"
-                                  label={
-                                    if(layer == :terrain, do: "Base (always on)", else: "Show layer")
-                                  }
-                                  disabled={layer == :terrain}
-                                  class="h-4 w-4 rounded border border-white/20 bg-slate-950 text-amber-300 focus:ring-2 focus:ring-amber-300/40"
-                                />
-                                <.input
-                                  field={@layer_forms[layer][:opacity]}
-                                  type="range"
-                                  label="Opacity"
-                                  min="0"
-                                  max="100"
-                                  step="5"
-                                  phx-debounce="100"
-                                  class="h-2 w-full cursor-pointer appearance-none rounded-full bg-white/10 accent-amber-300"
-                                />
-                              </.form>
-                            </div>
-                          <% end %>
-                        </div>
-                      </div>
-
-                      <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
-                        <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Selection</p>
-
-                        <.form
-                          for={@selection_form}
-                          id="selection-form"
-                          phx-submit="set_selection"
-                          class="mt-3 space-y-3"
-                        >
-                          <.input
-                            field={@selection_form[:value]}
-                            type="number"
-                            class="rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200"
-                          />
-                          <button
-                            id="apply-selection-button"
-                            type="submit"
-                            class="w-full rounded-2xl border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
-                          >
-                            Apply value
-                          </button>
-                        </.form>
-
-                        <p class="mt-3 text-xs text-slate-500">
-                          Scroll to cycle values. Right-click to sample.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div class="space-y-4">
-                      <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-4 text-xs text-slate-400">
-                        <p class="uppercase tracking-[0.3em] text-slate-500">Controls</p>
-
-                        <div class="mt-3 grid gap-2 sm:grid-cols-2">
-                          <div class="flex items-start gap-2">
-                            <.icon name="hero-hand-raised" class="size-4 text-amber-300" />
-                            <span>Left drag paints with the current selection.</span>
-                          </div>
-
-                          <div class="flex items-start gap-2">
-                            <.icon name="hero-eye" class="size-4 text-sky-300" />
-                            <span>Right click samples the current layer.</span>
-                          </div>
-
-                          <div class="flex items-start gap-2">
-                            <.icon name="hero-adjustments-horizontal" class="size-4 text-emerald-300" />
-                            <span>Alt/Shift modify the scroll step size.</span>
-                          </div>
-
-                          <div class="flex items-start gap-2">
-                            <.icon name="hero-command-line" class="size-4 text-indigo-300" />
-                            <span>Ctrl toggles sampling mode.</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="relative overflow-auto bg-slate-950">
-                <canvas
-                  id="map-canvas"
-                  phx-hook="MapCanvas"
-                  phx-update="ignore"
-                  data-map-width={@map_width}
-                  data-map-height={@map_height}
-                  data-plane={Atom.to_string(@plane)}
-                  data-layer={Atom.to_string(@active_layer)}
-                  data-layer-type={layer_type(@active_layer)}
-                  data-tiles={@encoded_layer}
-                  data-terrain={@terrain_encoded}
-                  data-terrain-flags={@terrain_flags_encoded}
-                  data-minerals={@minerals_encoded}
-                  data-exploration={@exploration_encoded}
-                  data-landmass={@landmass_encoded}
-                  data-computed-adj-mask={@adj_mask_encoded}
-                  data-render-mode={Atom.to_string(@render_mode)}
-                  data-phase-index={@phase_index}
-                  data-snapshot-mode={@snapshot_mode}
-                  data-debug-terrain-kinds={@debug_terrain_kinds}
-                  data-debug-coast-audit={@debug_coast_audit}
-                  data-debug-shore-semantics={@debug_shore_semantics}
-                  data-tile-size="32"
-                  class="block"
-                >
-                </canvas>
-              </div>
-
-              <aside class="flex h-full flex-col gap-6 overflow-y-auto border-l border-white/10 bg-slate-950/90 p-4">
-                <div class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-lg shadow-black/60 backdrop-blur pointer-events-auto">
-                  <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Research</p>
-
-                  <h3 class="mt-2 text-lg font-semibold text-white">Value intel</h3>
-
-                  <div class="mt-4 space-y-3">
-                    <.form
-                      for={@value_name_form}
-                      id="value-name-form"
-                      phx-submit="set_value_name"
-                      class="grid gap-3"
-                    >
-                      <div class="grid gap-3 sm:grid-cols-2">
-                        <.input
-                          field={@value_name_form[:value]}
-                          type="number"
-                          class="rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200"
-                        />
-                        <.input
-                          field={@value_name_form[:name]}
-                          type="text"
-                          placeholder="Label this value"
-                          class="rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200 placeholder:text-slate-500"
-                        />
-                      </div>
-
-                      <button
-                        id="save-value-name-button"
-                        type="submit"
-                        class="rounded-2xl border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
-                      >
-                        Save label
-                      </button>
-                    </.form>
-
-                    <div class="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
-                      <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Histogram</p>
-
-                      <div class="mt-3 space-y-2">
-                        <%= for entry <- hist_entries(@state, @active_layer) do %>
-                          <button
-                            id={"hist-#{entry.value}"}
-                            type="button"
-                            phx-click="set_selection"
-                            phx-value-value={entry.value}
-                            class="flex w-full items-center justify-between rounded-xl border border-white/10 px-3 py-2 text-xs text-slate-200 transition hover:border-white/30"
-                          >
-                            <span class="font-semibold">#{entry.value}</span>
-                            <span class="text-slate-500">{entry.name || "???"}</span>
-                            <span class="text-slate-400">{entry.count}</span>
-                          </button>
-                        <% end %>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-lg shadow-black/60 backdrop-blur pointer-events-auto">
-                  <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Tile inspector</p>
-
-                  <h3 class="mt-2 text-lg font-semibold text-white">Bit flag lab</h3>
-
-                  <div class="mt-4 space-y-4 text-sm text-slate-300">
-                    <%= if @state.save && @hover do %>
-                      <% value = @hover.layer_value || 0 %> <% original_value = @hover.original_value %> <% snapshot_value =
-                        snapshot_value(@state, @plane, @active_layer) %> <% unsupported_layer =
-                        not u8_layer?(@active_layer) %>
-                      <div class="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
-                        <div class="flex flex-wrap items-center justify-between gap-3 text-[0.65rem] uppercase tracking-[0.2em] text-slate-500">
-                          <span>Tile ({@hover.x}, {@hover.y})</span>
-                          <span>{@layer_labels[@active_layer]}</span>
-                        </div>
-
-                        <div class="mt-3 flex flex-wrap items-end justify-between gap-4">
-                          <div>
-                            <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Current</p>
-
-                            <div class="flex items-baseline gap-3">
-                              <span class="text-3xl font-semibold text-white">{value}</span>
-                              <span class="text-sm font-semibold text-slate-400">
-                                {hex_byte(value)}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div class="text-xs text-slate-500">
-                            <%= if is_integer(original_value) do %>
-                              <p class="uppercase tracking-[0.2em] text-slate-500">Original</p>
-
-                              <p class="text-sm text-slate-300">
-                                {original_value} ({hex_byte(original_value)})
-                              </p>
-                            <% else %>
-                              <p class="text-slate-600">Original value unavailable</p>
-                            <% end %>
-                          </div>
-                        </div>
-                      </div>
-
-                      <%= if unsupported_layer do %>
-                        <p class="text-xs text-slate-500">
-                          Bit toggles only apply to u8 layers. Switch to Terrain Flags, Minerals,
-                          Exploration, or Landmass.
-                        </p>
-                      <% else %>
-                        <div class="grid gap-2 sm:grid-cols-2">
-                          <%= for bit <- 0..7 do %>
-                            <% bit_on = bit_set?(value, bit) %> <% bit_name = Map.get(@bit_names, bit) %>
-                            <button
-                              id={"inspect-bit-#{bit}"}
-                              type="button"
-                              phx-click="inspect_toggle_bit"
-                              phx-value-bit={bit}
-                              class={[
-                                "group flex items-center justify-between rounded-xl border px-3 py-2 text-xs transition",
-                                bit_on &&
-                                  "border-emerald-300/50 bg-emerald-300/10 text-emerald-100",
-                                not bit_on &&
-                                  "border-white/10 text-slate-300 hover:border-white/30"
-                              ]}
-                              aria-pressed={bit_on}
-                            >
-                              <div class="flex items-center gap-3">
-                                <span class={[
-                                  "inline-flex h-6 w-6 items-center justify-center rounded-lg border text-[0.65rem] font-semibold",
-                                  bit_on &&
-                                    "border-emerald-300/60 bg-emerald-300/20 text-emerald-100",
-                                  not bit_on && "border-white/10 text-slate-400"
-                                ]}>
-                                  {if bit_on, do: "1", else: "0"}
-                                </span>
-                                <div>
-                                  <p class="text-[0.65rem] uppercase tracking-[0.2em] text-slate-400">
-                                    Bit {bit}
-                                  </p>
-
-                                  <p class="text-xs text-slate-500">
-                                    {if bit_name in [nil, ""], do: "Unlabeled", else: bit_name}
-                                  </p>
-                                </div>
-                              </div>
-
-                              <span class="text-[0.6rem] uppercase tracking-[0.2em] text-slate-500">
-                                Toggle
-                              </span>
-                            </button>
-                          <% end %>
-                        </div>
-
-                        <div class="grid gap-2 sm:grid-cols-2">
-                          <button
-                            id="inspect-set-zero"
-                            type="button"
-                            phx-click="inspect_set_value"
-                            phx-value-value="0"
-                            class="rounded-xl border border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200 transition hover:border-white/30"
-                          >
-                            Set 0
-                          </button>
-                          <button
-                            id="inspect-set-255"
-                            type="button"
-                            phx-click="inspect_set_value"
-                            phx-value-value="255"
-                            class="rounded-xl border border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200 transition hover:border-white/30"
-                          >
-                            Set 255
-                          </button>
-                          <button
-                            id="inspect-invert"
-                            type="button"
-                            phx-click="inspect_invert"
-                            class="rounded-xl border border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200 transition hover:border-white/30"
-                          >
-                            Invert
-                          </button>
-                          <button
-                            id="inspect-revert"
-                            type="button"
-                            phx-click="inspect_revert"
-                            disabled={is_nil(original_value)}
-                            class={[
-                              "rounded-xl border px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition",
-                              is_nil(original_value) &&
-                                "cursor-not-allowed border-white/5 text-slate-600",
-                              not is_nil(original_value) &&
-                                "border-white/10 text-slate-200 hover:border-white/30"
-                            ]}
-                          >
-                            Revert tile
-                          </button>
-                        </div>
-
-                        <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-3">
-                          <div class="grid gap-2 sm:grid-cols-2">
-                            <button
-                              id="inspect-snapshot-a"
-                              type="button"
-                              phx-click="inspect_snapshot_a"
-                              class="rounded-xl border border-white/10 px-3 py-2 text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-200 transition hover:border-white/30"
-                            >
-                              Snapshot A
-                            </button>
-                            <button
-                              id="inspect-restore-a"
-                              type="button"
-                              phx-click="inspect_restore_a"
-                              disabled={is_nil(snapshot_value)}
-                              class={[
-                                "rounded-xl border px-3 py-2 text-[0.65rem] font-semibold uppercase tracking-[0.2em] transition",
-                                is_nil(snapshot_value) &&
-                                  "cursor-not-allowed border-white/5 text-slate-600",
-                                not is_nil(snapshot_value) &&
-                                  "border-white/10 text-slate-200 hover:border-white/30"
-                              ]}
-                            >
-                              Restore A
-                            </button>
-                          </div>
-
-                          <%= if is_integer(snapshot_value) do %>
-                            <p class="mt-2 text-[0.65rem] uppercase tracking-[0.2em] text-slate-500">
-                              A: {snapshot_value} ({hex_byte(snapshot_value)})
-                            </p>
-                          <% else %>
-                            <p class="mt-2 text-[0.65rem] uppercase tracking-[0.2em] text-slate-600">
-                              A: Empty
-                            </p>
-                          <% end %>
-                        </div>
-                      <% end %>
-                    <% else %>
-                      <%= if @state.save do %>
-                        <p class="text-slate-500">Hover a tile to inspect bit flags.</p>
-                      <% else %>
-                        <p class="text-slate-500">Load a save to inspect tile flags.</p>
-                      <% end %>
-                    <% end %>
-                  </div>
-                </div>
-
-                <div class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-lg shadow-black/60 backdrop-blur pointer-events-auto">
-                  <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Bit names</p>
-
-                  <div class="mt-4 space-y-3">
-                    <%= for {bit, form} <- @bit_forms do %>
-                      <.form
-                        for={form}
-                        id={"bit-form-#{bit}"}
-                        phx-submit="set_bit_name"
-                        class="flex items-center gap-3"
-                      >
-                        <.input field={form[:bit]} type="hidden" />
-                        <span class="text-xs font-semibold text-slate-300">Bit {bit}</span>
-                        <.input
-                          field={form[:name]}
-                          type="text"
-                          placeholder="Name"
-                          class="flex-1 rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200 placeholder:text-slate-500"
-                        />
-                        <button
-                          type="submit"
-                          class="rounded-full border border-white/20 px-3 py-2 text-[0.6rem] font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
-                        >
-                          Save
-                        </button>
-                      </.form>
-                    <% end %>
-                  </div>
-                </div>
-
-                <div class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-lg shadow-black/60 backdrop-blur pointer-events-auto">
-                  <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Hover vision</p>
-
-                  <div class="mt-4 space-y-2 text-sm text-slate-300">
-                    <%= if @hover do %>
-                      <p>Tile: ({@hover.x}, {@hover.y})</p>
-
-                      <p>Terrain: {@hover.terrain} ({@hover.terrain_class})</p>
-
-                      <p>Adj mask: {@hover.adj_mask}</p>
-
-                      <div class="mt-3 grid gap-2 text-xs">
-                        <%= for ray <- @hover.rays do %>
-                          <div class="flex items-center justify-between rounded-lg border border-white/10 px-3 py-2">
-                            <span class="uppercase text-slate-400">{ray.dir}</span>
-                            <span class="text-slate-200">{ray.hit}</span>
-                            <span class="text-slate-500">d{ray.dist}</span>
-                          </div>
-                        <% end %>
-                      </div>
-                    <% else %>
-                      <p class="text-slate-500">Hover a tile to inspect adjacency and ray hits.</p>
-                    <% end %>
-                  </div>
-                </div>
-              </aside>
+            <div
+              :if={@hover}
+              id="hover-readout"
+              class="pointer-events-none fixed bottom-4 left-4 rounded-lg border border-white/10 bg-slate-950/85 px-3 py-1.5 font-mono text-xs text-slate-300 shadow-lg"
+            >
+              ({@hover.x}, {@hover.y}) · tile {@hover.terrain}
             </div>
           </div>
         </div>
-      </div>
+      <% end %>
     </Layouts.app>
     """
   end
+
+  attr :plane, :atom, required: true
+  attr :map_width, :integer, required: true
+  attr :map_height, :integer, required: true
+  attr :active_layer, :atom, required: true
+  attr :encoded_layer, :string, required: true
+  attr :terrain_encoded, :string, required: true
+  attr :terrain_flags_encoded, :string, required: true
+  attr :minerals_encoded, :string, required: true
+  attr :exploration_encoded, :string, required: true
+  attr :landmass_encoded, :string, required: true
+  attr :adj_mask_encoded, :string, required: true
+  attr :render_mode, :atom, required: true
+  attr :phase_index, :integer, required: true
+  attr :snapshot_mode, :boolean, required: true
+
+  defp map_canvas(assigns) do
+    ~H"""
+    <canvas
+      id="map-canvas"
+      phx-hook="MapCanvas"
+      phx-update="ignore"
+      data-map-width={@map_width}
+      data-map-height={@map_height}
+      data-plane={Atom.to_string(@plane)}
+      data-layer={Atom.to_string(@active_layer)}
+      data-layer-type={layer_type(@active_layer)}
+      data-tiles={@encoded_layer}
+      data-terrain={@terrain_encoded}
+      data-terrain-flags={@terrain_flags_encoded}
+      data-minerals={@minerals_encoded}
+      data-exploration={@exploration_encoded}
+      data-landmass={@landmass_encoded}
+      data-computed-adj-mask={@adj_mask_encoded}
+      data-render-mode={Atom.to_string(@render_mode)}
+      data-phase-index={@phase_index}
+      data-snapshot-mode={@snapshot_mode}
+      data-tile-size="32"
+      class="block"
+    >
+    </canvas>
+    """
+  end
+
+  defp plane_name(:arcanus), do: "Arcanus"
+  defp plane_name(:myrror), do: "Myrror"
+
+  defp map_path(:arcanus), do: ~p"/arcanus"
+  defp map_path(:myrror), do: ~p"/myrror"
+
+  defp other_plane(:arcanus), do: :myrror
+  defp other_plane(:myrror), do: :arcanus
 
   defp set_selection_from_value(socket, value) do
     state = socket.assigns.state
@@ -1827,9 +1882,7 @@ defmodule MirrorWeb.MapLive do
         ""
       end
 
-    layer_visibility =
-      Map.get(state, :layer_visibility, default_layer_visibility(state.active_layer))
-
+    layer_visibility = effective_layer_visibility(socket, state)
     layer_opacity = Map.get(state, :layer_opacity, default_layer_opacity())
 
     assign(socket,
@@ -1850,16 +1903,13 @@ defmodule MirrorWeb.MapLive do
       layer_opacity: layer_opacity,
       map_width: MirrorMap.width(),
       map_height: MirrorMap.height(),
-      render_mode: state.render_mode,
+      render_mode: effective_render_mode(socket, state),
       phase_index: effective_phase,
       phase_input: phase_input,
       phase_loop_len: loop_len,
       phase_loop_status: phase_loop_status,
       phase_loop_detecting: Map.get(state, :phase_loop_detecting, false),
       snapshot_mode: Map.get(state, :snapshot_mode, true),
-      debug_terrain_kinds: Map.get(state, :debug_terrain_kinds, false),
-      debug_coast_audit: Map.get(state, :debug_coast_audit, false),
-      debug_shore_semantics: Map.get(state, :debug_shore_semantics, false),
       engine_session_id: Map.get(state, :engine_session_id)
     )
   end
@@ -2118,20 +2168,15 @@ defmodule MirrorWeb.MapLive do
   defp push_map_state(socket) do
     state = socket.assigns.state
 
-    layer_visibility =
-      Map.get(state, :layer_visibility, default_layer_visibility(state.active_layer))
-
+    layer_visibility = effective_layer_visibility(socket, state)
     layer_opacity = Map.get(state, :layer_opacity, default_layer_opacity())
 
     push_event(socket, "map_state", %{
       layer: Atom.to_string(state.active_layer),
       layer_type: layer_type(state.active_layer),
-      render_mode: Atom.to_string(state.render_mode),
+      render_mode: Atom.to_string(effective_render_mode(socket, state)),
       phase_index: effective_phase_index(state),
       snapshot_mode: Map.get(state, :snapshot_mode, true),
-      debug_terrain_kinds: Map.get(state, :debug_terrain_kinds, false),
-      debug_coast_audit: Map.get(state, :debug_coast_audit, false),
-      debug_shore_semantics: Map.get(state, :debug_shore_semantics, false),
       layer_visibility: stringify_layer_map(layer_visibility),
       layer_opacity: stringify_layer_map(layer_opacity)
     })
@@ -2144,9 +2189,7 @@ defmodule MirrorWeb.MapLive do
     layer = state.active_layer
     values = Base.encode64(Map.fetch!(plane_layers, layer))
 
-    layer_visibility =
-      Map.get(state, :layer_visibility, default_layer_visibility(state.active_layer))
-
+    layer_visibility = effective_layer_visibility(socket, state)
     layer_opacity = Map.get(state, :layer_opacity, default_layer_opacity())
 
     push_event(socket, "map_reload", %{
@@ -2160,12 +2203,9 @@ defmodule MirrorWeb.MapLive do
       exploration: Base.encode64(plane_layers.exploration),
       landmass: Base.encode64(plane_layers.landmass),
       computed_adj_mask: Base.encode64(plane_layers.computed_adj_mask),
-      render_mode: Atom.to_string(state.render_mode),
+      render_mode: Atom.to_string(effective_render_mode(socket, state)),
       phase_index: effective_phase_index(state),
       snapshot_mode: Map.get(state, :snapshot_mode, true),
-      debug_terrain_kinds: Map.get(state, :debug_terrain_kinds, false),
-      debug_coast_audit: Map.get(state, :debug_coast_audit, false),
-      debug_shore_semantics: Map.get(state, :debug_shore_semantics, false),
       layer_visibility: stringify_layer_map(layer_visibility),
       layer_opacity: stringify_layer_map(layer_opacity)
     })
@@ -2225,62 +2265,49 @@ defmodule MirrorWeb.MapLive do
   defp maybe_push_tile_assets(socket) do
     state = socket.assigns.state
 
-    if connected?(socket) and state.render_mode == :tiles do
+    if connected?(socket) and effective_render_mode(socket, state) == :tiles do
       push_tile_assets(socket, state)
     else
       socket
     end
   end
 
-  defp push_tile_assets(socket, state) do
+  defp push_tile_assets(socket, _state) do
     {socket, clear_cache?} =
       case socket.assigns.tile_assets do
         nil -> {assign(socket, :tile_assets, TileAtlas.build()), true}
         _ -> {socket, false}
       end
 
-    atlas = socket.assigns.tile_assets
-    terrain_names = terrain_name_map(state)
-    terrain_flag_names = terrain_flag_name_map(state)
-    terrain_water_values = Application.get_env(:mirror, :terrain_water_values, [0])
+    case socket.assigns.tile_assets do
+      nil ->
+        socket
 
-    push_event(socket, "tile_assets", %{
-      backend: Atom.to_string(Map.get(atlas, :backend, :lbx)),
-      images: atlas.images,
-      terrain_groups: atlas.terrain_groups,
-      overlay_groups: atlas.overlay_groups,
-      momime: atlas.momime,
-      terrain_lbx: Map.get(atlas, :terrain_lbx),
-      terrain_names: terrain_names,
-      terrain_flag_names: terrain_flag_names,
-      terrain_water_values: terrain_water_values,
-      clear_cache: clear_cache?
-    })
+      atlas ->
+        push_event(socket, "tile_assets", %{
+          backend: Atom.to_string(atlas.backend),
+          terrain_lbx: atlas.terrain_lbx,
+          clear_cache: clear_cache?
+        })
+    end
   end
 
-  defp terrain_name_map(%{dataset_id: nil}), do: %{}
-
-  defp terrain_name_map(state) do
-    0..255
-    |> Enum.reduce(%{}, fn value, acc ->
-      case Stats.value_name(state.dataset_id, :terrain, value) do
-        nil -> acc
-        name -> Map.put(acc, Integer.to_string(value), name)
-      end
-    end)
+  # The map pages always show terrain art with no research overlays; the
+  # Lab uses whatever the session has.
+  defp effective_render_mode(socket, state) do
+    if socket.assigns[:lab?], do: state.render_mode, else: :tiles
   end
 
-  defp terrain_flag_name_map(%{dataset_id: nil}), do: %{}
-
-  defp terrain_flag_name_map(state) do
-    0..7
-    |> Enum.reduce(%{}, fn bit, acc ->
-      case Stats.bit_name(state.dataset_id, :terrain_flags, bit) do
-        nil -> acc
-        name -> Map.put(acc, Integer.to_string(bit), name)
-      end
-    end)
+  defp effective_layer_visibility(socket, state) do
+    if socket.assigns[:lab?] do
+      Map.get(state, :layer_visibility, default_layer_visibility(state.active_layer))
+    else
+      Map.new(@layers, &{&1, &1 == :terrain})
+    end
   end
+
+  defp parse_plane("myrror"), do: :myrror
+  defp parse_plane(_), do: :arcanus
 
   defp layer_type(layer) do
     if layer in @u16_layers, do: "u16", else: "u8"

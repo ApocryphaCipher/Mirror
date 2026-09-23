@@ -75,6 +75,13 @@ defmodule MirrorWeb.Layouts do
                 <span class="transition group-hover:text-white">Myrror</span>
                 <span class="absolute -bottom-1 left-0 h-px w-0 bg-emerald-300 transition-all group-hover:w-full" />
               </.link>
+              <span class="h-4 w-px bg-white/15" aria-hidden="true" />
+              <.link navigate={~p"/lab/arcanus"} class="text-slate-400 transition hover:text-white">
+                Lab
+              </.link>
+              <.link navigate={~p"/tile-probe"} class="text-slate-400 transition hover:text-white">
+                Tile probe
+              </.link>
               <div class="ml-2">
                 <.theme_toggle />
               </div>

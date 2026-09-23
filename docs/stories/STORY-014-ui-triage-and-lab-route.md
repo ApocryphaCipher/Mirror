@@ -1,7 +1,10 @@
 # STORY-014: Triage the UI; move research tools to a Lab route
 
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
-**Status:** open, ready to start
+**Status:** done 2026-09-22. `/lab/:plane` holds all research tools (same
+`MapLive`, `:lab` action). The map pages show the map with a slim header,
+are hover-only (no painting), and always render terrain art with no
+research overlays. The MOMIME path is removed (see backlog).
 **Size:** small–medium
 
 ## What to do
