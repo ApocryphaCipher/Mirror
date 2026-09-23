@@ -36,3 +36,13 @@ Unsorted, not yet promoted to a story.
   until this is actually fixed — worth root-causing (looked like it might be
   a macOS Gatekeeper/quarantine issue on the downloaded arm64 binary, not
   confirmed) rather than continuing to route around it file by file.
+- Remove the MOMIME-PNG render path (`MomimePngIndex`, `ShoreMask`,
+  `SmoothingRules` on the render path, `detectTerrainBaseSource`, the kind
+  tables, `resources/`) now that `terrain_lbx` is the default and verified.
+  Keep `SmoothingRules` only if terrain editing is ever planned.
+- The app currently renders with **no CSS at all** (seen 2026-09-22 during
+  STORY-005). This is very likely the Tailwind CLI crash above, now affecting
+  the whole stylesheet rather than just new classes. Hidden elements like the
+  LiveView "reconnecting" banner are visible permanently.
+- Draw tiles at native 20×18 aspect instead of stretched into square cells
+  (canvas geometry change; see `Canvas_Geometry_Invariants` in codex-notes).

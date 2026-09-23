@@ -5,10 +5,40 @@ defmodule Mirror.TileAtlas do
 
   require Logger
 
-  alias Mirror.{AssetMap, MomimePngIndex, Paths, TileCache}
+  alias Mirror.{AssetMap, MomimePngIndex, Paths, TerrainLbx, TileCache}
   alias Mirror.LBX
 
+  @doc """
+  Pick a tile backend. `MIRROR_TILE_BACKEND` = `terrain_lbx` | `momime` |
+  `auto` (default: `TERRAIN.LBX` from `MIRROR_MOM_PATH` if present, then
+  MOMIME PNGs, then the tagged-LBX fallback).
+  """
   def build(opts \\ []) do
+    case Paths.tile_backend() do
+      "momime" -> build_momime(opts)
+      _ -> build_terrain_lbx(opts)
+    end
+  end
+
+  defp build_terrain_lbx(opts) do
+    case TerrainLbx.load(Paths.mom_path()) do
+      {:ok, terrain} ->
+        %{
+          backend: :terrain_lbx,
+          images: %{},
+          terrain_groups: %{},
+          overlay_groups: %{},
+          momime: nil,
+          terrain_lbx: TerrainLbx.payload(terrain)
+        }
+
+      {:error, reason} ->
+        Logger.info("TERRAIN.LBX backend unavailable (#{inspect(reason)}), falling back")
+        build_momime(opts)
+    end
+  end
+
+  defp build_momime(opts) do
     case MomimePngIndex.load_assets() do
       {:ok, assets} ->
         assets

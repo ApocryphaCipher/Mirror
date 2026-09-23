@@ -2,4 +2,4 @@
 - [STORY-002](STORY-002-stop-circular-terrain-source-heuristic.md): stop the terrain-source heuristic. Rescoped to a full-`u16` read and folded into STORY-005
 - [STORY-003](STORY-003-find-real-terrain-value-table.md): find the real terrain-value table. Done; it's `TERRAIN.LBX` entry 1
 - [STORY-004](STORY-004-add-river-volcano-node-kinds.md): river/volcano/node kinds. Obsolete for rendering
-- [STORY-005](STORY-005-render-from-terrain-lbx.md): render the map from `TERRAIN.LBX` in the app (EPIC-002). **Next up**
+- [STORY-005](STORY-005-render-from-terrain-lbx.md): render the map from `TERRAIN.LBX` in the app (EPIC-002). Implemented; MOMIME-path removal is the follow-up

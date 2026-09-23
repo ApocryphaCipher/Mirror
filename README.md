@@ -5,16 +5,15 @@ overland map — terrain, coastlines, both planes (Arcanus/Myrror) — using the
 game's own logic for which tile art goes where. It's a Phoenix/LiveView app;
 the map renders live in the browser from a save you load in.
 
-**Status, honestly:** the app currently renders terrain through a
-MOMIME-derived PNG asset pack plus a ported smoothing algorithm. That works,
-but it's being replaced: on 2026-09-22 we found that save terrain values
-are tile numbers straight into the game's own `TERRAIN.LBX`, and a small
-script ([scripts/mom_map_render.py](scripts/mom_map_render.py)) renders a complete, correct map
-from classic art with no smoothing at all. See
-[docs/reference/classic-terrain-format.md](docs/reference/classic-terrain-format.md). Moving the app onto that path
-is [STORY-005](docs/stories/STORY-005-render-from-terrain-lbx.md). Cities, towers, and other overland features
-are not implemented yet ([EPIC-004](docs/epics/EPIC-004-overland-map-features.md)). [docs/epics/](docs/epics/) is the living
-status. This paragraph is a summary, not the source of truth.
+**Status, honestly:** terrain renders directly from the game's own
+`TERRAIN.LBX`. A save's terrain value is a tile number into that file, so
+there's no classification or smoothing step. Both planes match a
+reference decode pixel for pixel. See
+[docs/reference/classic-terrain-format.md](docs/reference/classic-terrain-format.md). The older MOMIME-PNG path
+still exists behind `MIRROR_TILE_BACKEND=momime` until it's removed.
+Cities, towers, and other overland features are not implemented yet
+([EPIC-004](docs/epics/EPIC-004-overland-map-features.md)). [docs/epics/](docs/epics/) is the living status. This
+paragraph is a summary, not the source of truth.
 
 ## Quick start
 

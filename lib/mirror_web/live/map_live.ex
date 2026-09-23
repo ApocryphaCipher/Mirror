@@ -2250,6 +2250,7 @@ defmodule MirrorWeb.MapLive do
       terrain_groups: atlas.terrain_groups,
       overlay_groups: atlas.overlay_groups,
       momime: atlas.momime,
+      terrain_lbx: Map.get(atlas, :terrain_lbx),
       terrain_names: terrain_names,
       terrain_flag_names: terrain_flag_names,
       terrain_water_values: terrain_water_values,

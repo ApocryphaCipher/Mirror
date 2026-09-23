@@ -1,6 +1,6 @@
 # EPIC-002: Get off the MOMIME PNG dependency — render from Mirror's own pipeline
 
-**Status:** spike succeeded 2026-09-22 — full map renders from raw `TERRAIN.LBX` outside the app; in-app implementation not started (see "Next" below)
+**Status:** spike succeeded 2026-09-22 — full map renders from raw `TERRAIN.LBX` outside the app; in-app implementation done (STORY-005). Remaining: delete the MOMIME path once Kevin has used the new one
 **Owner:** Kevin
 **Requested:** 2026-09-22, right after PR #4 (real smoothing rules) landed
 
@@ -52,7 +52,7 @@ Answers to the original open questions:
 5. **Does `SmoothingRules` apply?** Not on this path at all. It becomes
    dead code for rendering once the switch is made.
 
-## Next: STORY-005 — render from `TERRAIN.LBX` in the app
+## STORY-005 — render from `TERRAIN.LBX` in the app (done)
 
 Roughly:
 

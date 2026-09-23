@@ -109,6 +109,7 @@ const MapCanvas = {
     this.momimeBaseUrl = ""
     this.momimeImageCache = {}
     this.momimeMaskWhitelist = {}
+    this.terrainLbx = null
     this.terrainNames = {}
     this.terrainWaterValues = [0]
     this.terrainWaterValueSet = new Set(this.terrainWaterValues)
@@ -397,6 +398,7 @@ const MapCanvas = {
       this.momimeBaseUrl = momime.base_url || ""
       this.momimeSmoothingLookups = momime.smoothing_lookups || {}
       this.momimeSmoothingKindSystems = momime.smoothing_kind_systems || {}
+      this.terrainLbx = payload.terrain_lbx ? this.buildTerrainLbxAtlas(payload.terrain_lbx) : null
       this.buildMomimeMaskWhitelist()
       this.buildMomimeMaskCandidates()
       const shouldClearCache =
@@ -789,6 +791,9 @@ const MapCanvas = {
   },
 
   hasTileAssets() {
+    if (this.tileBackend === "terrain_lbx") {
+      return !!this.terrainLbx
+    }
     if (this.tileBackend === "momime_png") {
       return this.momimeIndex && Object.keys(this.momimeIndex).length > 0
     }
@@ -812,6 +817,69 @@ const MapCanvas = {
     return result
   },
 
+  // TERRAIN.LBX backend: the save's u16 terrain value is a tile number
+  // (0..761 per plane) already resolved to the right edge/rotation variant,
+  // so drawing is a direct lookup. See docs/reference/classic-terrain-format.md.
+  buildTerrainLbxAtlas(data) {
+    const tileW = data.tile_width
+    const tileH = data.tile_height
+    const count = data.tile_count
+    const pixels = Uint8Array.from(atob(data.pixels), char => char.charCodeAt(0))
+    const palette = Uint8Array.from(atob(data.palette), char => char.charCodeAt(0))
+    const columns = 64
+    const rows = Math.ceil(count / columns)
+    const canvas = document.createElement("canvas")
+    canvas.width = columns * tileW
+    canvas.height = rows * tileH
+    const ctx = canvas.getContext("2d")
+    const image = ctx.createImageData(canvas.width, canvas.height)
+    const out = image.data
+    const tilePx = tileW * tileH
+
+    for (let t = 0; t < count; t++) {
+      const originX = (t % columns) * tileW
+      const originY = Math.floor(t / columns) * tileH
+      for (let p = 0; p < tilePx; p++) {
+        const color = pixels[t * tilePx + p] * 4
+        const dst = ((originY + Math.floor(p / tileW)) * canvas.width + originX + (p % tileW)) * 4
+        out[dst] = palette[color]
+        out[dst + 1] = palette[color + 1]
+        out[dst + 2] = palette[color + 2]
+        out[dst + 3] = 255
+      }
+    }
+    ctx.putImageData(image, 0, 0)
+
+    return {canvas, columns, tileW, tileH, tiles: data.tiles || {}}
+  },
+
+  drawTerrainLbxTile(x, y, render) {
+    const atlas = this.terrainLbx
+    if (!atlas) return false
+    const planeTiles = atlas.tiles[this.plane]
+    if (!planeTiles) return false
+    const value = this.terrainValues[y * this.mapWidth + x] || 0
+    const tile = planeTiles[value]
+    if (!tile || tile[0] < 0) return false
+
+    const [index, frames] = tile
+    const frame = frames > 1 && render.usePhase ? render.phaseIndex % frames : 0
+    const t = index + frame
+    const {ctx, size} = render
+    ctx.drawImage(
+      atlas.canvas,
+      (t % atlas.columns) * atlas.tileW,
+      Math.floor(t / atlas.columns) * atlas.tileH,
+      atlas.tileW,
+      atlas.tileH,
+      x * size,
+      y * size,
+      size,
+      size
+    )
+    return true
+  },
+
   fillBackground(ctx = this.ctx, size = this.deviceTileSize) {
     const width = this.mapWidth * size
     const height = this.mapHeight * size
@@ -832,8 +900,12 @@ const MapCanvas = {
   drawTerrainBase(x, y, render) {
     const resolved = this.resolveRender(render)
     this.drawTileArt(x, y, {includeOverlays: false, render: resolved})
-    this.drawFeatureOverlays(x, y, resolved)
-    this.drawEmbeddedSpecialOverlay(x, y, resolved)
+    // The feature/embedded-special overlays reinterpret bits of the terrain
+    // value; on the TERRAIN.LBX path the whole u16 is a tile number, so skip them.
+    if (this.tileBackend !== "terrain_lbx") {
+      this.drawFeatureOverlays(x, y, resolved)
+      this.drawEmbeddedSpecialOverlay(x, y, resolved)
+    }
     if (this.debugTerrainKinds || this.debugShoreSemantics) {
       const kind = this.terrainKindAt(x, y)
       if (this.debugTerrainKinds) {
@@ -869,6 +941,12 @@ const MapCanvas = {
   drawTileArt(x, y, options = {}) {
     const render = this.resolveRender(options.render)
     const includeOverlays = options.includeOverlays !== false
+    if (this.tileBackend === "terrain_lbx") {
+      if (!this.drawTerrainLbxTile(x, y, render)) {
+        this.drawMissingTile(x, y, render, "missing")
+      }
+      return
+    }
     if (this.tileBackend === "momime_png") {
       const drawn = this.drawMomimeBaseTile(x, y, render)
       if (!drawn) {
