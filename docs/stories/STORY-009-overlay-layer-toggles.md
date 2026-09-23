@@ -20,9 +20,7 @@ it with **overlay layers**, drawn above terrain in this order:
 Each gets its own checkbox, all on by default, and is remembered per
 browser (`localStorage`, wrapped in try/catch).
 
-**Note:** the page currently has no CSS at all (Tailwind CLI crash, see
-backlog). Fixing that first would make this UI usable. Worth doing as
-part of this story or just before it.
+(The missing-CSS problem noted here earlier is fixed by #10; see backlog.)
 
 ## Definition of done
 
