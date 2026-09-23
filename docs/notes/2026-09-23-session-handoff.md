@@ -59,6 +59,14 @@ module (backlog), and remove the stray `proposal.md` at the repo root.
 
 ## Gotchas learned the hard way
 
+- **Something syncs this checkout and can undo work.** Besides the
+  `[conflicted]` copies below, it renamed `_build/…/.mix/compile.elixir`
+  away (Phoenix then shows "restart your server" and the compiler prints
+  "redefining module"), and once **deleted a tracked file**
+  (`assets/js/map_overlays.js`, restored from git). Commit and push often;
+  after a pull, check `git status` for unexpected ` D` files; clear
+  `find _build -name '*[conflicted*' -delete` and rebuild if the reloader
+  complains. Cause not found yet (not iCloud/Dropbox/Google Drive).
 - **Something is syncing `.git`.** On 2026-09-23 files named
   `… [conflicted]` appeared in `.git/refs/heads/` and `.git/`, rolling a
   local branch back a commit and breaking `git pull` ("bad object"). The

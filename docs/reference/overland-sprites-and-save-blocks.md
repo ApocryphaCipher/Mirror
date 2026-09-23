@@ -16,7 +16,7 @@ top-level block table.
 | Fortresses | `0x0065f8` | 4 | 6 | No. Probably x/y/plane/active per wizard; verify |
 | Towers of Wizardry | `0x006610` | 4 | 6 | No. Probably x/y/owner; verify |
 | Encounter zones | `0x006628` | `0x18` (24) | 99 + 3 | **No.** Lairs, ruins, temples, keeps, mounds, etc. Needs type + x/y/plane + guardians |
-| Cities | `0x008aac` | `0x72` (114) | 100 | Mostly: momedit gives race/x/y/plane/owner/pop (see [momedit-source](momedit-source/)) |
+| Cities | `0x008aac` | `0x72` (114) | 100 | **Yes** for name/race/x/y/plane/owner/size/pop: momedit + SAVE1's 27 cities (`Mirror.SaveFile.Cities`); count u16 at `0x0009e0`. `+19` size class is a guess |
 | Units | `0x00b734` | `0x20` (32) | 1000 + 9 | **No.** Needs x/y/plane/owner/unit type at minimum. Unit count at `0x0009e2` |
 | Terrain flags map | `0x01cbb8` | 1 / tile | 2 × 2400 | No. Likely roads / enchanted roads / corruption bits; verify |
 | Minerals map | `0x013554` | 1 / tile | 2 × 2400 | No. Mineral/special type per tile; verify |
@@ -44,12 +44,18 @@ reasoned from the pictures, not yet confirmed against a save.
 | City **without** walls, size 1–5 | `MAPBACK.LBX #21/0..4` (`CITYNOWA`) |
 
 Frames grow from a single hut (frame 0) to a sprawling capital (frame 4).
-*Guess:* frame = the game's city size class (hamlet … capital); confirm
-against a save's city population in STORY-010. The frame-0 wall ring is
-what tells #20 from #21. The owner flag is 8 px in palette indices
-**216–218** (the green ramp; x 17–20, y 10–11 in frame 0). *Guess:* the
-game swaps those three indices for the owner's banner ramp (see the
-sparkle ramps below).
+Frame = the city record's `+19` byte. *Guess:* that byte is the size
+class (hamlet … capital); in SAVE1 it tracks population (pop 2–3 → 0,
+4–6 → 1, 8–9 → 2). The frame-0 wall ring is what tells #20 from #21. The
+owner flag is 8 px in palette indices **216–218**, green shades 3–5
+(x 17–20, y 10–11 in frame 0).
+
+**Banner ramps in the palette** (read from `FONTS.LBX` #2): indices
+199–223 are five 5-shade ramps, red 199–203, purple 204–208, yellow
+209–213, green 214–218, blue 219–223. Mirror recolours the flag by
+shifting 216–218 into the owner's ramp, and uses the neutral plaque's
+browns (53–55) for neutral cities. *Guess:* that's what the game does;
+compare with a real screenshot (STORY-032).
 
 ### Unit plaques: `MAPBACK.LBX` #14–#19 (20×18)
 

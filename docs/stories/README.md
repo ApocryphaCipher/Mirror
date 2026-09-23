@@ -7,7 +7,7 @@
 - [STORY-007](STORY-007-live-terrain-animation.md): live terrain animation / ocean twinkle (EPIC-005)
 - [STORY-008](STORY-008-node-auras.md): node auras, Chaos / Nature / Sorcery sparkle (EPIC-005)
 - [STORY-009](STORY-009-overlay-layer-toggles.md): overlay layers with on/off toggles (EPIC-004) **Done**
-- [STORY-010](STORY-010-cities.md): cities (EPIC-004)
+- [STORY-010](STORY-010-cities.md): cities (EPIC-004) **Done**
 - [STORY-011](STORY-011-sites-towers-lairs.md): towers, fortresses, lairs, ruins, sites (EPIC-004)
 - [STORY-012](STORY-012-units-with-banner-plaques.md): units with banner-colour plaques (EPIC-004)
 - [STORY-013](STORY-013-roads-minerals-corruption.md): specials and bonuses (ores, gems, nightshade, wild game…), roads, corruption (EPIC-004)
@@ -29,3 +29,4 @@
 - [STORY-029](STORY-029-safe-editing-see-everything.md): safe map editing: see everything past the fog, and flag impossible states (units on water…) (EPIC-006, later; blocked on EPIC-004)
 - [STORY-030](STORY-030-docker-image-and-compose.md): Docker release image + `compose.yaml`, game files mounted read-only, never baked in (EPIC-007)
 - [STORY-031](STORY-031-spike-download-own-gog-copy.md): **spike**: script the download of the user's own GOG purchase (their GOG login), feeding `mix mirror.import_game` (EPIC-007)
+- [STORY-032](STORY-032-cities-walls-labels-verify.md): cities follow-up: walls, name labels, check size frame / flag colour against the real game (EPIC-004)

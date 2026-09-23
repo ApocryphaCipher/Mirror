@@ -241,4 +241,17 @@ defmodule MirrorWeb.MapLiveEditTest do
     render_click(view, "discard_edits", %{})
     assert changed(view) =~ "0 tiles changed"
   end
+
+  describe "cities overlay (STORY-010)" do
+    test "loading a save pushes this plane's cities with owner banners", %{conn: conn, save: save} do
+      {:ok, view, _} = live(conn, ~p"/arcanus")
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+
+      assert_push_event(view, "overlay_data", %{layer: "cities", items: items})
+      assert length(items) == 16
+      assert %{x: 38, y: 21, size: 1, banner: :yellow, name: "Deventor"} in items
+
+      assert_push_event(view, "overlay_sprites", %{cities: %{unwalled: %{width: 32, height: 30}}})
+    end
+  end
 end
