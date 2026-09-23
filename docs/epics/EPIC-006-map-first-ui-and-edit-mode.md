@@ -72,6 +72,7 @@ STORY-017 → then the rest as their EPIC-004 data stories land.
 - [STORY-022](../stories/STORY-022-bug-raw-value-paint-artifacts.md): **bug**: stray raw-value paint (wheel silently changes the brush; bare click paints) shows up as map artifacts
 - [STORY-023](../stories/STORY-023-bug-edit-paint-no-live-redraw.md): **bug**: painting in edit mode doesn't redraw the tile until reload
 - [STORY-024](../stories/STORY-024-tile-hover-highlight.md): highlight the tile under the cursor (nice-to-have)
+- [STORY-025](../stories/STORY-025-in-game-cursor.md): use the game's own mouse cursor over the map (nice-to-have)
 
 Dependencies: 018–020 need the matching EPIC-004 decode stories
 (013 roads/minerals, 010 cities, 011 sites, 012 units) first. 017 needs

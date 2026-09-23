@@ -55,6 +55,20 @@ All named `STATFIG1` / `STATFIG2`, 18×16 images. Presumably indexed by
 unit type number (UNITS1 then UNITS2). Verify the mapping against a known
 unit.
 
+### `MAIN.LBX` (65 entries): main-screen UI
+
+Buttons (`MAINBUTN`), movement-type icons (`MAINMOVE` sail/swim/fly/…),
+medals, magic-weapon icons, and **`MAINBTN2` "unit backgrnd 1–9"
+(entries 24–32, 22×28)**: candidates for the unit plaques in STORY-012,
+alongside the `MAPBACK.LBX` `SITES` colour entries. Verify which one the
+overland map actually uses.
+
+### `FONTS.LBX` palette entries: mouse cursors
+
+Entries 2–8 (5,472 bytes each) hold a palette followed by 16×16
+column-major cursor images (gauntlet, wand, red X, arrow, swords,
+hourglass, boot, 5-frame casting sparkle). See STORY-025.
+
 ### `TERRAIN.LBX`: animated terrain
 
 79 of the 1524 tile pointers carry the animated flag (4 frames each);
