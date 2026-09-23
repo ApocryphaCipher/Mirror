@@ -62,3 +62,40 @@ the save's bytes with what the game drew. Record each result here.
 | 9 | Units standing on the map, own and enemy | unit figures and banner plaques (STORY-012) |
 | 10 | Anything showing `MAPBACK #21` (`CITYNOWA`) | what that sprite is for |
 
+## Findings from the god-mode playthrough (2026-09-23)
+
+Saves `SAVE4`–`SAVE9` ("CG Build", "Explore", "Road Locat", "Speger",
+"Settlement") plus 58 window shots in
+`~/.mirror/dev/DOSbox/FREYA - God Mode/`, lined up by timestamp. Diffing
+the city records between saves:
+
+- **City Walls = building index 32, record byte `+66`.** "CG Build"
+  changed exactly that byte in the starting city, and the game announced
+  "…completed the construction of a City Wall" (3:40:51 PM shot). It
+  also fits momedit: 33 building bytes from `+34` end where its
+  enchantments start (`+67`). Other indices line up with the game's
+  building order (0 Barracks, 5 Smithy, 12 Sawmill, 23 Marketplace,
+  26 Granary, 13 Library, 19 Shrine, 27 Farmers' Market, 28 Foresters'
+  Guild…). Building bytes: `1` built, `0xFF` not built, `0` replaced
+  (Barracks → Armory in Bremen/Maimz).
+- **Walls don't change the overland sprite**, at least at hamlet size:
+  the starting city looks identical before and after (3:34 vs 3:41 shots).
+- **Size byte names, from the game's city-screen titles:** `0` Outpost
+  (Zwolle, "New Outpost Founded", pop 0), `1` Hamlet (Norport, Speger),
+  `2` Village (Ozenwall, pop 9). That fits frame = size − 1 for hamlets
+  and up. An outpost looks like a small boxed city **without a flag**
+  (4:37:49 shot, *to confirm*); Mirror currently draws it as frame 0 with
+  a flag.
+- **Captured city:** Speger changed owner 5 → 0 in "Speger" and shows
+  Freya's yellow flag in the game's city-screen mini-map.
+- **Units:** Freya's units stand on yellow/gold plaques (`MAPBACK #18`),
+  confirming the plaque catalog entry (STORY-012).
+- **Roads** show as thin brown lines between cities from "Road Locat" on
+  (STORY-013 can check its road layout against `SAVE6`/`SAVE8`).
+- **Rival cities seen by these saves:** Sidon (blue, SAVE6), Capua (red)
+  and Cremona (green, SAVE7), Bloodrock (purple, size 2, SAVE8). Their
+  flag colours in the screenshots haven't been checked yet.
+
+Still open: what `#21` `CITYNOWA` is for (maybe outposts?), the outpost
+sprite, the rival and neutral flag colours, and frames for Town and up.
+

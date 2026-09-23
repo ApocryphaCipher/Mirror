@@ -16,7 +16,7 @@ top-level block table.
 | Fortresses | `0x0065f8` | 4 | 6 | No. Probably x/y/plane/active per wizard; verify |
 | Towers of Wizardry | `0x006610` | 4 | 6 | No. Probably x/y/owner; verify |
 | Encounter zones | `0x006628` | `0x18` (24) | 99 + 3 | **No.** Lairs, ruins, temples, keeps, mounds, etc. Needs type + x/y/plane + guardians |
-| Cities | `0x008aac` | `0x72` (114) | 100 | **Yes** for name/race/x/y/plane/owner/size/pop: momedit + SAVE1's 27 cities (`Mirror.SaveFile.Cities`); count u16 at `0x0009e0`. `+19` size class is a guess |
+| Cities | `0x008aac` | `0x72` (114) | 100 | **Yes** for name/race/x/y/plane/owner/size/pop: momedit + SAVE1's 27 cities (`Mirror.SaveFile.Cities`); count u16 at `0x0009e0`. `+19` size: 0 Outpost, 1 Hamlet, 2 Village (game titles). Buildings `+34`..`+66` (1 built, 0xFF not, 0 replaced); **City Walls = `+66`** (verified in-game, STORY-032) |
 | Units | `0x00b734` | `0x20` (32) | 1000 + 9 | **No.** Needs x/y/plane/owner/unit type at minimum. Unit count at `0x0009e2` |
 | Terrain flags map | `0x01cbb8` | 1 / tile | 2 × 2400 | No. Likely roads / enchanted roads / corruption bits; verify |
 | Minerals map | `0x013554` | 1 / tile | 2 × 2400 | No. Mineral/special type per tile; verify |
