@@ -1,7 +1,20 @@
 # STORY-026 (bug): Discard does nothing; edits feel impossible to get rid of
 
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
-**Status:** open
+**Status:** fixed 2026-09-23.
+- Discard is a two-step in-page confirmation ("Discard N changes? Yes,
+  discard / Cancel"); no native dialog. It was the only `data-confirm` in
+  the app.
+- Esc leaves edit mode even from the tile box.
+- A fresh load or reload always opens in view mode (option **b**); the
+  draft is kept and shown by a view-mode notice ("N unsaved changes ·
+  Review in edit mode · Discard").
+- Found while fixing it: the edit toolbar and notice were in the page flow,
+  so when their text re-wrapped (e.g. "1 tile" → "2 tiles changed") the map
+  moved under a still pointer and clicks landed on a different tile. Both
+  now float over the map.
+- Not done: making Discard itself undoable (the in-page confirm made it
+  unnecessary for now).
 **Size:** small
 **Reported by:** Kevin, 2026-09-23: "Discard button does not work. I am
 permanently stuck in an edit state with undo/redo and X tiles changed. I

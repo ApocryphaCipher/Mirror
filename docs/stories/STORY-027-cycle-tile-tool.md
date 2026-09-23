@@ -1,7 +1,14 @@
 # STORY-027: Cycle tool: clicking a tile steps to the next tile picture
 
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
-**Status:** open
+**Status:** done 2026-09-23. `🔄 Cycle` (default) and `🎨 Paint` in the edit
+toolbar. Cycle: click +1, right-click or shift-click −1, wrapping 0–761, one
+undo step per click, redrawn live. The readout shows `tile 134 → 135` and
+follows the clicked tile. Paint is the old click-to-stamp behaviour, with
+the brush shown only for Paint.
+**Not yet:** remembering the tool per browser; the land↔water warning
+(needs the tile-number→terrain-type mapping first, STORY-017/029); a
+separate Pick tool (right-click in Paint already picks).
 **Size:** small–medium
 **Requested by:** Kevin, 2026-09-23
 
