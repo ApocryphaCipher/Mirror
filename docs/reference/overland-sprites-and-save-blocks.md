@@ -24,61 +24,193 @@ top-level block table.
 Verifying a layout means using two sources, or one source plus a visual
 check against a known save, as was done for the terrain offsets.
 
-## LBX sprite sources
+## Sprite catalog (verified 2026-09-23, STORY-006)
 
-LBX files carry a readable name table (at file offset `0x200`, 32-byte
-rows of `NAME\0` + description). That makes finding sprites far easier
-than scanning bytes. What the names show:
+Every entry below was decoded with `Mirror.LBX` and **looked at**. Contact
+sheets were rendered with the game palette, and the same decode was checked
+against an independent Python decoder: 1,380 frames hash-identical across
+MAPBACK, UNITS1/2, MAIN, SPECFX, MAGIC and CITYSCAP. Browse any of these in
+`/tile-probe`, which now shows the name table next to each entry.
 
-### `MAPBACK.LBX` (94 entries): overland map overlays
+Notation: `FILE.LBX #entry[/frame]`, 0-based, numbered from the offset table
+at byte 8, the same numbering the name table uses. Rows marked *guess* are
+reasoned from the pictures, not yet confirmed against a save.
 
-- `SITES` in `blue` / `green` / `purple` / `red` / `yellow` / `neutral`:
-  per-banner-colour pieces. **Most likely the unit plaques** (the coloured
-  backing an overland unit figure sits on). Verify.
-- `MAPCITY`, `CITYNOWA`: city markers (sizes/owners likely vary by frame).
-- `ROADS` in 8 directions (+ `no road`), `E_ROADS`: roads and enchanted roads.
-- `MAGIC` in `blue` / `green` / `purple` / `red` / `white` / `yellow`: magic
-  overlays by colour. Candidates for **node auras / realm sparkle**, or
-  owned-node borders. Verify which.
-- `SITES` unowned tower, owned tower, mound, temple, keep, ruins, fallen
-  temple: **encounter-zone and tower icons.**
-- `SITES` coal, iron, silver, gold, gems, mithril, adamantium, quork,
-  crysx, nightshade, wild game, hunter's lodge, mine, lumber camp:
-  mineral/special icons.
-- `CORRUPT` corruption, `WARPED` warped mask, `MASK` (×16), `MAGIC` city
-  worked area.
-- The first images are 20×18 (tile-sized).
+### Cities: `MAPBACK.LBX` #20, #21 (32×30, 5 frames)
 
-### `UNITS1.LBX` (120 entries) + `UNITS2.LBX` (78 entries): overland unit figures
+| Sprite | Entry |
+| --- | --- |
+| City **with** walls, size 1–5 | `MAPBACK.LBX #20/0..4` (`MAPCITY`) |
+| City **without** walls, size 1–5 | `MAPBACK.LBX #21/0..4` (`CITYNOWA`) |
 
-All named `STATFIG1` / `STATFIG2`, 18×16 images. Presumably indexed by
-unit type number (UNITS1 then UNITS2). Verify the mapping against a known
-unit.
+Frames grow from a single hut (frame 0) to a sprawling capital (frame 4).
+*Guess:* frame = the game's city size class (hamlet … capital); confirm
+against a save's city population in STORY-010. The frame-0 wall ring is
+what tells #20 from #21. The owner flag is 8 px in palette indices
+**216–218** (the green ramp; x 17–20, y 10–11 in frame 0). *Guess:* the
+game swaps those three indices for the owner's banner ramp (see the
+sparkle ramps below).
 
-### `MAIN.LBX` (65 entries): main-screen UI
+### Unit plaques: `MAPBACK.LBX` #14–#19 (20×18)
 
-Buttons (`MAINBUTN`), movement-type icons (`MAINMOVE` sail/swim/fly/…),
-medals, magic-weapon icons, and **`MAINBTN2` "unit backgrnd 1–9"
-(entries 24–32, 22×28)**: candidates for the unit plaques in STORY-012,
-alongside the `MAPBACK.LBX` `SITES` colour entries. Verify which one the
-overland map actually uses.
+Tile-sized, filled, dark-bordered squares, one per banner colour. The unit
+figure sits on top.
 
-### `FONTS.LBX` palette entries: mouse cursors
+| Banner (wizard record `+0x16`) | Entry |
+| --- | --- |
+| 0 blue | `MAPBACK.LBX #14` (`SITES blue`) |
+| 1 green | `MAPBACK.LBX #15` |
+| 2 purple | `MAPBACK.LBX #16` |
+| 3 red | `MAPBACK.LBX #17` |
+| 4 yellow | `MAPBACK.LBX #18` |
+| neutral / raiders | `MAPBACK.LBX #19` (brown) |
 
-Entries 2–8 (5,472 bytes each) hold a palette followed by 16×16
-column-major cursor images (gauntlet, wand, red X, arrow, swords,
-hourglass, boot, 5-frame casting sparkle). See STORY-025.
+`MAIN.LBX #24–#32` (`MAINBTN2 unit backgrnd 1–9`, 22×28) are **not** the
+map plaques. They are grey stone buttons with a health-bar slot, used by
+the unit panel on the main screen's right side.
 
-### `TERRAIN.LBX`: animated terrain
+### Unit figures: `UNITS1.LBX` / `UNITS2.LBX` (18×16, 1 frame, all `STATFIG*`)
 
-79 of the 1524 tile pointers carry the animated flag (4 frames each);
-see [classic-terrain-format.md](classic-terrain-format.md). This is where
-the **ocean twinkle** comes from, and possibly animated volcano/node tiles.
-Which tile numbers they are is not yet listed.
+| Unit type | Entry |
+| --- | --- |
+| 0–119 | `UNITS1.LBX #type` |
+| 120–197 | `UNITS2.LBX #(type − 120)` |
 
-### Image format note
+Checked against the game's unit list by eye. UNITS1 #0–34 are 35 mounted
+heroes, then #35 trireme, #36 galley, #37 catapult, #38 warship, and
+settler wagons appear among the racial units (e.g. #44). UNITS2 #34–#77
+are the 44 summoned creatures in the known order: #34 magic spirit, #35
+hell hounds, #36 gargoyles, #37 fire giant, #38 fire elemental … #70
+floating island, #71 phantom beast, #72 phantom warriors, #73 storm giant,
+#74 air elemental, #75 djinn, #76 sky drake, #77 nagas. That is unit type
+154–197, which makes the offset of 120 exact. Still to do: confirm against
+a save's unit records (STORY-012).
 
-`TERRAIN.LBX` tiles are raw pixels. `MAPBACK`/`UNITS*` entries use the
-standard LBX image format (header + RLE frames), which `Mirror.LBX`
-already decodes. With the `FONTS.LBX` entry-2 palette forced, they should
-render correctly. The 0-index is transparent, which overlays need.
+### Encounter sites and towers: `MAPBACK.LBX` (20×18, 1 frame)
+
+| Sprite | Entry |
+| --- | --- |
+| Tower of Wizardry, unowned | `MAPBACK.LBX #69` |
+| Tower of Wizardry, owned | `MAPBACK.LBX #70` |
+| Mound (*guess:* cave / monster lair) | `MAPBACK.LBX #71` |
+| Temple | `MAPBACK.LBX #72` |
+| Keep | `MAPBACK.LBX #73` |
+| Ruins | `MAPBACK.LBX #74` |
+| Fallen temple | `MAPBACK.LBX #75` |
+| Mud (brown speckle; *guess:* a terrain special, not a site) | `MAPBACK.LBX #76` |
+
+Nodes are terrain tiles (`TERRAIN.LBX`), not sprites. Which encounter-zone
+type number uses which icon is STORY-011's job.
+
+### Specials (minerals, food): `MAPBACK.LBX` (20×18, 1 frame)
+
+| Special | Entry |
+| --- | --- |
+| Coal | `#78` |
+| Iron | `#79` |
+| Silver | `#80` |
+| Gold | `#81` |
+| Gems | `#82` |
+| Mithril | `#83` |
+| Adamantium | `#84` |
+| Quork crystals | `#85` |
+| Crysx crystals | `#86` |
+| Nightshade | `#91` |
+| Wild game | `#92` |
+| Mine, lumber camp, hunter's lodge | `#87`, `#88`, `#90`: **blank** (47-byte entries, every column empty) |
+
+The minerals-map byte → special mapping is STORY-013's job.
+
+### Roads: `MAPBACK.LBX` (20×18)
+
+Each piece is the half-road from the tile centre toward one neighbour.
+Draw the pieces for every connected neighbour, plus the centre piece.
+
+| Piece | Normal road (1 frame) | Enchanted road (6-frame animation) |
+| --- | --- | --- |
+| centre ("no road") | `#45` | `#54` |
+| top | `#46` | `#55` |
+| top right | `#47` | `#56` |
+| right | `#48` | `#57` |
+| bottom right | `#49` | `#58` |
+| bottom | `#50` | `#59` |
+| bottom left | `#51` | `#60` |
+| left | `#52` | `#61` |
+| top left | `#53` | `#62` |
+
+The `E_ROADS` rows have no descriptions in the name table. Their order was
+read off the pictures and matches `ROADS` exactly.
+
+### Sparkles / node auras: `MAPBACK.LBX` #63–#68 (20×18, 6 frames)
+
+Twinkling star sparkles, one colour each. The name table says blue, green,
+purple, red, white, yellow, but the pixels say otherwise:
+
+| Colour actually drawn (palette indices) | Entry | Name-table label |
+| --- | --- | --- |
+| blue (219–220, 100) | `#63` | blue |
+| green (216, 218) | `#64` | green |
+| purple (121–124) | `#65` | purple |
+| red (200–203) | `#66` | red |
+| **yellow** (211–212) | `#67` | "white" |
+| **nothing** (every frame blank) | `#68` | "yellow" |
+
+So sparkle = `MAPBACK.LBX #(63 + banner)` for banners 0–4. *Guess:* these
+are the melded-node aura sparkles in the owner's colour (STORY-008). Verify
+against a save with a melded node.
+
+### Other `MAPBACK.LBX` entries
+
+| Sprite | Entry |
+| --- | --- |
+| Edge masks, black dither along one or two sides (*guess:* unexplored-area edges) | `#0–#13` (`MASK`, 20×18) |
+| Corruption | `#77` (22×18: note the width) |
+| City worked-area outline (blue dashed border, 6 frames) | `#89` (`MAGIC city worked area`) |
+| Warped mask (black blob) | `#93` |
+| (empty entries, 0 bytes, no name) | `#22–#44` |
+
+### Other files
+
+- `MAIN.LBX` (65 entries): main-screen UI. Buttons, `MAINMOVE` movement
+  icons (#18–23, #36–38), medals (#51–53), magic-weapon icons (#54–56),
+  the unit-panel stone buttons above.
+- `FONTS.LBX` #2–#8 (5,472 bytes each): a palette followed by 16×16
+  column-major cursor images (see STORY-025). #2's first 768 bytes are the
+  game palette.
+- `TERRAIN.LBX`: terrain tiles, not in the standard image format; see
+  [classic-terrain-format.md](classic-terrain-format.md).
+
+## LBX formats (as implemented in `Mirror.LBX`)
+
+**Container.** `u16 count`, `u16 0xFEAD`, 4 bytes, then `count + 1` u32
+entry offsets from byte 8. Most files also have a **name table** at `0x200`:
+one 32-byte row per entry, a 9-byte NUL-padded name then a NUL-terminated
+description (`SITES` / `blue`). The sound banks and `TERRAIN.LBX` have none
+(56 of the 61 GOG files do). Before this story, `Mirror.LBX` guessed the
+table position and accepted a table at byte 4 whenever bytes 4–7 were zero.
+That shifted every entry index by one in files like `MAPBACK.LBX`.
+`TERRAIN.LBX` and `FONTS.LBX` happened to parse correctly, so "entry 2" and
+TerrainLbx's entries 1/2 were right all along.
+
+**Images.** Header `u16 width, height, 0, frames, delay, ?, ?,
+palette_info, flags`, then `frames + 1` u32 frame offsets at `0x12`. Each
+frame starts with a byte: `1` = fresh, `0` = drawn over the previous frame.
+Then comes one record per column, left to right: `0xFF` = empty column,
+else a mode byte (`0x00` copy, `0x80` RLE), a size byte and `size` bytes of
+runs. Each run is `count, skip`, then `count` encoded bytes placed `skip`
+rows below the previous run's end. In RLE mode a byte `b > 0xDF` means
+"repeat the next byte `b − 0xDF` times". All 3,543 image entries in the 61
+GOG LBX files on disk decode with this.
+
+**Palette.** `FONTS.LBX` #2, first 768 bytes, 6-bit VGA (× 255/63). Index 0
+is transparent. When `palette_info` is non-zero, it points at `u16 offset,
+first, count`, a 6-bit patch over colours `first…` (e.g. `MAGIC.LBX #0`
+patches 224–255). 355 image entries carry one, mostly full-screen art.
+
+**The old "colored noise" bug** was the decoder, not the palette. The old
+code read `frames` from offset 4 (always 0), so every real image failed the
+header check. It then fell back to painting the RLE bytes as raw pixels,
+which is the noise. Forcing the FONTS palette alone changed nothing: with
+the old decoder every MAPBACK entry still failed. Separately, it wrote
+pixels as BGRA into a canvas that expects RGBA, swapping red and blue.
+Fixed in STORY-006.

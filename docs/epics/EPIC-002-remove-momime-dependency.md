@@ -40,10 +40,10 @@ Answers to the original open questions:
    *missing* from `MAGIC.zip` (a CD-era install with ~23 of ~70 LBX files).
    The GOG release Kevin uploaded has it. That's why nothing in the old
    install looked like terrain.
-2. **Palette?** `FONTS.LBX` entry 2, 6-bit VGA ×4. Not yet checked whether
-   this alone fixes `Mirror.LBX.Palette`'s `:auto` mode for other files
-   (the `Halofam.lbx #6` / `Compix.lbx #23` candidates are moot for
-   terrain).
+2. **Palette?** `FONTS.LBX` entry 2, 6-bit VGA ×4. It is the right palette
+   for other files too, but the `:auto` "colored noise" was a decoder bug
+   (fixed in STORY-006). The `Halofam.lbx #6` / `Compix.lbx #23`
+   candidates are moot.
 3. **Per-mask variants in DOS?** Yes — 762 tiles per plane, and the save
    already stores which one. The game did the smoothing at map generation
    (via `TERRTYPE.LBX`'s mask → tile table); a viewer does none.

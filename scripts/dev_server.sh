@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Needs TERRAIN.LBX + FONTS.LBX (from a full install, e.g. GOG) for terrain art.
-export MIRROR_MOM_PATH="$HOME/.mirror_assets/MAGIC"
+# The GOG install (all LBX art + SAVEn.GAM copies); needs at least TERRAIN.LBX +
+# FONTS.LBX for terrain, MAPBACK/UNITS1/UNITS2.LBX for overland sprites.
+export MIRROR_MOM_PATH="$HOME/.mirror_assets/GOG"
 export MIRROR_TERRAIN_OFFSET="0x002698"
 export MIRROR_LANDMASS_OFFSET="0x004d98"
 export MIRROR_MINERALS_OFFSET="0x013554"

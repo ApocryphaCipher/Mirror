@@ -10,9 +10,14 @@ Unsorted, not yet promoted to a story.
   2026-09-22: raw `TERRAIN.LBX`. See
   [reference/classic-terrain-format.md](reference/classic-terrain-format.md) and STORY-005.
 - ~~Pull the rest of the GOG install down~~ → promoted to STORY-006.
-- Check whether the `FONTS.LBX` entry-2 palette also fixes
-  `Mirror.LBX.Palette`'s `:auto` mode for non-terrain LBX files (the old
-  "colored noise" bug).
+- ~~Check whether the `FONTS.LBX` entry-2 palette also fixes the old
+  "colored noise" bug~~: it doesn't on its own. The decoder was the bug
+  (STORY-006, see the reference doc's "LBX formats").
+- Pull the ~36 small GOG LBX files that are still missing (< 75 KB each:
+  `CMB*`, `ITEM*`, `SPELLS`, `SPECIAL/2`, `VORTEX`, `PORTRAIT`, `HIRE`, …).
+  The Drive connector only saves large files to disk; a Drive-side zip, or
+  Kevin copying the folder, would be the easy route. Not needed for the
+  overland map.
 - Decode `TERRTYPE.LBX` properly (the original game's mask → tile table).
   Only needed if Mirror ever edits terrain.
 - `MIRROR_TERRAIN_OFFSET` etc. offsets are currently only set in

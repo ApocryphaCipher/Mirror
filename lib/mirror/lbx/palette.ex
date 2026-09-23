@@ -19,6 +19,26 @@ defmodule Mirror.LBX.Palette do
     end
   end
 
+  @doc """
+  The game's shared palette from 768 bytes of 6-bit VGA RGB (`FONTS.LBX`
+  entry 2), with index 0 transparent as the game draws it.
+  """
+  def game(bin) when byte_size(bin) == 768 do
+    [{r, g, b, _} | rest] = from_rgb_triplets(bin, 63)
+    [{r, g, b, 0} | rest]
+  end
+
+  @doc "Overwrite colours `first..` with a 6-bit RGB patch (an image's embedded palette)."
+  def patch(palette, {first, bin}) do
+    colours = from_rgb_triplets(bin, 63)
+
+    palette
+    |> Enum.with_index()
+    |> Enum.map(fn {colour, i} ->
+      if i >= first and i < first + length(colours), do: Enum.at(colours, i - first), else: colour
+    end)
+  end
+
   def to_binary(palette) when is_list(palette) do
     Enum.reduce(palette, <<>>, fn {r, g, b, a}, acc ->
       <<acc::binary, r::unsigned-integer-size(8), g::unsigned-integer-size(8),
