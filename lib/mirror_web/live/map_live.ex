@@ -3,7 +3,8 @@ defmodule MirrorWeb.MapLive do
   import Bitwise
 
   alias Mirror.Engine.{Delta, Session, SessionSupervisor, View}
-  alias Mirror.{Paths, SaveFile, SessionStore, Stats, TerrainLbx, TileAtlas}
+  alias Mirror.{OverlaySprites, Paths, SaveFile, SessionStore, Stats, TerrainLbx, TileAtlas}
+  alias Mirror.SaveFile.{Cities, Wizards}
   alias Mirror.Map, as: MirrorMap
 
   @layers [
@@ -2786,7 +2787,7 @@ defmodule MirrorWeb.MapLive do
     state = socket.assigns.state
 
     if connected?(socket) and effective_render_mode(socket, state) == :tiles do
-      push_tile_assets(socket, state)
+      socket |> push_tile_assets(state) |> push_overlays()
     else
       socket
     end
@@ -2811,6 +2812,45 @@ defmodule MirrorWeb.MapLive do
         })
     end
   end
+
+  # Overlay layers on the map pages (STORY-009): the sprites once, then each
+  # layer's items for this plane. The Lab has no overlays.
+  defp push_overlays(%{assigns: %{lab?: true}} = socket), do: socket
+
+  defp push_overlays(socket) do
+    socket =
+      case OverlaySprites.load(Paths.mom_path()) do
+        {:ok, sprites} -> push_event(socket, "overlay_sprites", sprites)
+        {:error, _} -> socket
+      end
+
+    push_event(socket, "overlay_data", %{
+      layer: "cities",
+      items: city_items(socket.assigns.state, socket.assigns.plane)
+    })
+  end
+
+  defp city_items(%{save: %{raw: raw}}, plane) do
+    banners = Wizards.banners(raw)
+
+    case Cities.parse(raw) do
+      {:ok, cities} ->
+        for %{plane: ^plane} = city <- cities do
+          %{
+            x: city.x,
+            y: city.y,
+            size: city.size,
+            banner: Map.get(banners, city.owner, :neutral),
+            name: city.name
+          }
+        end
+
+      {:error, _} ->
+        []
+    end
+  end
+
+  defp city_items(_state, _plane), do: []
 
   # The map pages always show terrain art with no research overlays; the
   # Lab uses whatever the session has.
