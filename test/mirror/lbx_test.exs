@@ -146,8 +146,8 @@ defmodule Mirror.LBXTest do
   end
 
   describe "real GOG files" do
-    @mom_path System.get_env("MIRROR_MOM_PATH")
-    @has_mapback @mom_path && File.exists?(Path.join(@mom_path || "", "MAPBACK.LBX"))
+    @mom_path System.get_env("MIRROR_MOM_PATH", "")
+    @has_mapback @mom_path != "" and File.exists?(Path.join(@mom_path, "MAPBACK.LBX"))
 
     @tag skip: !@has_mapback && "MIRROR_MOM_PATH has no MAPBACK.LBX"
     test "MAPBACK.LBX: names line up with entries and every image decodes" do

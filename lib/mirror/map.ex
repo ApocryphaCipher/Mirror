@@ -24,7 +24,7 @@ defmodule Mirror.Map do
   def width, do: @width
   def height, do: @height
 
-  def idx(x, y) when x in 0..(@width - 1) and y in 0..(@height - 1) do
+  def idx(x, y) when x in 0..(@width - 1)//1 and y in 0..(@height - 1)//1 do
     y * @width + x
   end
 
@@ -38,25 +38,25 @@ defmodule Mirror.Map do
 
   def get_tile_u8(bin, x, y) do
     index = idx(x, y)
-    <<_::binary-size(index), value::unsigned-integer-size(8), _::binary>> = bin
+    <<_::binary-size(^index), value::unsigned-integer-size(8), _::binary>> = bin
     value
   end
 
   def get_tile_u16_le(bin, x, y) do
     index = idx(x, y) * 2
-    <<_::binary-size(index), value::little-unsigned-integer-size(16), _::binary>> = bin
+    <<_::binary-size(^index), value::little-unsigned-integer-size(16), _::binary>> = bin
     value
   end
 
   def put_tile_u8(bin, x, y, value) do
     index = idx(x, y)
-    <<head::binary-size(index), old::unsigned-integer-size(8), tail::binary>> = bin
+    <<head::binary-size(^index), old::unsigned-integer-size(8), tail::binary>> = bin
     {<<head::binary, value::unsigned-integer-size(8), tail::binary>>, old}
   end
 
   def put_tile_u16_le(bin, x, y, value) do
     index = idx(x, y) * 2
-    <<head::binary-size(index), old::little-unsigned-integer-size(16), tail::binary>> = bin
+    <<head::binary-size(^index), old::little-unsigned-integer-size(16), tail::binary>> = bin
     {<<head::binary, value::little-unsigned-integer-size(16), tail::binary>>, old}
   end
 

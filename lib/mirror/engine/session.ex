@@ -246,7 +246,7 @@ defmodule Mirror.Engine.Session do
     Enum.reduce(changes, {bin, []}, fn change, {acc, updates} ->
       {x, y, new} = normalize_change(change, topo)
       index = y * topo.w + x
-      <<head::binary-size(index), old::unsigned-integer-size(8), tail::binary>> = acc
+      <<head::binary-size(^index), old::unsigned-integer-size(8), tail::binary>> = acc
       updated = <<head::binary, new::unsigned-integer-size(8), tail::binary>>
       {updated, [{x, y, old, new} | updates]}
     end)
@@ -258,7 +258,7 @@ defmodule Mirror.Engine.Session do
       {x, y, new} = normalize_change(change, topo)
       index = (y * topo.w + x) * 2
 
-      <<head::binary-size(index), old::little-unsigned-integer-size(16), tail::binary>> = acc
+      <<head::binary-size(^index), old::little-unsigned-integer-size(16), tail::binary>> = acc
       updated = <<head::binary, new::little-unsigned-integer-size(16), tail::binary>>
       {updated, [{x, y, old, new} | updates]}
     end)
@@ -280,13 +280,13 @@ defmodule Mirror.Engine.Session do
 
   defp read_value(:u8, bin, x, y, %Topology{} = topo) do
     index = y * topo.w + x
-    <<_::binary-size(index), value::unsigned-integer-size(8), _::binary>> = bin
+    <<_::binary-size(^index), value::unsigned-integer-size(8), _::binary>> = bin
     value
   end
 
   defp read_value(:u16, bin, x, y, %Topology{} = topo) do
     index = (y * topo.w + x) * 2
-    <<_::binary-size(index), value::little-unsigned-integer-size(16), _::binary>> = bin
+    <<_::binary-size(^index), value::little-unsigned-integer-size(16), _::binary>> = bin
     value
   end
 
@@ -308,7 +308,7 @@ defmodule Mirror.Engine.Session do
   defp set_bit(bitset, idx, value) when value in [0, 1] do
     byte_index = div(idx, 8)
     bit_offset = rem(idx, 8)
-    <<head::binary-size(byte_index), byte, tail::binary>> = bitset
+    <<head::binary-size(^byte_index), byte, tail::binary>> = bitset
     mask = 1 <<< bit_offset
 
     updated =

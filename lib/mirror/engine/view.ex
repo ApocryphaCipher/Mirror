@@ -67,7 +67,7 @@ defmodule Mirror.Engine.View do
   defp get_bit(bitset, idx) do
     byte_index = div(idx, 8)
     bit_offset = rem(idx, 8)
-    <<_::binary-size(byte_index), byte, _::binary>> = bitset
+    <<_::binary-size(^byte_index), byte, _::binary>> = bitset
     byte >>> bit_offset &&& 1
   end
 end
