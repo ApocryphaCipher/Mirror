@@ -1,0 +1,150 @@
+head	1.1;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.1
+date	2009.05.18.16.47.31;	author p_grudzien12;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.1
+log
+@*** empty log message ***
+@
+text
+@using System;
+using System.Collections.Generic;
+using System.Text;
+using MoMSaveEditor.MapObjects;
+using System.Drawing;
+using MoMSaveEditor.GameObjects;
+
+namespace MoMSaveEditor
+{
+    class MiniMap
+    {
+        SavedGame sg;
+
+        internal Map Map
+        {
+            get { return sg.Map; }
+        }
+        Bitmap arcanusImage;
+
+        public Bitmap ArcanusBitmap
+        {
+            get { return arcanusImage; }
+            set { arcanusImage = value; }
+        }
+        Bitmap myrrorImage;
+
+        public Bitmap MyrrorBitmap
+        {
+            get { return myrrorImage; }
+            set { myrrorImage = value; }
+        }
+
+        private Bitmap Redraw(WorldEnum world)
+        {
+            Bitmap bmMinimap = new Bitmap(sg.Map.Width, sg.Map.Height);
+            Color oceanColor = Color.FromArgb(0, 0, 88);
+            Color tundraColor = Color.FromArgb(124, 116, 112);
+            Color grasslandColor = Color.FromArgb(16, 92, 16);
+            Graphics g = Graphics.FromImage(bmMinimap);
+            g.FillRectangle(Brushes.Wheat, new Rectangle(new Point(0, 0), bmMinimap.Size));
+            g.Dispose();
+            for (int x = 0; x < Map.Width; x++)
+            {
+                for (int y = 0; y < Map.Height; y++)
+                {
+                    if (IsOcean(x, y, world))
+                        bmMinimap.SetPixel(x, y, oceanColor);
+                    else if (IsTundra(x, y, world))
+                        bmMinimap.SetPixel(x, y, tundraColor);
+                    else if (IsGrassLand(x, y, world))
+                        bmMinimap.SetPixel(x, y, grasslandColor);
+
+                }
+            }
+            return bmMinimap;
+        }
+
+        private static short[] oceanFields = { 0x0259 };
+        private static short[] tundraFields = { 0xb5, 0xb6, 0xa7, 0x25a, 0x263, 0x25f };
+        private static short[] grasslandFields = { 0xac, 0xad };
+        public MiniMap(SavedGame sg)
+        {
+            this.sg = sg;
+            arcanusImage = Redraw(WorldEnum.Arcanus);
+            myrrorImage = Redraw(WorldEnum.Myrror);
+        }
+        private bool Contain(short[] list, short obj)
+        {
+            foreach (short s in list)
+            {
+                if (s == obj)
+                    return true;
+            }
+            return false;
+        }
+        public bool IsOcean(int x, int y, WorldEnum world)
+        {
+            short f;
+            if (world == WorldEnum.Arcanus)
+                f = Map.Aracnus(x, y);
+            else
+                f = Map.Myrror(x, y);
+            return (f < 0x040) || Contain(oceanFields, f);
+            
+        }
+        public bool IsTundra(int x, int y, WorldEnum world)
+        {
+            short f;
+            if (world == WorldEnum.Arcanus)
+                f = Map.Aracnus(x, y);
+            else
+                f = Map.Myrror(x, y);
+            return Contain(tundraFields, f);
+        }
+        public bool IsGrassLand(int x, int y, WorldEnum world)
+        {
+            short f;
+            if (world == WorldEnum.Arcanus)
+                f = Map.Aracnus(x, y);
+            else
+                f = Map.Myrror(x, y);
+            return Contain(tundraFields, f);
+        }
+    }
+    struct MiniMapPoint
+    {
+        WorldEnum world;
+
+        public WorldEnum World
+        {
+            get { return world; }
+            set { world = value; }
+        }
+        Point location;
+
+        public Point Location
+        {
+            get { return location; }
+            set { location = value; }
+        }
+        public MiniMapPoint(WorldEnum w, Point l)
+        {
+            world = w;
+            location = l;
+        }
+    }
+}
+@

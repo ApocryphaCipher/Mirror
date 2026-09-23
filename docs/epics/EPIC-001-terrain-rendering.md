@@ -1,6 +1,6 @@
 # EPIC-001: Correct terrain tile rendering (rotation/layering)
 
-**Status:** rotation/smoothing fully fixed (PR #3 + STORY-001) — real MOMIME reduction rules ported and verified against the real resource set and a real save. Remaining work is asset-pipeline, not algorithm: see [EPIC-002](EPIC-002-remove-momime-dependency.md) for getting off the MOMIME PNG dependency entirely.
+**Status:** rotation/smoothing algorithm fixed and verified (PR #3 + PR #4) — but the map is still visibly wrong for other reasons. STORY-001 (shoreline) is reopened pending [EPIC-003](EPIC-003-terrain-value-classification.md) (terrain values are being misread beneath the algorithm). Rivers/cities/towers are separately out of scope here — see EPIC-003 (rivers) and [EPIC-004](EPIC-004-overland-map-features.md) (cities/towers/lairs). [EPIC-002](EPIC-002-remove-momime-dependency.md) (asset pipeline) is unaffected and still open.
 **Owner:** Kevin
 
 ## Goal

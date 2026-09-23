@@ -1,0 +1,242 @@
+head	1.2;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.2
+date	2009.05.18.16.47.31;	author p_grudzien12;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2008.11.14.12.53.42;	author p_grudzien12;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.2
+log
+@*** empty log message ***
+@
+text
+@using System;
+using System.Collections.Generic;
+using System.Text;
+using System.ComponentModel;
+using System.IO;
+using MoMSaveEditor.UIEditors;
+using System.Drawing;
+namespace MoMSaveEditor.GameObjects
+{
+    class City
+    {
+        public static long CITY_OFFSET = 0x8aac;
+        public static long CITY_OBJ_LEN = 114;
+
+        private int myNumber;
+
+        private byte x;
+
+        [Category("Map")]
+        public byte X
+        {
+            get { return x; }
+            set { x = value; }
+        }
+        private byte y;
+
+        [Category("Map")]
+        public byte Y
+        {
+            get { return y; }
+            set { y = value; }
+        }
+
+        private String name;
+
+        [Category("General")]
+        public String Name
+        {
+            get { return name; }
+            set { name = value; }
+        }
+        private int growthRate;
+
+        [Category("General")]
+        public int GrowthRate
+        {
+            get { return growthRate; }
+            set { growthRate = value; }
+        }
+        private CityBuildings buildings = new CityBuildings();
+
+        [Category("General")]
+        [EditorAttribute(typeof(CityBuildingsEditor),
+            typeof(System.Drawing.Design.UITypeEditor))]
+        public CityBuildings Buildings
+        {
+            get { return buildings; }
+            set { buildings = value; }
+        }
+
+        private CityEnchantments enchantments = new CityEnchantments();
+
+        [Category("General")]
+        [EditorAttribute(typeof(CityEnchantmentsEditor),
+            typeof(System.Drawing.Design.UITypeEditor))]
+        public CityEnchantments Enchantments
+        {
+            get { return enchantments; }
+            set { enchantments = value; }
+        }
+
+        private RaceEnum race;
+
+        public RaceEnum Race
+        {
+            get { return race; }
+            set { race = value; }
+        }
+
+        private WorldEnum world;
+
+        public WorldEnum World
+        {
+            get { return world; }
+            set { world = value; }
+        }
+        private byte owner;
+
+        public byte Owner
+        {
+            get { return owner; }
+            set { owner = value; }
+        }
+
+        private int population;
+
+        public int Population
+        {
+            get { return population; }
+            set { population = value; }
+        }
+
+        private int workerFarmerRatio;
+
+        public int WorkerFarmerRatio
+        {
+            get { return workerFarmerRatio; }
+            set { workerFarmerRatio = value; }
+        }
+
+        private byte currentProduction;
+
+        public String CurrentProduction
+        {
+            get
+            {
+                String s = System.Enum.GetName(typeof(BuildingsEnum), (BuildingsEnum)currentProduction);
+                if (s == null || s == "")
+                    s = currentProduction.ToString();
+                return s;
+            }
+            set
+            {
+                currentProduction = (byte)System.Enum.Parse(typeof(BuildingsEnum), value, true);
+            }
+        }
+        public void Save(BinaryWriter bw)
+        {
+            long offset = CITY_OFFSET + CITY_OBJ_LEN * myNumber;
+            bw.BaseStream.Position = offset;
+            MOMReadWrite.WriteCString(bw, Name);
+
+            bw.BaseStream.Position = offset + 14; // race
+            bw.Write((byte)Race);
+
+            bw.Write((byte)X);  // +15
+            bw.Write((byte)Y);  // +16
+
+            bw.Write((byte)World); // +17
+
+            bw.Write((byte)Owner); // + 18
+
+            bw.BaseStream.Position = offset + 20; // population
+            bw.Write((byte)Population);
+            bw.Write((byte)WorkerFarmerRatio); // +21
+
+            bw.BaseStream.Position = offset + 24; // population growth rate
+            bw.Write((Int16)GrowthRate);
+
+            bw.BaseStream.Position = offset + 28; // current production
+            bw.Write((byte)currentProduction);
+
+            bw.BaseStream.Position = offset + 34; // activeSpells
+            for (int i = 0; i < Buildings.Length; i++)
+            {
+                MOMReadWrite.Write1FFBoolean(bw, Buildings[i]);
+                //bw.Write((bool)Buildings[i]);
+            }
+
+            bw.BaseStream.Position = offset + 67; // presence of city enchantment
+            for (int i = 0; i < Enchantments.Length; i++)
+                MOMReadWrite.Write01Boolean(bw, Enchantments[i]);
+        }
+        public void Load(BinaryReader br, int no)
+        {
+            myNumber = no;
+            long offset = CITY_OFFSET + CITY_OBJ_LEN * no;
+            br.BaseStream.Seek(offset, SeekOrigin.Begin);
+            Name = MOMReadWrite.ReadCString(br);
+
+            br.BaseStream.Position = offset + 14; // race
+            Race = (RaceEnum)br.ReadByte();
+
+            X = br.ReadByte();  // +15
+            Y = br.ReadByte();  // +16
+
+            World = (WorldEnum)br.ReadByte(); // +17
+
+            Owner = br.ReadByte(); // + 18
+            br.ReadByte(); Population = br.ReadByte(); // +19
+            WorkerFarmerRatio = br.ReadByte(); // +21
+
+            br.BaseStream.Position = offset + 24; // population growth rate
+            GrowthRate = br.ReadInt16();
+
+            br.BaseStream.Position = offset + 28; // current production
+            currentProduction = br.ReadByte();
+
+            br.BaseStream.Position = offset + 34; // activeSpells
+            for (int i = 0; i < Buildings.Length; i++)
+            {
+                Buildings[i] = MOMReadWrite.Read1FFBoolean(br);
+            }
+
+            br.BaseStream.Position = offset + 67; // presence of city enchantment
+            for (int i = 0; i < Enchantments.Length; i++)
+                Enchantments[i] = MOMReadWrite.Read01Boolean(br);
+
+        }
+
+
+    }
+}
+@
+
+
+1.1
+log
+@First version.
+No comments.
+@
+text
+@d7 1
+@
+

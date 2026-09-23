@@ -1,0 +1,109 @@
+head	1.1;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.1
+date	2009.05.18.16.47.31;	author p_grudzien12;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.1
+log
+@*** empty log message ***
+@
+text
+@using System;
+using System.Collections.Generic;
+using System.Text;
+using System.IO;
+
+namespace MoMSaveEditor.MapObjects
+{
+    class Map
+    {
+        public static int MAP_HEIGHT = 40;
+        public static int MAP_WIDTH = 60;
+        short[][] arcanus = new short[MAP_WIDTH][];
+        short[][] myrror = new short[MAP_WIDTH][];
+        public static long MAP_OFFSET = 0x2698;
+
+        public Map()
+        {
+            for (int i = 0; i < MAP_WIDTH; i++)
+            {
+                arcanus[i] = new short[MAP_HEIGHT];
+                myrror[i] = new short[MAP_HEIGHT];
+            }
+        }
+        public void Save(BinaryWriter bw)
+        {
+            long offset = MAP_OFFSET;
+            bw.BaseStream.Position = offset;
+            for (int i = 0; i < MAP_HEIGHT; i++)
+            {
+                for (int j = 0; j < MAP_WIDTH; j++)
+                {
+                    bw.Write(arcanus[j][i]);
+                }
+            }
+            for (int i = 0; i < MAP_HEIGHT; i++)
+            {
+                for (int j = 0; j < MAP_WIDTH; j++)
+                {
+                    bw.Write(myrror[j][i]);
+                }
+            }
+        }
+        public void Load(BinaryReader br)
+        {
+            long offset = MAP_OFFSET;
+            br.BaseStream.Seek(offset, SeekOrigin.Begin);
+            for (int i = 0; i < MAP_HEIGHT; i++)
+            {
+                for (int j = 0; j < MAP_WIDTH; j++)
+                {
+                    arcanus[j][i] = br.ReadInt16();
+                }
+            }
+            for (int i = 0; i < MAP_HEIGHT; i++)
+            {
+                for (int j = 0; j < MAP_WIDTH; j++)
+                {
+                    myrror[j][i] = br.ReadInt16();
+                }
+            }
+        }
+        public short Aracnus(int x, int y)
+        {
+            return arcanus[x][y];
+        }
+        public short Myrror(int x, int y)
+        {
+            return myrror[x][y];
+        }
+        public int Width
+        {
+            get
+            {
+                return MAP_WIDTH;
+            }
+        }
+        public int Height
+        {
+            get
+            {
+                return MAP_HEIGHT;
+            }
+        }
+
+    }
+}
+@
