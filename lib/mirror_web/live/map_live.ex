@@ -3117,7 +3117,7 @@ defmodule MirrorWeb.MapLive do
     case Paths.mom_path() do
       nil -> ""
       "" -> ""
-      path -> path |> Path.join("SAVE1.GAM") |> String.replace("/", "\\")
+      path -> Path.join(path, "SAVE1.GAM")
     end
   end
 
