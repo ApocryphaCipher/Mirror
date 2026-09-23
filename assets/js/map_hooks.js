@@ -52,17 +52,27 @@ const MapCanvas = {
     }
     window.addEventListener("resize", this.handleResize)
 
-    // In view mode the surrounding MapViewport owns drag (pan) and wheel
-    // (zoom); the canvas only reports hover.
-    const viewOnly = this.el.dataset.interaction === "view"
+    // Interaction: "lab" (research page: paint + wheel cycles values),
+    // "view" (hover only; MapViewport pans/zooms) or "edit" (left paints,
+    // right picks; MapViewport still zooms and pans with space/middle-drag).
+    this.interaction = this.el.dataset.interaction || "lab"
+    this.brushTile = 0
     this.el.addEventListener("contextmenu", event => event.preventDefault())
     this.el.addEventListener("pointermove", this.onPointerMove.bind(this))
-    if (!viewOnly) {
-      this.el.addEventListener("pointerdown", this.onPointerDown.bind(this))
-      this.el.addEventListener("pointerup", this.onPointerUp.bind(this))
-      this.el.addEventListener("pointerleave", this.onPointerLeave.bind(this))
-      this.el.addEventListener("wheel", this.onWheel.bind(this), {passive: false})
-    }
+    this.el.addEventListener("pointerdown", this.onPointerDown.bind(this))
+    this.el.addEventListener("pointerup", this.onPointerUp.bind(this))
+    this.el.addEventListener("pointerleave", this.onPointerLeave.bind(this))
+    this.el.addEventListener("wheel", this.onWheel.bind(this), {passive: false})
+
+    this.handleEvent("edit_mode", payload => {
+      this.interaction = payload.mode === "edit" ? "edit" : "view"
+      this.el.style.cursor = this.interaction === "edit" ? "crosshair" : ""
+    })
+
+    this.handleEvent("brush", payload => {
+      this.brushTile = payload.tile || 0
+      this.drawBrushPreview()
+    })
 
     this.handleEvent("map_state", payload => {
       let needsRender = false
@@ -149,6 +159,7 @@ const MapCanvas = {
       if (!payload) return
       this.terrainLbx = payload.terrain_lbx ? this.buildTerrainLbxAtlas(payload.terrain_lbx) : null
       this.renderAll()
+      this.drawBrushPreview()
     })
 
     this.handleEvent("map_render_mode", payload => {
@@ -407,6 +418,39 @@ const MapCanvas = {
       size
     )
     return true
+  },
+
+  // Draw the current brush tile into the edit toolbar's preview canvas.
+  drawBrushPreview() {
+    const preview = document.getElementById("brush-preview")
+    const atlas = this.terrainLbx
+    if (!preview || !atlas) return
+    const tile = atlas.tiles[this.plane]?.[this.brushTile]
+    const ctx = preview.getContext("2d")
+    ctx.clearRect(0, 0, preview.width, preview.height)
+    if (!tile || tile[0] < 0) return
+    const t = tile[0]
+    ctx.drawImage(
+      atlas.canvas,
+      (t % atlas.columns) * atlas.tileW,
+      Math.floor(t / atlas.columns) * atlas.tileH,
+      atlas.tileW,
+      atlas.tileH,
+      0,
+      0,
+      preview.width,
+      preview.height
+    )
+  },
+
+  // Whether a pointer-down should reach the server. In edit mode only a
+  // plain left click (paint) or right click (pick) counts: space+drag and
+  // middle-drag belong to the viewport's pan.
+  pointerEditsMap(event) {
+    if (this.interaction === "lab") return true
+    if (this.interaction !== "edit") return false
+    if (window.__mirrorSpaceHeld) return false
+    return event.button === 0 || event.button === 2
   },
 
   fillBackground(ctx = this.ctx, size = this.deviceTileSize) {
@@ -677,8 +721,11 @@ const MapCanvas = {
   },
 
   onPointerDown(event) {
+    if (!this.pointerEditsMap(event)) return
     const tile = this.tileFromEvent(event)
     if (!tile) return
+    // Keep the viewport from starting a pan under a paint stroke.
+    event.stopPropagation()
 
     this.isPointerDown = true
     this.pointerButton = event.button
@@ -723,6 +770,8 @@ const MapCanvas = {
   },
 
   onWheel(event) {
+    // Only the Lab cycles values with the wheel; elsewhere it zooms (viewport).
+    if (this.interaction !== "lab") return
     event.preventDefault()
     this.pushEvent("map_pointer", {
       action: "wheel",

@@ -1,7 +1,14 @@
 # STORY-016: Edit mode shell
 
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
-**Status:** open, after STORY-015
+**Status:** done 2026-09-23. `✎ Edit` / `Done` in the map header (and `Esc`)
+toggle `?edit=terrain`. The toolbar has a layer picker (Terrain live; Roads,
+Structures and Units shown disabled), a tile brush with a preview from the
+atlas, Undo/Redo, an "N tiles changed" counter with **Discard**, and
+**Save as** (suggests the next free `SAVEn.GAM`; refuses the loaded file).
+Input: left paints, right picks; wheel still zooms; space-drag or
+middle-drag pans. View mode is unchanged (hover only). Covered by
+`test/mirror_web/live/map_live_edit_test.exs` (needs game files).
 **Size:** medium
 
 ## What to do

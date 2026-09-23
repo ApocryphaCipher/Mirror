@@ -18,6 +18,8 @@ const MapViewport = {
     this.ty = 0
     this.userZoomed = false
     this.drag = null
+    this.editing = this.canvas.dataset.interaction === "edit"
+    window.__mirrorSpaceHeld = false
 
     this.canvas.style.transformOrigin = "0 0"
     this.canvas.style.imageRendering = "pixelated"
@@ -31,6 +33,28 @@ const MapViewport = {
       }
     }
     window.addEventListener("resize", this.onResize)
+
+    // Edit mode: Space held turns left-drag back into panning; Esc finishes.
+    this.onKeyDown = event => {
+      if (isTyping(event)) return
+      if (event.code === "Space" && this.editing) {
+        window.__mirrorSpaceHeld = true
+        this.el.style.cursor = "grab"
+        event.preventDefault()
+      }
+      if (event.key === "Escape" && this.editing) this.pushEvent("exit_edit", {})
+    }
+    this.onKeyUp = event => {
+      if (event.code !== "Space") return
+      window.__mirrorSpaceHeld = false
+      this.el.style.cursor = ""
+    }
+    window.addEventListener("keydown", this.onKeyDown)
+    window.addEventListener("keyup", this.onKeyUp)
+
+    this.handleEvent("edit_mode", payload => {
+      this.editing = payload.mode === "edit"
+    })
 
     this.el.addEventListener("wheel", event => this.onWheel(event), {passive: false})
     this.el.addEventListener("pointerdown", event => this.onPointerDown(event))
@@ -54,6 +78,9 @@ const MapViewport = {
 
   destroyed() {
     window.removeEventListener("resize", this.onResize)
+    window.removeEventListener("keydown", this.onKeyDown)
+    window.removeEventListener("keyup", this.onKeyUp)
+    window.__mirrorSpaceHeld = false
   },
 
   // Fill the window below the viewport's top edge, whatever sits above it.
@@ -112,8 +139,13 @@ const MapViewport = {
     this.zoomBy(event.deltaY < 0 ? 1 : -1, {x: event.clientX - rect.left, y: event.clientY - rect.top})
   },
 
+  // View mode: left-drag pans. Edit mode: left is the brush, so pan with
+  // middle-drag or space+left-drag.
   onPointerDown(event) {
-    if (event.button !== 0) return
+    const pans =
+      event.button === 1 || (event.button === 0 && (!this.editing || window.__mirrorSpaceHeld))
+    if (!pans) return
+    event.preventDefault()
     this.drag = {x: event.clientX, y: event.clientY, tx: this.tx, ty: this.ty, moved: false}
     this.el.setPointerCapture(event.pointerId)
   },
@@ -155,6 +187,11 @@ const MapViewport = {
     this.canvas.style.transform = `translate(${this.tx}px, ${this.ty}px) scale(${this.scale})`
     if (this.zoomLabel) this.zoomLabel.textContent = `${Math.round(this.scale * 100)}%`
   },
+}
+
+function isTyping(event) {
+  const tag = event.target?.tagName
+  return tag === "INPUT" || tag === "TEXTAREA" || event.target?.isContentEditable
 }
 
 function clamp(value, min, max) {
