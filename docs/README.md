@@ -6,3 +6,4 @@ Working docs for the Mirror project (Master of Magic save-file viewer). Not ship
 - `stories/` — smaller units under an epic, linked back to it
 - `backlog.md` — unsorted/uncommitted ideas and known issues, not yet promoted to a story
 - `notes/` — dated session notes, investigation logs, things learned about the LBX/MOMIME formats that aren't obvious from the code
+- `reference/` — primary-source material other work here relies on: MOMIME's real source (`momime-source/`), a classic-save editor's source (`momedit-source/`), and the original Codex planning docs (`codex-notes/`) that explain how earlier (wrong) approaches got built
