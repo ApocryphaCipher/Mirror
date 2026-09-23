@@ -11,7 +11,7 @@ top-level block table.
 
 | Block | Offset | Record size | Count | Record layout known? |
 | --- | --- | --- | --- | --- |
-| Wizards (+ neutral) | `0x0009e8` | `0x04c8` | 5 + 1 | Yes (wiki). **Banner colour at `+0x16`** (`0` blue, `1` green, `2` purple, `3` red, `4` yellow) |
+| Wizards (+ neutral) | `0x0009e8` | `0x04c8` | 5 + 1 | Yes (wiki). **Banner colour at `+0x16`** (`0` blue, `1` green, `2` purple, `3` red, `4` yellow); **gold u16 at `+0x356`, mana u16 at `+0x25c`** (found by value in SAVE1, consistent across SAVE1/2/9: AI wizards start with 150 gold, 0 mana). Player is record 0 |
 | Node attributes | `0x006058` | `0x30` (48) | 30 | **No.** Expected to include x/y/plane, owner, realm, and the list of aura tiles; verify |
 | Fortresses | `0x0065f8` | 4 | 6 | No. Probably x/y/plane/active per wizard; verify |
 | Towers of Wizardry | `0x006610` | 4 | 6 | No. Probably x/y/owner; verify |
