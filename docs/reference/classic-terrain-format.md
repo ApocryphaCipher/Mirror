@@ -1,6 +1,7 @@
 # Classic terrain format: save values → `TERRAIN.LBX` tiles
 
-**Status:** verified 2026-09-22 by rendering `SAVE1.GAM` (both planes)
+**Status:** implemented in the app as the `terrain_lbx` tile backend
+(`Mirror.TerrainLbx`, STORY-005). Verified 2026-09-22 by rendering `SAVE1.GAM` (both planes)
 end-to-end from the GOG release's `TERRAIN.LBX`, with no smoothing or
 classification code at all. Output matched the real game: smooth
 coastlines, rivers, mountain ranges, nodes, volcanoes, polar tundra.
@@ -50,7 +51,7 @@ animated = (w & 0x80) != 0     # 4 consecutive records = 4 animation frames
 79 of the 1524 pointers are animated (water-type tiles).
 
 **Palette**: `FONTS.LBX` entry 2, first 768 bytes — 256 × RGB, 6-bit VGA
-(multiply by 4). This is the palette that makes terrain render correctly;
+(scale by 255/63, as `Mirror.LBX.Palette` does). This is the palette that makes terrain render correctly;
 it's very likely the missing piece behind the earlier "colored noise"
 results in `Mirror.LBX.Palette` (EPIC-002), not yet confirmed there.
 

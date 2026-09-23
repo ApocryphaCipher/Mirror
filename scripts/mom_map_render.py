@@ -36,8 +36,8 @@ def find(dirpath, name):
 def load_palette(lbx_dir):
     fonts = open(find(lbx_dir, 'FONTS.LBX'), 'rb').read()
     entries, _ = lbx_entries(fonts)
-    raw = entries[2][:768]    # 6-bit VGA RGB triplets
-    return [tuple(min(255, c * 4) for c in raw[i * 3:i * 3 + 3]) for i in range(256)]
+    raw = entries[2][:768]    # 6-bit VGA RGB triplets, scaled like Mirror.LBX.Palette
+    return [tuple(min(255, round(c * 255 / 63)) for c in raw[i * 3:i * 3 + 3]) for i in range(256)]
 
 
 class Terrain:

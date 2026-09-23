@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Needs TERRAIN.LBX + FONTS.LBX for the terrain_lbx backend (the default).
+# MIRROR_TILE_BACKEND=momime forces the old MOMIME-PNG path for comparison.
 export MIRROR_MOM_PATH="$HOME/.mirror_assets/MAGIC"
 export MIRROR_TERRAIN_OFFSET="0x002698"
 export MIRROR_LANDMASS_OFFSET="0x004d98"
