@@ -32,18 +32,16 @@ highlight).
 
 ## Dev setup
 
-- Game files live outside the repo (copyrighted; never commit them):
-  - `~/.mirror_assets/GOG`: **the dev server's `MIRROR_MOM_PATH`**. 61 GOG
-    LBX files plus copies of `SAVE1/2/9.GAM` and `render_map.py`. About 36
-    small LBX files (< 75 KB, none of them overland art) are still only on
-    Kevin's Google Drive ("Master of Magic Official Release"). The Drive
-    connector saves big files to disk but returns small ones inline (see
-    the backlog).
-  - `~/.mirror_assets/MAGIC`: the old CD-era install plus the original saves.
+- Game files live outside the repo (copyrighted; never commit them).
+  `mix mirror.import_game <install folder or zip>` copies the five LBX files
+  Mirror reads, plus the saves, into **`~/.mirror/game`**, which is the dev
+  server's default `MIRROR_MOM_PATH`. Kevin's full copies:
+  `~/.mirror_assets/GOG` (61 GOG LBX files) and `~/.mirror_assets/MAGIC`
+  (old CD-era install + original saves).
 - Run the app: `bash scripts/dev_server.sh` (port 4000). The Load box
-  defaults to `…/GOG/SAVE1.GAM`.
+  defaults to `~/.mirror/game/SAVE1.GAM`.
 - Tests: `mix test` skips the real-file tests; **`bash scripts/test_game.sh`**
-  runs everything with the game-file env (44 tests).
+  runs everything with the game-file env (50 tests).
 - Reference renderer: `python3 scripts/mom_map_render.py SAVE1.GAM --lbx ~/.mirror_assets/GOG`.
 
 ## Gotchas learned the hard way

@@ -45,8 +45,15 @@ defmodule Mirror.LBX do
 
   def open(path) do
     with {:ok, raw} <- File.read(path),
-         {:ok, offsets} <- parse_offsets(raw) do
-      {:ok, %__MODULE__{path: path, raw: raw, entry_offsets: offsets}}
+         {:ok, lbx} <- from_binary(raw) do
+      {:ok, %{lbx | path: path}}
+    end
+  end
+
+  @doc "Parse an LBX already in memory (no path, so no game palette lookup)."
+  def from_binary(raw) when is_binary(raw) do
+    with {:ok, offsets} <- parse_offsets(raw) do
+      {:ok, %__MODULE__{raw: raw, entry_offsets: offsets}}
     end
   end
 
@@ -161,7 +168,7 @@ defmodule Mirror.LBX do
             {Palette.default(), :grayscale}
 
           _auto ->
-            case game_palette(Path.dirname(lbx.path)) do
+            case game_palette(lbx.path && Path.dirname(lbx.path)) do
               {:ok, palette} -> {palette, :game}
               {:error, _} -> {Palette.default(), :grayscale}
             end

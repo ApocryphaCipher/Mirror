@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# The GOG install (all LBX art + SAVEn.GAM copies); needs at least TERRAIN.LBX +
-# FONTS.LBX for terrain, MAPBACK/UNITS1/UNITS2.LBX for overland sprites.
-export MIRROR_MOM_PATH="$HOME/.mirror_assets/GOG"
+# Game files come from your own copy of Master of Magic, imported once with
+#   mix mirror.import_game <your install folder or zip>
+# which copies what Mirror needs (and your saves) into ~/.mirror/game.
+# Set MIRROR_MOM_PATH to use a different folder.
+export MIRROR_MOM_PATH="${MIRROR_MOM_PATH:-$HOME/.mirror/game}"
 export MIRROR_TERRAIN_OFFSET="0x002698"
 export MIRROR_LANDMASS_OFFSET="0x004d98"
 export MIRROR_MINERALS_OFFSET="0x013554"

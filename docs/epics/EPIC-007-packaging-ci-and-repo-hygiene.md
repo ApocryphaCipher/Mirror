@@ -24,8 +24,15 @@ pull requests with green CI.
 - **Branch protection on `main`**: see the PR that added this epic for the
   exact rules. No direct pushes, PR required, CI required.
 
+- **Game-file import** (`mix mirror.import_game`, `Mirror.GameFiles`,
+  2026-09-23): copies the files Mirror needs out of the user's own install
+  or zip into `~/.mirror/game`, hash-checked against the GOG release.
+
 ## Stories
 
 - [STORY-030](../stories/STORY-030-docker-image-and-compose.md): Docker
   image (release) and `compose.yaml`, with the game files mounted, not
   baked in.
+- [STORY-031](../stories/STORY-031-spike-download-own-gog-copy.md): spike:
+  can a script download the user's *own* GOG purchase (their login) so
+  setup is "buy on GOG, run one command"?
