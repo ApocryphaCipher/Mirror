@@ -15,15 +15,20 @@ Elixir/OTP versions in step with CI.
 
 ## Mirror-specific constraints
 
-- **Game files are never in the image.** They're copyrighted. Mount the
-  install read-only (e.g. `${MIRROR_GAME_DIR:-~/.mirror_assets/GOG}:/game:ro`)
-  and set `MIRROR_MOM_PATH=/game`. The image must build and start without
+- **Game files are never in the image.** They're copyrighted. The user
+  runs `mix mirror.import_game` once (or the same task inside the container,
+  see below), which fills `~/.mirror/game`. Compose bind-mounts that folder
+  (`${MIRROR_HOME:-~/.mirror}/game:/game`) and sets `MIRROR_MOM_PATH=/game`.
+  A bind mount beats a named volume here: the user can see and back up their
+  saves. Offer an import path for people without Elixir, e.g.
+  `docker compose run --rm -v "/path/to/install:/source:ro" app bin/mirror
+  eval 'Mirror.GameFiles.import("/source", "/game")'`, wrapped in a
+  release command. The image must build and start without
   them. The map then shows raw values, as it already does when
   `TERRAIN.LBX` is missing.
-- **Saves need a writable mount.** Loading takes a path typed into the
-  UI, and Save as writes `SAVEn.GAM` next to the loaded file. A saves
-  volume (e.g. `/saves`) is needed, and the Load box default should point
-  there when containerised.
+- **Saves are in the same mount.** The importer puts `SAVEn.GAM` in the
+  game folder, the Load box defaults to `$MIRROR_MOM_PATH/SAVE1.GAM`, and
+  Save as writes next to the loaded file, so `/game` must be writable.
 - **Save-block offsets** (`MIRROR_TERRAIN_OFFSET` etc.) are set only in
   `scripts/dev_server.sh` today. The container needs them too, so move them
   into one place both can use (config defaults, or an env file compose

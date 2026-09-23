@@ -65,9 +65,11 @@ The game's files (`*.LBX`, `*.GAM`, `FONTS.LBX` palettes, anything decoded
 from them, `priv/tile_cache/`) are copyrighted. **They must never be
 committed**, not even small fixtures cut from them.
 
-- They live outside the repo, under `~/.mirror_assets/` (`GOG/` is the
-  complete install and the dev server's `MIRROR_MOM_PATH`; `MAGIC/` is an old
-  partial CD install).
+- They live outside the repo. `mix mirror.import_game <install or zip>`
+  copies the ones Mirror uses into `~/.mirror/game`, the dev server's
+  `MIRROR_MOM_PATH`. The list is `Mirror.GameFiles.manifest/0`: when code
+  starts reading a new LBX file, add it there. (Kevin's full copies are in
+  `~/.mirror_assets/GOG`; `MAGIC/` is an old partial CD install.)
 - Tests use **synthetic** binaries built in the test (see
   `test/mirror/lbx_test.exs`). Real-file tests read from `MIRROR_MOM_PATH`
   and are skipped when it's missing:

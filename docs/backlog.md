@@ -13,11 +13,11 @@ Unsorted, not yet promoted to a story.
 - ~~Check whether the `FONTS.LBX` entry-2 palette also fixes the old
   "colored noise" bug~~: it doesn't on its own. The decoder was the bug
   (STORY-006, see the reference doc's "LBX formats").
-- Pull the ~36 small GOG LBX files that are still missing (< 75 KB each:
-  `CMB*`, `ITEM*`, `SPELLS`, `SPECIAL/2`, `VORTEX`, `PORTRAIT`, `HIRE`, …).
-  The Drive connector only saves large files to disk; a Drive-side zip, or
-  Kevin copying the folder, would be the easy route. Not needed for the
-  overland map.
+- ~36 small GOG LBX files (`CMB*`, `ITEM*`, `SPELLS`, `SPECIAL/2`, …) are
+  still only on Kevin's Drive, not in `~/.mirror_assets/GOG`. Mirror doesn't
+  read any of them (see `Mirror.GameFiles.manifest/0`), so this only matters
+  for exploring them in `/tile-probe`. If needed, copy the Drive folder over
+  and re-run `mix mirror.import_game`.
 - Decode `TERRTYPE.LBX` properly (the original game's mask → tile table).
   Only needed if Mirror ever edits terrain.
 - `MIRROR_TERRAIN_OFFSET` etc. offsets are currently only set in

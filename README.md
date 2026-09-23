@@ -28,12 +28,17 @@ You need:
 
 ```bash
 mix setup
+mix mirror.import_game "/path/to/your/Master of Magic"   # an install folder or a .zip
 ```
 
-Then start the server with [scripts/dev_server.sh](scripts/dev_server.sh). It sets
-`MIRROR_MOM_PATH` (the game directory, default `~/.mirror_assets/GOG`) and
-the save-block offsets (`MIRROR_*_OFFSET`). Edit the paths at the top for
-your install.
+`mirror.import_game` copies only the files Mirror reads (five LBX files,
+plus your `SAVEn.GAM` saves) into `~/.mirror/game`, checks each one, and
+says whether it matches the GOG release. Re-running it is safe: it never
+overwrites a save you've edited unless you pass `--force`.
+
+Then start the server with [scripts/dev_server.sh](scripts/dev_server.sh). It points
+`MIRROR_MOM_PATH` at `~/.mirror/game` (override by setting it yourself) and
+sets the save-block offsets (`MIRROR_*_OFFSET`).
 
 ```bash
 bash scripts/dev_server.sh
