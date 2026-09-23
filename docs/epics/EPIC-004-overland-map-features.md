@@ -1,6 +1,9 @@
 # EPIC-004: Render towns, forts, towers, tombs, and other overland features
 
-**Status:** scoped, not started
+**Status:** scoped into stories 2026-09-22 (STORY-006, STORY-009–013).
+Scope widened by Kevin to include **units** (figure on a banner-colour
+plaque) and **per-layer on/off toggles**. Sprite and save-block survey:
+[../reference/overland-sprites-and-save-blocks.md](../reference/overland-sprites-and-save-blocks.md).
 **Owner:** Kevin
 **Found:** 2026-09-22, Kevin: "The towns, forts, towers, tombs, and other
 overland stuff is not showing either."
@@ -70,23 +73,19 @@ These need their own verification before trusting the byte layout.
 
 ## Stories
 
-### STORY: Parse and render cities (start here — best-grounded data)
-X/Y/plane/owner/name only, to start. A colored dot or simple marker per
-city is enough to prove the pipeline; city-specific art (per race/size) is
-a follow-up refinement, not a blocker.
+Suggested order: STORY-006 → STORY-009 → STORY-010 → STORY-012 →
+STORY-011 → STORY-013.
 
-### STORY: Parse and render encounter zones / towers / lairs / ruins
-Needs the wiki's `0x006628` layout verified against a second source first
-(same pattern as everything else this session — don't build on an
-unverified single source if it can be avoided). If a second source can't be
-found quickly, this becomes an empirical-verification task instead: parse
-per the wiki's guess, then visually sanity-check placements against a
-known save.
+- [STORY-006](../stories/STORY-006-sprite-groundwork.md): sprite groundwork (full GOG install, named-sprite catalog). **Start here**
+- [STORY-009](../stories/STORY-009-overlay-layer-toggles.md): overlay layers with on/off toggles
+- [STORY-010](../stories/STORY-010-cities.md): cities
+- [STORY-011](../stories/STORY-011-sites-towers-lairs.md): towers, fortresses, lairs, ruins and other sites
+- [STORY-012](../stories/STORY-012-units-with-banner-plaques.md): units with banner-colour plaques
+- [STORY-013](../stories/STORY-013-roads-minerals-corruption.md): roads, minerals, corruption
 
-### STORY: Pull in `overland/cities` + `overland/mapFeatures` MOMIME art
-Small, mechanical — same process as PR #4's terrain folder copy, just
-different subfolders. Blocks the above two stories' visual output but not
-their data-parsing halves.
+Superseded from the original scoping above: the plan to use MOMIME
+`overland/cities` / `overland/mapFeatures` PNGs. Classic LBX art is the
+path now.
 
 ## Open question
 

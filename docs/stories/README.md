@@ -3,3 +3,11 @@
 - [STORY-003](STORY-003-find-real-terrain-value-table.md): find the real terrain-value table. Done; it's `TERRAIN.LBX` entry 1
 - [STORY-004](STORY-004-add-river-volcano-node-kinds.md): river/volcano/node kinds. Obsolete for rendering
 - [STORY-005](STORY-005-render-from-terrain-lbx.md): render the map from `TERRAIN.LBX` in the app (EPIC-002). Implemented; MOMIME-path removal is the follow-up
+- [STORY-006](STORY-006-sprite-groundwork.md): sprite groundwork, full GOG install + named-sprite catalog (EPIC-004/005). **Start here**
+- [STORY-007](STORY-007-live-terrain-animation.md): live terrain animation / ocean twinkle (EPIC-005)
+- [STORY-008](STORY-008-node-auras.md): node auras, Chaos / Nature / Sorcery sparkle (EPIC-005)
+- [STORY-009](STORY-009-overlay-layer-toggles.md): overlay layers with on/off toggles (EPIC-004)
+- [STORY-010](STORY-010-cities.md): cities (EPIC-004)
+- [STORY-011](STORY-011-sites-towers-lairs.md): towers, fortresses, lairs, ruins, sites (EPIC-004)
+- [STORY-012](STORY-012-units-with-banner-plaques.md): units with banner-colour plaques (EPIC-004)
+- [STORY-013](STORY-013-roads-minerals-corruption.md): roads, minerals, corruption (EPIC-004)
