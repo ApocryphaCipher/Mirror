@@ -5,7 +5,7 @@
 EPIC-004 (cities, sites, **units**, roads, **specials**) and the
 exploration (fog-of-war) layer's meaning.
 **Size:** medium–large
-**Raised by:** Kevin, 2026-09-23
+**Raised by:** [Kevin](https://github.com/KevinAsbury), 2026-09-23
 
 ## The problem
 

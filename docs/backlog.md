@@ -14,7 +14,7 @@ Unsorted, not yet promoted to a story.
   "colored noise" bug~~: it doesn't on its own. The decoder was the bug
   (STORY-006, see the reference doc's "LBX formats").
 - ~36 small GOG LBX files (`CMB*`, `ITEM*`, `SPELLS`, `SPECIAL/2`, …) are
-  still only on Kevin's Drive, not in `~/.mirror_assets/GOG`. Mirror doesn't
+  still only on [Kevin](https://github.com/KevinAsbury)'s Drive, not in `~/.mirror_assets/GOG`. Mirror doesn't
   read any of them (see `Mirror.GameFiles.manifest/0`), so this only matters
   for exploring them in `/tile-probe`. If needed, copy the Drive folder over
   and re-run `mix mirror.import_game`.

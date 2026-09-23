@@ -70,7 +70,7 @@ Decoded only superficially so far.
 The `MAGIC.zip` install at `~/.mirror_assets/MAGIC` is **not** a complete
 game — it's a CD-era hard-drive install plus third-party tools (`MTITLE71`,
 `MAPEDIT7`, `CREATE30`, …) with only 23 of ~70 LBX files; `TERRAIN.LBX`,
-`MAIN.LBX`, `MAPBACK.LBX`, unit art etc. were read from the CD. Kevin
+`MAIN.LBX`, `MAPBACK.LBX`, unit art etc. were read from the CD. [Kevin](https://github.com/KevinAsbury)
 uploaded the complete **GOG release** to Google Drive ("Master of Magic
 Official Release" folder, plus `Master of Magic - GOG.zip`). `TERRAIN.LBX`
 and `FONTS.LBX` from it are at `~/.mirror_assets/GOG`. Copyrighted — never

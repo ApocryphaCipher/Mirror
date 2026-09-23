@@ -19,7 +19,7 @@ Repo: `ApocryphaCipher/Mirror` (note: not "ApocraphaCypher" — org name is
   - `MIRROR_MOMIME_RES_PATH` — extracted PNGs from the MOMIME Java project
     (defaults to `./resources` if unset)
   - Neither exists here, so `TileAtlas.build/1` currently has nothing to load.
-    Can't visually verify anything until Kevin hands over paths + a save file.
+    Can't visually verify anything until [Kevin](https://github.com/KevinAsbury) hands over paths + a save file.
 
 ## The two rendering paths
 

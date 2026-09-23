@@ -50,7 +50,7 @@ still needs to come from somewhere.
    mechanism (`set_value_name/4`, `set_bit_name/4`) built and never used
    (see `docs/notes/2026-09-22-repo-recon.md`). If no authoritative source
    turns up, the fallback is: load a save, compare Mirror's raw-value
-   histogram against either (a) the actual DOS game running (if Kevin has
+   histogram against either (a) the actual DOS game running (if [Kevin](https://github.com/KevinAsbury) has
    a way to run it) or (b) careful reasoning from known constraints (ocean
    is by far the most common value and should be low/simple; rivers are
    comparatively rare; etc.) — slower and lower-confidence than a real

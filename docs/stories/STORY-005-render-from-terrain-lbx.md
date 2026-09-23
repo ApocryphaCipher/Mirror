@@ -32,7 +32,7 @@ agrees on all 4800 tiles.
 - `mix test` is green, with a decoder test (for example, value `0` → a
   20×18 ocean record) tagged to skip when game files are absent. Game
   files can't be committed as fixtures.
-- A follow-up PR removes the MOMIME path after Kevin has looked at it.
+- A follow-up PR removes the MOMIME path after [Kevin](https://github.com/KevinAsbury) has looked at it.
 
 ## As built (2026-09-22)
 

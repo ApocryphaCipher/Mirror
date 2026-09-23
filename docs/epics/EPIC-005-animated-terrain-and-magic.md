@@ -1,7 +1,7 @@
 # EPIC-005: Animated terrain and magic effects
 
 **Status:** scoped, not started
-**Owner:** Kevin
+**Owner:** [Kevin](https://github.com/KevinAsbury)
 **Requested:** 2026-09-22, right after STORY-005 (map renders from `TERRAIN.LBX`)
 
 ## Goal

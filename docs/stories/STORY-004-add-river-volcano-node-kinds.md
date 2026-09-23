@@ -61,7 +61,7 @@ would change where this story's classification logic lives).
 ## Definition of done
 
 - Real save (`SAVE1.GAM`) renders visible rivers matching their real
-  in-game positions (needs a reference screenshot or Kevin's own
+  in-game positions (needs a reference screenshot or [Kevin](https://github.com/KevinAsbury)'s own
   recollection of the map to confirm placement, not just "something blue
   and squiggly appears").
 - Volcano and node-variant tiles render as their own distinct art, not

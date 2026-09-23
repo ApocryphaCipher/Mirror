@@ -4,7 +4,7 @@
 **Status:** open, nice-to-have. **After STORY-027** (the tools must exist)
 and after STORY-029's prerequisites for anything beyond single tiles.
 **Size:** medium
-**Requested by:** Kevin, 2026-09-23
+**Requested by:** [Kevin](https://github.com/KevinAsbury), 2026-09-23
 
 ## The idea
 

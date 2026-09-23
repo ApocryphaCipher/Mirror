@@ -1,6 +1,6 @@
 The actual prompt/plan documents from the prior Codex sessions that built the
 current MOMIME-PNG rendering path (~7 months ago), pulled from `Mirror Docs.zip`
-on Kevin's Google Drive. Kept verbatim for reference — these are historical
+on [Kevin](https://github.com/KevinAsbury)'s Google Drive. Kept verbatim for reference — these are historical
 planning docs, not current instructions.
 
 Read [../../notes/2026-09-22-momime-source-findings.md](../../notes/2026-09-22-momime-source-findings.md) first — it traces

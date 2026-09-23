@@ -2,7 +2,7 @@
 
 Two things happened this session that unblock EPIC-001:
 
-1. Kevin uploaded `MAGIC.zip` (the actual DOS Master of Magic install, LBX
+1. [Kevin](https://github.com/KevinAsbury) uploaded `MAGIC.zip` (the actual DOS Master of Magic install, LBX
    files + `Magic.exe` + three real save games) to his Google Drive. Pulled
    it down and extracted to `~/.mirror_assets/MAGIC` (outside the repo,
    not gitignored-and-forgotten — it just lives on disk, not tracked).

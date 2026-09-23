@@ -4,7 +4,7 @@
 **Status:** mostly fixed by #16 (STORY-016); **the Lab's wheel/click
 footgun remains** (items 2–3 below).
 **Size:** small–medium
-**Reported by:** Kevin, 2026-09-23 (screenshot: `/lab/arcanus`, broken
+**Reported by:** [Kevin](https://github.com/KevinAsbury), 2026-09-23 (screenshot: `/lab/arcanus`, broken
 shore fragments floating in the ocean near the top-left of Arcanus)
 
 ## Symptom

@@ -94,6 +94,11 @@ This README describes what Mirror does *now*; plans belong in `docs/epics/`.
 Update the Status paragraph when something in `docs/epics/` materially
 changes (a feature starts working, or a fix lands), not more often.
 
+## Maintainer
+
+Mirror is maintained by [Kevin Asbury](https://github.com/KevinAsbury). "Kevin"
+in the docs and tickets means him.
+
 ## Attribution
 
 Mirror's early rendering logic was informed by the MOMIME project (GPLv2).

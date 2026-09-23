@@ -6,7 +6,7 @@
 
 ## What to do
 
-Kevin wants to see everything at once, and to switch each kind of thing on
+[Kevin](https://github.com/KevinAsbury) wants to see everything at once, and to switch each kind of thing on
 and off. `map_live.ex` / `map_hooks.js` already have a layer stack with
 per-layer visibility + opacity (`layer_terrain[visible]`, etc.). Extend
 it with **overlay layers**, drawn above terrain in this order:

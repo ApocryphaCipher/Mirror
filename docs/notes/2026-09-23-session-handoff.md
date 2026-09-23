@@ -2,7 +2,9 @@
 
 ## Where things stand
 
-All work is merged to `main` (PRs #3–#23); nothing is open.
+All work is merged to `main` (PRs #3–#27, plus the docs PR carrying this
+note). `main` is protected: PR required, CI's `test` check required, no
+direct pushes (EPIC-007).
 
 - **Terrain renders straight from `TERRAIN.LBX`.** A save's u16 terrain
   value is a tile number: [../reference/classic-terrain-format.md](../reference/classic-terrain-format.md). The MOMIME
@@ -15,6 +17,10 @@ All work is merged to `main` (PRs #3–#23); nothing is open.
   next free `SAVEn.GAM`, refuses the loaded file).
 - **`/lab/:plane`**: research workbench (raw layers, bit/value labelling,
   histograms, raw painter). **`/tile-probe`**: LBX explorer.
+- **Setup is scripted**: `mix mirror.import_game <install or zip>` fills
+  `~/.mirror/game`, which the dev server uses by default.
+- **Repo conventions** are in [../../AGENTS.md](../../AGENTS.md); CI runs format, strict compile
+  and tests on every PR.
 - The stories index is [../stories/README.md](../stories/README.md); epics are in [../epics/](../epics/).
 
 ## Next task: pick an overlay story (STORY-006 is done)
@@ -27,8 +33,15 @@ save block decoded first: STORY-009 (layer toggles), then STORY-010
 (cities) → STORY-012 (units + plaques) → STORY-011 (sites) → STORY-013
 (roads/specials), and STORY-008 (node auras).
 
+Suggested next session: STORY-009 and STORY-010 together, so the first
+overlay layer ships with cities drawn in it.
+
 Smaller alternatives: STORY-007 (ocean twinkle), STORY-024 (hover
-highlight).
+highlight). Packaging: STORY-030 (Docker), STORY-031 (spike: download the
+user's own GOG copy).
+
+Open proposals waiting on Kevin: delete the dead `Mirror.Quality.SmoothingRules`
+module (backlog), and remove the stray `proposal.md` at the repo root.
 
 ## Dev setup
 
@@ -45,6 +58,12 @@ highlight).
 - Reference renderer: `python3 scripts/mom_map_render.py SAVE1.GAM --lbx ~/.mirror_assets/GOG`.
 
 ## Gotchas learned the hard way
+
+- **Something is syncing `.git`.** On 2026-09-23 files named
+  `… [conflicted]` appeared in `.git/refs/heads/` and `.git/`, rolling a
+  local branch back a commit and breaking `git pull` ("bad object"). The
+  remote was fine. Fix: move the `[conflicted]` copies out of `.git`, then
+  `git fetch`. The tool responsible isn't identified yet (not iCloud).
 
 - **The Claude in-app browser answers `window.confirm()` with `false`
   instantly** (no dialog). Never use `data-confirm`; use in-page confirms.
@@ -63,7 +82,7 @@ highlight).
   0 transparent. Format details are in the reference doc's "LBX formats".
 - **Sessions own their dev server.** Start it with `scripts/dev_server.sh`
   and stop it when you're done. A leftover server from an earlier session
-  is a mistake, not Kevin's (Kevin, 2026-09-23), so check first:
+  is a mistake, not [Kevin](https://github.com/KevinAsbury)'s (Kevin, 2026-09-23), so check first:
   `lsof -iTCP:4000 -sTCP:LISTEN`. Session state lives in its
   ETS, so still don't leave test edits in a save you're sharing.
 
