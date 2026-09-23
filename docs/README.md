@@ -1,5 +1,7 @@
 # Mirror docs
 
+**Picking this up? Read [notes/2026-09-23-session-handoff.md](notes/2026-09-23-session-handoff.md) first.**
+
 Working docs for the Mirror project (Master of Magic save-file viewer). Not shipped with the app — this is planning/notes scaffolding.
 
 - `epics/` — large bodies of work, one file each, status tracked at the top
