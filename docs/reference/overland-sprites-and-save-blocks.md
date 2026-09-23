@@ -40,22 +40,26 @@ reasoned from the pictures, not yet confirmed against a save.
 
 | Sprite | Entry |
 | --- | --- |
-| City **with** walls, size 1–5 | `MAPBACK.LBX #20/0..4` (`MAPCITY`) |
-| City **without** walls, size 1–5 | `MAPBACK.LBX #21/0..4` (`CITYNOWA`) |
+| Ordinary city, frames 0–4 small to large | `MAPBACK.LBX #20/0..4` (`MAPCITY`) |
+| Unknown use | `MAPBACK.LBX #21/0..4` (`CITYNOWA`) |
 
-Frames grow from a single hut (frame 0) to a sprawling capital (frame 4).
-Frame = the city record's `+19` byte. *Guess:* that byte is the size
-class (hamlet … capital); in SAVE1 it tracks population (pop 2–3 → 0,
-4–6 → 1, 8–9 → 2). The frame-0 wall ring is what tells #20 from #21. The
-owner flag is 8 px in palette indices **216–218**, green shades 3–5
-(x 17–20, y 10–11 in frame 0).
+**Checked in the game (DOSBox, SAVE1, 2026-09-23):** the player's
+starting city (record 0: Barbarian, pop 4,000, size byte 1, owner Freya,
+no City Walls) is drawn on the overland map as `#20` frame 0, the single
+building in a grey box, with a **yellow** flag. So `#20` is the normal city
+sprite, not a walled one (the grey box isn't walls), and a size-byte-1
+city uses frame 0. Mirror draws frame `size − 1` (sizes 0 and 1 both frame
+0); *guess* for sizes 2+, since there's one data point so far. What `#21`
+(`CITYNOWA`) is for is unknown. The owner flag is 8 px in palette indices
+**216–218**, green shades 3–5 (x 17–20, y 10–11 in frame 0).
 
 **Banner ramps in the palette** (read from `FONTS.LBX` #2): indices
 199–223 are five 5-shade ramps, red 199–203, purple 204–208, yellow
 209–213, green 214–218, blue 219–223. Mirror recolours the flag by
 shifting 216–218 into the owner's ramp, and uses the neutral plaque's
-browns (53–55) for neutral cities. *Guess:* that's what the game does;
-compare with a real screenshot (STORY-032).
+browns (53–55) for neutral cities. The game's yellow flag on Freya's city
+matches; the other colours and the neutral browns are still a *guess*
+(STORY-032).
 
 ### Unit plaques: `MAPBACK.LBX` #14–#19 (20×18)
 
