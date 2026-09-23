@@ -6,7 +6,7 @@
 - [STORY-006](STORY-006-sprite-groundwork.md): sprite groundwork, full GOG install + named-sprite catalog (EPIC-004/005). **Done**
 - [STORY-007](STORY-007-live-terrain-animation.md): live terrain animation / ocean twinkle (EPIC-005)
 - [STORY-008](STORY-008-node-auras.md): node auras, Chaos / Nature / Sorcery sparkle (EPIC-005)
-- [STORY-009](STORY-009-overlay-layer-toggles.md): overlay layers with on/off toggles (EPIC-004)
+- [STORY-009](STORY-009-overlay-layer-toggles.md): overlay layers with on/off toggles (EPIC-004) **Done**
 - [STORY-010](STORY-010-cities.md): cities (EPIC-004)
 - [STORY-011](STORY-011-sites-towers-lairs.md): towers, fortresses, lairs, ruins, sites (EPIC-004)
 - [STORY-012](STORY-012-units-with-banner-plaques.md): units with banner-colour plaques (EPIC-004)
