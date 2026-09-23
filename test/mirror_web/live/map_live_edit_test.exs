@@ -77,6 +77,24 @@ defmodule MirrorWeb.MapLiveEditTest do
     assert changed(view) =~ "1 tile changed"
   end
 
+  test "painting, undo and redo push the tile to the canvas (STORY-023)",
+       %{conn: conn, save: save} do
+    {:ok, view, _} = live(conn, ~p"/arcanus?edit=terrain")
+    load(view, save)
+    view |> element("#brush-form") |> render_change(%{"brush" => %{"tile" => "5"}})
+
+    pointer(view, "start", 1, 1)
+    assert_push_event(view, "engine_delta", %{layer: "terrain", changes: [%{x: 1, y: 1, new: 5}]})
+    pointer(view, "end", 1, 1)
+
+    render_click(view, "undo", %{})
+
+    assert_push_event(view, "engine_delta", %{layer: "terrain", changes: [%{x: 1, y: 1, prev: 5}]})
+
+    render_click(view, "redo", %{})
+    assert_push_event(view, "engine_delta", %{layer: "terrain", changes: [%{x: 1, y: 1, new: 5}]})
+  end
+
   test "a stroke is undoable even if it never finishes", %{conn: conn, save: save} do
     {:ok, view, _} = live(conn, ~p"/arcanus?edit=terrain")
     load(view, save)

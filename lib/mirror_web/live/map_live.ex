@@ -2534,8 +2534,12 @@ defmodule MirrorWeb.MapLive do
     })
   end
 
+  # Send changed tiles to the canvas. Any layer is fine: the client stores
+  # every layer and only redraws what's visible. (This used to drop the
+  # `push_event` result, so no live update ever reached the canvas:
+  # STORY-023.)
   defp maybe_push_updates(socket, layer, updates, changes) do
-    if connected?(socket) and layer == socket.assigns.active_layer and updates != [] do
+    if connected?(socket) and updates != [] do
       payload_changes =
         if is_list(changes) do
           Enum.map(changes, fn {x, y, prev, new} ->
@@ -2552,9 +2556,9 @@ defmodule MirrorWeb.MapLive do
         delta_type: "tile_set",
         changes: payload_changes
       })
+    else
+      socket
     end
-
-    socket
   end
 
   defp emit_engine_delta(socket, plane, layer, changes) when is_list(changes) do

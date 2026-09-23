@@ -1,8 +1,15 @@
 # STORY-023 (bug): Painting in edit mode doesn't redraw the tile
 
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
-**Status:** open. For later; edits are saved correctly, only the live
-display is wrong.
+**Status:** fixed 2026-09-23. **Root cause:** `maybe_push_updates/4`
+called `push_event(...)` inside an `if`, discarded the returned socket, and
+returned the original one, so the `engine_delta` event was never sent.
+**No live tile update had ever reached the canvas**: edit mode, the Lab's
+painter, Undo and Redo alike. It now returns the pushed socket, and the
+`layer == active_layer` guard is gone (the client stores every layer and
+only redraws what's visible). A test asserts the push for paint, undo and
+redo. Verified in the browser: the painted tile changes on screen at once,
+and Undo reverts it.
 **Size:** small
 **Reported by:** Kevin, 2026-09-23
 
