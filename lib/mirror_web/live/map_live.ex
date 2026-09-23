@@ -1272,16 +1272,29 @@ defmodule MirrorWeb.MapLive do
           </div>
         </div>
       <% else %>
-        <div class="flex min-h-[100svh] flex-col">
-          <header class="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 bg-slate-950/80 px-6 py-3">
-            <div class="flex items-baseline gap-3">
-              <h2 class="text-2xl font-semibold text-white">{plane_name(@plane)}</h2>
-              <span class="text-sm text-slate-400">
+        <div class="flex flex-col">
+          <header class="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-slate-950/80 px-4 py-2">
+            <div class="flex items-center gap-4">
+              <nav class="flex rounded-xl border border-white/10 p-0.5 text-sm" aria-label="Plane">
+                <.link
+                  :for={plane <- [:arcanus, :myrror]}
+                  navigate={map_path(plane)}
+                  class={[
+                    "rounded-lg px-3 py-1 transition",
+                    plane == @plane && "bg-white/10 font-semibold text-white",
+                    plane != @plane && "text-slate-400 hover:text-white"
+                  ]}
+                  aria-current={plane == @plane && "page"}
+                >
+                  {plane_name(plane)}
+                </.link>
+              </nav>
+              <span class="truncate text-sm text-slate-400">
                 {if @state.save_path, do: Path.basename(@state.save_path), else: "No save loaded"}
               </span>
             </div>
 
-            <div class="flex flex-wrap items-center gap-3">
+            <div class="flex flex-wrap items-center gap-2">
               <.form
                 for={@load_form}
                 id="load-form"
@@ -1294,12 +1307,12 @@ defmodule MirrorWeb.MapLive do
                   type="text"
                   placeholder="Path to SAVEn.GAM"
                   phx-hook="StableInput"
-                  class="w-80 rounded-xl border border-white/10 bg-slate-950/60 py-1.5 text-sm text-slate-200 placeholder:text-slate-500"
+                  class="w-72 rounded-lg border border-white/10 bg-slate-950/60 py-1 text-sm text-slate-200 placeholder:text-slate-500"
                 />
                 <button
                   id="load-save-button"
                   type="submit"
-                  class="rounded-xl bg-amber-300 px-4 py-1.5 text-sm font-semibold text-slate-950 transition hover:bg-amber-200"
+                  class="rounded-lg bg-amber-300 px-3 py-1 text-sm font-semibold text-slate-950 transition hover:bg-amber-200"
                 >
                   Load
                 </button>
@@ -1308,16 +1321,22 @@ defmodule MirrorWeb.MapLive do
               <.link
                 id="open-lab-link"
                 navigate={~p"/lab/#{@plane}"}
-                class="rounded-xl border border-white/15 px-4 py-1.5 text-sm text-slate-300 transition hover:border-white/40 hover:text-white"
+                class="rounded-lg border border-white/15 px-3 py-1 text-sm text-slate-300 transition hover:border-white/40 hover:text-white"
               >
                 Lab
               </.link>
             </div>
           </header>
 
-          <div class="relative flex-1 overflow-auto bg-slate-950">
+          <div
+            id="map-viewport"
+            phx-hook="MapViewport"
+            phx-update="ignore"
+            class="relative touch-none select-none overflow-hidden bg-slate-950"
+          >
             <.map_canvas
               plane={@plane}
+              interaction="view"
               map_width={@map_width}
               map_height={@map_height}
               active_layer={@active_layer}
@@ -1333,13 +1352,41 @@ defmodule MirrorWeb.MapLive do
               snapshot_mode={@snapshot_mode}
             />
 
-            <div
-              :if={@hover}
-              id="hover-readout"
-              class="pointer-events-none fixed bottom-4 left-4 rounded-lg border border-white/10 bg-slate-950/85 px-3 py-1.5 font-mono text-xs text-slate-300 shadow-lg"
-            >
-              ({@hover.x}, {@hover.y}) · tile {@hover.terrain}
+            <div class="absolute bottom-4 right-4 flex items-center gap-1 rounded-xl border border-white/10 bg-slate-950/85 p-1 text-sm text-slate-200 shadow-lg">
+              <button
+                type="button"
+                data-zoom="out"
+                class="rounded-lg px-2.5 py-1 hover:bg-white/10"
+                aria-label="Zoom out"
+              >
+                −
+              </button>
+              <button
+                type="button"
+                data-zoom="fit"
+                class="rounded-lg px-2 py-1 font-mono text-xs hover:bg-white/10"
+                aria-label="Fit map to window"
+              >
+                <span data-zoom-label>100%</span>
+              </button>
+              <button
+                type="button"
+                data-zoom="in"
+                class="rounded-lg px-2.5 py-1 hover:bg-white/10"
+                aria-label="Zoom in"
+              >
+                +
+              </button>
             </div>
+          </div>
+
+          <div
+            :if={@hover}
+            id="hover-readout"
+            class="pointer-events-none fixed bottom-4 left-4 rounded-lg border border-white/10 bg-slate-950/85 px-3 py-1.5 font-mono text-xs text-slate-300 shadow-lg"
+          >
+            {plane_name(@plane)} ({@hover.x}, {@hover.y}) · tile {@hover.terrain}
+            <span class="text-slate-500">({hex_word(@hover.terrain)})</span>
           </div>
         </div>
       <% end %>
@@ -1348,6 +1395,7 @@ defmodule MirrorWeb.MapLive do
   end
 
   attr :plane, :atom, required: true
+  attr :interaction, :string, default: "edit"
   attr :map_width, :integer, required: true
   attr :map_height, :integer, required: true
   attr :active_layer, :atom, required: true
@@ -1371,6 +1419,7 @@ defmodule MirrorWeb.MapLive do
       data-map-width={@map_width}
       data-map-height={@map_height}
       data-plane={Atom.to_string(@plane)}
+      data-interaction={@interaction}
       data-layer={Atom.to_string(@active_layer)}
       data-layer-type={layer_type(@active_layer)}
       data-tiles={@encoded_layer}
@@ -1389,6 +1438,9 @@ defmodule MirrorWeb.MapLive do
     </canvas>
     """
   end
+
+  defp hex_word(value) when is_integer(value),
+    do: "0x" <> String.pad_leading(Integer.to_string(value, 16), 3, "0")
 
   defp plane_name(:arcanus), do: "Arcanus"
   defp plane_name(:myrror), do: "Myrror"

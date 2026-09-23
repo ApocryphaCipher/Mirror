@@ -1,7 +1,17 @@
 # STORY-015: View mode: the map fills the window
 
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
-**Status:** open, ready to start (STORY-014 first makes this easier)
+**Status:** done 2026-09-23. The map fits the window on load. Wheel zooms
+around the cursor in fixed steps (25%–400%); drag pans (clamped so the map
+can't be lost); double-click or the % button re-fits; the −/%/+ control sits
+bottom-right. The header has a plane switch, the save name, compact Load, and
+Lab. The hover readout shows plane, (x, y), and tile number (dec + hex).
+Pan/zoom is a CSS transform on the already-rendered canvas
+(`assets/js/map_viewport.js`), so it never re-renders, and pixels stay crisp
+via `image-rendering: pixelated`.
+**Deferred:** the **Edit** button (STORY-016), overlay toggles (STORY-009),
+and city/site/unit info in the readout (as EPIC-004 lands). Pinch-zoom on
+touch devices isn't implemented; wheel and trackpad scroll zoom are.
 **Size:** medium
 
 ## What to do
