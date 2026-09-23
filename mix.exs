@@ -70,12 +70,37 @@ defmodule Mirror.MixProject do
   #     $ mix setup
   #
   # See the documentation for `Mix` for more info on aliases.
+  # Tailwind's standalone macOS binary ships with a broken ad-hoc signature
+  # (verified identical to the official release), which macOS 27 enforces:
+  # the process is SIGKILLed with "Code Signature Invalid". Re-sign it
+  # ad-hoc after install. Still broken upstream as of tailwindcss v4.3.3 and
+  # the tailwind hex package v0.5.1.
+  defp resign_tailwind(_args) do
+    Mix.Task.run("loadpaths")
+    path = Tailwind.bin_path()
+
+    with {:unix, :darwin} <- :os.type(),
+         true <- File.exists?(path),
+         {_, status} when status != 0 <-
+           System.cmd("codesign", ["--verify", "--strict", path], stderr_to_stdout: true) do
+      Mix.shell().info("Re-signing #{path} (upstream signature is invalid)")
+      {_, 0} = System.cmd("codesign", ["--force", "--sign", "-", path], stderr_to_stdout: true)
+    end
+
+    :ok
+  end
+
   defp aliases do
     [
       setup: ["deps.get", "assets.setup", "assets.build"],
-      "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
-      "assets.build": ["compile", "tailwind mirror", "esbuild mirror"],
+      "assets.setup": [
+        "tailwind.install --if-missing",
+        &resign_tailwind/1,
+        "esbuild.install --if-missing"
+      ],
+      "assets.build": ["compile", &resign_tailwind/1, "tailwind mirror", "esbuild mirror"],
       "assets.deploy": [
+        &resign_tailwind/1,
         "tailwind mirror --minify",
         "esbuild mirror --minify",
         "phx.digest"

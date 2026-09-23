@@ -264,7 +264,7 @@ defmodule MirrorWeb.TileProbeLive do
                     <p class="text-xs uppercase tracking-[0.2em] text-slate-500">
                       Palette mode <span class="text-slate-600">(tinker tool — see EPIC-002)</span>
                     </p>
-                    <div class="mt-2 grid gap-2 sm:grid-cols-3" style="display:grid;gap:0.5rem;grid-template-columns:repeat(3,minmax(0,1fr))">
+                    <div class="mt-2 grid gap-2 sm:grid-cols-3">
                       <select
                         name="palette[mode]"
                         class="rounded-xl border border-white/10 bg-slate-950/60 px-2 py-1 text-xs text-slate-200"
@@ -345,7 +345,7 @@ defmodule MirrorWeb.TileProbeLive do
                         <p class="mt-2 text-slate-500">No index data for this frame.</p>
                       <% end %>
                       <%= if active_frame.index_grid do %>
-                        <pre class="mt-2 rounded-xl bg-black/40 p-2 font-mono text-[0.65rem] leading-snug text-slate-300" style="max-height:16rem;overflow:auto">{Enum.join(active_frame.index_grid, "\n")}</pre>
+                        <pre class="mt-2 rounded-xl bg-black/40 p-2 font-mono text-[0.65rem] leading-snug text-slate-300 max-h-64 overflow-auto">{Enum.join(active_frame.index_grid, "\n")}</pre>
                       <% else %>
                         <p class="mt-2 text-slate-500">
                           Grid too large to display ({active_frame.width}×{active_frame.height} — cap is {@max_index_grid_cells}
@@ -359,7 +359,7 @@ defmodule MirrorWeb.TileProbeLive do
                     <p class="uppercase tracking-[0.2em] text-slate-500">
                       Hex dump (first {@hex_dump_bytes} bytes of {@preview.entry_size})
                     </p>
-                    <pre class="mt-2 rounded-xl bg-black/40 p-2 font-mono text-[0.65rem] leading-snug text-slate-300" style="max-height:16rem;overflow:auto">{@preview.hex_dump}</pre>
+                    <pre class="mt-2 rounded-xl bg-black/40 p-2 font-mono text-[0.65rem] leading-snug text-slate-300 max-h-64 overflow-auto">{@preview.hex_dump}</pre>
                   </div>
                 </div>
               <% else %>
@@ -392,7 +392,7 @@ defmodule MirrorWeb.TileProbeLive do
                 </button>
               </div>
               <%= if @palette_scan do %>
-                <div class="mt-3 text-xs text-slate-300" style="max-height:12rem;overflow:auto">
+                <div class="mt-3 max-h-48 overflow-auto text-xs text-slate-300">
                   <%= if @palette_scan == [] do %>
                     <p class="text-slate-500">No palette-sized entries found in any file.</p>
                   <% else %>

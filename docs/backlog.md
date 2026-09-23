@@ -27,22 +27,19 @@ Unsorted, not yet promoted to a story.
 - `lib/mirror/map.ex` and related bitstring-match warnings on Elixir 1.20
   (pin operator, `0..@width - 1` guard step) — harmless today, cheap cleanup
   whenever someone's in that file.
-- `mix tailwind mirror` (and running `_build/tailwind-macos-arm64` directly)
-  crashes with SIGKILL (exit 137), reproducibly, in this dev environment —
-  matching crash reports in `~/Library/Logs/DiagnosticReports/`. Found while
-  building PR #5's tile-probe UI; worked around with inline `style=`
-  attributes on the handful of new utility classes instead of fixing the
-  build. Means any *other* new Tailwind class added elsewhere won't render
-  until this is actually fixed — worth root-causing (looked like it might be
-  a macOS Gatekeeper/quarantine issue on the downloaded arm64 binary, not
-  confirmed) rather than continuing to route around it file by file.
+- ~~`mix tailwind mirror` crashes with SIGKILL (exit 137)~~ — fixed
+  2026-09-22. Root cause: Tailwind's standalone macOS binary (a Bun-compiled
+  executable) ships with an invalid ad-hoc code signature. We checked it is
+  byte-identical to the official release, so it's upstream, not tampering.
+  macOS 27 enforces signatures page by page and kills it ("Code Signature
+  Invalid"). Still broken upstream in tailwindcss v4.3.3 and not handled by
+  the tailwind hex package (v0.5.1). The `assets.*` aliases in `mix.exs`
+  now re-sign the binary ad-hoc when verification fails. PR #5's inline
+  `style=` workarounds were replaced with real classes.
 - Remove the MOMIME-PNG render path (`MomimePngIndex`, `ShoreMask`,
   `SmoothingRules` on the render path, `detectTerrainBaseSource`, the kind
   tables, `resources/`) now that `terrain_lbx` is the default and verified.
   Keep `SmoothingRules` only if terrain editing is ever planned.
-- The app currently renders with **no CSS at all** (seen 2026-09-22 during
-  STORY-005). This is very likely the Tailwind CLI crash above, now affecting
-  the whole stylesheet rather than just new classes. Hidden elements like the
-  LiveView "reconnecting" banner are visible permanently.
+- ~~App renders with no CSS at all~~ — same root cause as above, fixed.
 - Draw tiles at native 20×18 aspect instead of stretched into square cells
   (canvas geometry change; see `Canvas_Geometry_Invariants` in codex-notes).
