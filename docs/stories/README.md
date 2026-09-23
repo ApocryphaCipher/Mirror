@@ -23,3 +23,5 @@
 - [STORY-023](STORY-023-bug-edit-paint-no-live-redraw.md): **bug**: painting in edit mode doesn't redraw the tile until reload (EPIC-006)
 - [STORY-024](STORY-024-tile-hover-highlight.md): highlight the tile under the cursor (glow / lift; brush ghost in edit mode) (EPIC-006, nice-to-have)
 - [STORY-025](STORY-025-in-game-cursor.md): use the game's own mouse cursor over the map (found in `FONTS.LBX`) (EPIC-006, nice-to-have)
+- [STORY-026](STORY-026-bug-discard-and-stuck-edit-state.md): **bug**: Discard does nothing (in-app browser swallows `confirm()`); edits feel impossible to clear (EPIC-006)
+- [STORY-027](STORY-027-cycle-tile-tool.md): Cycle tool: click steps a tile to the next picture (#134 → #135); today's click-to-paint becomes the Paint tool (EPIC-006)
