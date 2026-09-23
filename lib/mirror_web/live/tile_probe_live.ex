@@ -1,9 +1,12 @@
 defmodule MirrorWeb.TileProbeLive do
   use MirrorWeb, :live_view
 
-  alias Mirror.{AssetMap, LBX, Paths, TileCache}
+  alias Mirror.{AssetMap, LBX, Paths}
 
   @page_size 80
+  @palette_entry_sizes [768, 1024]
+  @max_index_grid_cells 4000
+  @hex_dump_bytes 512
 
   @impl true
   def mount(_params, _session, socket) do
@@ -26,6 +29,13 @@ defmodule MirrorWeb.TileProbeLive do
       |> assign(:selected_frame, 0)
       |> assign(:preview, nil)
       |> assign(:palette_source, "auto")
+      |> assign(:palette_mode, "auto")
+      |> assign(:borrow_lbx, "")
+      |> assign(:borrow_index, "0")
+      |> assign(:palette_scan, nil)
+      |> assign(:palette_scan_running, false)
+      |> assign(:max_index_grid_cells, @max_index_grid_cells)
+      |> assign(:hex_dump_bytes, @hex_dump_bytes)
       |> assign_forms()
 
     {:ok, socket}
@@ -67,25 +77,31 @@ defmodule MirrorWeb.TileProbeLive do
   end
 
   def handle_event("select_entry", %{"index" => index}, socket) do
-    mom_path = socket.assigns.mom_path
-    lbx_name = socket.assigns.selected_lbx
     index = parse_int(index, 0)
-
-    {preview, palette_source} =
-      case load_entry_preview(mom_path, lbx_name, index, :auto) do
-        {:ok, preview, source} -> {preview, source}
-        {:error, reason} -> {%{error: reason}, "error"}
-      end
 
     socket =
       socket
       |> assign(:selected_entry, index)
       |> assign(:selected_frame, 0)
-      |> assign(:preview, preview)
-      |> assign(:palette_source, palette_source)
-      |> assign_forms()
+      |> reload_preview()
 
     {:noreply, socket}
+  end
+
+  def handle_event("set_palette_mode", %{"palette" => params}, socket) do
+    socket =
+      socket
+      |> assign(:palette_mode, params["mode"] || "auto")
+      |> assign(:borrow_lbx, params["borrow_lbx"] || "")
+      |> assign(:borrow_index, params["borrow_index"] || "0")
+      |> reload_preview()
+
+    {:noreply, socket}
+  end
+
+  def handle_event("scan_palettes", _params, socket) do
+    results = scan_palette_candidates(socket.assigns.mom_path, socket.assigns.lbx_files)
+    {:noreply, assign(socket, :palette_scan, results)}
   end
 
   def handle_event("select_frame", %{"frame" => frame}, socket) do
@@ -235,8 +251,51 @@ defmodule MirrorWeb.TileProbeLive do
                       <p class="uppercase tracking-[0.2em] text-slate-500">Active frame</p>
                       <p class="mt-2">Frame #{@selected_frame}</p>
                       <p>Palette: {@palette_source}</p>
+                      <p>Entry bytes: {@preview.entry_size}</p>
                     </div>
                   </div>
+
+                  <.form
+                    for={to_form(%{})}
+                    id="palette-mode-form"
+                    phx-change="set_palette_mode"
+                    class="rounded-2xl border border-white/10 bg-slate-950/40 p-3"
+                  >
+                    <p class="text-xs uppercase tracking-[0.2em] text-slate-500">
+                      Palette mode <span class="text-slate-600">(tinker tool — see EPIC-002)</span>
+                    </p>
+                    <div class="mt-2 grid gap-2 sm:grid-cols-3" style="display:grid;gap:0.5rem;grid-template-columns:repeat(3,minmax(0,1fr))">
+                      <select
+                        name="palette[mode]"
+                        class="rounded-xl border border-white/10 bg-slate-950/60 px-2 py-1 text-xs text-slate-200"
+                      >
+                        <option value="auto" selected={@palette_mode == "auto"}>
+                          Auto (embedded → default)
+                        </option>
+                        <option value="default" selected={@palette_mode == "default"}>
+                          Force default fallback
+                        </option>
+                        <option value="borrow" selected={@palette_mode == "borrow"}>
+                          Borrow from another LBX entry
+                        </option>
+                      </select>
+                      <input
+                        type="text"
+                        name="palette[borrow_lbx]"
+                        value={@borrow_lbx}
+                        placeholder="Other file.lbx"
+                        class="rounded-xl border border-white/10 bg-slate-950/60 px-2 py-1 text-xs text-slate-200"
+                      />
+                      <input
+                        type="text"
+                        name="palette[borrow_index]"
+                        value={@borrow_index}
+                        placeholder="Entry index"
+                        class="rounded-xl border border-white/10 bg-slate-950/60 px-2 py-1 text-xs text-slate-200"
+                      />
+                    </div>
+                  </.form>
+
                   <div class="grid gap-3 sm:grid-cols-2">
                     <%= for frame <- @preview.frames do %>
                       <button
@@ -266,6 +325,42 @@ defmodule MirrorWeb.TileProbeLive do
                       </button>
                     <% end %>
                   </div>
+
+                  <% active_frame = Enum.find(@preview.frames, &(&1.index == @selected_frame)) %>
+                  <%= if active_frame do %>
+                    <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-3 text-xs text-slate-300">
+                      <p class="uppercase tracking-[0.2em] text-slate-500">
+                        Raw palette indices (frame {active_frame.index})
+                      </p>
+                      <%= if active_frame.index_summary do %>
+                        <p class="mt-2">
+                          {active_frame.index_summary.count} pixels,
+                          {active_frame.index_summary.distinct_count} distinct value(s):
+                          <span class="font-mono">
+                            {Enum.join(active_frame.index_summary.distinct_values, ", ")}{if active_frame.index_summary.distinct_truncated,
+                              do: ", …"}
+                          </span>
+                        </p>
+                      <% else %>
+                        <p class="mt-2 text-slate-500">No index data for this frame.</p>
+                      <% end %>
+                      <%= if active_frame.index_grid do %>
+                        <pre class="mt-2 rounded-xl bg-black/40 p-2 font-mono text-[0.65rem] leading-snug text-slate-300" style="max-height:16rem;overflow:auto">{Enum.join(active_frame.index_grid, "\n")}</pre>
+                      <% else %>
+                        <p class="mt-2 text-slate-500">
+                          Grid too large to display ({active_frame.width}×{active_frame.height} — cap is {@max_index_grid_cells}
+                          cells, summary above still applies).
+                        </p>
+                      <% end %>
+                    </div>
+                  <% end %>
+
+                  <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-3 text-xs text-slate-300">
+                    <p class="uppercase tracking-[0.2em] text-slate-500">
+                      Hex dump (first {@hex_dump_bytes} bytes of {@preview.entry_size})
+                    </p>
+                    <pre class="mt-2 rounded-xl bg-black/40 p-2 font-mono text-[0.65rem] leading-snug text-slate-300" style="max-height:16rem;overflow:auto">{@preview.hex_dump}</pre>
+                  </div>
                 </div>
               <% else %>
                 <p class="mt-3 text-sm text-slate-400">
@@ -276,6 +371,53 @@ defmodule MirrorWeb.TileProbeLive do
                     Decode failed: {@preview.error}
                   </p>
                 <% end %>
+              <% end %>
+            </div>
+
+            <div class="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-black/40">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Palette scan</p>
+                  <p class="text-xs text-slate-500">
+                    Finds candidate shared-palette entries (768/1024 bytes) across every LBX file — see EPIC-002.
+                  </p>
+                </div>
+                <button
+                  id="scan-palettes-button"
+                  type="button"
+                  phx-click="scan_palettes"
+                  class="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:border-white/40"
+                >
+                  Scan
+                </button>
+              </div>
+              <%= if @palette_scan do %>
+                <div class="mt-3 text-xs text-slate-300" style="max-height:12rem;overflow:auto">
+                  <%= if @palette_scan == [] do %>
+                    <p class="text-slate-500">No palette-sized entries found in any file.</p>
+                  <% else %>
+                    <table class="w-full text-left">
+                      <thead class="text-[0.6rem] uppercase tracking-[0.2em] text-slate-500">
+                        <tr>
+                          <th class="pb-1">File</th>
+                          <th class="pb-1">Entry</th>
+                          <th class="pb-1">Size</th>
+                          <th class="pb-1">Type</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <%= for candidate <- @palette_scan do %>
+                          <tr class="border-t border-white/5">
+                            <td class="py-1">{candidate.lbx}</td>
+                            <td class="py-1">#{candidate.index}</td>
+                            <td class="py-1">{candidate.size}</td>
+                            <td class="py-1">#{candidate.type}</td>
+                          </tr>
+                        <% end %>
+                      </tbody>
+                    </table>
+                  <% end %>
+                </div>
               <% end %>
             </div>
 
@@ -366,19 +508,65 @@ defmodule MirrorWeb.TileProbeLive do
     end
   end
 
+  defp reload_preview(socket) do
+    mom_path = socket.assigns.mom_path
+    lbx_name = socket.assigns.selected_lbx
+    index = socket.assigns.selected_entry
+
+    if index == nil do
+      socket
+    else
+      palette_opt = resolve_palette_opt(socket)
+
+      {preview, palette_source} =
+        case load_entry_preview(mom_path, lbx_name, index, palette_opt) do
+          {:ok, preview, source} -> {preview, source}
+          {:error, reason} -> {%{error: inspect(reason)}, "error"}
+        end
+
+      socket
+      |> assign(:preview, preview)
+      |> assign(:palette_source, palette_source)
+      |> assign_forms()
+    end
+  end
+
+  # Translates the UI's palette_mode/borrow_lbx/borrow_index assigns into
+  # whatever Mirror.LBX.resolve_palette/3's `:palette` option expects — either
+  # one of its own atoms, or an explicit decoded palette list "borrowed" from
+  # a different LBX file/entry, for testing where the real shared palette
+  # for a given file might actually live (see EPIC-002).
+  defp resolve_palette_opt(%{assigns: %{palette_mode: "borrow"} = assigns}) do
+    path = resolve_lbx_path(assigns.mom_path, assigns.borrow_lbx)
+    borrow_index = parse_int(assigns.borrow_index, 0)
+
+    with {:ok, lbx} <- LBX.open(path),
+         {:ok, palette} <- LBX.decode_palette(lbx, borrow_index) do
+      palette
+    else
+      _ -> :auto
+    end
+  end
+
+  defp resolve_palette_opt(%{assigns: %{palette_mode: "default"}}), do: :force_default
+  defp resolve_palette_opt(_socket), do: :auto
+
   defp load_entry_preview(mom_path, lbx_name, index, palette_opt) do
     path = resolve_lbx_path(mom_path, lbx_name)
 
     with {:ok, lbx} <- LBX.open(path),
+         {:ok, raw_entry} <- LBX.read_entry(lbx, index),
          {:ok, palette, source} <- LBX.resolve_palette(lbx, index, palette: palette_opt),
-         {:ok, image} <- TileCache.fetch(lbx, index, palette: palette) do
+         {:ok, image} <- LBX.decode_image(lbx, index, palette: palette) do
       frames =
         Enum.map(image.frames, fn frame ->
           %{
             index: frame.index,
             width: frame.width,
             height: frame.height,
-            rgba: Base.encode64(frame.rgba)
+            rgba: Base.encode64(frame.rgba),
+            index_summary: index_summary(Map.get(frame, :indices)),
+            index_grid: index_grid(Map.get(frame, :indices), frame.width, frame.height)
           }
         end)
 
@@ -387,9 +575,86 @@ defmodule MirrorWeb.TileProbeLive do
          width: image.width,
          height: image.height,
          frame_count: image.frame_count,
-         frames: frames
+         frames: frames,
+         entry_size: byte_size(raw_entry),
+         hex_dump: hex_dump(raw_entry)
        }, Atom.to_string(source)}
     end
+  end
+
+  # Raw palette-index values (0-255) for a frame, independent of whatever
+  # color the (possibly wrong) palette renders them as — this is what
+  # actually answers "what distinct values does this data contain",
+  # regardless of palette correctness. See STORY-003 for why this mattered.
+  defp index_summary(indices) when is_binary(indices) and byte_size(indices) > 0 do
+    values = for <<byte <- indices>>, do: byte
+    distinct = values |> Enum.uniq() |> Enum.sort()
+
+    %{
+      count: length(values),
+      distinct_count: length(distinct),
+      distinct_values: Enum.take(distinct, 64),
+      distinct_truncated: length(distinct) > 64
+    }
+  end
+
+  defp index_summary(_), do: nil
+
+  # Text grid of raw indices, row per image row, for small/narrow images
+  # (like a 1xN lookup-table-shaped entry) where seeing the literal
+  # sequence matters more than a rendered thumbnail. Skipped for anything
+  # too big to usefully read.
+  defp index_grid(indices, width, height)
+       when is_binary(indices) and width * height > 0 and width * height <= @max_index_grid_cells do
+    for row <- 0..(height - 1) do
+      row_bytes = binary_part(indices, row * width, width)
+      row_bytes |> :binary.bin_to_list() |> Enum.join(",")
+    end
+  end
+
+  defp index_grid(_indices, _width, _height), do: nil
+
+  defp hex_dump(binary) do
+    binary
+    |> binary_part(0, min(byte_size(binary), @hex_dump_bytes))
+    |> :binary.bin_to_list()
+    |> Enum.chunk_every(16)
+    |> Enum.with_index()
+    |> Enum.map(fn {chunk, row} ->
+      offset = row * 16
+      hex = chunk |> Enum.map(&pad_hex/1) |> Enum.join(" ")
+      ascii = chunk |> Enum.map(&printable_byte/1) |> Enum.join("")
+      "#{pad_offset(offset)}  #{hex}  #{ascii}"
+    end)
+    |> Enum.join("\n")
+  end
+
+  defp pad_hex(byte), do: byte |> Integer.to_string(16) |> String.pad_leading(2, "0")
+  defp pad_offset(offset), do: offset |> Integer.to_string(16) |> String.pad_leading(6, "0")
+  defp printable_byte(b) when b >= 32 and b <= 126, do: <<b>>
+  defp printable_byte(_), do: "."
+
+  # Scans every LBX file for entries whose size matches a classic 256-color
+  # palette (768 bytes = RGB triples, 1024 = RGBA quads) — candidates for
+  # "where does the real shared palette for this game actually live",
+  # since Mirror.LBX currently falls back to a hardcoded default whenever a
+  # file has neither its own embedded palette nor another palette-sized
+  # entry in the *same* file (see EPIC-002).
+  defp scan_palette_candidates(mom_path, lbx_files) do
+    Enum.flat_map(lbx_files, fn lbx_name ->
+      path = resolve_lbx_path(mom_path, lbx_name)
+
+      case LBX.open(path) do
+        {:ok, lbx} ->
+          lbx
+          |> LBX.entries()
+          |> Enum.filter(&(&1.size in @palette_entry_sizes))
+          |> Enum.map(&%{lbx: lbx_name, index: &1.index, size: &1.size, type: &1.type})
+
+        {:error, _} ->
+          []
+      end
+    end)
   end
 
   defp resolve_lbx_path(mom_path, lbx_name) do

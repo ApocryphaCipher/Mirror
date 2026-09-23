@@ -66,8 +66,18 @@ tile art.
    the palette lookup to recover raw indices, not just eyeballing colors).
    Classic DOS VGA games often need an externally-supplied or
    per-file-embedded 256-color palette rather than a guessed one — figure
-   out which, and fix `Mirror.LBX.Palette` to resolve it correctly. This is
-   the same kind of "go find the real answer instead of guessing" work that
+   out which, and fix `Mirror.LBX.Palette` to resolve it correctly.
+
+   The Tile Bit Inspector (`/tile-probe`) now has a "Palette scan" tool
+   (finds every 768/1024-byte entry across all LBX files — candidate
+   shared palettes) and a "borrow palette from another entry" mode to test
+   candidates interactively without writing throwaway scripts. First scan
+   turned up two candidates worth checking first: `Halofam.lbx` entry #6
+   and `Compix.lbx` entry #23 (both 1024 bytes). Not yet verified whether
+   either actually renders other files correctly — next step for whoever
+   picks this up.
+
+   This is the same kind of "go find the real answer instead of guessing" work that
    unblocked EPIC-001 — likely worth checking actual DOS MoM file-format
    documentation rather than trial-and-error against palette bytes.
 3. **Does the classic DOS game even have per-mask tile variants**, or did

@@ -252,11 +252,18 @@ defmodule Mirror.LBX do
           case decode_frame(frame_data, width, height) do
             {:ok, indices} ->
               rgba = indices_to_rgba(indices, palette)
-              %{index: frame_index, width: width, height: height, rgba: rgba}
+              %{index: frame_index, width: width, height: height, rgba: rgba, indices: indices}
 
             {:error, reason} ->
               Logger.warning("LBX frame decode failed: #{inspect(reason)}")
-              %{index: frame_index, width: width, height: height, rgba: empty_rgba(width, height)}
+
+              %{
+                index: frame_index,
+                width: width,
+                height: height,
+                rgba: empty_rgba(width, height),
+                indices: <<>>
+              }
           end
         end)
 
@@ -309,7 +316,7 @@ defmodule Mirror.LBX do
            width: width,
            height: height,
            frame_count: 1,
-           frames: [%{index: 0, width: width, height: height, rgba: rgba}],
+           frames: [%{index: 0, width: width, height: height, rgba: rgba, indices: indices}],
            rgba: rgba,
            palette_hash: palette_hash
          }}
@@ -651,6 +658,14 @@ defmodule Mirror.LBX do
 
   defp select_palette(_lbx, _embedded, palette) when is_list(palette) do
     {palette, :explicit}
+  end
+
+  # Forces the file-wide-scan-or-hardcoded fallback even when this entry has
+  # its own embedded palette — useful for testing whether an entry's
+  # embedded palette is itself the thing producing wrong colors (tile probe
+  # "Force default" mode).
+  defp select_palette(lbx, _embedded, :force_default) do
+    {default_palette(lbx), :default}
   end
 
   defp select_palette(_lbx, embedded, _palette_opt) when is_list(embedded) do
