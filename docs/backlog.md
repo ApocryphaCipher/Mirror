@@ -18,3 +18,12 @@ Unsorted, not yet promoted to a story.
 - `lib/mirror/map.ex` and related bitstring-match warnings on Elixir 1.20
   (pin operator, `0..@width - 1` guard step) — harmless today, cheap cleanup
   whenever someone's in that file.
+- `mix tailwind mirror` (and running `_build/tailwind-macos-arm64` directly)
+  crashes with SIGKILL (exit 137), reproducibly, in this dev environment —
+  matching crash reports in `~/Library/Logs/DiagnosticReports/`. Found while
+  building PR #5's tile-probe UI; worked around with inline `style=`
+  attributes on the handful of new utility classes instead of fixing the
+  build. Means any *other* new Tailwind class added elsewhere won't render
+  until this is actually fixed — worth root-causing (looked like it might be
+  a macOS Gatekeeper/quarantine issue on the downloaded arm64 binary, not
+  confirmed) rather than continuing to route around it file by file.
