@@ -27,3 +27,4 @@
 - [STORY-027](STORY-027-cycle-tile-tool.md): Cycle tool: click steps a tile to the next picture (#134 → #135); today's click-to-paint becomes the Paint tool (EPIC-006)
 - [STORY-028](STORY-028-floating-tool-palette.md): floating emoji tool palette (🔄 Cycle, 🎨 Paint) with Cycle instructions and a Paint panel (brush size, quick terrain buttons) (EPIC-006, nice-to-have)
 - [STORY-029](STORY-029-safe-editing-see-everything.md): safe map editing: see everything past the fog, and flag impossible states (units on water…) (EPIC-006, later; blocked on EPIC-004)
+- [STORY-030](STORY-030-docker-image-and-compose.md): Docker release image + `compose.yaml`, game files mounted read-only, never baked in (EPIC-007)

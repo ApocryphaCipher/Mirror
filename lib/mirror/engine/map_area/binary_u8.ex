@@ -41,14 +41,14 @@ defmodule Mirror.Engine.MapArea.BinaryU8 do
   @impl true
   def get(%__MODULE__{} = ref, x, y) when x >= 0 and y >= 0 and x < ref.w and y < ref.h do
     index = y * ref.w + x
-    <<_::binary-size(index), value::unsigned-integer-size(8), _::binary>> = ref.data
+    <<_::binary-size(^index), value::unsigned-integer-size(8), _::binary>> = ref.data
     value
   end
 
   @impl true
   def put(%__MODULE__{} = ref, x, y, value) when x >= 0 and y >= 0 and x < ref.w and y < ref.h do
     index = y * ref.w + x
-    <<head::binary-size(index), _::unsigned-integer-size(8), tail::binary>> = ref.data
+    <<head::binary-size(^index), _::unsigned-integer-size(8), tail::binary>> = ref.data
     %{ref | data: <<head::binary, value::unsigned-integer-size(8), tail::binary>>}
   end
 

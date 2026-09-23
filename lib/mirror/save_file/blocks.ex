@@ -59,7 +59,7 @@ defmodule Mirror.SaveFile.Blocks do
       if byte_size(binary) < offset + size do
         {:error, {:short_binary, layer}}
       else
-        <<_::binary-size(offset), slice::binary-size(size), _::binary>> = binary
+        <<_::binary-size(^offset), slice::binary-size(^size), _::binary>> = binary
         {:ok, slice}
       end
     end
@@ -72,7 +72,7 @@ defmodule Mirror.SaveFile.Blocks do
       if byte_size(slice) != size do
         {:error, {:slice_size_mismatch, layer}}
       else
-        <<head::binary-size(offset), _::binary-size(size), tail::binary>> = binary
+        <<head::binary-size(^offset), _::binary-size(^size), tail::binary>> = binary
         {:ok, <<head::binary, slice::binary, tail::binary>>}
       end
     end

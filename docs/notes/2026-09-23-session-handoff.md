@@ -71,6 +71,10 @@ highlight).
 
 ## Working agreement with Kevin
 
+The full version is [../../AGENTS.md](../../AGENTS.md). CI runs on every PR, and `main`
+is protected (no direct pushes).
+
+
 - Push branches and open PRs without asking; Kevin merges. Never enable
   auto-merge.
 - Ground claims in the real files (render it, hash it, test it) before

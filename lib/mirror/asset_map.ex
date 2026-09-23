@@ -3,8 +3,6 @@ defmodule Mirror.AssetMap do
   Persist user-labeled tile mappings.
   """
 
-  require Logger
-
   alias Mirror.Paths
 
   @terrain_file "terrain_tiles.json"

@@ -79,7 +79,7 @@ defmodule Mirror.Engine.Fog do
   defp set_bit(bitset, idx, value) when value in [0, 1] do
     byte_index = div(idx, 8)
     bit_offset = rem(idx, 8)
-    <<head::binary-size(byte_index), byte, tail::binary>> = bitset
+    <<head::binary-size(^byte_index), byte, tail::binary>> = bitset
 
     mask = 1 <<< bit_offset
 
