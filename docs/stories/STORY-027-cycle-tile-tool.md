@@ -47,6 +47,14 @@ the next shore variant instead of jumping from shore into grassland. Plain
 ±1 is the right first version: simple, predictable, and exactly what Kevin
 described.
 
+## Continents (landmass layer)
+
+A Cycle step can turn land into water or back (e.g. stepping from a
+shore picture into grassland). Until the landmass rule is decoded
+(STORY-029), **flag** such steps rather than silently leaving the tile's
+continent ID stale: show a warning in the readout, and record the change
+for the edit checker.
+
 ## Definition of done
 
 - In edit mode with **Cycle** selected, clicking a tile on #134 shows #135

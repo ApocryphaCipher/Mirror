@@ -36,7 +36,7 @@ There is no automatic neighbor-mask → tile-variant logic on this path at
 all — this explains why "ocean and land" work (those are simple/unrotated
 lookups) but edges never got done automatically.
 
-### 2. MOMIME PNG index ([lib/mirror/momime_png_index.ex](../../lib/mirror/momime_png_index.ex))
+### 2. MOMIME PNG index (lib/mirror/momime_png_index.ex (removed in #13))
 
 Reads `resources-map.txt` from an extracted MOMIME client graphics dump
 (`terrain/<plane>/<terrain_kind>/<mask>-frame<N>.png`). This is where the
@@ -46,7 +46,7 @@ rotation logic Kevin remembers actually lives:
   neighbor direction (N, NE, E, SE, S, SW, W, NW) — not a binary bit-flag.
   Even indices (cardinals) are `0`/`1` (water/land). Odd indices
   (diagonals) are `0`/`1`/`2` — see `shore_mask_digits/3` in
-  [lib/mirror/quality/shore_mask.ex](../../lib/mirror/quality/shore_mask.ex) for how Mirror currently computes
+  lib/mirror/quality/shore_mask.ex (removed in #13) for how Mirror currently computes
   this from the save's terrain grid.
 - `Mirror.Quality.ShoreMask` (692 lines) + its JS mirror in `map_hooks.js`
   implement: mask computation, 90°-rotation search (masks are stored in one

@@ -81,7 +81,7 @@ STORY-011 → STORY-013.
 - [STORY-010](../stories/STORY-010-cities.md): cities
 - [STORY-011](../stories/STORY-011-sites-towers-lairs.md): towers, fortresses, lairs, ruins and other sites
 - [STORY-012](../stories/STORY-012-units-with-banner-plaques.md): units with banner-colour plaques
-- [STORY-013](../stories/STORY-013-roads-minerals-corruption.md): roads, minerals, corruption
+- [STORY-013](../stories/STORY-013-roads-minerals-corruption.md): specials and bonuses (ores, gems, nightshade, wild game…), roads, corruption
 
 Superseded from the original scoping above: the plan to use MOMIME
 `overland/cities` / `overland/mapFeatures` PNGs. Classic LBX art is the
