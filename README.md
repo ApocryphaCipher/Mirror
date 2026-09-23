@@ -1,42 +1,39 @@
 # Mirror
 
-Mirror reads a classic *Master of Magic* (1994 DOS) save file and draws the
-overland map — terrain, coastlines, both planes (Arcanus/Myrror) — using the
-game's own logic for which tile art goes where. It's a Phoenix/LiveView app;
-the map renders live in the browser from a save you load in.
+Mirror is a viewer and editor for classic *Master of Magic* (1994 DOS) save
+files. It reads a `SAVEn.GAM`, draws the overland map of both planes
+(Arcanus and Myrror) with the game's own tile art, and lets you edit the
+terrain and save the result back to a new `.GAM`. It's a Phoenix/LiveView
+app; everything renders live in the browser.
 
-**Status, honestly:** terrain renders directly from the game's own
-`TERRAIN.LBX`. A save's terrain value is a tile number into that file, so
-there's no classification or smoothing step. Both planes match a
-reference decode pixel for pixel. See
-[docs/reference/classic-terrain-format.md](docs/reference/classic-terrain-format.md). Cities, towers, and other overland features are not implemented yet
-([EPIC-004](docs/epics/EPIC-004-overland-map-features.md)). [docs/epics/](docs/epics/) is the living status. This
-paragraph is a summary, not the source of truth.
+**Status:** terrain renders directly from the game's `TERRAIN.LBX` and
+matches a reference decode pixel for pixel. The map pages have a view mode
+(zoom, pan, hover readout) and an edit mode: cycle or paint tiles, undo/redo,
+Save as. Overland features (cities, units, towers, sites, roads, specials)
+are next. The sprites for all of them are identified and decode correctly
+([sprite catalog](docs/reference/overland-sprites-and-save-blocks.md)), but
+they aren't drawn on the map yet ([EPIC-004](docs/epics/EPIC-004-overland-map-features.md)).
+[docs/epics/](docs/epics/) is the living status; this paragraph is a summary.
 
 ## Quick start
 
 You need:
 
-- Elixir/Erlang (see `mix.exs` for version constraints)
-- Your own copy of the classic *Master of Magic* game files (LBX files) —
-  Mirror doesn't ship these, you provide them. It needs a **complete**
-  install (the GOG release works); some CD-era installs leave
-  `TERRAIN.LBX` and friends on the disc.
-- A save file (`.GAM`) from that install
+- Elixir 1.20.4 / Erlang/OTP 29.1 (what CI uses; `mix.exs` has the minimum).
+- Your own copy of the classic game files. Mirror doesn't ship them; they
+  are copyrighted and must never be committed. You need a **complete**
+  install (the GOG release works). CD-era installs often leave
+  `TERRAIN.LBX` and others on the disc.
+- A save file (`SAVEn.GAM`) from that install.
 
 ```bash
-mix setup   # deps.get + assets.setup + assets.build
+mix setup
 ```
 
-Then either:
-
-```bash
-mix phx.server   # bare — you'll need to set MIRROR_MOM_PATH and the
-                  # MIRROR_*_OFFSET env vars yourself, see config/runtime.exs
-```
-
-or use [scripts/dev_server.sh](scripts/dev_server.sh), which sets all of that for you — edit the
-paths at the top of the script to point at your own install, then:
+Then start the server with [scripts/dev_server.sh](scripts/dev_server.sh). It sets
+`MIRROR_MOM_PATH` (the game directory, default `~/.mirror_assets/GOG`) and
+the save-block offsets (`MIRROR_*_OFFSET`). Edit the paths at the top for
+your install.
 
 ```bash
 bash scripts/dev_server.sh
@@ -44,41 +41,56 @@ bash scripts/dev_server.sh
 
 Visit `localhost:4000`:
 
-- `/arcanus`, `/myrror` — the map viewer for each plane. Load a save via the
-  path field in the header.
-- `/lab/arcanus`, `/lab/myrror` — the research workbench: raw layers,
-  value/bit labelling, histograms, the raw-value painter, snapshots, save.
-- `/tile-probe` — the LBX explorer/tinker tool: browse raw LBX entries,
-  inspect decoded palette indices, hex-dump entries, test palette sources
-  against each other. Built for exactly the kind of format archaeology this
-  project needs a lot of.
+- `/arcanus`, `/myrror`: the map for each plane. Load a save with the path
+  field in the header (it defaults to `$MIRROR_MOM_PATH/SAVE1.GAM`), then
+  ✎ Edit to change terrain.
+- `/lab/arcanus`, `/lab/myrror`: the research workbench. Raw layers,
+  value/bit labelling, histograms, the raw-value painter.
+- `/tile-probe`: the LBX explorer. Browse any LBX file's entries by name,
+  preview images and animation frames in the game palette, and inspect
+  palette indices and hex dumps.
 
-## Why this needs real reverse-engineering, and how that's tracked
+## Tests
 
-Mirror depends on undocumented binary formats (the classic save file, the
-LBX asset containers) and on correctly reimplementing game logic nobody
-published. The approach that's worked, repeatedly: find a primary source
-(the actual game's own data, or another independent implementation) instead
-of guessing from patterns — see [docs/notes/](docs/notes/) and
-[docs/reference/](docs/reference/) for what's been found and where it came from
-(MOMIME's production ruleset, a classic-save editor's source, the
-community save-format wiki).
+```bash
+mix test                  # everything that doesn't need game files
+bash scripts/test_game.sh # everything, using dev_server.sh's game-file env
+```
 
-**`docs/` is where the actual project state lives** — epics, stories,
-backlog, research notes. This README is an entry point, not a substitute
-for it. If you're picking this project back up (human or AI), start at
-[docs/README.md](docs/README.md).
+Tests that need real game files are skipped when `MIRROR_MOM_PATH` doesn't
+point at them, so CI (which has no game files) runs `mix test` only.
+
+## Contributing
+
+All changes go through a pull request: branch, commit, open a PR, CI
+passes, merge. Nobody pushes to `main` directly. CI runs
+`mix format --check-formatted`, `mix compile --warnings-as-errors` and
+`mix test` on every PR and on `main`.
+
+Coding standards and project conventions, for humans and AI agents, are in
+[AGENTS.md](AGENTS.md).
+
+## How the project is tracked
+
+Mirror depends on undocumented binary formats (the save file, the LBX asset
+containers) and on reimplementing game logic nobody published. What has
+worked every time is finding a primary source instead of guessing from
+patterns: the game's own data files, or an independent implementation.
+[docs/reference/](docs/reference/) holds the format write-ups and where
+each fact came from; [docs/notes/](docs/notes/) holds dated session notes.
+
+**`docs/` is where the project state lives:** epics, stories, the backlog
+and research notes. If you're picking this project up (human or AI), start
+at [docs/README.md](docs/README.md).
 
 ## Keeping this file current
 
-This README should describe what Mirror *actually does right now*, not
-what it's supposed to do eventually — that belongs in `docs/epics/`.
-Update the Status line above when something in `docs/epics/` materially
-changes (a feature actually works now, or a fix landed), not more often
-than that.
+This README describes what Mirror does *now*; plans belong in `docs/epics/`.
+Update the Status paragraph when something in `docs/epics/` materially
+changes (a feature starts working, or a fix lands), not more often.
 
 ## Attribution
 
-Mirror's rendering logic is informed by the MOMIME project (GPLv2) — see
-[NOTICE.md](NOTICE.md) and [docs/reference/momime-source/](docs/reference/momime-source/) for specifics
-and citations.
+Mirror's early rendering logic was informed by the MOMIME project (GPLv2).
+See [NOTICE.md](NOTICE.md) and [docs/reference/momime-source/](docs/reference/momime-source/) for
+details and citations.
