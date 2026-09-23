@@ -77,7 +77,7 @@ Suggested order: STORY-006 → STORY-009 → STORY-010 → STORY-012 →
 STORY-011 → STORY-013.
 
 - [STORY-006](../stories/STORY-006-sprite-groundwork.md): sprite groundwork (full GOG install, named-sprite catalog). **Done**: catalog in [../reference/overland-sprites-and-save-blocks.md](../reference/overland-sprites-and-save-blocks.md)
-- [STORY-009](../stories/STORY-009-overlay-layer-toggles.md): overlay layers with on/off toggles
+- [STORY-009](../stories/STORY-009-overlay-layer-toggles.md): overlay layers with on/off toggles. **Done**
 - [STORY-010](../stories/STORY-010-cities.md): cities
 - [STORY-011](../stories/STORY-011-sites-towers-lairs.md): towers, fortresses, lairs, ruins and other sites
 - [STORY-012](../stories/STORY-012-units-with-banner-plaques.md): units with banner-colour plaques

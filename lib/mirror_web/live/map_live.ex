@@ -27,6 +27,17 @@ defmodule MirrorWeb.MapLive do
     computed_adj_mask: "Adjacency Mask"
   }
 
+  # Map-page overlay layers (STORY-009), bottom to top. Drawn client-side by
+  # map_overlays.js on a canvas above the terrain; each story that decodes a
+  # layer's save data fills it in.
+  @overlay_layers [
+    {:roads, "Roads & specials", "STORY-013"},
+    {:auras, "Node auras", "STORY-008"},
+    {:sites, "Sites", "STORY-011"},
+    {:cities, "Cities", "STORY-010"},
+    {:units, "Units", "STORY-012"}
+  ]
+
   @phase_loop_max 32
   @phase_loop_fallback 8
   @phase_loop_threshold 0
@@ -1628,23 +1639,59 @@ defmodule MirrorWeb.MapLive do
               phx-update="ignore"
               class="relative touch-none select-none overflow-hidden bg-slate-950"
             >
-              <.map_canvas
-                plane={@plane}
-                interaction={if @edit, do: "edit", else: "view"}
-                map_width={@map_width}
-                map_height={@map_height}
-                active_layer={@active_layer}
-                encoded_layer={@encoded_layer}
-                terrain_encoded={@terrain_encoded}
-                terrain_flags_encoded={@terrain_flags_encoded}
-                minerals_encoded={@minerals_encoded}
-                exploration_encoded={@exploration_encoded}
-                landmass_encoded={@landmass_encoded}
-                adj_mask_encoded={@adj_mask_encoded}
-                render_mode={@render_mode}
-                phase_index={@phase_index}
-                snapshot_mode={@snapshot_mode}
-              />
+              <div data-map-stage class="relative w-max">
+                <.map_canvas
+                  plane={@plane}
+                  interaction={if @edit, do: "edit", else: "view"}
+                  map_width={@map_width}
+                  map_height={@map_height}
+                  active_layer={@active_layer}
+                  encoded_layer={@encoded_layer}
+                  terrain_encoded={@terrain_encoded}
+                  terrain_flags_encoded={@terrain_flags_encoded}
+                  minerals_encoded={@minerals_encoded}
+                  exploration_encoded={@exploration_encoded}
+                  landmass_encoded={@landmass_encoded}
+                  adj_mask_encoded={@adj_mask_encoded}
+                  render_mode={@render_mode}
+                  phase_index={@phase_index}
+                  snapshot_mode={@snapshot_mode}
+                />
+                <canvas
+                  id="map-overlays"
+                  phx-hook="MapOverlays"
+                  data-map-width={@map_width}
+                  data-map-height={@map_height}
+                  data-tile-size="32"
+                  class="pointer-events-none absolute left-0 top-0"
+                  aria-hidden="true"
+                >
+                </canvas>
+              </div>
+
+              <details
+                id="overlay-layers-panel"
+                data-overlay-panel
+                open
+                class="absolute bottom-16 right-4 z-10 rounded-xl border border-white/10 bg-slate-950/85 px-3 py-2 text-sm text-slate-200 shadow-lg"
+              >
+                <summary class="cursor-pointer select-none font-semibold">Layers</summary>
+                <ul class="mt-2 space-y-1">
+                  <li :for={{layer, label, story} <- Enum.reverse(overlay_layers())}>
+                    <label class="flex items-center gap-2" title={"Data arrives with #{story}"}>
+                      <input
+                        type="checkbox"
+                        data-overlay-toggle
+                        data-for="map-overlays"
+                        value={layer}
+                        checked
+                        class="rounded border-white/20 bg-slate-900"
+                      />
+                      <span>{label}</span>
+                    </label>
+                  </li>
+                </ul>
+              </details>
 
               <div class="absolute bottom-4 right-4 flex items-center gap-1 rounded-xl border border-white/10 bg-slate-950/85 p-1 text-sm text-slate-200 shadow-lg">
                 <button
@@ -1777,6 +1824,8 @@ defmodule MirrorWeb.MapLive do
 
   defp hex_word(value) when is_integer(value),
     do: "0x" <> String.pad_leading(Integer.to_string(value, 16), 3, "0")
+
+  defp overlay_layers, do: @overlay_layers
 
   defp plane_name(:arcanus), do: "Arcanus"
   defp plane_name(:myrror), do: "Myrror"

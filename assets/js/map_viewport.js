@@ -1,7 +1,9 @@
 // Pan/zoom container for the map canvas on the map pages (view mode).
 //
 // The canvas keeps rendering at its fixed resolution; this hook only applies
-// a CSS transform, so zooming never re-renders. `image-rendering: pixelated`
+// a CSS transform, so zooming never re-renders. The transform goes on the
+// `[data-map-stage]` wrapper when there is one, so the overlay canvas stacked
+// over the terrain (map_overlays.js) moves with it. `image-rendering: pixelated`
 // keeps tiles crisp, and MapCanvas's hover picking keeps working because it
 // reads the transformed bounding rect.
 
@@ -11,7 +13,8 @@ const MIN_VISIBLE_PX = 120
 
 const MapViewport = {
   mounted() {
-    this.canvas = this.el.querySelector("canvas")
+    this.canvas = this.el.querySelector("#map-canvas") || this.el.querySelector("canvas")
+    this.stage = this.el.querySelector("[data-map-stage]") || this.canvas
     this.zoomLabel = this.el.querySelector("[data-zoom-label]")
     this.scale = 1
     this.tx = 0
@@ -21,7 +24,8 @@ const MapViewport = {
     this.editing = this.canvas.dataset.interaction === "edit"
     window.__mirrorSpaceHeld = false
 
-    this.canvas.style.transformOrigin = "0 0"
+    this.stage.style.transformOrigin = "0 0"
+    this.stage.querySelectorAll("canvas").forEach(c => (c.style.imageRendering = "pixelated"))
     this.canvas.style.imageRendering = "pixelated"
 
     this.onResize = () => {
@@ -189,7 +193,7 @@ const MapViewport = {
   },
 
   apply() {
-    this.canvas.style.transform = `translate(${this.tx}px, ${this.ty}px) scale(${this.scale})`
+    this.stage.style.transform = `translate(${this.tx}px, ${this.ty}px) scale(${this.scale})`
     if (this.zoomLabel) this.zoomLabel.textContent = `${Math.round(this.scale * 100)}%`
   },
 }

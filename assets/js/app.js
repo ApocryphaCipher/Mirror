@@ -25,6 +25,7 @@ import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/mirror"
 import {MapCanvas} from "./map_hooks"
 import {MapViewport} from "./map_viewport"
+import {MapOverlays} from "./map_overlays"
 import {RgbaCanvas} from "./lbx_hooks"
 import topbar from "../vendor/topbar"
 
@@ -53,7 +54,7 @@ const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, MapCanvas, MapViewport, RgbaCanvas, StableInput},
+  hooks: {...colocatedHooks, MapCanvas, MapOverlays, MapViewport, RgbaCanvas, StableInput},
 })
 
 // Show progress bar on live navigation and form submits
