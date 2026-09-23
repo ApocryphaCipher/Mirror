@@ -21,8 +21,10 @@ pull requests with green CI.
 - **[AGENTS.md](../../AGENTS.md)**: the project's coding standards and
   conventions, adapted from the Shiba baseline.
 - **README** rewritten for what Mirror does now.
-- **Branch protection on `main`**: see the PR that added this epic for the
-  exact rules. No direct pushes, PR required, CI required.
+- **Branch protection on `main`** (applied 2026-09-23, Kevin's go-ahead):
+  pull request required (0 approvals, since PRs are opened under Kevin's
+  own account and GitHub won't let him approve them), CI's `test` check must
+  pass, enforced for admins too, no force-pushes, no deletion.
 
 - **Game-file import** (`mix mirror.import_game`, `Mirror.GameFiles`,
   2026-09-23): copies the files Mirror needs out of the user's own install
