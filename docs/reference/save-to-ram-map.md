@@ -34,7 +34,7 @@ is constant within a block.
 | `0x09D8` | 8 × 2 | `0x03478C` down to `0x03477E` | 8 u16 counters in the data segment, written one by one in reverse address order; `0x09E2` is the unit count (`0x034782`), `0x09E0` *guess:* the city count |
 | `0x09E8` | 7344 | `0x0328BA` | **Wizard records** (5 × 0x4C8 = 6120) and what follows them to `0x2698` |
 | `0x2698` | 9600 | `0x072630` | Terrain, 2 planes × 2400 × u16 |
-| `0x4C18` | 192 | `0x074BE0` | unknown (two 192-byte blocks, 0x30 apart in RAM) |
+| `0x4C18` | 192 | `0x074BE0` | unknown (two 192-byte blocks; their RAM − file offsets differ by 0x30) |
 | `0x4CD8` | 192 | `0x074CD0` | unknown |
 | `0x4D98` | 4800 | `0x074DC0` | Landmass, 2 × 2400 |
 | `0x6058` | 1440 | `0x085FE0` | Nodes, 30 × 48 (the live copy; the one at `0x087010` is stale) |
