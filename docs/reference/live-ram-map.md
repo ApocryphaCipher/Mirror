@@ -139,8 +139,8 @@ Hamburg's size byte, still 1 at 5,700 people, was **2** by `cp33`, so it
 does update, just not at the first end of turn after crossing 5,000;
 what triggers it is still open.
 
-Three starting capitals, Hamburg, Capua (`cp37`) and Cremona (`cp38`),
-have exactly building ids 3, 8 and 32 built, so that is the starting set; *guess:*
+Four starting capitals, Hamburg, Capua (`cp37`), Cremona (`cp38`) and
+Sidon (`cp39`), have exactly building ids 3, 8 and 32 built, so that is the starting set; *guess:*
 Barracks, Smithy, Builder's Hall.
 
 Bytes **`+67..+92`** are zero in every city: 26 bytes, the number of
@@ -368,6 +368,7 @@ In `~/.mirror/dev/DOSbox/ram-dumps-2026-09-23/`, each a full 16 MB:
 | `cp34_cartographer_arcanus.bin` | just after closing the Cartographer (Arcanus); game data identical to `cp35` |
 | `cp36_surveyor_capua.bin`, `cp37_capua_city_screen.bin` | Surveyor on Capua, then Capua's city screen (Hamlet, Nomad, no enchantments) |
 | `cp38_surveyor_cremona.bin` | Surveyor on Cremona (Merlin's capital) |
+| `cp39_surveyor_sidon.bin` | Surveyor on Sidon (Jafar's capital), no specials nearby |
 | `cp35_cartographer_open.bin` | Cartographer open on Arcanus. The screen is graphics: "Arcanus Plane" is not text, and legend names come from the wizard records |
 | `cp26`–`cp31` | Sorcery node in Surveyor; next turn after the teleport; first combat turn at the node; mid-fight; back on the map after winning; node melded (sparkles) |
 | `cp20`–`cp25` | Surveyor open, hovering: Hamburg area, gold ore (39, 20), wild game (38, 19), gems (32, 25), Myrror adamantium (28, 25), Myrror Keep (26, 25); screenshots `surveyor-*.webp` beside them |

@@ -28,6 +28,7 @@ What the game shows (screenshots in
 | Swamp with Nightshade, (46, 16), beside the neutral city Steyr (47, 16) | "Swamp / 1/2 food", "Nightshade / Protects city from spells", then the too-close message. RAM (`cp32_surveyor_nightshade.bin`): terrain 166, minerals plane **128**, Mirror's value for Nightshade |
 | Capua, Sharee's capital (11, 26), a Nomad hamlet of 4,640 | "Forest / 1/2 food / +3% production", "Hamlet of Capua", **City Resources: Maximum Pop 13, Prod Bonus +23%, Gold Bonus +12%**. Its catchment's only special is Silver at (9, 26). RAM (`cp36_surveyor_capua.bin`) |
 | Cremona, Merlin's capital (15, 11), a Nomad hamlet of 3,260 on a mountain ring | "Mountain / +5% production", "Hamlet of Cremona", **City Resources: Maximum Pop 8, Prod Bonus +63%, Gold Bonus +9%**. Catchment specials: Coal (15, 10), Gold (16, 11); Nightshade (11, 10) lies just outside. RAM (`cp38_surveyor_cremona.bin`) |
+| Sidon, Jafar's capital (55, 29), a Nomad hamlet of 4,640 on a narrow island | "Grasslands / 1 1/2 food", "Hamlet of Sidon", **City Resources: Maximum Pop 14, Prod Bonus +6%, Gold Bonus +12%**. **No specials in the catchment**, so terrain alone gives these: the simplest case for the formula. RAM (`cp39_surveyor_sidon.bin`) |
 
 So there are two parts:
 
@@ -61,7 +62,9 @@ Nothing here is checked yet. Candidates:
 **City Resources are computed, not stored** (checked on three cities):
 no byte of Hamburg's record holds 19, 60 or 50, none of Capua's holds 13
 or 23 (its two 12s are the per-turn figures at `+96` and `+100`), and
-none of Cremona's holds 8, 63 or 9.
+none of Cremona's holds 8, 63 or 9, and Sidon's only match is a 12 at
+`+100` (Capua also has 12 there with +12% gold, but Hamburg's `+100` is
+10 against +50%, so it is not the bonus).
 So Mirror must compute them from the tiles, like the game.
 
 ## Checking it
