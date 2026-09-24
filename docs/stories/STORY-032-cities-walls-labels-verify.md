@@ -64,6 +64,9 @@ the save's bytes with what the game drew. Record each result here.
 
 ## Findings from the god-mode playthrough (2026-09-23)
 
+These saves are backed up in `~/.mirror/dev/DOSbox/FREYA - God Mode/saves-2026-09-23/`;
+the live slots will be reused.
+
 Saves `SAVE4`–`SAVE9` ("CG Build", "Explore", "Road Locat", "Speger",
 "Settlement") plus 58 window shots in
 `~/.mirror/dev/DOSbox/FREYA - God Mode/`, lined up by timestamp. Diffing

@@ -16,7 +16,9 @@ Each claim is marked with how it was checked:
   screenshot (AGENTS.md §6);
 - **kazzmir**: from kazzmir's code only; still to check.
 
-Saves are `~/DOS/MAGIC/SAVE1`–`9`; see
+The saves are the Freya checkpoints, backed up in
+`~/.mirror/dev/DOSbox/FREYA - God Mode/saves-2026-09-23/` (with `MAGIC.SET` and
+checksums). The live slots in `~/DOS/MAGIC` will be overwritten. See
 [../notes/2026-09-23-evening-handoff.md](../notes/2026-09-23-evening-handoff.md).
 
 **Trust the loader, not the drawing code.** kazzmir's rendering makes

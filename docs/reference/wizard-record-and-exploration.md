@@ -1,7 +1,8 @@
 # Wizard record and the explored map
 
 Found 2026-09-23 while editing Kevin's "Freya - God mode" save
-(`~/DOS/MAGIC/SAVE3.GAM`): fog of war removed, retorts added.
+(`~/DOS/MAGIC/SAVE3.GAM`): fog of war removed, retorts added. Backup of the
+saves, before and after the edit: `~/.mirror/dev/DOSbox/FREYA - God Mode/saves-2026-09-23/`.
 
 **Sources:**
 - kazzmir's Go remake,
