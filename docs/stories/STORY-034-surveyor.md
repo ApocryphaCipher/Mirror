@@ -42,6 +42,15 @@ Nothing here is checked yet. Candidates:
 - Where a city is allowed: the game's own rule is on screen (not less than
   3 squares from any other city).
 
+- **The game's own wording:** a RAM dump taken with Surveyor open
+  (`cp20_surveyor_open.bin`, see
+  [live-ram-map.md](../reference/live-ram-map.md)) has the panel's static
+  strings in the data segment around `ds+0x5352`: "Surveyor", "Maximum
+  Pop", "Prod Bonus", "Gold Bonus", then terrain words ("River", "Hills"
+  near `ds+0x5400..0x5490`). The shown text is assembled in a scratch
+  buffer near `ds+0xd5a4`. The numbers are not kept as text, so the game
+  computes them on hover; Mirror has to compute them too.
+
 ## Checking it
 
 Per AGENTS.md §6, the numbers need the game's own confirmation:
