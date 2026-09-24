@@ -75,6 +75,16 @@ First session: 2026-09-23. Dumps and the matching save are in
   to place the blocks we haven't found (heroes, explored map, the block
   above 1 MB) without guessing.
 
+- **Memory signatures:** start DOSBox with
+  `--set webserver_signature_dir=$HOME/repo/python/gama/signatures/mom` and
+  the fork watches memory as you play: every city's population, size,
+  buildings and enchantments, node owners, cleared lairs, the unit count,
+  the minerals map, and Freya's fame, research, summoning circle and
+  combat skill. Each change goes to `hits.jsonl` there with old and new
+  values and a window of the memory around it; some also take a
+  screenshot. A signature can pause the game so a `gama checkpoint`
+  catches the moment. See gama's README and `signatures/mom/`.
+
 ## How to work with it
 
 The game is turn-based, so Kevin stops at a **checkpoint** (a screen that
