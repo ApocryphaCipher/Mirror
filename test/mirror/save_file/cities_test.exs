@@ -41,10 +41,25 @@ defmodule Mirror.SaveFile.CitiesTest do
              plane: :arcanus,
              owner: 0,
              size: 1,
-             population: 4
+             population: 4,
+             walled: false
            }
 
     assert %{name: "Bloodrock", plane: :myrror, owner: 2, size: 2} = bloodrock
+  end
+
+  test "City Walls is building byte +66: 1 built; 0xFF (not built) and 0 (replaced) are not" do
+    buildings = fn walls -> :binary.copy(<<0xFF>>, 32) <> <<walls>> end
+    walled = city("Norport", 38, 21, 0, 0, 1, 4) <> :binary.copy(<<0>>, 13) <> buildings.(1)
+    open = city("Posen", 31, 24, 0, 5, 1, 4) <> :binary.copy(<<0>>, 13) <> buildings.(0xFF)
+    replaced = city("Odd", 1, 1, 0, 5, 1, 4) <> :binary.copy(<<0>>, 13) <> buildings.(0)
+
+    assert {:ok, [%{walled: true}, %{walled: false}, %{walled: false}]} =
+             Cities.parse(save([walled, open, replaced]))
+  end
+
+  test "size classes the game names; unseen ones are numbered" do
+    assert Enum.map(0..3, &Cities.size_name/1) == ["Outpost", "Hamlet", "Village", "size 3"]
   end
 
   test "only the first `count` records are live" do

@@ -9,8 +9,9 @@ defmodule Mirror.OverlaySprites do
   alias Mirror.LBX
   alias Mirror.LBX.Palette
 
-  # #20 MAPCITY is what the game draws for an ordinary (unwalled) city,
-  # checked in-game on SAVE1 (2026-09-23). #21 CITYNOWA's use is unknown.
+  # #20 MAPCITY is what the game draws for every city, walled or not
+  # (checked in DOSBox, STORY-032). #21 CITYNOWA's frames are #20's without
+  # the stone ring; its use is unknown.
   @cities %{city: 20, citynowa: 21}
 
   @doc """

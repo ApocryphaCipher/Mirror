@@ -249,9 +249,36 @@ defmodule MirrorWeb.MapLiveEditTest do
 
       assert_push_event(view, "overlay_data", %{layer: "cities", items: items})
       assert length(items) == 16
-      assert %{x: 38, y: 21, size: 1, banner: :yellow, name: "Deventor"} in items
+      assert %{x: 38, y: 21, size: 1, banner: :yellow, name: "Deventor", walled: false} in items
 
       assert_push_event(view, "overlay_sprites", %{cities: %{city: %{width: 32, height: 30}}})
     end
+
+    test "the hover readout names the city under the pointer (STORY-032)", %{
+      conn: conn,
+      save: save
+    } do
+      # City Walls for record 0 (Deventor): byte +66 of the block at 0x8aac.
+      File.write!(save, put_byte(File.read!(save), 0x8AAC + 66, 1))
+
+      {:ok, view, _} = live(conn, ~p"/arcanus")
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+
+      assert_push_event(view, "overlay_data", %{layer: "cities", items: items})
+      assert %{name: "Deventor", walled: true} = Enum.find(items, &(&1.name == "Deventor"))
+
+      pointer(view, "hover", 38, 21)
+
+      assert view |> element("#hover-city") |> render() |> text_of() =~
+               ~r/Deventor\s+\(Hamlet, walled\)/
+
+      pointer(view, "hover", 0, 0)
+      refute has_element?(view, "#hover-city")
+    end
+  end
+
+  defp put_byte(raw, at, byte) do
+    <<head::binary-size(^at), _, tail::binary>> = raw
+    head <> <<byte>> <> tail
   end
 end

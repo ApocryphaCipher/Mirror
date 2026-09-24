@@ -1730,6 +1730,12 @@ defmodule MirrorWeb.MapLive do
           >
             {plane_name(@plane)} ({@hover.x}, {@hover.y}) · tile {@hover.terrain}
             <span class="text-slate-500">({hex_word(@hover.terrain)})</span>
+            <span :if={@hover.city} id="hover-city" class="text-amber-200">
+              · {@hover.city.name}
+              <span class="text-slate-400">
+                ({Cities.size_name(@hover.city.size)}{if @hover.city.walled, do: ", walled"})
+              </span>
+            </span>
             <span :if={@edit && @tool == :cycle} class="text-emerald-300">
               → {Integer.mod(@hover.terrain + 1, TerrainLbx.tiles_per_plane())}
             </span>
@@ -2559,7 +2565,8 @@ defmodule MirrorWeb.MapLive do
           original_value: original_tile_value(state, plane, layer, x, y),
           adj_mask: adj,
           rays: rays,
-          engine_tile: engine_tile
+          engine_tile: engine_tile,
+          city: city_at(state, plane, x, y)
         }
       else
         nil
@@ -2841,7 +2848,8 @@ defmodule MirrorWeb.MapLive do
             y: city.y,
             size: city.size,
             banner: Map.get(banners, city.owner, :neutral),
-            name: city.name
+            name: city.name,
+            walled: city.walled
           }
         end
 
@@ -2851,6 +2859,13 @@ defmodule MirrorWeb.MapLive do
   end
 
   defp city_items(_state, _plane), do: []
+
+  defp city_at(%{save: %{raw: raw}}, plane, x, y) do
+    case Cities.parse(raw) do
+      {:ok, cities} -> Enum.find(cities, &match?(%{plane: ^plane, x: ^x, y: ^y}, &1))
+      {:error, _} -> nil
+    end
+  end
 
   # The map pages always show terrain art with no research overlays; the
   # Lab uses whatever the session has.
