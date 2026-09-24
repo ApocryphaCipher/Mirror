@@ -77,6 +77,7 @@ STORY-017 → then the rest as their EPIC-004 data stories land.
 - [STORY-027](../stories/STORY-027-cycle-tile-tool.md): Cycle tool (click = next tile picture); Paint becomes its own tool
 - [STORY-028](../stories/STORY-028-floating-tool-palette.md): floating emoji tool palette with Cycle instructions and a Paint panel (nice-to-have)
 - [STORY-029](../stories/STORY-029-safe-editing-see-everything.md): safe editing: see everything, flag impossible states (later; blocked on EPIC-004)
+- [STORY-034](../stories/STORY-034-surveyor.md): Surveyor readout: tile value and City Resources, matched against the game's Surveyor
 
 Dependencies: 018–020 need the matching EPIC-004 decode stories
 (013 roads/minerals, 010 cities, 011 sites, 012 units) first. 017 needs
