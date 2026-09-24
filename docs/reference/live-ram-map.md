@@ -12,10 +12,10 @@ First session: 2026-09-23. Dumps and the matching save are in
 
 - **Source:** `~/repo/c++/dosbox-staging`, a fork of DOSBox Staging
   (`ApocryphaCipher/dosbox-staging`, GPL). Upstream already has an HTTP
-  API (`src/webserver/`); the fork's branch `webserver-write-guard` only
-  adds `webserver_allow_writes` (off by default: memory writes,
-  allocate/free and shutdown return 403) and refuses non-loopback bind
-  addresses.
+  API (`src/webserver/`); the fork's branch `webserver-write-guard` adds
+  `webserver_allow_writes` (off by default: memory writes, allocate/free
+  and shutdown return 403), refuses non-loopback bind addresses, and adds
+  a **screenshot endpoint** (below).
 - **Build:**
   `VCPKG_ROOT=$HOME/vcpkg cmake --preset=debug-macos && cmake --build --preset=debug-macos`.
   The binary is `build/debug-macos/Debug/dosbox`. If configure says
@@ -39,11 +39,27 @@ First session: 2026-09-23. Dumps and the matching save are in
   ```
 
   Writes stay off. Don't ask for them unless Kevin wants to poke the game.
+- **Screenshot** of the next frame, taken on the emulation thread like
+  the screenshot hotkeys:
+
+  ```bash
+  curl -s -X POST http://127.0.0.1:8086/api/v1/capture/screenshot                 # raw: the game's own frame (320x200 in-game)
+  curl -s -X POST "http://127.0.0.1:8086/api/v1/capture/screenshot?type=rendered" # what Kevin sees (CRT shader)
+  curl -s -X POST "http://127.0.0.1:8086/api/v1/capture/screenshot?inline=1" -o shot.png
+  ```
+
+  It answers with `{"path": ...}` once the PNG is complete (files land in
+  `~/Library/Preferences/DOSBox/capture/`), or with the PNG itself for
+  `inline=1`. Types: `raw` (default), `upscaled`, `rendered`. **At each
+  checkpoint take a raw screenshot together with the dump** and keep it
+  beside the dump, so the bytes and the screen are from the same moment.
+  Raw frames keep the exact palette colours, for sprite and flag checks.
 
 ## How to work with it
 
 The game is turn-based, so Kevin stops at a **checkpoint** (a screen that
-waits for input) and says so; the agent dumps; Kevin does one thing; the
+waits for input) and says so; the agent dumps (and screenshots) at once,
+before anything else; Kevin does one thing; the
 agent dumps again and diffs. Useful checkpoints: right after loading a
 save, the start of a turn on the map, one known action (pick research, buy
 something), and right after saving to a slot.
