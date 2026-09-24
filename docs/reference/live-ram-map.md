@@ -210,6 +210,14 @@ stored. *Guess:* that is the buy-price rule when no production is stored.
 - **`+14`**, *guess:* experience. It rose 1 → 2 → 3 over two turns on
   both garrison units and stayed 0 on the (summoned) Sprites; the text
   buffer held "Regular (1 ep)" earlier. Check against a unit's ep.
+- **Unit enchantments are a bit field at `+24..+27`** (u32), checked
+  (`cp14` → `cp15`): Stone Skin cast on the Magic Spirit (slot 59; Kevin
+  saw the green aura) changed only `+25`, `0x00` → `0x08`, i.e. bit
+  **`0x800` = Stone Skin**. *guess:* the other bits follow kazzmir's
+  enchantment order, where `0x800` is also Stone Skin; re-check his code
+  before relying on it. Mana and skill left did not change between target
+  selection and cast, so *guess:* the cost is paid when the spell is
+  chosen.
 - **`+8` is moves left, `+4` moves per turn**, in half-moves. `+8`
   checked: after moving one tile the Sprites had 2 and the screen said
   "Moves: 1". Earlier evidence from the Sprites (`+4` = 4, "Moves: 2" on screen; `+8` 4 → 0
@@ -240,4 +248,7 @@ In `~/.mirror/dev/DOSbox/ram-dumps-2026-09-23/`, each a full 16 MB:
 | `cp10_sprites_path.bin` | Sprites given a path east to (39, 22) |
 | `cp11_done_patrol_move.bin` | next turn: Spearmen on Patrol, Swordsmen Done, Sprites two tiles along the path |
 | `cp12_arrived_wait.bin` | next turn: Sprites arrived at (39, 22), Swordsmen on Wait |
+| `cp13_sprites_home.bin` | Sprites moved onto Hamburg's tile |
+| `cp14_stoneskin_target.bin` | later: stack of 8 Sprites + Magic Spirit at (36, 20), Stone Skin waiting for a target |
+| `cp15_stoneskin_cast.bin` | Stone Skin cast on the Magic Spirit (slot 59) |
 | `SAVE4.GAM` | the save written just before `cp4` |
