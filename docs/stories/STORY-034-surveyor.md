@@ -42,7 +42,16 @@ So there are two parts:
 
 ## Where the numbers come from
 
-Nothing here is checked yet. Candidates:
+**City Resources: solved (2026-09-24).** The formula is in
+[surveyor-formula.md](../reference/surveyor-formula.md). It was read in
+ReMoM, restated in our own words, and implemented in gama (`gama
+resources DUMP X Y [PLANE]`). It gives exactly the game's numbers for all six
+readouts above (Hamburg, Capua, Cremona, Sidon, Bloodrock and the empty
+Myrror site). Still unchecked: tiles shared with another city, road trade,
+and city enchantments. Mirror's Elixir version should port gama's
+`resources.py` (our own MIT code) and reuse the six cases as tests.
+
+The notes below are from before the formula was found. Candidates were:
 
 - Tile type: Mirror already reads the terrain (`0x002698`) and minerals
   (`0x013554`) planes, and `TERRAIN.LBX` entry 1 classifies tiles.
