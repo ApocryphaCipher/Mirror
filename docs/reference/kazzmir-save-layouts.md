@@ -36,16 +36,19 @@ Use his *layouts and tables*; check his *pictures* against DOSBox.
 | Offset | Field | Status |
 | --- | --- | --- |
 | `+0` `+1` `+2` | x, y, plane | **checked:** all 30 land on node tiles in SAVE1 |
-| `+3` | owner (i8, −1 = nobody; else wizard index = the melder) | **checked:** all −1 on turn one |
-| `+4` | power = number of aura tiles used (SAVE1: 5–20) | kazzmir |
+| `+3` | owner (i8, −1 = nobody; else wizard index = the melder) | **checked:** all −1 on turn one; live RAM: −1 → 0 when Kevin's Magic Spirit melded the Sorcery node at (42, 10) |
+| `+4` | power = number of aura tiles used (SAVE1: 5–20) | kazzmir; live RAM: 5 for the (42, 10) node, whose aura lists hold 5 tiles, the ones that sparkled |
 | `+5..+24` | aura tile x's (20 bytes) | **checked:** the first entry is the node's own tile |
 | `+25..+44` | aura tile y's (20 bytes) | same |
 | `+45` | type: **0 Sorcery, 1 Nature, 2 Chaos** | **checked:** type 0/1/2 nodes stand on terrain tiles 168/169/170 (`0xA8`/`0xA9`/`0xAA`), which kazzmir's terrain table names Sorcery/Nature/Chaos node. 10 of each |
 | `+46` | flags (*kazzmir:* warped etc.) | kazzmir |
 | `+47` | unknown | — |
 
-**Drawing** (kazzmir; the game is still to check): a node shows aura
-sparkles **only when melded**. The sparkle is `MAPBACK #(63 + banner)` of
+**Drawing:** a node shows aura sparkles **only when melded**. **checked
+in the game** (2026-09-23): the (42, 10) Sorcery node showed none until
+Kevin melded it; then its 5 aura tiles, (42, 10) (43, 10) (41, 9)
+(42, 11) (41, 10), sparkled ([live-ram-map.md](live-ram-map.md)).
+kazzmir: The sparkle is `MAPBACK #(63 + banner)` of
 the owner, drawn on each aura tile. That fits our catalog's sparkle
 entries. An unmelded node is just its terrain tile.
 
@@ -127,11 +130,12 @@ summoned creatures, e.g. tower (33, 7): Unicorns ×3 and Guardian Spirits
 **Guard count byte: two packed nibbles.** kazzmir uses only the low
 nibble (`count & 0xF`). In SAVE1 all 148 filled guard slots have the high
 nibble equal to the low one (`0x11`, `0x22` … `0x88`).
-- *Guess:* one nibble is the guards left and the other the starting
-  count, so they would differ after a fight that the player retreats
-  from.
-- *To check:* attack a lair, retreat after killing some guards, save,
-  and diff. No checkpoint save has a fight in it.
+- **checked (live RAM, 2026-09-23):** the **low nibble is the guards
+  left, the high nibble the starting count**. After Kevin's Sprites beat
+  all eight Phantom Warriors at the Sorcery node (42, 10), encounter 19's
+  count went `0x88` → `0x80`, and intact `+3` went 1 → 0
+  ([live-ram-map.md](live-ram-map.md)). A retreat mid-fight would show a
+  partial low nibble; not seen yet.
 
 **`+15` flags: *guess*, who has explored the site.** kazzmir leaves it
 unread (`ExploredBy: // FIXME`).
@@ -203,6 +207,15 @@ One byte per tile, row-major.
 | 9 | Crysx crystals | `#86` |
 | 64 | Wild game | `#92` |
 | 128 | Nightshade | `#91` |
+
+**checked in the running game** (live RAM + Surveyor, 2026-09-23, dumps
+`cp21`/`cp22` in [live-ram-map.md](live-ram-map.md)): **4** at (39, 20),
+where Surveyor said "Gold Ore +3 gold", and **64** at (38, 19), where it
+said "Wild Game +2 food"; **5** at (32, 25), where it said "Gems +5 gold"
+(`cp23`); and on **Myrror (the second plane)**, **7** at (28, 25), where it
+said "Adamantium Ore +2 power" (`cp24`; the tile was pinned by its
+neighbours: 64 at (27, 26) and (24, 23), 4 at (28, 29), 7 at (26, 29),
+all visible on screen).
 
 - **Checked:** every value in SAVE1 is 0 or one of those 11.
 - **Checked, and a correction:** `#78` is iron and `#79` is coal.
