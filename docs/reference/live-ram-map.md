@@ -257,6 +257,22 @@ go-to into the node. *guess:* the map draws units from a visibility or
 draw cache rebuilt at end of turn, and a go-to stops rather than start a
 fight. Dumps `cp26` (before) and `cp27` (next turn).
 
+**Combat, first look, 2026-09-23** (`cp28`, Kevin's stack vs the
+Sorcery node at (42, 10), start of his first combat turn):
+
+- When the battle starts, the game **creates the node's guardians as
+  overland units**: slots 74–81 held 8 Phantom Warriors (type 192) at
+  (42, 10), owner 5 (neutral). Encounter record 19 still said 8 guards
+  (`0x88`), intact.
+- A **battle unit table** sits at RAM about `0x05bd..` : 17 records, a
+  stride of `0x6e` (110) bytes, first the attacker's 9 units then the 8
+  guardians. Each record holds the overland unit slot as a u16 (at the
+  address found, `0x05bde0` for the first). *guess:* the bytes before it
+  are the unit's combat stats (identical for every Sprites record,
+  different for the Magic Spirit and the Phantom Warriors), and the u16
+  pairs after it are battlefield positions. Record start and field layout
+  are not worked out yet.
+
 ## The dumps
 
 In `~/.mirror/dev/DOSbox/ram-dumps-2026-09-23/`, each a full 16 MB:
@@ -283,5 +299,6 @@ In `~/.mirror/dev/DOSbox/ram-dumps-2026-09-23/`, each a full 16 MB:
 | `cp17_resist_on_spirit.bin` | Resist Elements on the Magic Spirit |
 | `cp18_resist_on_sprite.bin` | Resist Elements on the fourth Sprites (slot 51); Hamburg building a Marketplace |
 | `cp19_marketplace_built.bin` | next turn: Marketplace built; the stack one step along its path to (42, 10) |
+| `cp26`–`cp28` | Sorcery node in Surveyor; next turn after the teleport; first combat turn at the node |
 | `cp20`–`cp25` | Surveyor open, hovering: Hamburg area, gold ore (39, 20), wild game (38, 19), gems (32, 25), Myrror adamantium (28, 25), Myrror Keep (26, 25); screenshots `surveyor-*.webp` beside them |
 | `SAVE4.GAM` | the save written just before `cp4` |
