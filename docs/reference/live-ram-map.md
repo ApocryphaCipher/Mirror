@@ -264,10 +264,10 @@ Sorcery node at (42, 10), start of his first combat turn):
   overland units**: slots 74–81 held 8 Phantom Warriors (type 192) at
   (42, 10), owner 5 (neutral). Encounter record 19 still said 8 guards
   (`0x88`), intact.
-- A **battle unit table** sits at RAM about `0x05bd..` : 17 records, a
-  stride of `0x6e` (110) bytes, first the attacker's 9 units then the 8
-  guardians. Each record holds the overland unit slot as a u16 (at the
-  address found, `0x05bde0` for the first). *guess:* the bytes before it
+- A **battle unit table**: 17 records, `0x6e` (110) bytes apart, first
+  the attacker's 9 units, then the 8 guardians. Each record holds the
+  overland unit slot as a u16; for record *j* it is at RAM
+  `0x05bde0 + j × 0x6e`. *guess:* the bytes before it
   are the unit's combat stats (identical for every Sprites record,
   different for the Magic Spirit and the Phantom Warriors), and the u16
   pairs after it are battlefield positions. Record start and field layout
