@@ -300,6 +300,12 @@ Sorcery node at (42, 10), start of his first combat turn):
   - The node itself (record 7 of the node table, which has two copies in
     RAM at `0x085fe0` and `0x087010`) still had owner `0xff`: beating the
     guardians does not take the node; melding does.
+- **The meld** (`cp31`, a turn later, sparkles on screen): node record 7
+  owner `+3` `0xff` → 0 in the copy at **`0x085fe0`** (the live table);
+  the copy at `0x087010` did not change (*guess:* a stale copy). Its
+  aura lists name 5 tiles, which are the ones that sparkle. The Magic
+  Spirit (slot 59, type 154) was marked dead in place (plane and owner
+  `0xff`).
 
 ## The dumps
 
@@ -327,6 +333,6 @@ In `~/.mirror/dev/DOSbox/ram-dumps-2026-09-23/`, each a full 16 MB:
 | `cp17_resist_on_spirit.bin` | Resist Elements on the Magic Spirit |
 | `cp18_resist_on_sprite.bin` | Resist Elements on the fourth Sprites (slot 51); Hamburg building a Marketplace |
 | `cp19_marketplace_built.bin` | next turn: Marketplace built; the stack one step along its path to (42, 10) |
-| `cp26`–`cp30` | Sorcery node in Surveyor; next turn after the teleport; first combat turn at the node; mid-fight; back on the map after winning |
+| `cp26`–`cp31` | Sorcery node in Surveyor; next turn after the teleport; first combat turn at the node; mid-fight; back on the map after winning; node melded (sparkles) |
 | `cp20`–`cp25` | Surveyor open, hovering: Hamburg area, gold ore (39, 20), wild game (38, 19), gems (32, 25), Myrror adamantium (28, 25), Myrror Keep (26, 25); screenshots `surveyor-*.webp` beside them |
 | `SAVE4.GAM` | the save written just before `cp4` |
