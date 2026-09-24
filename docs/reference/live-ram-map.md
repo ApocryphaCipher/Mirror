@@ -55,9 +55,13 @@ First session: 2026-09-23. Dumps and the matching save are in
   beside the dump, so the bytes and the screen are from the same moment.
   Raw frames keep the exact palette colours, for sprite and flag checks.
 
-- **Analyse** with gama (`~/repo/python/gama`): `uv run gama ingest
-  <dumps>` stores and decodes dumps into SQLite, `uv run gama sql "..."`
-  queries them. See its README.
+- **Keep and analyse** with [Evi](https://github.com/ApocryphaCipher/evi)
+  and [gama](https://github.com/ApocryphaCipher/gama): with
+  `EVI_HOME=~/repo/mom-evi-vault`, `uv run gama ingest <dumps>
+  --collection <name>` adds dumps to the private Evi vault (stored as
+  shared pages, with provenance) and decodes them into SQLite;
+  `uv run gama sql "..."` queries them. Screenshots and other evidence go
+  in with `evi add`, and findings become `evi claim`s linked to them.
 
 ## How to work with it
 
