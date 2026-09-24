@@ -134,10 +134,14 @@ box**.
 
 The same screen checks three city fields: "Village of Steyr" with size
 `+19` = 2; "Gnoll" with race `+14` = 5 (and Hamburg, "Barbarian", has
-race 0); and a granary silo in the picture with building id 29 flagged.
+race 0; Capua, "Nomad", race 11, `cp37`); and a granary silo in the picture with building id 29 flagged.
 Hamburg's size byte, still 1 at 5,700 people, was **2** by `cp33`, so it
 does update, just not at the first end of turn after crossing 5,000;
 what triggers it is still open.
+
+Both starting capitals, Hamburg and Capua (`cp37`), have exactly
+building ids 3, 8 and 32 built, so that is the starting set; *guess:*
+Barracks, Smithy, Builder's Hall.
 
 Bytes **`+67..+92`** are zero in every city: 26 bytes, the number of
 city enchantments in MoM. *guess:* the city enchantment block.
@@ -362,6 +366,7 @@ In `~/.mirror/dev/DOSbox/ram-dumps-2026-09-23/`, each a full 16 MB:
 | `cp32_surveyor_nightshade.bin` | Surveyor on the Nightshade swamp at (46, 16) beside Steyr |
 | `cp33_steyr_city_screen.bin` | Steyr's city screen (Village, Gnoll, no enchantments) |
 | `cp34_cartographer_arcanus.bin` | just after closing the Cartographer (Arcanus); game data identical to `cp35` |
+| `cp36_surveyor_capua.bin`, `cp37_capua_city_screen.bin` | Surveyor on Capua, then Capua's city screen (Hamlet, Nomad, no enchantments) |
 | `cp35_cartographer_open.bin` | Cartographer open on Arcanus. The screen is graphics: "Arcanus Plane" is not text, and legend names come from the wizard records |
 | `cp26`–`cp31` | Sorcery node in Surveyor; next turn after the teleport; first combat turn at the node; mid-fight; back on the map after winning; node melded (sparkles) |
 | `cp20`–`cp25` | Surveyor open, hovering: Hamburg area, gold ore (39, 20), wild game (38, 19), gems (32, 25), Myrror adamantium (28, 25), Myrror Keep (26, 25); screenshots `surveyor-*.webp` beside them |
