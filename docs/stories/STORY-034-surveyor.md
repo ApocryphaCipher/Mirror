@@ -30,6 +30,7 @@ What the game shows (screenshots in
 | Cremona, Merlin's capital (15, 11), a Nomad hamlet of 3,260 on a mountain ring | "Mountain / +5% production", "Hamlet of Cremona", **City Resources: Maximum Pop 8, Prod Bonus +63%, Gold Bonus +9%**. Catchment specials: Coal (15, 10), Gold (16, 11); Nightshade (11, 10) lies just outside. RAM (`cp38_surveyor_cremona.bin`) |
 | Sidon, Jafar's capital (55, 29), a Nomad hamlet of 4,640 on a narrow island | "Grasslands / 1 1/2 food", "Hamlet of Sidon", **City Resources: Maximum Pop 14, Prod Bonus +6%, Gold Bonus +12%**. **No specials in the catchment**, so terrain alone gives these: the simplest case for the formula. RAM (`cp39_surveyor_sidon.bin`) |
 | Bloodrock, Tlaloc's capital, **Myrror** (54, 23), a Dark Elf (race 2) hamlet of 4,640 on the coast | "Desert / +3% production", "Hamlet of Bloodrock", **City Resources: Maximum Pop 16, Prod Bonus +21%, Gold Bonus +10%**. Catchment special: Gems (54, 21). RAM (`cp40_surveyor_bloodrock.bin`) |
+| **Myrror** grassland with a temple, (28, 21) | "Grasslands / 1 1/2 food", "Temple / Unexplored", "Cities cannot be built on lairs." RAM (`cp41_surveyor_temple.bin`): encounter record 74, kind 6 (Ancient temple), intact, flags 0; guards 1 Skeletons + 1 Zombies, 50 mana |
 
 So there are two parts:
 

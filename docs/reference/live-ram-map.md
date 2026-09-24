@@ -372,6 +372,7 @@ In `~/.mirror/dev/DOSbox/ram-dumps-2026-09-23/`, each a full 16 MB:
 | `cp38_surveyor_cremona.bin` | Surveyor on Cremona (Merlin's capital) |
 | `cp39_surveyor_sidon.bin` | Surveyor on Sidon (Jafar's capital), no specials nearby |
 | `cp40_surveyor_bloodrock.bin` | Surveyor on Bloodrock (Tlaloc's capital, Myrror, purple flag) |
+| `cp41_surveyor_temple.bin` | Surveyor on a Myrror temple (28, 21), encounter 74, kind 6. Other sites in view also match their records, incl. a cave (28, 28) with flags `0x01` |
 | `cp35_cartographer_open.bin` | Cartographer open on Arcanus. The screen is graphics: "Arcanus Plane" is not text, and legend names come from the wizard records |
 | `cp26`–`cp31` | Sorcery node in Surveyor; next turn after the teleport; first combat turn at the node; mid-fight; back on the map after winning; node melded (sparkles) |
 | `cp20`–`cp25` | Surveyor open, hovering: Hamburg area, gold ore (39, 20), wild game (38, 19), gems (32, 25), Myrror adamantium (28, 25), Myrror Keep (26, 25); screenshots `surveyor-*.webp` beside them |
