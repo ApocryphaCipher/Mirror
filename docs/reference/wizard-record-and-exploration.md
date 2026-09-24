@@ -27,20 +27,20 @@ shows, and "kazzmir" means the offset comes from kazzmir's read order.
 | `+0x16` | banner: 0 blue, 1 green, 2 purple, 3 red, 4 yellow | game (yellow flag, STORY-032) |
 | `+0x18` / `+0x1a` | personality / objective (u16, AI) | kazzmir |
 | `+0x22` | mastery research (u16) | kazzmir |
-| `+0x24` | fame (u16) | game: 10 in SAVE1, which the Famous retort grants |
-| `+0x26` | power base (u16) | kazzmir |
-| `+0x2a..+0x2c` | research / mana / skill ratio (u8; 34/33/33 in SAVE1) | kazzmir; they sum to 100 |
+| `+0x24` | fame (u16) | game: 10 in SAVE1, which the Famous retort grants; live RAM: 10 → 11 on "You have gained 1 fame" |
+| `+0x26` | power base (u16) | kazzmir + game: 12, Magic screen "Power Base: 12" (live RAM) |
+| `+0x2a..+0x2c` | research / mana / skill ratio (u8; 34/33/33 in SAVE1) | kazzmir; they sum to 100. `+0x2c` = skill checked: 72 after Kevin moved the Skill slider (9 SP of 12). `+0x2a`/`+0x2b` were both 14, so their order is still kazzmir's |
 | `+0x2e` / `+0x30` / `+0x32` | summoning circle x / y / plane (i16) | game: (38, 21, Arcanus), the capital Norport |
 | `+0x34` | 8 research candidate spells (u16) | kazzmir; SAVE1's are Nature spell ids |
-| `+0x54` / `+0x56` | skill left / nominal skill (u16) | kazzmir |
+| `+0x54` / `+0x56` | skill left / nominal skill (u16) | `+0x56` checked: 60 = "Casting Skill: 60(60)". `+0x54` = skill left this turn, checked: it fell by each spell's cost (60 → 42 for Wall of Stone at 18 MP, 42 → 32 for Sprites at 10 MP). The Magic screen still said 60(60) at 42, so its first number is something else |
 | `+0x58` | tax rate (u16) | kazzmir |
 | `+0x5a` | spellbooks per realm, 5 × i16: **Nature, Sorcery, Chaos, Life, Death** | kazzmir + game (Freya: 12 Nature) |
 | `+0x64..+0x75` | **retorts**, one byte each, 1 = has it (table below) | kazzmir + fame check |
 | `+0x130..+0x14f` | unknown, 16 × u16; a per-turn running total | live RAM ([live-ram-map.md](live-ram-map.md)) |
 | `+0x25a` | research points left (u16) | live RAM: matches the book's cost, counts down per turn |
 | `+0x25c` | mana (u16) | found by value (earlier session); live RAM |
-| `+0x25e` | *guess:* casting skill points (u16) | live RAM: only rises |
-| `+0x262` | spell being researched (u16) | live RAM: set when research is picked |
+| `+0x25e` | *guess:* casting skill points (u16) | live RAM: only rises; 2513 with casting skill 60, and √2513 ≈ 50 (+10 if Freya has Archmage) |
+| `+0x262` | spell being researched (u16) | checked: 10 while the Magic screen said "Researching: Earth Lore" |
 | `+0x356` | gold (u16) | found by value (earlier session); live RAM |
 
 ### Retorts, `+0x64..+0x75`

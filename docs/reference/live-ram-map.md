@@ -83,7 +83,7 @@ the save written at the same moment, or matching a value on screen.
   16 MB, not just conventional memory.
 
 **The addresses are not guaranteed to be stable.** They held across four
-turns in one session, but the far-heap blocks are allocated at start-up and
+turns in one session and across one relaunch (the city block, at least), but the far-heap blocks are allocated at start-up and
 could move with a different DOSBox memory config or even a fresh launch.
 Re-find them each session: search for the wizard name ("Freya") at record
 `+0x01`, or re-run the save match. Don't hard-code them.
@@ -101,7 +101,7 @@ Evidence: all five wizards across four dumps.
 | Offset | Field | Evidence |
 | --- | --- | --- |
 | `+0x25a` | research points left (u16) | checked: 250 when Earth Lore was picked (the book's cost), then 243 next turn (7/turn, the book's "36 turns"); the AI wizards also count down |
-| `+0x262` | spell being researched (u16) | checked: set to 10 when Kevin picked Earth Lore, set for all AI wizards at the same moment, unchanged next turn. *guess:* 10 is Earth Lore's id in the spell list |
+| `+0x262` | spell being researched (u16) | checked: set to 10 when Kevin picked Earth Lore, set for all AI wizards at the same moment, and the Magic screen said "Researching: Earth Lore" while it was 10 |
 | `+0x25e` | *guess:* casting skill points (u16) | only rises: Freya 2500 → 2506 → 2512, AIs 245–565. Confirm against the Magic screen's casting skill |
 | `+0x130..+0x14f` | unknown, 16 × u16 | filled with 10–15 for every wizard on the first turn change, then roughly doubled the next; a running total of something |
 
@@ -110,6 +110,202 @@ had 30006 gold (+6 income) and 30005 mana (+5), both matching the incomes
 shown on screen. By the map they were 30000 again, and stayed there.
 *guess:* the game caps gold and mana at 30000. Check by spending some
 first and watching income apply normally.
+
+**Encounter zones (lairs, keeps, node guardians), checked 2026-09-23**
+(`cp25`): the 102 × 24 table sits at RAM `0x086660` (save `0x006628` +
+`0x80038`); all 102 records parse. Kevin hovered a Keep on Myrror in
+Surveyor ("Keep / Unexplored"): record 46 is at (26, 25, plane 1),
+kind 7 (Abandoned keep), intact 1, explored-by flags 0, guards Behemoth
+(188) count `0x22` and Cockatrices (181) count `0x33`, i.e. 2 and 3 with
+equal nibbles, as in SAVE1's intact sites.
+
+## Writes
+
+Start DOSBox with `--set webserver_allow_writes=true` as well. Write with
+a compare-and-swap so a stale read can't clobber anything: `If-Match`
+carries the base64 of the bytes you expect, and the API answers 412
+(and changes nothing) if they differ.
+
+```bash
+# set a u16 to 50 only if it is currently 0
+curl -X PUT -H 'Content-Type: application/octet-stream' -H 'If-Match: "AAA="' \
+     --data-binary $'\x32\x00' http://127.0.0.1:8086/api/v1/memory/$((0x6f980+24))
+```
+
+Then have Kevin open the screen that shows the value. A write the game
+displays is the strongest check we have: it proves the field *drives* the
+game, not just that it matches.
+
+**City population, checked 2026-09-23.** After a fresh load of SAVE3 the
+starting city (renamed Hamburg) was still at RAM `0x6f980`, the same
+address as in the earlier launch. Its record held `+20` = 4 and `+24` = 0,
+and the city screen showed 4,000. Writing 50 to `+24` made the city screen
+show **Population: 4,500 (+120)**. So:
+
+- shown population = `+20` × 1000 + `+24` × 10 (`+24` is u16 tens,
+  0–99; *guess:* the game carries into `+20` at 100);
+- growth (+120) did not change, so it is computed, not stored beside the
+  population.
+
+Then `+20..+25` was rewritten in one compare-and-swap to 5 and 0
+(5,000). The map immediately drew Hamburg with the **next, larger city
+sprite**, and the income panel dropped from 6 gold / 2 food to 5 / 1 (one
+more thousand to feed). But the stored size byte `+19` **stayed 1**
+(Hamlet). So:
+
+- the map sprite (and income) follow population live; 5,000 is the
+  first sprite change, as Kevin confirmed on screen;
+- `+19` is **not** recomputed at end of turn (checked below); what
+  moves it is still open.
+- For Mirror, "frame = size − 1" still holds for saves, where `+19` and
+  population agree, but it is not how the game decides.
+
+**Production and buildings, checked 2026-09-23** (dumps `cp5`–`cp7`).
+Kevin queued a Granary, bought it, cast Wall of Stone on Hamburg, and
+ended the turn:
+
+| Offset | Field | Evidence |
+| --- | --- | --- |
+| `+28` | item in production (u16) | checked: 2 while the screen said "Producing Housing", 29 for Granary, back to 2 when switched and after completion |
+| `+94` | production stored so far (u16) | checked: 0 → 40 on buying the Granary (cost 40: "5 Turns" at 9/turn), 40 → 0 when it was built |
+| `+93` | production per turn (u8) | checked: 9, and the city screen showed 9 hammers |
+| `+96` | gold per turn (u8) | checked: 8, and the screen showed 8 coins; 8 → 12 when the Marketplace (+50% gold) was built |
+| `+31+n` | built flag for building id *n* (1 built, `0xff` not) | checked three times: Granary (id 29) set `+60`, Wall of Stone set `+66` (City Walls, id 35), and a bought Marketplace (id 26) set `+57` the next turn (`cp19`), predicted in advance |
+| `+30` | unknown | 3 → 4, then unchanged, later 5 → 6 across turns; unchanged by buying or switching production; not a plain turn counter |
+| `+19` | size | still 1 (Hamlet) after the turn ended at 5,080, so the end-of-turn guess above is **wrong**; the city title still said "Hamlet" |
+
+So production ids and building ids are the same numbering (2 = Housing,
+29 = Granary, 35 = City Walls). *Guess:* the other built flags in
+Hamburg, `+34`, `+39`, `+63` (ids 3, 8, 32), are the starting Barracks,
+Smithy and Builder's Hall; check against the city screen's building
+list.
+
+Buying with nothing stored costs **4 × the building's cost** and fills
+`+94` to the full cost, checked twice: Granary 160 gold for cost 40
+(`cp5` → `cp6`), Marketplace 400 gold for cost 100 (`cp15` → `cp16`,
+`+94` = 100). The price with some production already stored is not yet
+checked.
+
+**Units, checked 2026-09-23** (`cp7` → `cp8`). Kevin cast Sprites
+(10 MP) at Hamburg:
+
+- A new record appeared in unit slot 42 (RAM `0x07e060 + 42 × 32`):
+  xy (38, 21) plane 0 (Hamburg's tile), owner 0, type (`+5`) **180**.
+- **Unit type names**, checked: the data segment has the unit type table
+  at `ds+0x19c`, `0x24` bytes per type, with a u16 pointer (DS offset) to
+  the name at `+0`. It names 39 Spearmen, 40 Swordsmen and 180 Sprites,
+  matching what Kevin saw on screen.
+- The **unit count** is a u16 at RAM `0x034782` (`ds+0xbd92`, the only
+  u16 in the data segment that went 42 → 43). It is *not* beside the
+  wizard records the way save offset `0x9e2` suggests.
+- The two garrison units (slots 0 and 5, types 39 and 40) changed only at
+  `+18`, 2 and 4 → 0, when the Sprites took the selection.
+- **`+18` is the unit's orders**, checked in `cp11`: Kevin set the
+  Spearmen (slot 0) to Patrol and the Swordsmen (slot 5) to Done. So
+  **2 = Patrol**, **4 = Done** (Done also set moves left `+8` to 0), and
+  0 = ready / awaiting orders (every unit on a selected tile shows 0).
+  The Sprites have held **5** the whole time they had a destination;
+  *guess:* 5 = going to `+9`/`+10`. (An earlier reading of 5 as Patrol
+  was wrong: the Sprites were already on a path when Patrol was clicked.)
+- The same Patrol order set the Sprites' `+7` and `+11` from 0 to 1, the
+  value the older units already had. Unknown.
+- **`+9` / `+10` is the move destination (x, y)**, checked against two
+  paths Kevin set (screenshots of the boot markers): (32, 22) with the
+  boots running west, then (39, 22) running east. The orders byte stayed 5.
+- **Paths run across turns**, checked in `cp11`: after the turn ended the
+  Sprites had walked two tiles east, (36, 22) → (38, 22), destination
+  still (39, 22), moves left 0.
+- **Arrival** (`cp12`): the Sprites reached (39, 22); `+9`/`+10` cleared
+  to (0, 0) and `+18` went 5 → 0, so 5 = going to (checked by arrival).
+  **Wait stores nothing**: the Swordsmen's `+18` stayed 4 after Wait.
+- **`+14`**, *guess:* experience. It rose 1 → 2 → 3 over two turns on
+  both garrison units and stayed 0 on the (summoned) Sprites; the text
+  buffer held "Regular (1 ep)" earlier. Check against a unit's ep.
+- **Unit enchantments are a bit field at `+24..+27`** (u32), checked
+  (`cp14` → `cp15`): Stone Skin cast on the Magic Spirit (slot 59; Kevin
+  saw the green aura) changed only `+25`, `0x00` → `0x08`, i.e. bit
+  **`0x800` = Stone Skin**. Then Resist Elements added **`0x200`** on the
+  Magic Spirit (`0x800` → `0xa00`, `cp17`) and on the fourth Sprites
+  (slot 51, `0` → `0x200`, `cp18`). Both match kazzmir's enchantment
+  order, so *guess:* the remaining bits follow it too.
+- **Spell cost is paid when the spell is chosen**, checked twice: mana
+  and skill left were unchanged between the target list and the cast for
+  Stone Skin (`cp14`/`cp15`) and Resist Elements (`cp16`/`cp17`), and
+  had already dropped by 9 at the Resist Elements target list. A second
+  Resist Elements took skill left from 9 to 0 and was allowed.
+- The unit list shown for targeting (and "Freya Units") is in unit-table
+  slot order: its fourth Sprites row was slot 51.
+- **`+8` is moves left, `+4` moves per turn**, in half-moves. `+8`
+  checked: after moving one tile the Sprites had 2 and the screen said
+  "Moves: 1". Earlier evidence from the Sprites (`+4` = 4, "Moves: 2" on screen; `+8` 4 → 0
+  after an accidental two-tile move) and the garrison (`+4` = `+8` = 2,
+  one move).
+- The route is not in the unit record. *guess:* the data segment holds a
+  step buffer the map draws from: three 120-entry arrays 0x78 apart at
+  `ds+0xc5f0` (per-step cost, 2 each), `ds+0xc668` (y) and `ds+0xc6e0`
+  (x); for the eastward path the first three entries were (37, 22),
+  (38, 22), (39, 22).
+
+**Moving a stack by writing `+0`/`+1`, 2026-09-23.** With writes on,
+all nine units of Kevin's stack (slots 42, 49–54, 59, 60) were moved from
+(35, 19) to (41, 10), next to the Sorcery node at (42, 10) (terrain 168),
+with one compare-and-swap per unit. Before writing, the target was checked
+to be free of units, cities and encounter sites. The stack **vanished
+from the map** until the turn ended, then showed at (41, 10) with full
+moves, destination cleared and orders 0; the game did not continue the
+go-to into the node. *guess:* the map draws units from a visibility or
+draw cache rebuilt at end of turn, and a go-to stops rather than start a
+fight. Dumps `cp26` (before) and `cp27` (next turn).
+
+**Combat, first look, 2026-09-23** (`cp28`, Kevin's stack vs the
+Sorcery node at (42, 10), start of his first combat turn):
+
+- When the battle starts, the game **creates the node's guardians as
+  overland units**: slots 74–81 held 8 Phantom Warriors (type 192) at
+  (42, 10), owner 5 (neutral). Encounter record 19 still said 8 guards
+  (`0x88`), intact.
+- A **battle unit table**: 17 records, `0x6e` (110) bytes apart, first
+  the attacker's 9 units, then the 8 guardians. Each record holds the
+  overland unit slot as a u16; for record *j* it is at RAM
+  `0x05bde0 + j × 0x6e`. *guess:* the bytes before it
+  are the unit's combat stats (identical for every Sprites record,
+  different for the Magic Spirit and the Phantom Warriors), and the u16
+  pairs after it are battlefield positions. Record start and field layout
+  are not worked out yet.
+- **Mid-fight diff** (`cp28` → `cp29`; Kevin's Sprites each shot once,
+  he moved one Sprites and the Magic Spirit, killed some Phantom Warriors
+  and cast Earth to Mud). Offsets are from the overland-slot u16:
+  - `-0x2d`: 4 → 3 on all eight Sprites. *guess:* ranged shots left.
+  - `+0x14` / `+0x16`: changed by one step only for the two units Kevin
+    moved (and for moving guardians). *guess:* battlefield x, y.
+  - `+0x18` / `+0x1a`: changed on units that only shot, too. *guess:*
+    target or facing point.
+  - `-0x23`: 6 → 0 on three Phantom Warriors (slots 74, 76, 80), with
+    `+0x4` = 4 and `+0x6` set. *guess:* figures left (Phantom Warriors
+    have 6), so 0 = dead.
+  - `-0x29`: 2 → 0 on the guardians that moved. *guess:* moves left.
+  - Overland mana dropped 6 (Earth to Mud); overland skill left did not
+    move, so combat keeps its own skill counter. The encounter record
+    still said 8 guards: it is updated only after the battle.
+- **After the victory** (`cp30`, on the map, "Inside you find 150 mana
+  crystals", "You have gained 1 fame"):
+  - mana 29805 → 29955 (+150, the encounter's `+12` reward, which stays
+    in the record); fame (wizard `+0x24`) 10 → 11: **fame checked**.
+  - The 8 guardian units (slots 74–81) got plane and owner `0xff`: dead
+    units are marked in place; the unit count stayed 82.
+  - Encounter 19: intact `+3` 1 → 0; guard count `0x88` → `0x80`, which
+    **settles the nibbles: low = guards left, high = starting count**;
+    flags `+15` `0x02` → `0x06` (one explored-by bit added; which wizard
+    each bit is stays open).
+  - The node itself (record 7 of the node table, which has two copies in
+    RAM at `0x085fe0` and `0x087010`) still had owner `0xff`: beating the
+    guardians does not take the node; melding does.
+- **The meld** (`cp31`, a turn later, sparkles on screen): node record 7
+  owner `+3` `0xff` → 0 in the copy at **`0x085fe0`** (the live table);
+  the copy at `0x087010` did not change (*guess:* a stale copy). Its
+  aura lists name 5 tiles, which are the ones that sparkle. The Magic
+  Spirit (slot 59, type 154) was marked dead in place (plane and owner
+  `0xff`).
 
 ## The dumps
 
@@ -122,4 +318,21 @@ In `~/.mirror/dev/DOSbox/ram-dumps-2026-09-23/`, each a full 16 MB:
 | `cp2_after_pick.bin` | turn 2, back on the map after picking Earth Lore |
 | `cp3_turn3.bin` | turn 3, map |
 | `cp4_saved.bin` | turn 3, map, right after saving to slot 4 |
+| `cp5_granary_queued.bin` | second run (SAVE3 reloaded, city renamed Hamburg, pop set to 5,000 by RAM write), Granary queued |
+| `cp6_granary_bought.bin` | Granary bought, back on the map |
+| `cp7_granary_walls.bin` | next turn: Granary built, Wall of Stone resolved |
+| `cp8_sprites.bin` | after casting Sprites, Sprites selected on the map |
+| `cp9_sprites_patrol.bin` | Sprites ordered to Patrol |
+| `cp10_sprites_path.bin` | Sprites given a path east to (39, 22) |
+| `cp11_done_patrol_move.bin` | next turn: Spearmen on Patrol, Swordsmen Done, Sprites two tiles along the path |
+| `cp12_arrived_wait.bin` | next turn: Sprites arrived at (39, 22), Swordsmen on Wait |
+| `cp13_sprites_home.bin` | Sprites moved onto Hamburg's tile |
+| `cp14_stoneskin_target.bin` | later: stack of 8 Sprites + Magic Spirit at (36, 20), Stone Skin waiting for a target |
+| `cp15_stoneskin_cast.bin` | Stone Skin cast on the Magic Spirit (slot 59) |
+| `cp16_before_resist.bin` | Resist Elements chosen, at the target list |
+| `cp17_resist_on_spirit.bin` | Resist Elements on the Magic Spirit |
+| `cp18_resist_on_sprite.bin` | Resist Elements on the fourth Sprites (slot 51); Hamburg building a Marketplace |
+| `cp19_marketplace_built.bin` | next turn: Marketplace built; the stack one step along its path to (42, 10) |
+| `cp26`–`cp31` | Sorcery node in Surveyor; next turn after the teleport; first combat turn at the node; mid-fight; back on the map after winning; node melded (sparkles) |
+| `cp20`–`cp25` | Surveyor open, hovering: Hamburg area, gold ore (39, 20), wild game (38, 19), gems (32, 25), Myrror adamantium (28, 25), Myrror Keep (26, 25); screenshots `surveyor-*.webp` beside them |
 | `SAVE4.GAM` | the save written just before `cp4` |
