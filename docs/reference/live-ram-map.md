@@ -361,7 +361,8 @@ In `~/.mirror/dev/DOSbox/ram-dumps-2026-09-23/`, each a full 16 MB:
 | `cp19_marketplace_built.bin` | next turn: Marketplace built; the stack one step along its path to (42, 10) |
 | `cp32_surveyor_nightshade.bin` | Surveyor on the Nightshade swamp at (46, 16) beside Steyr |
 | `cp33_steyr_city_screen.bin` | Steyr's city screen (Village, Gnoll, no enchantments) |
-| `cp34_cartographer_arcanus.bin` | Cartographer, Arcanus: owner-coloured city dots (checks the banner byte) |
+| `cp34_cartographer_arcanus.bin` | just after closing the Cartographer (Arcanus); game data identical to `cp35` |
+| `cp35_cartographer_open.bin` | Cartographer open on Arcanus. The screen is graphics: "Arcanus Plane" is not text, and legend names come from the wizard records |
 | `cp26`–`cp31` | Sorcery node in Surveyor; next turn after the teleport; first combat turn at the node; mid-fight; back on the map after winning; node melded (sparkles) |
 | `cp20`–`cp25` | Surveyor open, hovering: Hamburg area, gold ore (39, 20), wild game (38, 19), gems (32, 25), Myrror adamantium (28, 25), Myrror Keep (26, 25); screenshots `surveyor-*.webp` beside them |
 | `SAVE4.GAM` | the save written just before `cp4` |
