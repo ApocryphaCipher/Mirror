@@ -127,11 +127,12 @@ summoned creatures, e.g. tower (33, 7): Unicorns ×3 and Guardian Spirits
 **Guard count byte: two packed nibbles.** kazzmir uses only the low
 nibble (`count & 0xF`). In SAVE1 all 148 filled guard slots have the high
 nibble equal to the low one (`0x11`, `0x22` … `0x88`).
-- *Guess:* one nibble is the guards left and the other the starting
-  count, so they would differ after a fight that the player retreats
-  from.
-- *To check:* attack a lair, retreat after killing some guards, save,
-  and diff. No checkpoint save has a fight in it.
+- **checked (live RAM, 2026-09-23):** the **low nibble is the guards
+  left, the high nibble the starting count**. After Kevin's Sprites beat
+  all eight Phantom Warriors at the Sorcery node (42, 10), encounter 19's
+  count went `0x88` → `0x80`, and intact `+3` went 1 → 0
+  ([live-ram-map.md](live-ram-map.md)). A retreat mid-fight would show a
+  partial low nibble; not seen yet.
 
 **`+15` flags: *guess*, who has explored the site.** kazzmir leaves it
 unread (`ExploredBy: // FIXME`).
