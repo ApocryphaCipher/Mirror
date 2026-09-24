@@ -36,8 +36,12 @@ shows, and "kazzmir" means the offset comes from kazzmir's read order.
 | `+0x58` | tax rate (u16) | kazzmir |
 | `+0x5a` | spellbooks per realm, 5 × i16: **Nature, Sorcery, Chaos, Life, Death** | kazzmir + game (Freya: 12 Nature) |
 | `+0x64..+0x75` | **retorts**, one byte each, 1 = has it (table below) | kazzmir + fame check |
-| `+0x25c` | mana (u16) | found by value (earlier session) |
-| `+0x356` | gold (u16) | found by value (earlier session) |
+| `+0x130..+0x14f` | unknown, 16 × u16; a per-turn running total | live RAM ([live-ram-map.md](live-ram-map.md)) |
+| `+0x25a` | research points left (u16) | live RAM: matches the book's cost, counts down per turn |
+| `+0x25c` | mana (u16) | found by value (earlier session); live RAM |
+| `+0x25e` | *guess:* casting skill points (u16) | live RAM: only rises |
+| `+0x262` | spell being researched (u16) | live RAM: set when research is picked |
+| `+0x356` | gold (u16) | found by value (earlier session); live RAM |
 
 ### Retorts, `+0x64..+0x75`
 

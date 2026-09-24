@@ -39,6 +39,11 @@ STORY-013 (roads/specials), STORY-008 (node auras).
 
 - DOSBox 0.74-3 (`/Applications/DOSBox.app`). Its default config
   mounts `/Users/kevin/DOS` as `C:` (`cd MAGIC`, then `magic`).
+- **Live RAM:** a DOSBox Staging fork with a read-only HTTP API lets an
+  agent dump the game's memory while Kevin plays. The launch, workflow,
+  and the RAM addresses of the save blocks found so far are in
+  [../reference/live-ram-map.md](../reference/live-ram-map.md). It's a
+  tool for agents only; Mirror never talks to DOSBox.
 - **The checkpoint saves are backed up** in
   `~/.mirror/dev/DOSbox/FREYA - God Mode/saves-2026-09-23/` (SAVE1–9, `MAGIC.SET`,
   SAVE3 before and after the retort/fog edit, and checksums). Kevin will
