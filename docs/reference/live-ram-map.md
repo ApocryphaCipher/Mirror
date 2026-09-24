@@ -172,8 +172,11 @@ Hamburg, `+34`, `+39`, `+63` (ids 3, 8, 32), are the starting Barracks,
 Smithy and Builder's Hall; check against the city screen's building
 list.
 
-Buying the Granary cost 160 gold (29840 after), 4 × its cost with nothing
-stored. *Guess:* that is the buy-price rule when no production is stored.
+Buying with nothing stored costs **4 × the building's cost** and fills
+`+94` to the full cost, checked twice: Granary 160 gold for cost 40
+(`cp5` → `cp6`), Marketplace 400 gold for cost 100 (`cp15` → `cp16`,
+`+94` = 100). The price with some production already stored is not yet
+checked.
 
 **Units, checked 2026-09-23** (`cp7` → `cp8`). Kevin cast Sprites
 (10 MP) at Hamburg:
