@@ -20,6 +20,7 @@ What the game shows (screenshots in
 | --- | --- |
 | River, about (37, 22) | "River / 2 food / +20% gold", then "Cities cannot be built less than 3 squares from any other city." |
 | Hamburg, (38, 21) | "Hills / 1/2 food / +3% production", "Hamlet of Hamburg", then **City Resources: Maximum Pop 19, Prod Bonus +60%, Gold Bonus +50%** |
+| Mountain with gold ore, (39, 20) | "Mountain / +5% production", "Gold Ore / +3 gold", then the too-close-to-a-city message. RAM (`cp21_surveyor_gold_ore.bin`): the minerals plane has **4** there, Mirror's value for Gold, so plane and game agree. Its neighbour (38, 19), where a deer is drawn, holds 64 (*guess:* Wild Game) |
 
 So there are two parts:
 
