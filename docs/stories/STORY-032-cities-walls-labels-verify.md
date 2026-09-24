@@ -1,7 +1,7 @@
 # STORY-032: Cities: walls, name labels, and a check against the real game
 
 **Parent:** [EPIC-004](../epics/EPIC-004-overland-map-features.md)
-**Status:** open, follow-up to STORY-010
+**Status:** **Done** (2026-09-23); leftovers in [STORY-033](STORY-033-cities-town-frames-rival-flags.md)
 **Size:** small–medium
 
 ## What to do
@@ -88,6 +88,9 @@ the city records between saves:
   a flag.
 - **Captured city:** Speger changed owner 5 → 0 in "Speger" and shows
   Freya's yellow flag in the game's city-screen mini-map.
+- *Corrected by the outcome below:* "an outpost looks like a small boxed
+  city **without a flag**". That city was Posen, a neutral hamlet with a
+  brown flag. Zwolle, the outpost, has a yellow one.
 - **Units:** Freya's units stand on yellow/gold plaques (`MAPBACK #18`),
   confirming the plaque catalog entry (STORY-012).
 - **Roads** show as thin brown lines between cities from "Road Locat" on
@@ -99,3 +102,26 @@ the city records between saves:
 Still open: what `#21` `CITYNOWA` is for (maybe outposts?), the outpost
 sprite, the rival and neutral flag colours, and frames for Town and up.
 
+
+## Outcome (2026-09-23)
+
+- **Walls:** `Mirror.SaveFile.Cities` reads `walled` (`+66 == 1`), and it
+  goes to the client with each city. The game draws the same sprite either
+  way (walled hamlet Norport vs. unwalled village Ozenwall), so walls are
+  data for later, not a different sprite.
+- **Names:** the map's hover readout shows the city under the pointer:
+  "· Deventor (Hamlet)", plus ", walled" when it is. No on-map labels
+  yet.
+- **Checked against the game** (details in the sprite catalog):
+  - frame = size − 1 is confirmed for sizes 0–2;
+  - outposts do have a flag (the "no flag" city above was Posen);
+  - the sprite is centred on its tile;
+  - neutral browns 53–55 are right.
+- **Bug fixed: flag shade.** The game draws the flag as the owner's ramp
+  start + 1..3 (yellow 210–212). Mirror used start + 2..4, one shade too
+  dark. Checked by reading the pixels back from Mirror's overlay canvas.
+- **Not settled** (moved to STORY-033):
+  - frames for Town and up;
+  - rival flag colours (no rival flag is visible on the overland map in
+    any screenshot);
+  - what `#21` `CITYNOWA` is for.

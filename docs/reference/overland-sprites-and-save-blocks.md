@@ -16,7 +16,7 @@ top-level block table.
 | Fortresses | `0x0065f8` | 4 | 6 | No. Probably x/y/plane/active per wizard; verify |
 | Towers of Wizardry | `0x006610` | 4 | 6 | No. Probably x/y/owner; verify |
 | Encounter zones | `0x006628` | `0x18` (24) | 99 + 3 | **No.** Lairs, ruins, temples, keeps, mounds, etc. Needs type + x/y/plane + guardians |
-| Cities | `0x008aac` | `0x72` (114) | 100 | **Yes** for name/race/x/y/plane/owner/size/pop: momedit + SAVE1's 27 cities (`Mirror.SaveFile.Cities`); count u16 at `0x0009e0`. `+19` size: 0 Outpost, 1 Hamlet, 2 Village (game titles). Buildings `+34`..`+66` (1 built, 0xFF not, 0 replaced); **City Walls = `+66`** (verified in-game, STORY-032) |
+| Cities | `0x008aac` | `0x72` (114) | 100 | **Yes** for name/race/x/y/plane/owner/size/pop: momedit + SAVE1's 27 cities (`Mirror.SaveFile.Cities`); count u16 at `0x0009e0`. `+19` size: 0 Outpost, 1 Hamlet, 2 Village (game titles); sprite frame = size − 1. Buildings `+34`..`+66` (1 built, 0xFF not, 0 replaced); **City Walls = `+66`** (verified in-game, STORY-032) |
 | Units | `0x00b734` | `0x20` (32) | 1000 + 9 | **No.** Needs x/y/plane/owner/unit type at minimum. Unit count at `0x0009e2` |
 | Terrain flags map | `0x01cbb8` | 1 / tile | 2 × 2400 | No. Likely roads / enchanted roads / corruption bits; verify |
 | Minerals map | `0x013554` | 1 / tile | 2 × 2400 | No. Mineral/special type per tile; verify |
@@ -40,26 +40,38 @@ reasoned from the pictures, not yet confirmed against a save.
 
 | Sprite | Entry |
 | --- | --- |
-| Ordinary city, frames 0–4 small to large | `MAPBACK.LBX #20/0..4` (`MAPCITY`) |
-| Unknown use | `MAPBACK.LBX #21/0..4` (`CITYNOWA`) |
+| Every city, walled or not: frame = size byte − 1 (outpost and hamlet both frame 0) | `MAPBACK.LBX #20/0..4` (`MAPCITY`) |
+| Unknown use; the same frames as `#20` without the stone ring | `MAPBACK.LBX #21/0..4` (`CITYNOWA`) |
 
-**Checked in the game (DOSBox, SAVE1, 2026-09-23):** the player's
-starting city (record 0: Barbarian, pop 4,000, size byte 1, owner Freya,
-no City Walls) is drawn on the overland map as `#20` frame 0, the single
-building in a grey box, with a **yellow** flag. So `#20` is the normal city
-sprite, not a walled one (the grey box isn't walls), and a size-byte-1
-city uses frame 0. Mirror draws frame `size − 1` (sizes 0 and 1 both frame
-0); *guess* for sizes 2+, since there's one data point so far. What `#21`
-(`CITYNOWA`) is for is unknown. The owner flag is 8 px in palette indices
-**216–218**, green shades 3–5 (x 17–20, y 10–11 in frame 0).
+**Checked in the game (DOSBox, STORY-032).** Sources: SAVE1 and the
+god-mode checkpoint saves `SAVE4`–`SAVE9`, lined up with window
+screenshots. DOSBox screenshots keep exact palette colours, so flag pixels
+can be read back as palette indices.
+
+- **Frame = size − 1, and walls don't change it.** Zwolle (size 0,
+  outpost) and Posen and Norport (size 1, hamlets) are all `#20` frame 0.
+  Ozenwall (size 2, village) is `#20` frame 1. Norport keeps frame 0 after
+  City Walls (`+66` = 1), and Ozenwall has no walls but its frame shows a
+  stone ring anyway. So the ring in frames 1–4 isn't City Walls.
+  *Not seen yet:* frames 2–4 (size 3+).
+- **Every city has a flag, outposts included.** An earlier note said
+  outposts have none, but that city was a neutral hamlet (Posen) with a
+  brown flag.
+- **Placement:** the sprite is centred on its tile, `left = x·20 − 6`,
+  `top = y·18 − 6` in map pixels. Checked from the flag pixels of Norport
+  (3:34:09 PM shot) and Zwolle (4:37:49 PM).
+
+The owner flag is 8 px in palette indices **216–218** (x 17–20, y 10–11,
+rows `216 218 217 218` / `217 218 216 218`, the same in every frame).
 
 **Banner ramps in the palette** (read from `FONTS.LBX` #2): indices
 199–223 are five 5-shade ramps, red 199–203, purple 204–208, yellow
-209–213, green 214–218, blue 219–223. Mirror recolours the flag by
-shifting 216–218 into the owner's ramp, and uses the neutral plaque's
-browns (53–55) for neutral cities. The game's yellow flag on Freya's city
-matches; the other colours and the neutral browns are still a *guess*
-(STORY-032).
+209–213, green 214–218, blue 219–223. The game draws the flag's
+216/217/218 as the owner's ramp **start + 1/2/3**: Freya's yellow flags
+are 210/211/212 in every shot. Neutral cities use **53/54/55** (Ozenwall,
+Posen). Mirror does both. *Guess:* red, purple, green and blue follow the
+same start + 1 rule. No rival city's flag is visible on the overland map
+in the screenshots so far (STORY-033).
 
 ### Unit plaques: `MAPBACK.LBX` #14–#19 (20×18)
 

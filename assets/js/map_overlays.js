@@ -20,16 +20,18 @@ const TILE_ART_W = 20
 const TILE_ART_H = 18
 
 // Banner colours are 5-shade ramps in the game palette (199-223). City flags
-// are drawn in green shades 3-5 (216-218); *guess*: the game recolours them
-// to the owner's ramp. Neutral cities (no wizard ramp) get the neutral
-// plaque's browns (53-55), also a guess. See the sprite catalog.
+// are drawn in 216-218; the game shows them as the owner's ramp shades 2-4
+// (start + 1..3: 210-212 for yellow) and neutral cities in browns 53-55.
+// Both checked pixel-for-pixel in DOSBox screenshots (STORY-032); the other
+// wizard colours are assumed to follow the yellow rule. See the sprite
+// catalog.
 const FLAG = [216, 217, 218]
 const RAMP_START = {red: 199, purple: 204, yellow: 209, green: 214, blue: 219}
 const NEUTRAL_FLAG = [53, 54, 55]
 
 function flagRemap(banner) {
   const start = RAMP_START[banner]
-  const to = start === undefined ? NEUTRAL_FLAG : FLAG.map(i => i - RAMP_START.green + start)
+  const to = start === undefined ? NEUTRAL_FLAG : FLAG.map((_, i) => start + 1 + i)
   return new Map(FLAG.map((from, i) => [from, to[i]]))
 }
 
@@ -37,9 +39,10 @@ function flagRemap(banner) {
 // data (STORY-013 roads/specials, 008 auras, 011 sites, 010 cities, 012
 // units). Each receives (ctx, items, geometry) and draws every item.
 const DRAWERS = {
-  // STORY-010/032. The game draws MAPBACK #20 for an ordinary city; in
-  // SAVE1 a size-byte-1 hamlet shows frame 0, so frame = size - 1 (sizes 0
-  // and 1 both frame 0). One data point: *guess* for the other sizes.
+  // STORY-010/032. The game draws MAPBACK #20 at frame size - 1, walls or
+  // not: outposts (size 0) and hamlets (1) show frame 0, villages (2) frame
+  // 1, all with a flag, centred on the tile. Checked in DOSBox; Town and up
+  // (frames 2-4) haven't been seen in-game yet.
   cities(ctx, items, {tileSize, sprites}) {
     const sprite = sprites?.cities?.city
     if (!sprite) return
