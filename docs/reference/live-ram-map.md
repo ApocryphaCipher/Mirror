@@ -128,7 +128,16 @@ city are ordinary stats (x `+15`, population `+20` = 8, production
 `+93` = 13, gold `+96` = 9, and `+102` = 100, unknown), which it gets
 from being the largest. So *guess:* the game counts Nightshade from the
 minerals plane when it needs it, and Mirror should too. Only one
-Nightshade city was available, so this is not proof.
+Nightshade city was available, so this is not proof. The game agrees
+on screen: Steyr's city screen (`cp33`) shows an **empty Enchantments
+box**.
+
+The same screen checks three city fields: "Village of Steyr" with size
+`+19` = 2; "Gnoll" with race `+14` = 5 (and Hamburg, "Barbarian", has
+race 0); and a granary silo in the picture with building id 29 flagged.
+Hamburg's size byte, still 1 at 5,700 people, was **2** by `cp33`, so it
+does update, just not at the first end of turn after crossing 5,000;
+what triggers it is still open.
 
 Bytes **`+67..+92`** are zero in every city: 26 bytes, the number of
 city enchantments in MoM. *guess:* the city enchantment block.
@@ -351,6 +360,7 @@ In `~/.mirror/dev/DOSbox/ram-dumps-2026-09-23/`, each a full 16 MB:
 | `cp18_resist_on_sprite.bin` | Resist Elements on the fourth Sprites (slot 51); Hamburg building a Marketplace |
 | `cp19_marketplace_built.bin` | next turn: Marketplace built; the stack one step along its path to (42, 10) |
 | `cp32_surveyor_nightshade.bin` | Surveyor on the Nightshade swamp at (46, 16) beside Steyr |
+| `cp33_steyr_city_screen.bin` | Steyr's city screen (Village, Gnoll, no enchantments) |
 | `cp26`–`cp31` | Sorcery node in Surveyor; next turn after the teleport; first combat turn at the node; mid-fight; back on the map after winning; node melded (sparkles) |
 | `cp20`–`cp25` | Surveyor open, hovering: Hamburg area, gold ore (39, 20), wild game (38, 19), gems (32, 25), Myrror adamantium (28, 25), Myrror Keep (26, 25); screenshots `surveyor-*.webp` beside them |
 | `SAVE4.GAM` | the save written just before `cp4` |
