@@ -11,7 +11,7 @@ top-level block table.
 
 | Block | Offset | Record size | Count | Record layout known? |
 | --- | --- | --- | --- | --- |
-| Wizards (+ neutral) | `0x0009e8` | `0x04c8` | 5 + 1 | Yes (wiki). **Banner colour at `+0x16`** (`0` blue, `1` green, `2` purple, `3` red, `4` yellow); **gold u16 at `+0x356`, mana u16 at `+0x25c`** (found by value in SAVE1, consistent across SAVE1/2/9: AI wizards start with 150 gold, 0 mana). Player is record 0 |
+| Wizards (+ neutral) | `0x0009e8` | `0x04c8` | 5 + 1 | Yes (wiki). **Banner colour at `+0x16`** (`0` blue, `1` green, `2` purple, `3` red, `4` yellow); **gold u16 at `+0x356`, mana u16 at `+0x25c`** (found by value in SAVE1, consistent across SAVE1/2/9: AI wizards start with 150 gold, 0 mana). Player is record 0. Full layout (books, retorts, fame…): [wizard-record-and-exploration.md](wizard-record-and-exploration.md) |
 | Node attributes | `0x006058` | `0x30` (48) | 30 | **No.** Expected to include x/y/plane, owner, realm, and the list of aura tiles; verify |
 | Fortresses | `0x0065f8` | 4 | 6 | No. Probably x/y/plane/active per wizard; verify |
 | Towers of Wizardry | `0x006610` | 4 | 6 | No. Probably x/y/owner; verify |
@@ -20,6 +20,7 @@ top-level block table.
 | Units | `0x00b734` | `0x20` (32) | 1000 + 9 | **No.** Needs x/y/plane/owner/unit type at minimum. Unit count at `0x0009e2` |
 | Terrain flags map | `0x01cbb8` | 1 / tile | 2 × 2400 | No. Likely roads / enchanted roads / corruption bits; verify |
 | Minerals map | `0x013554` | 1 / tile | 2 × 2400 | No. Mineral/special type per tile; verify |
+| Explored map (fog of war) | `0x014814` | 1 / tile | 2 × 2400 | **Yes** (position; kazzmir + wiki): 0 unexplored, 15 fully explored, 1–14 partial (4-bit mask, bit meaning a *guess*). See [wizard-record-and-exploration.md](wizard-record-and-exploration.md) |
 
 Verifying a layout means using two sources, or one source plus a visual
 check against a known save, as was done for the terrain offsets.
