@@ -246,6 +246,17 @@ checked.
   (x); for the eastward path the first three entries were (37, 22),
   (38, 22), (39, 22).
 
+**Moving a stack by writing `+0`/`+1`, 2026-09-23.** With writes on,
+all nine units of Kevin's stack (slots 42, 49–54, 59, 60) were moved from
+(35, 19) to (41, 10), next to the Sorcery node at (42, 10) (terrain 168),
+with one compare-and-swap per unit. Before writing, the target was checked
+to be free of units, cities and encounter sites. The stack **vanished
+from the map** until the turn ended, then showed at (41, 10) with full
+moves, destination cleared and orders 0; the game did not continue the
+go-to into the node. *guess:* the map draws units from a visibility or
+draw cache rebuilt at end of turn, and a go-to stops rather than start a
+fight. Dumps `cp26` (before) and `cp27` (next turn).
+
 ## The dumps
 
 In `~/.mirror/dev/DOSbox/ram-dumps-2026-09-23/`, each a full 16 MB:
