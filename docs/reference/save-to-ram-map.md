@@ -63,8 +63,11 @@ ended with (`SAVE4`, "Gawdess"):
   Circle there. **Checked** by the action.
 - **City enchantment:** the capital (renamed Soest in this run) got
   **slot 14 = 1** in its 26-byte enchantment block (`+0x43`, i.e.
-  `+67..+92`). ReMoM names slot `0x0E` `Natures_Eye`; the value 1 fits
-  "player index + 1". The block is the city enchantments, **checked**.
-- **Transmute:** minerals at (39, 20) and (36, 23) went 4 → 1 (Gold →
-  Iron), so **1 = Iron** is checked by a spell whose effect is known.
+  `+67..+92`). Kevin confirmed the spell was **Nature's Eye**, and ReMoM
+  names slot `0x0E` `Natures_Eye`: slot 14 = Nature's Eye, **checked**.
+  The value 1 fits "player index + 1". The block is the city enchantments,
+  **checked**.
+- **Transmute:** minerals at (39, 20) and (36, 23) went 4 → 1. Kevin
+  confirmed he turned gold into iron on purpose, so **1 = Iron** is
+  checked.
 - **Change Terrain:** 20 Arcanus tiles changed around the capital.
