@@ -213,11 +213,17 @@ stored. *Guess:* that is the buy-price rule when no production is stored.
 - **Unit enchantments are a bit field at `+24..+27`** (u32), checked
   (`cp14` → `cp15`): Stone Skin cast on the Magic Spirit (slot 59; Kevin
   saw the green aura) changed only `+25`, `0x00` → `0x08`, i.e. bit
-  **`0x800` = Stone Skin**. *guess:* the other bits follow kazzmir's
-  enchantment order, where `0x800` is also Stone Skin; re-check his code
-  before relying on it. Mana and skill left did not change between target
-  selection and cast, so *guess:* the cost is paid when the spell is
-  chosen.
+  **`0x800` = Stone Skin**. Then Resist Elements added **`0x200`** on the
+  Magic Spirit (`0x800` → `0xa00`, `cp17`) and on the fourth Sprites
+  (slot 51, `0` → `0x200`, `cp18`). Both match kazzmir's enchantment
+  order, so *guess:* the remaining bits follow it too.
+- **Spell cost is paid when the spell is chosen**, checked twice: mana
+  and skill left were unchanged between the target list and the cast for
+  Stone Skin (`cp14`/`cp15`) and Resist Elements (`cp16`/`cp17`), and
+  had already dropped by 9 at the Resist Elements target list. A second
+  Resist Elements took skill left from 9 to 0 and was allowed.
+- The unit list shown for targeting (and "Freya Units") is in unit-table
+  slot order: its fourth Sprites row was slot 51.
 - **`+8` is moves left, `+4` moves per turn**, in half-moves. `+8`
   checked: after moving one tile the Sprites had 2 and the screen said
   "Moves: 1". Earlier evidence from the Sprites (`+4` = 4, "Moves: 2" on screen; `+8` 4 → 0
@@ -251,4 +257,7 @@ In `~/.mirror/dev/DOSbox/ram-dumps-2026-09-23/`, each a full 16 MB:
 | `cp13_sprites_home.bin` | Sprites moved onto Hamburg's tile |
 | `cp14_stoneskin_target.bin` | later: stack of 8 Sprites + Magic Spirit at (36, 20), Stone Skin waiting for a target |
 | `cp15_stoneskin_cast.bin` | Stone Skin cast on the Magic Spirit (slot 59) |
+| `cp16_before_resist.bin` | Resist Elements chosen, at the target list |
+| `cp17_resist_on_spirit.bin` | Resist Elements on the Magic Spirit |
+| `cp18_resist_on_sprite.bin` | Resist Elements on the fourth Sprites (slot 51); Hamburg building a Marketplace |
 | `SAVE4.GAM` | the save written just before `cp4` |
