@@ -6,8 +6,8 @@ stand. The earlier [2026-09-23-session-handoff.md](2026-09-23-session-handoff.md
 
 ## Where things stand
 
-Everything is merged to `main` (through #34); nothing is open. `main` is
-protected: PR plus a green CI `test` check, no direct pushes.
+Everything is merged to `main` through #35; the STORY-032 PR is open.
+`main` is protected: PR plus a green CI `test` check, no direct pushes.
 
 - **LBX decoding is correct** (`Mirror.LBX`): name tables, the real
   image format, and the `FONTS.LBX` #2 palette. The sprite catalog is in
@@ -18,22 +18,22 @@ protected: PR plus a green CI `test` check, no direct pushes.
 - **Setup:** `mix mirror.import_game <install or zip>` fills
   `~/.mirror/game` (the dev server's default `MIRROR_MOM_PATH`).
 
-## Next task: STORY-032 (cities follow-up)
+## Next task: STORY-012 (units + plaques)
 
-[../stories/STORY-032-cities-walls-labels-verify.md](../stories/STORY-032-cities-walls-labels-verify.md). Its
-"Findings" section already answers the hard parts: City Walls is record
-`+66`, the size byte runs 0 Outpost / 1 Hamlet / 2 Village, and outposts
-seem to have no flag. What's left to do:
+STORY-032 is done (PR `feat/story-032-cities-followup`):
+- **Walls:** `walled` (`+66`) is parsed and sent to the client.
+- **Hover readout** names the city under the pointer.
+- **Flag shade fixed** to the owner's ramp start + 1..3, matched
+  pixel-for-pixel against DOSBox screenshots.
+- **Confirmed:** frame = size − 1 for sizes 0–2, walls don't change the
+  sprite, sprites are centred on their tile, and neutral browns are right.
 
-1. Parse walls (`+66 == 1`) and pass `walled` to the client.
-   Walls don't change the hamlet sprite, so this is data for later.
-2. Outposts (size 0): find their sprite (maybe `#21` `CITYNOWA`?) and drop
-   the flag, checked against the screenshots.
-3. City names in the hover readout.
-4. Check the rival and neutral flag colours in the screenshots.
+What screenshots couldn't settle is in
+[STORY-033](../stories/STORY-033-cities-town-frames-rival-flags.md):
+Town+ frames, rival flag colours, and what `CITYNOWA` is for.
 
-After that, EPIC-004's order: STORY-012 (units + plaques), STORY-011
-(sites), STORY-013 (roads/specials), STORY-008 (node auras).
+Then EPIC-004's order: STORY-012 (units + plaques), STORY-011 (sites),
+STORY-013 (roads/specials), STORY-008 (node auras).
 
 ## Checking against the real game
 
@@ -44,7 +44,10 @@ After that, EPIC-004's order: STORY-012 (units + plaques), STORY-011
   checkpoint saves. Their window shots (with timestamps) are in
   `~/.mirror/dev/DOSbox/FREYA - God Mode/`.
 - Diff city records between saves first, then look at the few
-  screenshots that matter. Contact sheets (PIL) beat opening 58 images.
+  screenshots that matter. DOSBox shots keep exact palette colours, so
+  sample at game-pixel centres (4× in these shots; the map starts at
+  screen (112, 210)) and read pixels back as palette indices. Contact
+  sheets (PIL) beat opening 58 images.
   Screenshot filenames have a narrow no-break space before "PM", so
   match them with a glob.
 - Game quirk: loading SAVE1 renames the starting city ("Name Starting

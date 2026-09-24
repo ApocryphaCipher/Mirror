@@ -79,7 +79,8 @@ STORY-011 → STORY-013.
 - [STORY-006](../stories/STORY-006-sprite-groundwork.md): sprite groundwork (full GOG install, named-sprite catalog). **Done**: catalog in [../reference/overland-sprites-and-save-blocks.md](../reference/overland-sprites-and-save-blocks.md)
 - [STORY-009](../stories/STORY-009-overlay-layer-toggles.md): overlay layers with on/off toggles. **Done**
 - [STORY-010](../stories/STORY-010-cities.md) (**Done**): cities
-- [STORY-032](../stories/STORY-032-cities-walls-labels-verify.md): cities follow-up: walls, name labels, check against the real game
+- [STORY-032](../stories/STORY-032-cities-walls-labels-verify.md) (**Done**): cities follow-up: walls, name labels, check against the real game
+- [STORY-033](../stories/STORY-033-cities-town-frames-rival-flags.md): cities: Town+ frames, rival flag colours, `CITYNOWA`
 - [STORY-011](../stories/STORY-011-sites-towers-lairs.md): towers, fortresses, lairs, ruins and other sites
 - [STORY-012](../stories/STORY-012-units-with-banner-plaques.md): units with banner-colour plaques
 - [STORY-013](../stories/STORY-013-roads-minerals-corruption.md): specials and bonuses (ores, gems, nightshade, wild game…), roads, corruption
