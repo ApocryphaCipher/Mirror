@@ -147,10 +147,33 @@ more thousand to feed). But the stored size byte `+19` **stayed 1**
 
 - the map sprite (and income) follow population live; 5,000 is the
   first sprite change, as Kevin confirmed on screen;
-- *guess:* `+19` is only recomputed at end of turn. Check: end the turn
-  and read `+19` (expect 2).
+- `+19` is **not** recomputed at end of turn (checked below); what
+  moves it is still open.
 - For Mirror, "frame = size − 1" still holds for saves, where `+19` and
   population agree, but it is not how the game decides.
+
+**Production and buildings, checked 2026-09-23** (dumps `cp5`–`cp7`).
+Kevin queued a Granary, bought it, cast Wall of Stone on Hamburg, and
+ended the turn:
+
+| Offset | Field | Evidence |
+| --- | --- | --- |
+| `+28` | item in production (u16) | checked: 2 while the screen said "Producing Housing", 29 for Granary, back to 2 when switched and after completion |
+| `+94` | production stored so far (u16) | checked: 0 → 40 on buying the Granary (cost 40: "5 Turns" at 9/turn), 40 → 0 when it was built |
+| `+93` | production per turn (u8) | checked: 9, and the city screen showed 9 hammers |
+| `+96` | gold per turn (u8) | checked: 8, and the screen showed 8 coins |
+| `+31+n` | built flag for building id *n* (1 built, `0xff` not) | checked twice: Granary (id 29) set `+60`, Wall of Stone set `+66` (City Walls, id 35) |
+| `+30` | *guess:* a turn counter | 3 → 4 over one turn; unchanged by buying or switching production |
+| `+19` | size | still 1 (Hamlet) after the turn ended at 5,080, so the end-of-turn guess above is **wrong**; the city title still said "Hamlet" |
+
+So production ids and building ids are the same numbering (2 = Housing,
+29 = Granary, 35 = City Walls). *Guess:* the other built flags in
+Hamburg, `+34`, `+39`, `+63` (ids 3, 8, 32), are the starting Barracks,
+Smithy and Builder's Hall; check against the city screen's building
+list.
+
+Buying the Granary cost 160 gold (29840 after), 4 × its cost with nothing
+stored. *Guess:* that is the buy-price rule when no production is stored.
 
 ## The dumps
 
