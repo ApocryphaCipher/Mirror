@@ -175,6 +175,19 @@ list.
 Buying the Granary cost 160 gold (29840 after), 4 × its cost with nothing
 stored. *Guess:* that is the buy-price rule when no production is stored.
 
+**Units, checked 2026-09-23** (`cp7` → `cp8`). Kevin cast Sprites
+(10 MP) at Hamburg:
+
+- A new record appeared in unit slot 42 (RAM `0x07e060 + 42 × 32`):
+  xy (38, 21) plane 0 (Hamburg's tile), owner 0, type (`+5`) **180**,
+  so 180 is Sprites (*guess* only in that one summon made it).
+- The **unit count** is a u16 at RAM `0x034782` (`ds+0xbd92`, the only
+  u16 in the data segment that went 42 → 43). It is *not* beside the
+  wizard records the way save offset `0x9e2` suggests.
+- The two garrison units (slots 0 and 5, types 39 and 40) changed only at
+  `+18`, 2 and 4 → 0, when the Sprites took the selection. *guess:* a
+  status / orders byte.
+
 ## The dumps
 
 In `~/.mirror/dev/DOSbox/ram-dumps-2026-09-23/`, each a full 16 MB:
@@ -186,4 +199,8 @@ In `~/.mirror/dev/DOSbox/ram-dumps-2026-09-23/`, each a full 16 MB:
 | `cp2_after_pick.bin` | turn 2, back on the map after picking Earth Lore |
 | `cp3_turn3.bin` | turn 3, map |
 | `cp4_saved.bin` | turn 3, map, right after saving to slot 4 |
+| `cp5_granary_queued.bin` | second run (SAVE3 reloaded, city renamed Hamburg, pop set to 5,000 by RAM write), Granary queued |
+| `cp6_granary_bought.bin` | Granary bought, back on the map |
+| `cp7_granary_walls.bin` | next turn: Granary built, Wall of Stone resolved |
+| `cp8_sprites.bin` | after casting Sprites, Sprites selected on the map |
 | `SAVE4.GAM` | the save written just before `cp4` |

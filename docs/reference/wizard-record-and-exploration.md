@@ -32,7 +32,7 @@ shows, and "kazzmir" means the offset comes from kazzmir's read order.
 | `+0x2a..+0x2c` | research / mana / skill ratio (u8; 34/33/33 in SAVE1) | kazzmir; they sum to 100. `+0x2c` = skill checked: 72 after Kevin moved the Skill slider (9 SP of 12). `+0x2a`/`+0x2b` were both 14, so their order is still kazzmir's |
 | `+0x2e` / `+0x30` / `+0x32` | summoning circle x / y / plane (i16) | game: (38, 21, Arcanus), the capital Norport |
 | `+0x34` | 8 research candidate spells (u16) | kazzmir; SAVE1's are Nature spell ids |
-| `+0x54` / `+0x56` | skill left / nominal skill (u16) | `+0x56` checked: 60 = "Casting Skill: 60(60)". `+0x54` was 42 on that screen, not 60: *guess:* skill already spent this turn is 18 (Wall of Stone), so it is not the screen's first number |
+| `+0x54` / `+0x56` | skill left / nominal skill (u16) | `+0x56` checked: 60 = "Casting Skill: 60(60)". `+0x54` = skill left this turn, checked: it fell by each spell's cost (60 → 42 for Wall of Stone at 18 MP, 42 → 32 for Sprites at 10 MP). The Magic screen still said 60(60) at 42, so its first number is something else |
 | `+0x58` | tax rate (u16) | kazzmir |
 | `+0x5a` | spellbooks per realm, 5 × i16: **Nature, Sorcery, Chaos, Life, Death** | kazzmir + game (Freya: 12 Nature) |
 | `+0x64..+0x75` | **retorts**, one byte each, 1 = has it (table below) | kazzmir + fame check |
