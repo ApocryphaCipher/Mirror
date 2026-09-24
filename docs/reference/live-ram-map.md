@@ -185,8 +185,14 @@ stored. *Guess:* that is the buy-price rule when no production is stored.
   u16 in the data segment that went 42 → 43). It is *not* beside the
   wizard records the way save offset `0x9e2` suggests.
 - The two garrison units (slots 0 and 5, types 39 and 40) changed only at
-  `+18`, 2 and 4 → 0, when the Sprites took the selection. *guess:* a
-  status / orders byte.
+  `+18`, 2 and 4 → 0, when the Sprites took the selection.
+- **`+18` is the unit's orders** (`cp8` → `cp9`): Kevin ordered the
+  Sprites to Patrol and their `+18` went 0 → **5**, while the garrison
+  went back to 2 and 4. So **5 = Patrol** (checked once) and *guess:*
+  0 = ready / awaiting orders (every unit on the selected tile showed 0).
+  2 and 4 are the garrison's earlier orders, not yet identified.
+- The same Patrol order set the Sprites' `+7` and `+11` from 0 to 1, the
+  value the older units already had. Unknown.
 
 ## The dumps
 
@@ -203,4 +209,5 @@ In `~/.mirror/dev/DOSbox/ram-dumps-2026-09-23/`, each a full 16 MB:
 | `cp6_granary_bought.bin` | Granary bought, back on the map |
 | `cp7_granary_walls.bin` | next turn: Granary built, Wall of Stone resolved |
 | `cp8_sprites.bin` | after casting Sprites, Sprites selected on the map |
+| `cp9_sprites_patrol.bin` | Sprites ordered to Patrol |
 | `SAVE4.GAM` | the save written just before `cp4` |
