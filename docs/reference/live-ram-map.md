@@ -85,6 +85,27 @@ First session: 2026-09-23. Dumps and the matching save are in
   screenshot. A signature can pause the game so a `gama checkpoint`
   catches the moment. See gama's README and `signatures/mom/`.
 
+**Findings from the first session with signatures** (2026-09-24,
+"Freya - Dior", collection `mom-live-2026-09-24b` in the vault):
+
+- **City size updates exactly when population crosses a thousand** in the
+  game's turn processing: the capital's thousands went 4 → 5 and its size
+  1 → 2 in the same scan. Nine neutral cities, still at their map
+  generation values (3,000, 6,000) with stale sizes, got corrected sizes
+  (and lost 50 people each) on the first turn. The lag seen before came
+  from values set outside that code (our RAM write; map generation).
+  **checked**
+- **During a battle the game reuses the city table's memory** (and
+  others): at every battle start nearly all 100 city records changed at
+  once to nonsense (e.g. the capital's size 26, 75 buildings) and were
+  restored at the battle's end. Don't decode world tables mid-battle.
+  **checked** (4 battles)
+- **Nightshade is never stored in the city record**, not even for a city
+  of the player's: Steyr, taken by Kevin, with Nightshade on its
+  mini-map and none in its Enchantments box, kept enchantment slot 25 at
+  0 at all normal times (ReMoM labels that slot Nightshade; it held only
+  battle leftovers). **checked**
+
 ## How to work with it
 
 The game is turn-based, so Kevin stops at a **checkpoint** (a screen that

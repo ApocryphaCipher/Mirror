@@ -45,7 +45,8 @@ Offsets are record-relative and match the save file.
   charismatic, artificer).
 - **City:** `+0x1E` building count (our unknown `+30`: it went 3 → 4
   when the Granary was built), `+0x43` the 26 city enchantments (our
-  guessed block; ReMoM marks the last slot, `+0x5C`, as Nightshade, yet
-  Steyr's is 0, so that is open), `+0x61` building maintenance, `+0x62`
+  guessed block, now checked; ReMoM marks the last slot, `+0x5C`, as
+  Nightshade, but the game never set it, even for a city of Kevin's with
+  Nightshade in reach: see [live-ram-map.md](live-ram-map.md)), `+0x61` building maintenance, `+0x62`
   mana, `+0x63` research, `+0x64` food per turn, `+0x1A` contacts.
 - **The Surveyor formula** (STORY-034) should be in `CITYCALC.c`.
