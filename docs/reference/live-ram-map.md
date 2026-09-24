@@ -272,6 +272,21 @@ Sorcery node at (42, 10), start of his first combat turn):
   different for the Magic Spirit and the Phantom Warriors), and the u16
   pairs after it are battlefield positions. Record start and field layout
   are not worked out yet.
+- **Mid-fight diff** (`cp28` → `cp29`; Kevin's Sprites each shot once,
+  he moved one Sprites and the Magic Spirit, killed some Phantom Warriors
+  and cast Earth to Mud). Offsets are from the overland-slot u16:
+  - `-0x2d`: 4 → 3 on all eight Sprites. *guess:* ranged shots left.
+  - `+0x14` / `+0x16`: changed by one step only for the two units Kevin
+    moved (and for moving guardians). *guess:* battlefield x, y.
+  - `+0x18` / `+0x1a`: changed on units that only shot, too. *guess:*
+    target or facing point.
+  - `-0x23`: 6 → 0 on three Phantom Warriors (slots 74, 76, 80), with
+    `+0x4` = 4 and `+0x6` set. *guess:* figures left (Phantom Warriors
+    have 6), so 0 = dead.
+  - `-0x29`: 2 → 0 on the guardians that moved. *guess:* moves left.
+  - Overland mana dropped 6 (Earth to Mud); overland skill left did not
+    move, so combat keeps its own skill counter. The encounter record
+    still said 8 guards: it is updated only after the battle.
 
 ## The dumps
 
@@ -299,6 +314,6 @@ In `~/.mirror/dev/DOSbox/ram-dumps-2026-09-23/`, each a full 16 MB:
 | `cp17_resist_on_spirit.bin` | Resist Elements on the Magic Spirit |
 | `cp18_resist_on_sprite.bin` | Resist Elements on the fourth Sprites (slot 51); Hamburg building a Marketplace |
 | `cp19_marketplace_built.bin` | next turn: Marketplace built; the stack one step along its path to (42, 10) |
-| `cp26`–`cp28` | Sorcery node in Surveyor; next turn after the teleport; first combat turn at the node |
+| `cp26`–`cp29` | Sorcery node in Surveyor; next turn after the teleport; first combat turn at the node; mid-fight |
 | `cp20`–`cp25` | Surveyor open, hovering: Hamburg area, gold ore (39, 20), wild game (38, 19), gems (32, 25), Myrror adamantium (28, 25), Myrror Keep (26, 25); screenshots `surveyor-*.webp` beside them |
 | `SAVE4.GAM` | the save written just before `cp4` |
