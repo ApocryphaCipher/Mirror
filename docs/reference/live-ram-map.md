@@ -193,6 +193,18 @@ stored. *Guess:* that is the buy-price rule when no production is stored.
   2 and 4 are the garrison's earlier orders, not yet identified.
 - The same Patrol order set the Sprites' `+7` and `+11` from 0 to 1, the
   value the older units already had. Unknown.
+- **`+9` / `+10` is the move destination (x, y)**, checked against two
+  paths Kevin set (screenshots of the boot markers): (32, 22) with the
+  boots running west, then (39, 22) running east. The orders byte stayed 5.
+- **`+8` is moves left, `+4` moves per turn**, both in half-moves:
+  *guess* from the Sprites (`+4` = 4, "Moves: 2" on screen; `+8` 4 → 0
+  after an accidental two-tile move) and the garrison (`+4` = `+8` = 2,
+  one move).
+- The route is not in the unit record. *guess:* the data segment holds a
+  step buffer the map draws from: three 120-entry arrays 0x78 apart at
+  `ds+0xc5f0` (per-step cost, 2 each), `ds+0xc668` (y) and `ds+0xc6e0`
+  (x); for the eastward path the first three entries were (37, 22),
+  (38, 22), (39, 22).
 
 ## The dumps
 
@@ -210,4 +222,5 @@ In `~/.mirror/dev/DOSbox/ram-dumps-2026-09-23/`, each a full 16 MB:
 | `cp7_granary_walls.bin` | next turn: Granary built, Wall of Stone resolved |
 | `cp8_sprites.bin` | after casting Sprites, Sprites selected on the map |
 | `cp9_sprites_patrol.bin` | Sprites ordered to Patrol |
+| `cp10_sprites_path.bin` | Sprites given a path east to (39, 22) |
 | `SAVE4.GAM` | the save written just before `cp4` |
