@@ -204,6 +204,11 @@ One byte per tile, row-major.
 | 64 | Wild game | `#92` |
 | 128 | Nightshade | `#91` |
 
+**checked in the running game** (live RAM + Surveyor, 2026-09-23, dumps
+`cp21`/`cp22` in [live-ram-map.md](live-ram-map.md)): **4** at (39, 20),
+where Surveyor said "Gold Ore +3 gold", and **64** at (38, 19), where it
+said "Wild Game +2 food".
+
 - **Checked:** every value in SAVE1 is 0 or one of those 11.
 - **Checked, and a correction:** `#78` is iron and `#79` is coal.
   - The pictures: `#78` is rust-red, `#79` black.
