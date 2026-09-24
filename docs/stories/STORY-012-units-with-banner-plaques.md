@@ -1,8 +1,11 @@
 # STORY-012: Units on the map with banner-colour plaques
 
 **Parent:** [EPIC-004](../epics/EPIC-004-overland-map-features.md)
-**Status:** open, blocked on STORY-006 (figure + plaque art) and on
-verifying the unit record layout
+**Status:** open, ready. The figure and plaque art is catalogued (STORY-006).
+The unit record layout and type table are in
+[kazzmir-save-layouts.md](../reference/kazzmir-save-layouts.md).
+Checked on SAVE1: 42 units, and Freya's Barbarian Spearmen (39) and
+Swordsmen (40) at Norport.
 **Size:** medium–large
 
 ## What to do

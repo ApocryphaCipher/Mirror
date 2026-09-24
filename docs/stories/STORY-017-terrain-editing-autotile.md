@@ -1,7 +1,10 @@
 # STORY-017: Terrain editing with auto-tiling
 
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
-**Status:** open, blocked on decoding `TERRTYPE.LBX` properly
+**Status:** open. Was blocked on decoding `TERRTYPE.LBX`. kazzmir's terrain
+tile table (each tile's type plus which terrains it accepts on each of
+its 8 sides) may replace that: see
+[kazzmir-save-layouts.md](../reference/kazzmir-save-layouts.md).
 **Size:** large
 
 ## Why this is the interesting one

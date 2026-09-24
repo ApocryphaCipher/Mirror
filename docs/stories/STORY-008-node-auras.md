@@ -1,8 +1,11 @@
 # STORY-008: Node auras (Chaos / Nature / Sorcery sparkle)
 
 **Parent:** [EPIC-005](../epics/EPIC-005-animated-terrain-and-magic.md)
-**Status:** open, blocked on STORY-006 (needs the sparkle art identified)
-and on verifying the node record layout
+**Status:** open, ready. The sparkle art is catalogued (STORY-006). The node
+record layout is in [kazzmir-save-layouts.md](../reference/kazzmir-save-layouts.md):
+x/y/plane, owner, and power are checked against SAVE1, as are the aura
+tile lists and type (0 Sorcery, 1 Nature, 2 Chaos). kazzmir draws sparkles
+only on melded nodes, in the melder's colour; check that in the game.
 **Size:** medium
 
 ## What to do

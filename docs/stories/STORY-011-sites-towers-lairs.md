@@ -1,8 +1,11 @@
 # STORY-011: Towers, fortresses, lairs, ruins and other sites
 
 **Parent:** [EPIC-004](../epics/EPIC-004-overland-map-features.md)
-**Status:** open, blocked on STORY-006 (site art) and on verifying the
-encounter-zone record layout
+**Status:** open, ready. The site art is catalogued (STORY-006). Layouts
+for fortresses (checked), towers (no plane byte) and encounter zones
+(kind table and sprite per kind) are in
+[kazzmir-save-layouts.md](../reference/kazzmir-save-layouts.md). Still to check: which encounter kind is
+which node realm, and why kind 0 has 15 records for 6 towers.
 **Size:** medium
 
 ## What to do
