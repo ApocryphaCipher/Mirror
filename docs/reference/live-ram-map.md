@@ -139,6 +139,19 @@ show **Population: 4,500 (+120)**. So:
 - growth (+120) did not change, so it is computed, not stored beside the
   population.
 
+Then `+20..+25` was rewritten in one compare-and-swap to 5 and 0
+(5,000). The map immediately drew Hamburg with the **next, larger city
+sprite**, and the income panel dropped from 6 gold / 2 food to 5 / 1 (one
+more thousand to feed). But the stored size byte `+19` **stayed 1**
+(Hamlet). So:
+
+- the map sprite (and income) follow population live; 5,000 is the
+  first sprite change, as Kevin confirmed on screen;
+- *guess:* `+19` is only recomputed at end of turn. Check: end the turn
+  and read `+19` (expect 2).
+- For Mirror, "frame = size − 1" still holds for saves, where `+19` and
+  population agree, but it is not how the game decides.
+
 ## The dumps
 
 In `~/.mirror/dev/DOSbox/ram-dumps-2026-09-23/`, each a full 16 MB:
