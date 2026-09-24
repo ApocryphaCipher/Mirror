@@ -163,7 +163,7 @@ ended the turn:
 | `+93` | production per turn (u8) | checked: 9, and the city screen showed 9 hammers |
 | `+96` | gold per turn (u8) | checked: 8, and the screen showed 8 coins |
 | `+31+n` | built flag for building id *n* (1 built, `0xff` not) | checked twice: Granary (id 29) set `+60`, Wall of Stone set `+66` (City Walls, id 35) |
-| `+30` | *guess:* a turn counter | 3 → 4 over one turn; unchanged by buying or switching production |
+| `+30` | unknown | 3 → 4 over one turn, then **unchanged** over the next, and unchanged by buying or switching production; not a turn counter |
 | `+19` | size | still 1 (Hamlet) after the turn ended at 5,080, so the end-of-turn guess above is **wrong**; the city title still said "Hamlet" |
 
 So production ids and building ids are the same numbering (2 = Housing,
@@ -179,25 +179,33 @@ stored. *Guess:* that is the buy-price rule when no production is stored.
 (10 MP) at Hamburg:
 
 - A new record appeared in unit slot 42 (RAM `0x07e060 + 42 × 32`):
-  xy (38, 21) plane 0 (Hamburg's tile), owner 0, type (`+5`) **180**,
-  so 180 is Sprites (*guess* only in that one summon made it).
+  xy (38, 21) plane 0 (Hamburg's tile), owner 0, type (`+5`) **180**.
+- **Unit type names**, checked: the data segment has the unit type table
+  at `ds+0x19c`, `0x24` bytes per type, with a u16 pointer (DS offset) to
+  the name at `+0`. It names 39 Spearmen, 40 Swordsmen and 180 Sprites,
+  matching what Kevin saw on screen.
 - The **unit count** is a u16 at RAM `0x034782` (`ds+0xbd92`, the only
   u16 in the data segment that went 42 → 43). It is *not* beside the
   wizard records the way save offset `0x9e2` suggests.
 - The two garrison units (slots 0 and 5, types 39 and 40) changed only at
   `+18`, 2 and 4 → 0, when the Sprites took the selection.
-- **`+18` is the unit's orders** (`cp8` → `cp9`): Kevin ordered the
-  Sprites to Patrol and their `+18` went 0 → **5**, while the garrison
-  went back to 2 and 4. So **5 = Patrol** (checked once) and *guess:*
-  0 = ready / awaiting orders (every unit on the selected tile showed 0).
-  2 and 4 are the garrison's earlier orders, not yet identified.
+- **`+18` is the unit's orders**, checked in `cp11`: Kevin set the
+  Spearmen (slot 0) to Patrol and the Swordsmen (slot 5) to Done. So
+  **2 = Patrol**, **4 = Done** (Done also set moves left `+8` to 0), and
+  0 = ready / awaiting orders (every unit on a selected tile shows 0).
+  The Sprites have held **5** the whole time they had a destination;
+  *guess:* 5 = going to `+9`/`+10`. (An earlier reading of 5 as Patrol
+  was wrong: the Sprites were already on a path when Patrol was clicked.)
 - The same Patrol order set the Sprites' `+7` and `+11` from 0 to 1, the
   value the older units already had. Unknown.
 - **`+9` / `+10` is the move destination (x, y)**, checked against two
   paths Kevin set (screenshots of the boot markers): (32, 22) with the
   boots running west, then (39, 22) running east. The orders byte stayed 5.
+- **Paths run across turns**, checked in `cp11`: after the turn ended the
+  Sprites had walked two tiles east, (36, 22) → (38, 22), destination
+  still (39, 22), moves left 0.
 - **`+8` is moves left, `+4` moves per turn**, both in half-moves:
-  *guess* from the Sprites (`+4` = 4, "Moves: 2" on screen; `+8` 4 → 0
+  *guess* (strengthened by the path and by Done zeroing `+8`) from the Sprites (`+4` = 4, "Moves: 2" on screen; `+8` 4 → 0
   after an accidental two-tile move) and the garrison (`+4` = `+8` = 2,
   one move).
 - The route is not in the unit record. *guess:* the data segment holds a
@@ -223,4 +231,5 @@ In `~/.mirror/dev/DOSbox/ram-dumps-2026-09-23/`, each a full 16 MB:
 | `cp8_sprites.bin` | after casting Sprites, Sprites selected on the map |
 | `cp9_sprites_patrol.bin` | Sprites ordered to Patrol |
 | `cp10_sprites_path.bin` | Sprites given a path east to (39, 22) |
+| `cp11_done_patrol_move.bin` | next turn: Spearmen on Patrol, Swordsmen Done, Sprites two tiles along the path |
 | `SAVE4.GAM` | the save written just before `cp4` |
