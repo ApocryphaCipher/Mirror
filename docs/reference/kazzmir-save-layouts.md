@@ -36,16 +36,19 @@ Use his *layouts and tables*; check his *pictures* against DOSBox.
 | Offset | Field | Status |
 | --- | --- | --- |
 | `+0` `+1` `+2` | x, y, plane | **checked:** all 30 land on node tiles in SAVE1 |
-| `+3` | owner (i8, −1 = nobody; else wizard index = the melder) | **checked:** all −1 on turn one |
-| `+4` | power = number of aura tiles used (SAVE1: 5–20) | kazzmir |
+| `+3` | owner (i8, −1 = nobody; else wizard index = the melder) | **checked:** all −1 on turn one; live RAM: −1 → 0 when Kevin's Magic Spirit melded the Sorcery node at (42, 10) |
+| `+4` | power = number of aura tiles used (SAVE1: 5–20) | kazzmir; live RAM: 5 for the (42, 10) node, whose aura lists hold 5 tiles, the ones that sparkled |
 | `+5..+24` | aura tile x's (20 bytes) | **checked:** the first entry is the node's own tile |
 | `+25..+44` | aura tile y's (20 bytes) | same |
 | `+45` | type: **0 Sorcery, 1 Nature, 2 Chaos** | **checked:** type 0/1/2 nodes stand on terrain tiles 168/169/170 (`0xA8`/`0xA9`/`0xAA`), which kazzmir's terrain table names Sorcery/Nature/Chaos node. 10 of each |
 | `+46` | flags (*kazzmir:* warped etc.) | kazzmir |
 | `+47` | unknown | — |
 
-**Drawing** (kazzmir; the game is still to check): a node shows aura
-sparkles **only when melded**. The sparkle is `MAPBACK #(63 + banner)` of
+**Drawing:** a node shows aura sparkles **only when melded**. **checked
+in the game** (2026-09-23): the (42, 10) Sorcery node showed none until
+Kevin melded it; then its 5 aura tiles, (42, 10) (43, 10) (41, 9)
+(42, 11) (41, 10), sparkled ([live-ram-map.md](live-ram-map.md)).
+kazzmir: The sparkle is `MAPBACK #(63 + banner)` of
 the owner, drawn on each aura tile. That fits our catalog's sparkle
 entries. An unmelded node is just its terrain tile.
 
