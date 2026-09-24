@@ -24,7 +24,7 @@ shows, and "kazzmir" means the offset comes from kazzmir's read order.
 | `+0x00` | portrait / wizard id (u8; Freya = 9) | kazzmir |
 | `+0x01` | name, 20 bytes, NUL-padded | game ("Freya") |
 | `+0x15` | capital race | kazzmir |
-| `+0x16` | banner: 0 blue, 1 green, 2 purple, 3 red, 4 yellow | game (yellow flag, STORY-032) |
+| `+0x16` | banner: 0 blue, 1 green, 2 purple, 3 red, 4 yellow | game (yellow flag, STORY-032); live RAM + Cartographer: red (Sharee, 3), blue (Jafar, 0), green (Merlin, 1) and yellow (Freya, 4) city dots each sit on their owner's city; purple (Tlaloc, 2): his capital Bloodrock flies a purple flag. **All five checked** |
 | `+0x18` / `+0x1a` | personality / objective (u16, AI) | kazzmir |
 | `+0x22` | mastery research (u16) | kazzmir |
 | `+0x24` | fame (u16) | game: 10 in SAVE1, which the Famous retort grants; live RAM: 10 → 11 on "You have gained 1 fame" |

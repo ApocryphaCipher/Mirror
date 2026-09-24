@@ -215,7 +215,8 @@ said "Wild Game +2 food"; **5** at (32, 25), where it said "Gems +5 gold"
 (`cp23`); and on **Myrror (the second plane)**, **7** at (28, 25), where it
 said "Adamantium Ore +2 power" (`cp24`; the tile was pinned by its
 neighbours: 64 at (27, 26) and (24, 23), 4 at (28, 29), 7 at (26, 29),
-all visible on screen).
+all visible on screen); and **128** at (46, 16), a swamp beside Steyr,
+where it said "Nightshade / Protects city from spells" (`cp32`).
 
 - **Checked:** every value in SAVE1 is 0 or one of those 11.
 - **Checked, and a correction:** `#78` is iron and `#79` is coal.

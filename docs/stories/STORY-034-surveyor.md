@@ -25,6 +25,12 @@ What the game shows (screenshots in
 | Desert with gems, (32, 25) | "Desert / +3% production", "Gems / +5 gold", then the too-close message. RAM (`cp23_surveyor_gems.bin`): minerals plane **5**, Mirror's value for Gems |
 | **Myrror** hills with Adamantium, (28, 25) | "Hills / 1/2 food / +3% production", "Adamantium Ore / +2 power", then **City Resources: Maximum Pop 17, Prod Bonus +33%, Gold Bonus +10%** (a city is allowed here: the first case of City Resources for an empty site). RAM (`cp24_surveyor_adamantium_myrror.bin`): Myrror minerals plane **7** |
 | **Myrror** river mouth with a Keep, (26, 25) | "River Mouth / 1/2 food / +30% gold", "Keep / Unexplored", then "Cities cannot be built on lairs." RAM (`cp25_surveyor_keep.bin`): encounter record 46 at (26, 25, Myrror), kind 7 (Abandoned keep), intact, explored-by flags 0; guards 2 Behemoths + 3 Cockatrices |
+| Swamp with Nightshade, (46, 16), beside the neutral city Steyr (47, 16) | "Swamp / 1/2 food", "Nightshade / Protects city from spells", then the too-close message. RAM (`cp32_surveyor_nightshade.bin`): terrain 166, minerals plane **128**, Mirror's value for Nightshade |
+| Capua, Sharee's capital (11, 26), a Nomad hamlet of 4,640 | "Forest / 1/2 food / +3% production", "Hamlet of Capua", **City Resources: Maximum Pop 13, Prod Bonus +23%, Gold Bonus +12%**. Its catchment's only special is Silver at (9, 26). RAM (`cp36_surveyor_capua.bin`) |
+| Cremona, Merlin's capital (15, 11), a Nomad hamlet of 3,260 on a mountain ring | "Mountain / +5% production", "Hamlet of Cremona", **City Resources: Maximum Pop 8, Prod Bonus +63%, Gold Bonus +9%**. Catchment specials: Coal (15, 10), Gold (16, 11); Nightshade (11, 10) lies just outside. RAM (`cp38_surveyor_cremona.bin`) |
+| Sidon, Jafar's capital (55, 29), a Nomad hamlet of 4,640 on a narrow island | "Grasslands / 1 1/2 food", "Hamlet of Sidon", **City Resources: Maximum Pop 14, Prod Bonus +6%, Gold Bonus +12%**. **No specials in the catchment**, so terrain alone gives these: the simplest case for the formula. RAM (`cp39_surveyor_sidon.bin`) |
+| Bloodrock, Tlaloc's capital, **Myrror** (54, 23), a Dark Elf (race 2) hamlet of 4,640 on the coast | "Desert / +3% production", "Hamlet of Bloodrock", **City Resources: Maximum Pop 16, Prod Bonus +21%, Gold Bonus +10%**. Catchment special: Gems (54, 21). RAM (`cp40_surveyor_bloodrock.bin`) |
+| **Myrror** grassland with a temple, (28, 21) | "Grasslands / 1 1/2 food", "Temple / Unexplored", "Cities cannot be built on lairs." RAM (`cp41_surveyor_temple.bin`): encounter record 74, kind 6 (Ancient temple), intact, flags 0; guards 1 Skeletons + 1 Zombies, 50 mana |
 
 So there are two parts:
 
@@ -54,6 +60,15 @@ Nothing here is checked yet. Candidates:
   near `ds+0x5400..0x5490`). The shown text is assembled in a scratch
   buffer near `ds+0xd5a4`. The numbers are not kept as text, so the game
   computes them on hover; Mirror has to compute them too.
+
+**City Resources are computed, not stored** (checked on three cities):
+no byte of Hamburg's record holds 19, 60 or 50, none of Capua's holds 13
+or 23 (its two 12s are the per-turn figures at `+96` and `+100`), and
+none of Cremona's holds 8, 63 or 9, and Sidon's only match is a 12 at
+`+100` (Capua also has 12 there with +12% gold, but Hamburg's `+100` is
+10 against +50%, so it is not the bonus); Bloodrock's holds none of 16,
+21 or 10.
+So Mirror must compute them from the tiles, like the game.
 
 ## Checking it
 

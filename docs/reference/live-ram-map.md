@@ -119,6 +119,36 @@ kind 7 (Abandoned keep), intact 1, explored-by flags 0, guards Behemoth
 (188) count `0x22` and Cockatrices (181) count `0x33`, i.e. 2 and 3 with
 equal nibbles, as in SAVE1's intact sites.
 
+**Nightshade is not stored in the city record** (*guess*, `cp32`,
+2026-09-23). Of the 27 cities (both planes), only the neutral **Steyr**
+(47, 16) has Nightshade in its catchment (the 5 × 5 square minus
+corners; the tile at (46, 16)). No city-record byte equals each city's
+Nightshade count, and the bytes where Steyr differs from every other
+city are ordinary stats (x `+15`, population `+20` = 8, production
+`+93` = 13, gold `+96` = 9, and `+102` = 100, unknown), which it gets
+from being the largest. So *guess:* the game counts Nightshade from the
+minerals plane when it needs it, and Mirror should too. Only one
+Nightshade city was available, so this is not proof. The game agrees
+on screen: Steyr's city screen (`cp33`) shows an **empty Enchantments
+box**.
+
+The same screen checks three city fields: "Village of Steyr" with size
+`+19` = 2; "Gnoll" with race `+14` = 5 (and Hamburg, "Barbarian", has
+race 0; Capua, "Nomad", race 11, `cp37`; Bloodrock, a Dark Elf city
+by its sprites and Kevin's reading, race 2, `cp40`); and a granary silo in the picture with building id 29 flagged.
+Hamburg's size byte, still 1 at 5,700 people, was **2** by `cp33`, so it
+does update, just not at the first end of turn after crossing 5,000;
+what triggers it is still open.
+
+All five starting capitals, Hamburg, Capua (`cp37`), Cremona (`cp38`),
+Sidon (`cp39`) and Bloodrock (`cp40`), have exactly building ids 3, 8 and
+32 built, so that is the starting set; *guess:*
+Barracks, Smithy, Builder's Hall.
+
+Bytes **`+67..+92`** are zero in every city: 26 bytes, the number of
+city enchantments in MoM. *guess:* the city enchantment block.
+Check: cast a city enchantment (e.g. Nature's Eye) on Hamburg and diff.
+
 ## Writes
 
 Start DOSBox with `--set webserver_allow_writes=true` as well. Write with
@@ -250,7 +280,9 @@ checked.
 all nine units of Kevin's stack (slots 42, 49–54, 59, 60) were moved from
 (35, 19) to (41, 10), next to the Sorcery node at (42, 10) (terrain 168),
 with one compare-and-swap per unit. Before writing, the target was checked
-to be free of units, cities and encounter sites. The stack **vanished
+to be free of units, cities and encounter sites. (The city check first
+used a wrong table start; re-run with the right one, **city 0 at RAM
+`0x06f980`**, it still found no city there.) The stack **vanished
 from the map** until the turn ended, then showed at (41, 10) with full
 moves, destination cleared and orders 0; the game did not continue the
 go-to into the node. *guess:* the map draws units from a visibility or
@@ -333,6 +365,15 @@ In `~/.mirror/dev/DOSbox/ram-dumps-2026-09-23/`, each a full 16 MB:
 | `cp17_resist_on_spirit.bin` | Resist Elements on the Magic Spirit |
 | `cp18_resist_on_sprite.bin` | Resist Elements on the fourth Sprites (slot 51); Hamburg building a Marketplace |
 | `cp19_marketplace_built.bin` | next turn: Marketplace built; the stack one step along its path to (42, 10) |
+| `cp32_surveyor_nightshade.bin` | Surveyor on the Nightshade swamp at (46, 16) beside Steyr |
+| `cp33_steyr_city_screen.bin` | Steyr's city screen (Village, Gnoll, no enchantments) |
+| `cp34_cartographer_arcanus.bin` | just after closing the Cartographer (Arcanus); game data identical to `cp35` |
+| `cp36_surveyor_capua.bin`, `cp37_capua_city_screen.bin` | Surveyor on Capua, then Capua's city screen (Hamlet, Nomad, no enchantments) |
+| `cp38_surveyor_cremona.bin` | Surveyor on Cremona (Merlin's capital) |
+| `cp39_surveyor_sidon.bin` | Surveyor on Sidon (Jafar's capital), no specials nearby |
+| `cp40_surveyor_bloodrock.bin` | Surveyor on Bloodrock (Tlaloc's capital, Myrror, purple flag) |
+| `cp41_surveyor_temple.bin` | Surveyor on a Myrror temple (28, 21), encounter 74, kind 6. Other sites in view also match their records, incl. a cave (28, 28) with flags `0x01` |
+| `cp35_cartographer_open.bin` | Cartographer open on Arcanus. The screen is graphics: "Arcanus Plane" is not text, and legend names come from the wizard records |
 | `cp26`–`cp31` | Sorcery node in Surveyor; next turn after the teleport; first combat turn at the node; mid-fight; back on the map after winning; node melded (sparkles) |
 | `cp20`–`cp25` | Surveyor open, hovering: Hamburg area, gold ore (39, 20), wild game (38, 19), gems (32, 25), Myrror adamantium (28, 25), Myrror Keep (26, 25); screenshots `surveyor-*.webp` beside them |
 | `SAVE4.GAM` | the save written just before `cp4` |
