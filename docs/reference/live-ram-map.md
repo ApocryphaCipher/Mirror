@@ -111,6 +111,14 @@ shown on screen. By the map they were 30000 again, and stayed there.
 *guess:* the game caps gold and mana at 30000. Check by spending some
 first and watching income apply normally.
 
+**Encounter zones (lairs, keeps, node guardians), checked 2026-09-23**
+(`cp25`): the 102 × 24 table sits at RAM `0x086660` (save `0x006628` +
+`0x80038`); all 102 records parse. Kevin hovered a Keep on Myrror in
+Surveyor ("Keep / Unexplored"): record 46 is at (26, 25, plane 1),
+kind 7 (Abandoned keep), intact 1, explored-by flags 0, guards Behemoth
+(188) count `0x22` and Cockatrices (181) count `0x33`, i.e. 2 and 3 with
+equal nibbles, as in SAVE1's intact sites.
+
 ## Writes
 
 Start DOSBox with `--set webserver_allow_writes=true` as well. Write with
@@ -264,4 +272,5 @@ In `~/.mirror/dev/DOSbox/ram-dumps-2026-09-23/`, each a full 16 MB:
 | `cp17_resist_on_spirit.bin` | Resist Elements on the Magic Spirit |
 | `cp18_resist_on_sprite.bin` | Resist Elements on the fourth Sprites (slot 51); Hamburg building a Marketplace |
 | `cp19_marketplace_built.bin` | next turn: Marketplace built; the stack one step along its path to (42, 10) |
+| `cp20`–`cp25` | Surveyor open, hovering: Hamburg area, gold ore (39, 20), wild game (38, 19), gems (32, 25), Myrror adamantium (28, 25), Myrror Keep (26, 25); screenshots `surveyor-*.webp` beside them |
 | `SAVE4.GAM` | the save written just before `cp4` |
