@@ -101,7 +101,7 @@ Evidence: all five wizards across four dumps.
 | Offset | Field | Evidence |
 | --- | --- | --- |
 | `+0x25a` | research points left (u16) | checked: 250 when Earth Lore was picked (the book's cost), then 243 next turn (7/turn, the book's "36 turns"); the AI wizards also count down |
-| `+0x262` | spell being researched (u16) | checked: set to 10 when Kevin picked Earth Lore, set for all AI wizards at the same moment, unchanged next turn. *guess:* 10 is Earth Lore's id in the spell list |
+| `+0x262` | spell being researched (u16) | checked: set to 10 when Kevin picked Earth Lore, set for all AI wizards at the same moment, and the Magic screen said "Researching: Earth Lore" while it was 10 |
 | `+0x25e` | *guess:* casting skill points (u16) | only rises: Freya 2500 → 2506 → 2512, AIs 245–565. Confirm against the Magic screen's casting skill |
 | `+0x130..+0x14f` | unknown, 16 × u16 | filled with 10–15 for every wizard on the first turn change, then roughly doubled the next; a running total of something |
 
