@@ -27,7 +27,7 @@ shows, and "kazzmir" means the offset comes from kazzmir's read order.
 | `+0x16` | banner: 0 blue, 1 green, 2 purple, 3 red, 4 yellow | game (yellow flag, STORY-032) |
 | `+0x18` / `+0x1a` | personality / objective (u16, AI) | kazzmir |
 | `+0x22` | mastery research (u16) | kazzmir |
-| `+0x24` | fame (u16) | game: 10 in SAVE1, which the Famous retort grants |
+| `+0x24` | fame (u16) | game: 10 in SAVE1, which the Famous retort grants; live RAM: 10 → 11 on "You have gained 1 fame" |
 | `+0x26` | power base (u16) | kazzmir + game: 12, Magic screen "Power Base: 12" (live RAM) |
 | `+0x2a..+0x2c` | research / mana / skill ratio (u8; 34/33/33 in SAVE1) | kazzmir; they sum to 100. `+0x2c` = skill checked: 72 after Kevin moved the Skill slider (9 SP of 12). `+0x2a`/`+0x2b` were both 14, so their order is still kazzmir's |
 | `+0x2e` / `+0x30` / `+0x32` | summoning circle x / y / plane (i16) | game: (38, 21, Arcanus), the capital Norport |

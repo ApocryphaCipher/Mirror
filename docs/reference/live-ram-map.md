@@ -287,6 +287,19 @@ Sorcery node at (42, 10), start of his first combat turn):
   - Overland mana dropped 6 (Earth to Mud); overland skill left did not
     move, so combat keeps its own skill counter. The encounter record
     still said 8 guards: it is updated only after the battle.
+- **After the victory** (`cp30`, on the map, "Inside you find 150 mana
+  crystals", "You have gained 1 fame"):
+  - mana 29805 → 29955 (+150, the encounter's `+12` reward, which stays
+    in the record); fame (wizard `+0x24`) 10 → 11: **fame checked**.
+  - The 8 guardian units (slots 74–81) got plane and owner `0xff`: dead
+    units are marked in place; the unit count stayed 82.
+  - Encounter 19: intact `+3` 1 → 0; guard count `0x88` → `0x80`, which
+    **settles the nibbles: low = guards left, high = starting count**;
+    flags `+15` `0x02` → `0x06` (one explored-by bit added; which wizard
+    each bit is stays open).
+  - The node itself (record 7 of the node table, which has two copies in
+    RAM at `0x085fe0` and `0x087010`) still had owner `0xff`: beating the
+    guardians does not take the node; melding does.
 
 ## The dumps
 
@@ -314,6 +327,6 @@ In `~/.mirror/dev/DOSbox/ram-dumps-2026-09-23/`, each a full 16 MB:
 | `cp17_resist_on_spirit.bin` | Resist Elements on the Magic Spirit |
 | `cp18_resist_on_sprite.bin` | Resist Elements on the fourth Sprites (slot 51); Hamburg building a Marketplace |
 | `cp19_marketplace_built.bin` | next turn: Marketplace built; the stack one step along its path to (42, 10) |
-| `cp26`–`cp29` | Sorcery node in Surveyor; next turn after the teleport; first combat turn at the node; mid-fight |
+| `cp26`–`cp30` | Sorcery node in Surveyor; next turn after the teleport; first combat turn at the node; mid-fight; back on the map after winning |
 | `cp20`–`cp25` | Surveyor open, hovering: Hamburg area, gold ore (39, 20), wild game (38, 19), gems (32, 25), Myrror adamantium (28, 25), Myrror Keep (26, 25); screenshots `surveyor-*.webp` beside them |
 | `SAVE4.GAM` | the save written just before `cp4` |
