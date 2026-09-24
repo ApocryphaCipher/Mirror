@@ -106,6 +106,24 @@ First session: 2026-09-23. Dumps and the matching save are in
   0 at all normal times (ReMoM labels that slot Nightshade; it held only
   battle leftovers). **checked**
 
+**Surveyor hovering, the map view and the plane** (2026-09-24): with the
+Surveyor open, the fork's `surveyor-text` watch logs the panel's text
+slots and the mouse position for each hovered tile (about 300 hovers in
+Kevin's session; `gama surveyor hits.jsonl`).
+
+- The **overland map view's top-left tile** is a u16 pair at
+  **`ds+0x6FFE` (RAM `0x2F9EE`)**: the only data-segment pair that read
+  (32, 16), (30, 19), (23, 20) and (33, 7) in five Surveyor dumps as the
+  map was scrolled. **checked**: with it, hovers of "+2 food", "+3 gold"
+  and "+5 gold" land on the known wild game (38, 19), gold (39, 20),
+  (36, 23) and gems (32, 25), and "Konstanz" on the capital (38, 21).
+- The **plane being viewed** is a u16 at **`ds+0xBD86` (RAM `0x34776`)**:
+  the only one that is 1 on both Myrror dumps and 0 on three Arcanus
+  ones. *guess* (one experiment).
+- Hovered tile = view origin + (mouse x / 2 / 20, (mouse y - 20) / 18):
+  the map is 12 x 10 tiles of 20 x 18 pixels from screen row 20, INT 33h
+  x runs 0..639, and x wraps at 60.
+
 ## How to work with it
 
 The game is turn-based, so Kevin stops at a **checkpoint** (a screen that

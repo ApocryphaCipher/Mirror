@@ -70,6 +70,11 @@ none of Cremona's holds 8, 63 or 9, and Sidon's only match is a 12 at
 21 or 10.
 So Mirror must compute them from the tiles, like the game.
 
+- **Automatic test cases:** the DOSBox fork's Surveyor watch logs each
+  hovered tile's panel text with the tile (see
+  [live-ram-map.md](../reference/live-ram-map.md)), so a Surveyor session
+  yields hundreds of (tile, text) pairs to check the formula against.
+
 ## Checking it
 
 Per AGENTS.md §6, the numbers need the game's own confirmation:
