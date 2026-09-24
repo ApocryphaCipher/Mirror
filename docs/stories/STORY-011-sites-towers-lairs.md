@@ -1,8 +1,13 @@
 # STORY-011: Towers, fortresses, lairs, ruins and other sites
 
 **Parent:** [EPIC-004](../epics/EPIC-004-overland-map-features.md)
-**Status:** open, blocked on STORY-006 (site art) and on verifying the
-encounter-zone record layout
+**Status:** open, ready. The site art is catalogued (STORY-006). Layouts
+for fortresses (checked), towers (no plane byte) and encounter zones
+(kind table and sprite per kind) are in
+[kazzmir-save-layouts.md](../reference/kazzmir-save-layouts.md). Checked on SAVE1: each node
+kind's realm matches its node (all 30). Tower defenders are encounter
+records on both planes (0–5 Arcanus, 6–11 Myrror). Open: the guard-count
+nibbles and the `+15` explored-by flags.
 **Size:** medium
 
 ## What to do

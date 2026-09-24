@@ -12,14 +12,14 @@ top-level block table.
 | Block | Offset | Record size | Count | Record layout known? |
 | --- | --- | --- | --- | --- |
 | Wizards (+ neutral) | `0x0009e8` | `0x04c8` | 5 + 1 | Yes (wiki). **Banner colour at `+0x16`** (`0` blue, `1` green, `2` purple, `3` red, `4` yellow); **gold u16 at `+0x356`, mana u16 at `+0x25c`** (found by value in SAVE1, consistent across SAVE1/2/9: AI wizards start with 150 gold, 0 mana). Player is record 0. Full layout (books, retorts, fame…): [wizard-record-and-exploration.md](wizard-record-and-exploration.md) |
-| Node attributes | `0x006058` | `0x30` (48) | 30 | **No.** Expected to include x/y/plane, owner, realm, and the list of aura tiles; verify |
-| Fortresses | `0x0065f8` | 4 | 6 | No. Probably x/y/plane/active per wizard; verify |
-| Towers of Wizardry | `0x006610` | 4 | 6 | No. Probably x/y/owner; verify |
-| Encounter zones | `0x006628` | `0x18` (24) | 99 + 3 | **No.** Lairs, ruins, temples, keeps, mounds, etc. Needs type + x/y/plane + guardians |
+| Node attributes | `0x006058` | `0x30` (48) | 30 | **Yes** (kazzmir, checked on SAVE1): x/y/plane, owner, power, 20 aura x/y, type 0 Sorcery / 1 Nature / 2 Chaos. See [kazzmir-save-layouts.md](kazzmir-save-layouts.md) |
+| Fortresses | `0x0065f8` | 4 | 6 | **Yes** (kazzmir, checked: the wizards' capitals): x, y, plane, active. See [kazzmir-save-layouts.md](kazzmir-save-layouts.md) |
+| Towers of Wizardry | `0x006610` | 4 | 6 | kazzmir: x, y, owner (`0xFF` none), unknown; **no plane** (towers span both). See [kazzmir-save-layouts.md](kazzmir-save-layouts.md) |
+| Encounter zones | `0x006628` | `0x18` (24) | 99 + 3 | kazzmir: x/y/plane, intact, kind (0–10), guards, rewards, items. Partly checked. See [kazzmir-save-layouts.md](kazzmir-save-layouts.md) |
 | Cities | `0x008aac` | `0x72` (114) | 100 | **Yes** for name/race/x/y/plane/owner/size/pop: momedit + SAVE1's 27 cities (`Mirror.SaveFile.Cities`); count u16 at `0x0009e0`. `+19` size: 0 Outpost, 1 Hamlet, 2 Village (game titles); sprite frame = size − 1. Buildings `+34`..`+66` (1 built, 0xFF not, 0 replaced); **City Walls = `+66`** (verified in-game, STORY-032) |
-| Units | `0x00b734` | `0x20` (32) | 1000 + 9 | **No.** Needs x/y/plane/owner/unit type at minimum. Unit count at `0x0009e2` |
-| Terrain flags map | `0x01cbb8` | 1 / tile | 2 × 2400 | No. Likely roads / enchanted roads / corruption bits; verify |
-| Minerals map | `0x013554` | 1 / tile | 2 × 2400 | No. Mineral/special type per tile; verify |
+| Units | `0x00b734` | `0x20` (32) | 1000 + 9 | kazzmir: x/y/plane/owner, type `+5`, level, experience, enchantments… Checked on SAVE1's 42 units. Unit count at `0x0009e2`. See [kazzmir-save-layouts.md](kazzmir-save-layouts.md) |
+| Terrain flags map | `0x01cbb8` | 1 / tile | 2 × 2400 | **Partly:** `0x08` road (checked against a DOSBox shot), `0x10` enchanted road, `0x20` corruption (kazzmir). See [kazzmir-save-layouts.md](kazzmir-save-layouts.md) |
+| Minerals map | `0x013554` | 1 / tile | 2 × 2400 | **Yes** (kazzmir; SAVE1's values all fit): 1 iron … 9 crysx, 64 wild game, 128 nightshade. See [kazzmir-save-layouts.md](kazzmir-save-layouts.md) |
 | Explored map (fog of war) | `0x014814` | 1 / tile | 2 × 2400 | **Yes** (position; kazzmir + wiki): 0 unexplored, 15 fully explored, 1–14 partial (4-bit mask, bit meaning a *guess*). See [wizard-record-and-exploration.md](wizard-record-and-exploration.md) |
 
 Verifying a layout means using two sources, or one source plus a visual
@@ -115,22 +115,22 @@ a save's unit records (STORY-012).
 | --- | --- |
 | Tower of Wizardry, unowned | `MAPBACK.LBX #69` |
 | Tower of Wizardry, owned | `MAPBACK.LBX #70` |
-| Mound (*guess:* cave / monster lair) | `MAPBACK.LBX #71` |
-| Temple | `MAPBACK.LBX #72` |
-| Keep | `MAPBACK.LBX #73` |
-| Ruins | `MAPBACK.LBX #74` |
-| Fallen temple | `MAPBACK.LBX #75` |
+| Mound: cave and monster lair (encounter kinds 4 and 8, kazzmir) | `MAPBACK.LBX #71` |
+| Ancient temple (kind 6) | `MAPBACK.LBX #72` |
+| Abandoned keep (kind 7) | `MAPBACK.LBX #73` |
+| Ruins and dungeon (kinds 9 and 5) | `MAPBACK.LBX #74` |
+| Fallen temple (kind 10) | `MAPBACK.LBX #75` |
 | Mud (brown speckle; *guess:* a terrain special, not a site) | `MAPBACK.LBX #76` |
 
-Nodes are terrain tiles (`TERRAIN.LBX`), not sprites. Which encounter-zone
-type number uses which icon is STORY-011's job.
+Nodes are terrain tiles (`TERRAIN.LBX`), not sprites. The kind → icon
+mapping is kazzmir's ([kazzmir-save-layouts.md](kazzmir-save-layouts.md)); check it against DOSBox in STORY-011.
 
 ### Specials (minerals, food): `MAPBACK.LBX` (20×18, 1 frame)
 
 | Special | Entry |
 | --- | --- |
-| Coal | `#78` |
-| Iron | `#79` |
+| Iron (minerals value 1) | `#78` |
+| Coal (value 2) | `#79` |
 | Silver | `#80` |
 | Gold | `#81` |
 | Gems | `#82` |
@@ -142,7 +142,10 @@ type number uses which icon is STORY-011's job.
 | Wild game | `#92` |
 | Mine, lumber camp, hunter's lodge | `#87`, `#88`, `#90`: **blank** (47-byte entries, every column empty) |
 
-The minerals-map byte → special mapping is STORY-013's job.
+**Correction (2026-09-23):** `#78` is iron and `#79` coal. The name
+table labels them the other way round, but the pictures show `#78`
+rust-red and `#79` black, and kazzmir agrees. The other value → special
+mappings are in [kazzmir-save-layouts.md](kazzmir-save-layouts.md).
 
 ### Roads: `MAPBACK.LBX` (20×18)
 
@@ -178,9 +181,9 @@ purple, red, white, yellow, but the pixels say otherwise:
 | **yellow** (211–212) | `#67` | "white" |
 | **nothing** (every frame blank) | `#68` | "yellow" |
 
-So sparkle = `MAPBACK.LBX #(63 + banner)` for banners 0–4. *Guess:* these
-are the melded-node aura sparkles in the owner's colour (STORY-008). Verify
-against a save with a melded node.
+So sparkle = `MAPBACK.LBX #(63 + banner)` for banners 0–4. kazzmir draws
+them as the melded-node aura sparkles in the owner's colour, one per aura
+tile (STORY-008). Still to check in the game on a melded node.
 
 ### Other `MAPBACK.LBX` entries
 

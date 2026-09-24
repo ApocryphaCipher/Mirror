@@ -39,6 +39,10 @@ STORY-013 (roads/specials), STORY-008 (node auras).
 
 - DOSBox 0.74-3 (`/Applications/DOSBox.app`). Its default config
   mounts `/Users/kevin/DOS` as `C:` (`cd MAGIC`, then `magic`).
+- **The checkpoint saves are backed up** in
+  `~/.mirror/dev/DOSbox/FREYA - God Mode/saves-2026-09-23/` (SAVE1–9, `MAGIC.SET`,
+  SAVE3 before and after the retort/fog edit, and checksums). Kevin will
+  reuse the live slots, so cite the backup.
 - `~/DOS/MAGIC/SAVE3.GAM`, "Freya - God mode", is SAVE1 with 30,000
   gold and mana (wizard `+0x356` / `+0x25c`). Slots 4–9 are Kevin's
   checkpoint saves. Their window shots (with timestamps) are in

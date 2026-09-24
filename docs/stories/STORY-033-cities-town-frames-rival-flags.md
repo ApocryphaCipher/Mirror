@@ -1,7 +1,10 @@
 # STORY-033: Cities: Town+ frames, rival flag colours, `CITYNOWA`
 
 **Parent:** [EPIC-004](../epics/EPIC-004-overland-map-features.md)
-**Status:** open, follow-up to STORY-032
+**Status:** open, follow-up to STORY-032. kazzmir's remake draws `#21` for
+unwalled cities, but DOSBox shows unwalled Ozenwall as `#20`, so it
+doesn't answer the `CITYNOWA` question
+([kazzmir-save-layouts.md](../reference/kazzmir-save-layouts.md)).
 **Size:** small (mostly playing the game and taking screenshots)
 
 ## What's left

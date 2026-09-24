@@ -25,6 +25,9 @@ Unsorted, not yet promoted to a story.
   anything Kevin/Gemini derived themselves — worth a sanity pass (e.g.
   cross-check city/unit counts from the loaded save against what the game
   itself reports) before fully trusting them for anything beyond terrain.
+  kazzmir's loader reads the save front to back, so summing its read sizes
+  gives every offset independently: see
+  [reference/kazzmir-save-layouts.md](reference/kazzmir-save-layouts.md) ("Block offsets").
 - ~~`lib/mirror/map.ex` and related bitstring-match warnings on Elixir 1.20~~:
   fixed 2026-09-23 so CI can compile with `--warnings-as-errors` (EPIC-007).
 - `Mirror.Quality.SmoothingRules` (and its test) is dead code since terrain
