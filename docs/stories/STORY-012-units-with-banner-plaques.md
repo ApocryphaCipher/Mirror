@@ -6,6 +6,7 @@ The unit record layout and type table are in
 [kazzmir-save-layouts.md](../reference/kazzmir-save-layouts.md).
 Checked on SAVE1: 42 units, and Freya's Barbarian Spearmen (39) and
 Swordsmen (40) at Norport.
+**Live RAM (2026-09-24):** fields and all banner colours checked; **dead units stay in the table with plane/owner `0xff`**. See [the evaluation](../notes/2026-09-24-live-ram-evaluation.md).
 **Size:** medium–large
 
 ## What to do

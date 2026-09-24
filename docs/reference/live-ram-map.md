@@ -55,6 +55,10 @@ First session: 2026-09-23. Dumps and the matching save are in
   beside the dump, so the bytes and the screen are from the same moment.
   Raw frames keep the exact palette colours, for sprite and flag checks.
 
+- **Analyse** with gama (`~/repo/python/gama`): `uv run gama ingest
+  <dumps>` stores and decodes dumps into SQLite, `uv run gama sql "..."`
+  queries them. See its README.
+
 ## How to work with it
 
 The game is turn-based, so Kevin stops at a **checkpoint** (a screen that

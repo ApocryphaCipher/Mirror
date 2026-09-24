@@ -44,6 +44,8 @@ STORY-013 (roads/specials), STORY-008 (node auras).
   and the RAM addresses of the save blocks found so far are in
   [../reference/live-ram-map.md](../reference/live-ram-map.md). It's a
   tool for agents only; Mirror never talks to DOSBox.
+  **Start with [2026-09-24-live-ram-evaluation.md](2026-09-24-live-ram-evaluation.md):**
+  which stories are ready, and the next checks to run.
 - **The checkpoint saves are backed up** in
   `~/.mirror/dev/DOSbox/FREYA - God Mode/saves-2026-09-23/` (SAVE1–9, `MAGIC.SET`,
   SAVE3 before and after the retort/fog edit, and checksums). Kevin will
