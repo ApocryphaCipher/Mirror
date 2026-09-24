@@ -208,7 +208,10 @@ One byte per tile, row-major.
 `cp21`/`cp22` in [live-ram-map.md](live-ram-map.md)): **4** at (39, 20),
 where Surveyor said "Gold Ore +3 gold", and **64** at (38, 19), where it
 said "Wild Game +2 food"; **5** at (32, 25), where it said "Gems +5 gold"
-(`cp23`).
+(`cp23`); and on **Myrror (the second plane)**, **7** at (28, 25), where it
+said "Adamantium Ore +2 power" (`cp24`; the tile was pinned by its
+neighbours: 64 at (27, 26) and (24, 23), 4 at (28, 29), 7 at (26, 29),
+all visible on screen).
 
 - **Checked:** every value in SAVE1 is 0 or one of those 11.
 - **Checked, and a correction:** `#78` is iron and `#79` is coal.
