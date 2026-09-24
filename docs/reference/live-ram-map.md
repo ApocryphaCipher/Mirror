@@ -161,9 +161,9 @@ ended the turn:
 | `+28` | item in production (u16) | checked: 2 while the screen said "Producing Housing", 29 for Granary, back to 2 when switched and after completion |
 | `+94` | production stored so far (u16) | checked: 0 → 40 on buying the Granary (cost 40: "5 Turns" at 9/turn), 40 → 0 when it was built |
 | `+93` | production per turn (u8) | checked: 9, and the city screen showed 9 hammers |
-| `+96` | gold per turn (u8) | checked: 8, and the screen showed 8 coins |
-| `+31+n` | built flag for building id *n* (1 built, `0xff` not) | checked twice: Granary (id 29) set `+60`, Wall of Stone set `+66` (City Walls, id 35) |
-| `+30` | unknown | 3 → 4 over one turn, then **unchanged** over the next, and unchanged by buying or switching production; not a turn counter |
+| `+96` | gold per turn (u8) | checked: 8, and the screen showed 8 coins; 8 → 12 when the Marketplace (+50% gold) was built |
+| `+31+n` | built flag for building id *n* (1 built, `0xff` not) | checked three times: Granary (id 29) set `+60`, Wall of Stone set `+66` (City Walls, id 35), and a bought Marketplace (id 26) set `+57` the next turn (`cp19`), predicted in advance |
+| `+30` | unknown | 3 → 4, then unchanged, later 5 → 6 across turns; unchanged by buying or switching production; not a plain turn counter |
 | `+19` | size | still 1 (Hamlet) after the turn ended at 5,080, so the end-of-turn guess above is **wrong**; the city title still said "Hamlet" |
 
 So production ids and building ids are the same numbering (2 = Housing,
@@ -263,4 +263,5 @@ In `~/.mirror/dev/DOSbox/ram-dumps-2026-09-23/`, each a full 16 MB:
 | `cp16_before_resist.bin` | Resist Elements chosen, at the target list |
 | `cp17_resist_on_spirit.bin` | Resist Elements on the Magic Spirit |
 | `cp18_resist_on_sprite.bin` | Resist Elements on the fourth Sprites (slot 51); Hamburg building a Marketplace |
+| `cp19_marketplace_built.bin` | next turn: Marketplace built; the stack one step along its path to (42, 10) |
 | `SAVE4.GAM` | the save written just before `cp4` |
