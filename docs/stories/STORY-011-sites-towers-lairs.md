@@ -8,6 +8,7 @@ for fortresses (checked), towers (no plane byte) and encounter zones
 kind's realm matches its node (all 30). Tower defenders are encounter
 records on both planes (0–5 Arcanus, 6–11 Myrror). Open: the guard-count
 nibbles and the `+15` explored-by flags.
+**Live RAM (2026-09-24):** guard nibbles settled; several kinds checked on screen; open: `+15` and the cleared look. See [the evaluation](../notes/2026-09-24-live-ram-evaluation.md).
 **Size:** medium
 
 ## What to do

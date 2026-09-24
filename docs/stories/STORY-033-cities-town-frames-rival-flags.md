@@ -5,6 +5,7 @@
 unwalled cities, but DOSBox shows unwalled Ozenwall as `#20`, so it
 doesn't answer the `CITYNOWA` question
 ([kazzmir-save-layouts.md](../reference/kazzmir-save-layouts.md)).
+**Live RAM (2026-09-24):** the map sprite followed population while size `+19` lagged; decide which to draw from. See [the evaluation](../notes/2026-09-24-live-ram-evaluation.md).
 **Size:** small (mostly playing the game and taking screenshots)
 
 ## What's left

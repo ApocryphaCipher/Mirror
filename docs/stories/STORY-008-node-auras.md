@@ -6,6 +6,7 @@ record layout is in [kazzmir-save-layouts.md](../reference/kazzmir-save-layouts.
 x/y/plane, owner, and power are checked against SAVE1, as are the aura
 tile lists and type (0 Sorcery, 1 Nature, 2 Chaos). kazzmir draws sparkles
 only on melded nodes, in the melder's colour; check that in the game.
+**Live RAM (2026-09-24):** owner, power and aura lists checked by a real meld, and sparkles are in the **owner's** colour; see [the evaluation](../notes/2026-09-24-live-ram-evaluation.md).
 **Size:** medium
 
 ## What to do
