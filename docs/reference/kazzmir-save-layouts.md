@@ -67,12 +67,12 @@ SAVE1. The 4th byte varies (0, 78, 39): *unknown*.
 | `+0` `+1` `+2` | x, y, plane |
 | `+3` | intact (1 = not yet cleared) |
 | `+4` | kind (table below) |
-| `+5` `+6` | guard 1: unit type, count |
-| `+7` `+8` | guard 2: unit type, count |
+| `+5` `+6` | guard 1: unit type, count byte (see below) |
+| `+7` `+8` | guard 2: unit type, count byte |
 | `+9` | unknown |
 | `+10` / `+12` | gold / mana reward (i16) |
 | `+14` | spell reward |
-| `+15` | flags |
+| `+15` | flags: *guess:* who has explored the site (see below) |
 | `+16` | item count |
 | `+17` | unknown |
 | `+18` `+20` `+22` | items 1–3 (i16) |
@@ -89,15 +89,64 @@ SAVE1. The 4th byte varies (0, 78, 39): *unknown*.
 | 9 | Ruins | `#74` |
 | 10 | Fallen temple | `#75` |
 
-- **Checked in SAVE1:** kinds 1, 2 and 3 have 10 records each, the same
-  as the 30 nodes.
-- **Still to check:**
-  - The encounter kind numbers use a different order from the node
-    record's type byte. Check that a kind-2 zone sits on a Nature node.
-  - Kind 0 has 15 records against 6 towers, so some kind-0 records may be
-    unused slots.
-- The sprite column is kazzmir's choice. It settles our catalog's guess
-  that `#71` "mound" is a cave or lair.
+**Node guardians, checked in SAVE1.** Every one of the 30 kind-1/2/3
+records sits on a node, and the realms match the node record's type byte
+all 30 times:
+
+| Encounter kind | Node type byte | Realm |
+| --- | --- | --- |
+| 1 | 2 | Chaos |
+| 2 | 1 | Nature |
+| 3 | 0 | Sorcery |
+
+The node's defenders (its "occupying force") live in the encounter
+record, not the node record.
+
+**Towers of Wizardry, checked in SAVE1.** A tower's defenders are an
+encounter too:
+- Records 0–5 are the six towers' Arcanus sides, at exactly the tower
+  block's (x, y).
+- Records 6–11 are the same towers' Myrror sides: the same (x, y), plane 1,
+  and identical guards and rewards.
+- Records 99–101 are empty (all zero). That's the wiki's "99 + 3".
+
+That accounts for all 15 kind-0 records: 12 tower sides plus 3 empty
+slots. The tower block (`0x006610`) holds only the tower itself (x, y,
+owner), and the encounter holds the guards. SAVE1's guards are all
+summoned creatures, e.g. tower (33, 7): Unicorns ×3 and Guardian Spirits
+×4, plus 10 gold and 30 mana.
+
+*To check:*
+- Clear one side of a tower, then diff the two records. Does the game
+  update both (one tower, two records) or only the side you entered?
+- There's no link field between the tower and the encounter; they match
+  only by position.
+
+**Guard count byte: two packed nibbles.** kazzmir uses only the low
+nibble (`count & 0xF`). In SAVE1 all 148 filled guard slots have the high
+nibble equal to the low one (`0x11`, `0x22` … `0x88`).
+- *Guess:* one nibble is the guards left and the other the starting
+  count, so they would differ after a fight that the player retreats
+  from.
+- *To check:* attack a lair, retreat after killing some guards, save,
+  and diff. No checkpoint save has a fight in it.
+
+**`+15` flags: *guess*, who has explored the site.** kazzmir leaves it
+unread (`ExploredBy: // FIXME`).
+
+| Save | What changed in `+15` |
+| --- | --- |
+| SAVE1 | 94 sites are 0. Five are `0x01`, spread over both planes (records 14, 23, 33, 43, 57); what that bit means is unknown |
+| SAVE7–9 | Sites Freya came near change 0 → `0x02` (records 19, 54, 71, 83) |
+| SAVE7–9 | The fallen temple at (32, 28) (record 65) goes to `0x06` |
+
+- Records 71 and 83 (a cave and a dungeon, neither with guards) also flip
+  `intact` 1 → 0. Freya presumably looted them.
+- *To check:* did Freya enter the fallen temple at (32, 28)? And what
+  sets bit `0x01`?
+
+The sprite column is kazzmir's choice. It settles our catalog's guess
+that `#71` "mound" is a cave or lair.
 
 ## Units: `0x00b734`, up to 1009 × 32 bytes, count u16 at `0x0009e2` (STORY-012)
 

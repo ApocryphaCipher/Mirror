@@ -4,8 +4,10 @@
 **Status:** open, ready. The site art is catalogued (STORY-006). Layouts
 for fortresses (checked), towers (no plane byte) and encounter zones
 (kind table and sprite per kind) are in
-[kazzmir-save-layouts.md](../reference/kazzmir-save-layouts.md). Still to check: which encounter kind is
-which node realm, and why kind 0 has 15 records for 6 towers.
+[kazzmir-save-layouts.md](../reference/kazzmir-save-layouts.md). Checked on SAVE1: each node
+kind's realm matches its node (all 30). Tower defenders are encounter
+records on both planes (0–5 Arcanus, 6–11 Myrror). Open: the guard-count
+nibbles and the `+15` explored-by flags.
 **Size:** medium
 
 ## What to do
