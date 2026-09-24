@@ -182,8 +182,10 @@ Sidon (`cp39`) and Bloodrock (`cp40`), have exactly building ids 3, 8 and
 Barracks, Smithy, Builder's Hall.
 
 Bytes **`+67..+92`** are zero in every city: 26 bytes, the number of
-city enchantments in MoM. *guess:* the city enchantment block.
-Check: cast a city enchantment (e.g. Nature's Eye) on Hamburg and diff.
+city enchantments in MoM. **Checked** as the city enchantment block: the
+enchantment Kevin cast on his capital set slot 14 to 1 (ReMoM: slot `0x0E`
+is `Natures_Eye`; value = player index + 1), see
+[save-to-ram-map.md](save-to-ram-map.md).
 
 ## Writes
 
