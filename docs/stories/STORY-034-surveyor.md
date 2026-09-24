@@ -24,6 +24,7 @@ What the game shows (screenshots in
 | Forest with wild game, (38, 19) | "Forest / 1/2 food / +3% production", "Wild Game / +2 food", then the too-close message. RAM (`cp22_surveyor_wild_game.bin`): minerals plane **64**, Mirror's value for Wild game |
 | Desert with gems, (32, 25) | "Desert / +3% production", "Gems / +5 gold", then the too-close message. RAM (`cp23_surveyor_gems.bin`): minerals plane **5**, Mirror's value for Gems |
 | **Myrror** hills with Adamantium, (28, 25) | "Hills / 1/2 food / +3% production", "Adamantium Ore / +2 power", then **City Resources: Maximum Pop 17, Prod Bonus +33%, Gold Bonus +10%** (a city is allowed here: the first case of City Resources for an empty site). RAM (`cp24_surveyor_adamantium_myrror.bin`): Myrror minerals plane **7** |
+| **Myrror** river mouth with a Keep, (26, 25) | "River Mouth / 1/2 food / +30% gold", "Keep / Unexplored", then "Cities cannot be built on lairs." RAM (`cp25_surveyor_keep.bin`): encounter record 46 at (26, 25, Myrror), kind 7 (Abandoned keep), intact, explored-by flags 0; guards 2 Behemoths + 3 Cockatrices |
 
 So there are two parts:
 
