@@ -27,6 +27,7 @@ What the game shows (screenshots in
 | **Myrror** river mouth with a Keep, (26, 25) | "River Mouth / 1/2 food / +30% gold", "Keep / Unexplored", then "Cities cannot be built on lairs." RAM (`cp25_surveyor_keep.bin`): encounter record 46 at (26, 25, Myrror), kind 7 (Abandoned keep), intact, explored-by flags 0; guards 2 Behemoths + 3 Cockatrices |
 | Swamp with Nightshade, (46, 16), beside the neutral city Steyr (47, 16) | "Swamp / 1/2 food", "Nightshade / Protects city from spells", then the too-close message. RAM (`cp32_surveyor_nightshade.bin`): terrain 166, minerals plane **128**, Mirror's value for Nightshade |
 | Capua, Sharee's capital (11, 26), a Nomad hamlet of 4,640 | "Forest / 1/2 food / +3% production", "Hamlet of Capua", **City Resources: Maximum Pop 13, Prod Bonus +23%, Gold Bonus +12%**. Its catchment's only special is Silver at (9, 26). RAM (`cp36_surveyor_capua.bin`) |
+| Cremona, Merlin's capital (15, 11), a Nomad hamlet of 3,260 on a mountain ring | "Mountain / +5% production", "Hamlet of Cremona", **City Resources: Maximum Pop 8, Prod Bonus +63%, Gold Bonus +9%**. Catchment specials: Coal (15, 10), Gold (16, 11); Nightshade (11, 10) lies just outside. RAM (`cp38_surveyor_cremona.bin`) |
 
 So there are two parts:
 
@@ -57,9 +58,10 @@ Nothing here is checked yet. Candidates:
   buffer near `ds+0xd5a4`. The numbers are not kept as text, so the game
   computes them on hover; Mirror has to compute them too.
 
-**City Resources are computed, not stored** (checked on two cities): no
-byte of Hamburg's record holds 19, 60 or 50, and none of Capua's holds
-13 or 23 (its two 12s are the per-turn figures at `+96` and `+100`).
+**City Resources are computed, not stored** (checked on three cities):
+no byte of Hamburg's record holds 19, 60 or 50, none of Capua's holds 13
+or 23 (its two 12s are the per-turn figures at `+96` and `+100`), and
+none of Cremona's holds 8, 63 or 9.
 So Mirror must compute them from the tiles, like the game.
 
 ## Checking it
