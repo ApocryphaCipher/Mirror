@@ -207,7 +207,8 @@ One byte per tile, row-major.
 **checked in the running game** (live RAM + Surveyor, 2026-09-23, dumps
 `cp21`/`cp22` in [live-ram-map.md](live-ram-map.md)): **4** at (39, 20),
 where Surveyor said "Gold Ore +3 gold", and **64** at (38, 19), where it
-said "Wild Game +2 food".
+said "Wild Game +2 food"; **5** at (32, 25), where it said "Gems +5 gold"
+(`cp23`).
 
 - **Checked:** every value in SAVE1 is 0 or one of those 11.
 - **Checked, and a correction:** `#78` is iron and `#79` is coal.

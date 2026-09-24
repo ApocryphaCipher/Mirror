@@ -22,6 +22,7 @@ What the game shows (screenshots in
 | Hamburg, (38, 21) | "Hills / 1/2 food / +3% production", "Hamlet of Hamburg", then **City Resources: Maximum Pop 19, Prod Bonus +60%, Gold Bonus +50%** |
 | Mountain with gold ore, (39, 20) | "Mountain / +5% production", "Gold Ore / +3 gold", then the too-close-to-a-city message. RAM (`cp21_surveyor_gold_ore.bin`): the minerals plane has **4** there, Mirror's value for Gold, so plane and game agree. Its neighbour (38, 19), where a deer is drawn, holds 64 |
 | Forest with wild game, (38, 19) | "Forest / 1/2 food / +3% production", "Wild Game / +2 food", then the too-close message. RAM (`cp22_surveyor_wild_game.bin`): minerals plane **64**, Mirror's value for Wild game |
+| Desert with gems, (32, 25) | "Desert / +3% production", "Gems / +5 gold", then the too-close message. RAM (`cp23_surveyor_gems.bin`): minerals plane **5**, Mirror's value for Gems |
 
 So there are two parts:
 
