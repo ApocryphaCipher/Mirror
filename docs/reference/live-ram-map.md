@@ -63,6 +63,18 @@ First session: 2026-09-23. Dumps and the matching save are in
   `uv run gama sql "..."` queries them. Screenshots and other evidence go
   in with `evi add`, and findings become `evi claim`s linked to them.
 
+- **One call per checkpoint:** `EVI_HOME=~/repo/mom-evi-vault uv run gama
+  checkpoint "bought granary"` (in `~/repo/python/gama`) saves all 16 MB of
+  memory, a raw screenshot and the CPU registers into the vault as one
+  checkpoint and decodes it. Use it for every checkpoint.
+- **DOS file-call log:** start DOSBox with
+  `--set webserver_file_log=files.jsonl` to log every file open, read,
+  write and seek with the memory address used. After saving the game,
+  `uv run gama filemap files.jsonl --file 'SAVE*.GAM' --op write` lists
+  every save block with the RAM address it was written from. That is how
+  to place the blocks we haven't found (heroes, explored map, the block
+  above 1 MB) without guessing.
+
 ## How to work with it
 
 The game is turn-based, so Kevin stops at a **checkpoint** (a screen that
