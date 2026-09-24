@@ -250,7 +250,9 @@ checked.
 all nine units of Kevin's stack (slots 42, 49–54, 59, 60) were moved from
 (35, 19) to (41, 10), next to the Sorcery node at (42, 10) (terrain 168),
 with one compare-and-swap per unit. Before writing, the target was checked
-to be free of units, cities and encounter sites. The stack **vanished
+to be free of units, cities and encounter sites. (The city check first
+used a wrong table start; re-run with the right one, **city 0 at RAM
+`0x06f980`**, it still found no city there.) The stack **vanished
 from the map** until the turn ended, then showed at (41, 10) with full
 moves, destination cleared and orders 0; the game did not continue the
 go-to into the node. *guess:* the map draws units from a visibility or
@@ -333,6 +335,7 @@ In `~/.mirror/dev/DOSbox/ram-dumps-2026-09-23/`, each a full 16 MB:
 | `cp17_resist_on_spirit.bin` | Resist Elements on the Magic Spirit |
 | `cp18_resist_on_sprite.bin` | Resist Elements on the fourth Sprites (slot 51); Hamburg building a Marketplace |
 | `cp19_marketplace_built.bin` | next turn: Marketplace built; the stack one step along its path to (42, 10) |
+| `cp32_surveyor_nightshade.bin` | Surveyor on the Nightshade swamp at (46, 16) beside Steyr |
 | `cp26`–`cp31` | Sorcery node in Surveyor; next turn after the teleport; first combat turn at the node; mid-fight; back on the map after winning; node melded (sparkles) |
 | `cp20`–`cp25` | Surveyor open, hovering: Hamburg area, gold ore (39, 20), wild game (38, 19), gems (32, 25), Myrror adamantium (28, 25), Myrror Keep (26, 25); screenshots `surveyor-*.webp` beside them |
 | `SAVE4.GAM` | the save written just before `cp4` |
