@@ -204,8 +204,15 @@ stored. *Guess:* that is the buy-price rule when no production is stored.
 - **Paths run across turns**, checked in `cp11`: after the turn ended the
   Sprites had walked two tiles east, (36, 22) → (38, 22), destination
   still (39, 22), moves left 0.
-- **`+8` is moves left, `+4` moves per turn**, both in half-moves:
-  *guess* (strengthened by the path and by Done zeroing `+8`) from the Sprites (`+4` = 4, "Moves: 2" on screen; `+8` 4 → 0
+- **Arrival** (`cp12`): the Sprites reached (39, 22); `+9`/`+10` cleared
+  to (0, 0) and `+18` went 5 → 0, so 5 = going to (checked by arrival).
+  **Wait stores nothing**: the Swordsmen's `+18` stayed 4 after Wait.
+- **`+14`**, *guess:* experience. It rose 1 → 2 → 3 over two turns on
+  both garrison units and stayed 0 on the (summoned) Sprites; the text
+  buffer held "Regular (1 ep)" earlier. Check against a unit's ep.
+- **`+8` is moves left, `+4` moves per turn**, in half-moves. `+8`
+  checked: after moving one tile the Sprites had 2 and the screen said
+  "Moves: 1". Earlier evidence from the Sprites (`+4` = 4, "Moves: 2" on screen; `+8` 4 → 0
   after an accidental two-tile move) and the garrison (`+4` = `+8` = 2,
   one move).
 - The route is not in the unit record. *guess:* the data segment holds a
@@ -232,4 +239,5 @@ In `~/.mirror/dev/DOSbox/ram-dumps-2026-09-23/`, each a full 16 MB:
 | `cp9_sprites_patrol.bin` | Sprites ordered to Patrol |
 | `cp10_sprites_path.bin` | Sprites given a path east to (39, 22) |
 | `cp11_done_patrol_move.bin` | next turn: Spearmen on Patrol, Swordsmen Done, Sprites two tiles along the path |
+| `cp12_arrived_wait.bin` | next turn: Sprites arrived at (39, 22), Swordsmen on Wait |
 | `SAVE4.GAM` | the save written just before `cp4` |
