@@ -41,7 +41,6 @@ Nothing here is checked yet. Candidates:
   (BSD-3), per [kazzmir-save-layouts.md](../reference/kazzmir-save-layouts.md).
 - Where a city is allowed: the game's own rule is on screen (not less than
   3 squares from any other city).
-
 - **The game's own wording:** a RAM dump taken with Surveyor open
   (`cp20_surveyor_open.bin`, see
   [live-ram-map.md](../reference/live-ram-map.md)) has the panel's static
