@@ -30,7 +30,7 @@ shows, and "kazzmir" means the offset comes from kazzmir's read order.
 | `+0x24` | fame (u16) | game: 10 in SAVE1, which the Famous retort grants; live RAM: 10 → 11 on "You have gained 1 fame" |
 | `+0x26` | power base (u16) | kazzmir + game: 12, Magic screen "Power Base: 12" (live RAM) |
 | `+0x2a..+0x2c` | research / mana / skill ratio (u8; 34/33/33 in SAVE1) | kazzmir; they sum to 100. `+0x2c` = skill checked: 72 after Kevin moved the Skill slider (9 SP of 12). `+0x2a`/`+0x2b` were both 14, so their order is still kazzmir's |
-| `+0x2e` / `+0x30` / `+0x32` | summoning circle x / y / plane (i16) | game: (38, 21, Arcanus), the capital Norport |
+| `+0x2e` / `+0x30` / `+0x32` | summoning circle x / y / plane (i16) | game: (38, 21, Arcanus), the capital Norport; moved to (42, 16, 0) when Kevin cast Summoning Circle on Rostock (2026-09-24, [save-to-ram-map.md](save-to-ram-map.md)) |
 | `+0x34` | 8 research candidate spells (u16) | kazzmir; SAVE1's are Nature spell ids |
 | `+0x54` / `+0x56` | skill left / nominal skill (u16) | `+0x56` checked: 60 = "Casting Skill: 60(60)". `+0x54` = skill left this turn, checked: it fell by each spell's cost (60 → 42 for Wall of Stone at 18 MP, 42 → 32 for Sprites at 10 MP). The Magic screen still said 60(60) at 42, so its first number is something else |
 | `+0x58` | tax rate (u16) | kazzmir |
