@@ -119,6 +119,21 @@ kind 7 (Abandoned keep), intact 1, explored-by flags 0, guards Behemoth
 (188) count `0x22` and Cockatrices (181) count `0x33`, i.e. 2 and 3 with
 equal nibbles, as in SAVE1's intact sites.
 
+**Nightshade is not stored in the city record** (*guess*, `cp32`,
+2026-09-23). Of the 27 cities (both planes), only the neutral **Steyr**
+(47, 16) has Nightshade in its catchment (the 5 × 5 square minus
+corners; the tile at (46, 16)). No city-record byte equals each city's
+Nightshade count, and the bytes where Steyr differs from every other
+city are ordinary stats (x `+15`, population `+20` = 8, production
+`+93` = 13, gold `+96` = 9, and `+102` = 100, unknown), which it gets
+from being the largest. So *guess:* the game counts Nightshade from the
+minerals plane when it needs it, and Mirror should too. Only one
+Nightshade city was available, so this is not proof.
+
+Bytes **`+67..+92`** are zero in every city: 26 bytes, the number of
+city enchantments in MoM. *guess:* the city enchantment block.
+Check: cast a city enchantment (e.g. Nature's Eye) on Hamburg and diff.
+
 ## Writes
 
 Start DOSBox with `--set webserver_allow_writes=true` as well. Write with
