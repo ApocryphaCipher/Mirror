@@ -83,7 +83,7 @@ the save written at the same moment, or matching a value on screen.
   16 MB, not just conventional memory.
 
 **The addresses are not guaranteed to be stable.** They held across four
-turns in one session, but the far-heap blocks are allocated at start-up and
+turns in one session and across one relaunch (the city block, at least), but the far-heap blocks are allocated at start-up and
 could move with a different DOSBox memory config or even a fresh launch.
 Re-find them each session: search for the wizard name ("Freya") at record
 `+0x01`, or re-run the save match. Don't hard-code them.
@@ -110,6 +110,34 @@ had 30006 gold (+6 income) and 30005 mana (+5), both matching the incomes
 shown on screen. By the map they were 30000 again, and stayed there.
 *guess:* the game caps gold and mana at 30000. Check by spending some
 first and watching income apply normally.
+
+## Writes
+
+Start DOSBox with `--set webserver_allow_writes=true` as well. Write with
+a compare-and-swap so a stale read can't clobber anything: `If-Match`
+carries the base64 of the bytes you expect, and the API answers 412
+(and changes nothing) if they differ.
+
+```bash
+# set a u16 to 50 only if it is currently 0
+curl -X PUT -H 'Content-Type: application/octet-stream' -H 'If-Match: "AAA="' \
+     --data-binary $'\x32\x00' http://127.0.0.1:8086/api/v1/memory/$((0x6f980+24))
+```
+
+Then have Kevin open the screen that shows the value. A write the game
+displays is the strongest check we have: it proves the field *drives* the
+game, not just that it matches.
+
+**City population, checked 2026-09-23.** After a fresh load of SAVE3 the
+starting city (renamed Hamburg) was still at RAM `0x6f980`, the same
+address as in the earlier launch. Its record held `+20` = 4 and `+24` = 0,
+and the city screen showed 4,000. Writing 50 to `+24` made the city screen
+show **Population: 4,500 (+120)**. So:
+
+- shown population = `+20` × 1000 + `+24` × 10 (`+24` is u16 tens,
+  0–99; *guess:* the game carries into `+20` at 100);
+- growth (+120) did not change, so it is computed, not stored beside the
+  population.
 
 ## The dumps
 
