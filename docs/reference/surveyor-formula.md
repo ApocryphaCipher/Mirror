@@ -50,9 +50,11 @@ A tile that **another city** also works is **shared**:
   site alike. **Checked** on Steyr: three tiles shared with Bremen take
   45% down to the **37%** the game shows. The same rule then gave Bremen's
   +76% with no further change.
-- **Food:** a city counts shared tiles' food in full (Steyr's max pop
-  matches only that way). For an empty site, gama counts them at half.
-  *Unchecked.*
+- **Food:** a shared tile gives half its food, and the total is rounded
+  only after summing. **Checked** for cities: Straatus, Blade Stone and
+  Ozenwall (Kevin's road survey, below) match only this way, and Steyr
+  rules out rounding each tile. Empty sites use the same halving in gama.
+  *Unchecked* for empty sites.
 - **Wild game** on a shared tile gives a city 1, not 2 (ReMoM).
   *Unchecked.*
 
@@ -71,7 +73,8 @@ Production is the bonus in %.
 | Mountain `A4` | 0 | 5 |
 | Desert `A5` | 0 | 0 |
 | Desert `AE AF B0` | 0 | 3 |
-| Swamp `A6 B1 B2`, tundra `A7 B5 B6`, volcano `B3` | 0 | 0 |
+| Swamp `A6 B1 B2` (the panel says ½ food; see below) | 0 | 0 |
+| Tundra `A7 B5 B6`, volcano `B3` | 0 | 0 |
 | Sorcery node `A8` | 4 | 0 |
 | Nature node `A9` | 5 | 3 |
 | Chaos node `AA` | 0 | 5 |
@@ -84,9 +87,18 @@ Production is the bonus in %.
 | Four-way rivers `0x1D4..0x1D8` | 4 | 0 |
 | Shores `0x1D9..0x258` | 1 | 0 |
 
-These agree with the tile panel's own text where we have it ("Hills /
-1/2 food / +3% production", "Mountain / +5% production", "Grasslands /
-1 1/2 food", "River / 2 food").
+**Checked against the tile panel.** `gama surveyor hits.jsonl --check
+SAVE9.GAM` compares each logged hover's food and production text with
+this table. Of 180 hovers, 65 agree (49 distinct tiles: forest, hills,
+mountains, desert, grassland, shore, river, swamp and a nature node), 106
+carry no food or production text, and 9 conflict. Every conflict is text
+left over from the tile hovered just before, or from a map jump. The
+panel pads halves with spaces ("1   1/2 food").
+
+**Swamp is the one difference, and it's the game's own:** the panel says
+"Swamp / 1/2 food", but cities count swamp as **0** food. Ebonsway (four
+swamp tiles) shows Maximum Pop 9; at ½ food it would be 11. ReMoM notes
+the manual's ½ against the code's 0.
 
 **Wild game** (special 64) on a worked tile adds food (see Maximum Pop).
 
@@ -132,11 +144,16 @@ Inspirations (enchantment slot `0x12`) +100.
 **Checked:** the cap is visible in the data. Cremona (3,000 people,
 coast +10, Nomad +50) shows **+9%**, and Capua and Sidon (4,000, the
 same) show **+12%**. Hamburg (5,000, no water or river) shows +50%, all
-from its Marketplace. The road bonus shows only through the cap so far:
-Steyr (7,000, river +20, roads +12) shows **+21%**. Without its roads it
-would be +20%, so the roads count, but their exact size is still unchecked.
+from its Marketplace.
 
-## The six readouts
+**Road trade, checked below the cap:** Blade Stone (Myrror, 4,000 people,
+no water) is joined to Straatus (another race, 4,000: +4) and Ebonsway
+(the same race, 3,000: +3 ÷ 2 = 1) and shows **+5%**. Ozenwall (9,000,
+coast +10) is joined to Posen (the same race, 4,000: 2) and Speger (3,000:
+1) and shows **+13%**. Each linked city's half is rounded down on its own.
+Steyr (7,000, river +20, roads +12) shows the cap, **+21%**.
+
+## The readouts
 
 | Tile | Dump | Game | Formula | Detail |
 | --- | --- | --- | --- | --- |
@@ -149,6 +166,21 @@ would be +20%, so the roads count, but their exact size is still unchecked.
 
 Dumps are in `~/.mirror/dev/DOSbox/ram-dumps-2026-09-23/` and the Evi
 vault (collection `mom-live-2026-09-23`).
+
+**Kevin's road survey** (2026-09-24, "Freya - Dior", screenshots; checked
+with `gama resources SAVE9.GAM X Y P`). These are road-linked neutral
+cities, several of which share tiles with a neighbour:
+
+| City | Game | Formula | What it tests |
+| --- | --- | --- | --- |
+| Straatus (39, 6, Myrror) | 14, +11%, +12% | same | shared food (16 if counted in full); roads capped at 4 × 3 |
+| Blade Stone (40, 10, Myrror) | 19, +50%, +5% | same | shared food (21 in full); road trade below the cap |
+| Ebonsway (48, 11, Myrror) | 9, +13%, +9% | same | swamp counts 0 food |
+| Posen (31, 24) | 7, +35%, +12% | same | roads capped |
+| Ozenwall (31, 20) | 13, +29%, +13% | same | shared food (14 in full); road trade below the cap |
+| Speger (34, 16) | 10, +29%, +9% | same | roads capped |
+
+With the edited cities below, **all 15 full readouts match**.
 
 ## Editing the save to test enchantments (2026-09-24)
 
@@ -196,8 +228,7 @@ readout confirms that the game really does this. Hamburg's readout
 ## Still open
 
 - Shared food for an empty site, and shared wild game: unchecked. One
-  Surveyor hover on an empty tile beside a city, with a checkpoint,
-  would settle the first.
-- Road trade below the cap: every road-linked city so far was capped.
+  Surveyor hover on an empty tile beside a city would settle the first
+  (`gama resources` on the save gives the prediction).
 - Corruption: ReMoM's Surveyor loop does not exclude corrupted tiles,
   although a city's real food does. Unchecked.
