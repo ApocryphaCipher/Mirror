@@ -2,7 +2,7 @@
 
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
 **Status:** open, nice-to-have
-**Size:** small (flat black), medium (the game's soft edges)
+**Size:** small (extra credit: small to medium)
 **Requested by:** [Kevin](https://github.com/KevinAsbury), 2026-09-24
 
 ## Goal
@@ -26,17 +26,22 @@ The save's explored map
 
 Mirror already decodes it as the `exploration` layer.
 
-## Steps
+Mirror doesn't have to copy the game's fog drawing (Kevin, 2026-09-24).
 
-1. **Flat fog:** paint every tile with value 0 solid black, and leave
-   1–15 clear. This is enough to be useful.
-2. **Soft edges, like the game:** *guess:* each of the four bits is one
-   side or quarter of the tile, and the game draws partly explored tiles
-   with the `MAPBACK` edge masks (`#0–#13`). Confirm first:
-   - set one tile to 1, 2, 4 and 8 in turn with the DOSBox fork;
-   - screenshot each (the fork's screenshot endpoint);
-   - then draw the matching mask over those tiles.
-   - Write the result into the reference doc.
+1. **Black fog:** paint every tile with value 0 solid black, and leave
+   1–15 clear. This is the story.
+2. **Extra credit, partly explored tiles (1–14):** Mirror's own look,
+   not the game's. Soften the edge with transparency and a dither, so
+   the fog fades into the explored area instead of ending in a hard
+   grid line. For example:
+   - The four bits are the tile's four quarters or sides (*guess*, see
+     the reference doc). Fade or dither the unexplored parts, and set
+     their strength from how many bits are missing.
+   - A plain fallback: a partial tile gets a translucent black, stronger
+     when fewer bits are set.
+
+   A DOSBox check of what the bits mean would help place the dither
+   well, but it isn't required.
 
 ## Notes
 
@@ -52,4 +57,5 @@ Mirror already decodes it as the `exploration` layer.
 - The Layers panel has a Fog of war checkbox, unchecked on load.
 - Checked, the unexplored tiles on the current plane are black, matching
   the game on a real save; switching planes switches the fog.
-- If step 2 is done, the edge tiles match a game screenshot.
+- Extra credit: partly explored tiles fade into the explored area,
+  with no hard grid edges.
