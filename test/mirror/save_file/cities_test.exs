@@ -32,7 +32,7 @@ defmodule Mirror.SaveFile.CitiesTest do
 
     assert {:ok, [deventor, bloodrock]} = Cities.parse(raw)
 
-    assert deventor == %{
+    assert Map.drop(deventor, [:buildings, :enchantments, :road_links]) == %{
              index: 0,
              name: "Deventor",
              race: 5,
@@ -56,6 +56,23 @@ defmodule Mirror.SaveFile.CitiesTest do
 
     assert {:ok, [%{walled: true}, %{walled: false}, %{walled: false}]} =
              Cities.parse(save([walled, open, replaced]))
+  end
+
+  test "buildings by id (built or replaced), enchantments with their caster, road links" do
+    buildings = <<0>> <> :binary.copy(<<0xFF>>, 35)
+    buildings = put(put(put(buildings, 26, <<1>>), 29, <<0>>), 30, <<1>>)
+    enchantments = put(put(:binary.copy(<<0>>, 26), 14, <<1>>), 7, <<3>>)
+    roads = put(:binary.copy(<<0>>, 13), 1, <<0b0000_0101>>)
+
+    bytes =
+      city("Konstanz", 38, 21, 0, 0, 2, 8) <>
+        :binary.copy(<<0>>, 10) <> buildings <> enchantments <> :binary.copy(<<0>>, 8) <> roads
+
+    assert {:ok, [konstanz]} = Cities.parse(save([bytes]))
+    assert konstanz.buildings == %{26 => :built, 29 => :replaced, 30 => :built}
+    assert konstanz.enchantments == %{natures_eye: 0, famine: 2}
+    assert konstanz.road_links == [8, 10]
+    refute konstanz.walled
   end
 
   test "size classes the game names; unseen ones are numbered" do
