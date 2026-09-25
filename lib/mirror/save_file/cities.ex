@@ -88,7 +88,7 @@ defmodule Mirror.SaveFile.Cities do
 
     %{
       index: index,
-      name: name |> :binary.split(<<0>>) |> hd() |> String.trim(),
+      name: city_name(name),
       race: race,
       x: x,
       y: y,
@@ -104,6 +104,13 @@ defmodule Mirror.SaveFile.Cities do
   end
 
   defp record(_bytes, _index), do: nil
+
+  # The game's names are single-byte text; reading them as Latin-1 keeps any
+  # high byte valid UTF-8 (LiveView sends names as JSON).
+  @doc false
+  def city_name(raw) do
+    raw |> :binary.split(<<0>>) |> hd() |> :unicode.characters_to_binary(:latin1) |> String.trim()
+  end
 
   # Building id 0 is "no building"; its byte is always 0.
   defp buildings(<<_none, statuses::binary>>) do

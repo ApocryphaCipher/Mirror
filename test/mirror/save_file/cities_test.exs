@@ -75,6 +75,11 @@ defmodule Mirror.SaveFile.CitiesTest do
     refute konstanz.walled
   end
 
+  test "a name with a high byte is still valid UTF-8 (STORY-040)" do
+    assert Cities.city_name(<<"Bad", 0xFF, 0, 0>>) == "Badÿ"
+    assert Cities.city_name(<<"Konstanz", 0, 1, 2>>) == "Konstanz"
+  end
+
   test "size classes the game names; unseen ones are numbered" do
     assert Enum.map(0..3, &Cities.size_name/1) == ["Outpost", "Hamlet", "Village", "size 3"]
   end
