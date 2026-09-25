@@ -31,16 +31,17 @@ shows, and "kazzmir" means the offset comes from kazzmir's read order.
 | `+0x26` | power base (u16) | kazzmir + game: 12, Magic screen "Power Base: 12" (live RAM) |
 | `+0x2a..+0x2c` | research / mana / skill ratio (u8; 34/33/33 in SAVE1) | kazzmir; they sum to 100. `+0x2c` = skill checked: 72 after Kevin moved the Skill slider (9 SP of 12). `+0x2a`/`+0x2b` were both 14, so their order is still kazzmir's |
 | `+0x2e` / `+0x30` / `+0x32` | summoning circle x / y / plane (i16) | game: (38, 21, Arcanus), the capital Norport; moved to (42, 16, 0) when Kevin cast Summoning Circle on Rostock (2026-09-24, [save-to-ram-map.md](save-to-ram-map.md)) |
-| `+0x34` | 8 research candidate spells (u16) | kazzmir; SAVE1's are Nature spell ids |
-| `+0x54` / `+0x56` | skill left / nominal skill (u16) | `+0x56` checked: 60 = "Casting Skill: 60(60)". `+0x54` = skill left this turn, checked: it fell by each spell's cost (60 → 42 for Wall of Stone at 18 MP, 42 → 32 for Sprites at 10 MP). The Magic screen still said 60(60) at 42, so its first number is something else |
-| `+0x58` | tax rate (u16) | kazzmir |
+| `+0x34` | 8 research candidate spells (u16) | game: in Dior the Research page lists exactly these 8 (Dispel Magic, Earth Lore, Giant Spiders, Change Terrain, Cockatrices, Transmute, Nature's Cures, Basilisk) |
+| `+0x54` / `+0x56` | skill left / nominal skill (u16) | `+0x56` checked: 60 = "Casting Skill: 60(60)". `+0x54` = skill left this turn, checked: it fell by each spell's cost (60 → 42 for Wall of Stone at 18 MP, 42 → 32 for Sprites at 10 MP). The Magic screen still said 60(60) at 42, so its first number is something else. The spellbook marks a spell **"Instant"** when its cost ≤ skill left: with 60 left, Gorgons (60 MP) is Instant and Elemental Armor (62) is not (Dior, 2026-09-24) |
+| `+0x58` | tax rate (u16), the index into the Tax Per Population list: 0 = 0 gold … 6 = 3 gold | game: 2, and the list stars the third entry, "1 gold, 20% unrest" (Dior) |
 | `+0x5a` | spellbooks per realm, 5 × i16: **Nature, Sorcery, Chaos, Life, Death** | kazzmir + game (Freya: 12 Nature) |
-| `+0x64..+0x75` | **retorts**, one byte each, 1 = has it (table below) | kazzmir + fame check |
+| `+0x64..+0x75` | **retorts**, one byte each, 1 = has it (table below) | game: all 18 bytes match the Info screen (below) |
 | `+0x130..+0x14f` | unknown, 16 × u16; a per-turn running total | live RAM ([live-ram-map.md](live-ram-map.md)) |
 | `+0x25a` | research points left (u16) | live RAM: matches the book's cost, counts down per turn |
 | `+0x25c` | mana (u16) | found by value (earlier session); live RAM |
 | `+0x25e` | *guess:* casting skill points (u16) | live RAM: only rises; 2513 with casting skill 60, and √2513 ≈ 50 (+10 if Freya has Archmage) |
-| `+0x262` | spell being researched (u16) | checked: 10 while the Magic screen said "Researching: Earth Lore" |
+| `+0x262` | spell being researched (u16) | checked: 10 while the Magic screen said "Researching: Earth Lore"; 19 while the Research page highlighted Nature's Cures |
+| `+0x264` | **spell library**, 214 × u8: spell *n* (ReMoM's numbering: 1..40 Nature, 41..80 Sorcery, 81..120 Chaos, 121..160 Life, 161..200 Death, 201..214 Arcane) at byte *n* − 1. 0 unknown, 1 knowable, 2 known, 3 on the research list | game, by editing (below) |
 | `+0x356` | gold (u16) | found by value (earlier session); live RAM |
 
 ### Retorts, `+0x64..+0x75`
@@ -61,10 +62,31 @@ and the file follows the reader.
 | `+0x6b` | Sage Master | `+0x74` | Charismatic |
 | `+0x6c` | Channeler | `+0x75` | Artificer |
 
-*To confirm in-game:* open the wizard's Info screen in DOSBox and compare
-the retorts it lists with these bytes. SAVE3 now has Alchemy, Warlord,
-Nature Mastery, Sage Master, Channeler, Myrran, Archmage, Mana Focusing,
-Node Mastery, Famous, Runemaster, Conjurer, Charismatic and Artificer.
+**Checked** (2026-09-24, "Freya - Dior"): the Info screen lists
+"Alchemy, Warlord, Nature Mastery, Sage Master, Channeler, Myrran,
+Archmage, Mana Focusing, Node Mastery, Famous, Runemaster, Conjurer,
+Charismatic and Artificer". That is exactly the bytes set to 1, in byte
+order. The same screen's "12 Fame" matches `+0x24`.
+
+### Spell library, `+0x264`: checked by editing
+
+In "Freya - Dior" (`SAVE5.GAM`) we changed Freya's 22 Nature spells from
+1 (knowable) to 2 (known), and left the research list alone. In game:
+
+- The spellbook gained **17** of them: Path Finding, Elemental Armor,
+  Iron Skin, Regeneration, Nature Awareness, Herb Mastery, Nature's
+  Wrath, Ice Storm, Earthquake, Move Fortress, Gaia's Blessing, Earth
+  Gate, Stone Giant, Gorgons, Behemoth, Colossus and Great Wyrm.
+- The other 5, Ice Bolt, Petrify, Earth Elemental, Entangle and Call
+  Lightning, are combat-only, so the overland book doesn't list them.
+  Neither does it list Earth to Mud, Web or Cracks Call, which she
+  already knew.
+- The Research page was unchanged: the same 8 spells, with Nature's
+  Cures highlighted at 383.
+
+So status 2 is "known", and the game takes the spellbook straight from
+these bytes. See [surveyor-formula.md](surveyor-formula.md) for the city
+half of the same edit.
 
 ## Explored map (fog of war)
 
