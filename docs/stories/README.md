@@ -34,3 +34,4 @@
 - [STORY-034](STORY-034-surveyor.md): Surveyor readout: a tile's food and bonuses, and the City Resources (max pop, production and gold bonus) a city there would get (EPIC-006) **Done**
 - [STORY-035](STORY-035-settleable-tiles-overlay.md): overlay mode that highlights the tiles where a city can be built, optionally graded by Maximum Pop (EPIC-006, nice-to-have) **Done**
 - [STORY-036](STORY-036-fog-of-war-layer.md): fog-of-war layer, off by default, painting the game's black fog over unexplored tiles (EPIC-006, nice-to-have) **Done**
+- [STORY-037](STORY-037-reveal-all.md): Reveal all: an edit that marks every tile explored for the player, saved with Save as (EPIC-006, nice-to-have)

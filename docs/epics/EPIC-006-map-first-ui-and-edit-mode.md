@@ -80,6 +80,7 @@ STORY-017 → then the rest as their EPIC-004 data stories land.
 - [STORY-034](../stories/STORY-034-surveyor.md): Surveyor readout: tile value and City Resources, matched against the game's Surveyor **Done**
 - [STORY-035](../stories/STORY-035-settleable-tiles-overlay.md): overlay mode highlighting settleable tiles (nice-to-have) **Done**
 - [STORY-036](../stories/STORY-036-fog-of-war-layer.md): fog-of-war layer, off by default (nice-to-have) **Done**
+- [STORY-037](../stories/STORY-037-reveal-all.md): Reveal all: edit the save so every tile is explored (nice-to-have)
 
 Dependencies: 018–020 need the matching EPIC-004 decode stories
 (013 roads/minerals, 010 cities, 011 sites, 012 units) first. 017 needs
