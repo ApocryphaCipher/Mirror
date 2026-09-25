@@ -53,3 +53,8 @@ Unsorted, not yet promoted to a story.
 - ~~App renders with no CSS at all~~ — same root cause as above, fixed.
 - Draw tiles at native 20×18 aspect instead of stretched into square cells
   (canvas geometry change; see `Canvas_Geometry_Invariants` in codex-notes).
+- **Very low priority:** decode how the game draws partly explored fog.
+  The explored map's values 1–14 are probably four edge bits drawn with
+  `MAPBACK` masks `#0–#13` (*guess*). Confirm by setting one tile to 1, 2,
+  4 and 8 with the DOSBox fork and screenshotting each. Mirror doesn't
+  need this: STORY-036 uses its own dither (Kevin, 2026-09-24).
