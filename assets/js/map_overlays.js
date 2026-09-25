@@ -35,10 +35,65 @@ function flagRemap(banner) {
   return new Map(FLAG.map((from, i) => [from, to[i]]))
 }
 
+// A 4x4 ordered-dither (Bayer) pattern of black "fog pixels", `coverage`
+// (0..1) of them set, each `pixel` device pixels square. Patterns anchor to
+// the canvas origin, so the dither runs seamlessly across tiles.
+const BAYER_4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5]
+
+function ditherPattern(ctx, coverage, pixel) {
+  const canvas = document.createElement("canvas")
+  canvas.width = canvas.height = 4 * pixel
+  const c = canvas.getContext("2d")
+  c.fillStyle = "#000"
+  BAYER_4.forEach((threshold, i) => {
+    if (threshold < coverage * 16) c.fillRect((i % 4) * pixel, Math.floor(i / 4) * pixel, pixel, pixel)
+  })
+  return ctx.createPattern(canvas, "repeat")
+}
+
+function bitCount(n) {
+  let count = 0
+  for (; n; n >>= 1) count += n & 1
+  return count
+}
+
 // One draw function per layer, filled in by the stories that decode the
 // data (STORY-013 roads/specials, 008 auras, 011 sites, 010 cities, 012
 // units). Each receives (ctx, items, geometry) and draws every item.
 const DRAWERS = {
+  // STORY-035: where a new city could go, greener where its Maximum Pop
+  // would be higher (the cap is 25).
+  settleable(ctx, items, {tileSize}) {
+    for (const {x, y, max_pop} of items) {
+      ctx.fillStyle = `rgba(52, 211, 153, ${0.12 + (0.5 * max_pop) / 25})`
+      ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize)
+    }
+  },
+
+  // STORY-036: black over unexplored tiles (0). A partly explored tile
+  // (1-14, four bits) gets Mirror's own soft edge, not the game's: a light
+  // veil plus a dither, both heavier the more bits are missing.
+  fog(ctx, items, {tileSize}) {
+    const pixel = Math.max(1, Math.round(tileSize / 10))
+    const patterns = new Map()
+
+    for (const {x, y, explored} of items) {
+      const left = x * tileSize
+      const top = y * tileSize
+      if (explored === 0) {
+        ctx.fillStyle = "#000"
+        ctx.fillRect(left, top, tileSize, tileSize)
+        continue
+      }
+      const missing = (4 - bitCount(explored)) / 4
+      if (!patterns.has(missing)) patterns.set(missing, ditherPattern(ctx, missing, pixel))
+      ctx.fillStyle = `rgba(0, 0, 0, ${0.15 + 0.35 * missing})`
+      ctx.fillRect(left, top, tileSize, tileSize)
+      ctx.fillStyle = patterns.get(missing)
+      ctx.fillRect(left, top, tileSize, tileSize)
+    }
+  },
+
   // STORY-010/032. The game draws MAPBACK #20 at frame size - 1, walls or
   // not: outposts (size 0) and hamlets (1) show frame 0, villages (2) frame
   // 1, all with a flag, centred on the tile. Checked in DOSBox; Town and up
@@ -187,17 +242,18 @@ const MapOverlays = {
     }
   },
 
-  // All layers on by default; storage can be unavailable (private windows,
+  // Each layer starts as its checkbox is rendered (most on; fog and
+  // settleable tiles off); storage can be unavailable (private windows,
   // blocked site data), so every access is guarded.
   loadVisibility() {
-    const visible = Object.fromEntries(this.layers.map(layer => [layer, true]))
+    const visible = Object.fromEntries(this.toggles.map(input => [input.value, input.defaultChecked]))
     try {
       const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "{}")
       for (const layer of this.layers) {
         if (typeof saved[layer] === "boolean") visible[layer] = saved[layer]
       }
     } catch (_error) {
-      // Ignore: fall back to all layers on.
+      // Ignore: fall back to the defaults.
     }
     return visible
   },

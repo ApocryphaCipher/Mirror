@@ -116,9 +116,9 @@ defmodule Mirror.SurveyorTest do
              %{max_pop: 25, production: 63 + 100, gold: 100}
   end
 
-  describe "the panel" do
-    @no_sites %{nodes: [], towers: [], encounters: []}
+  @no_sites %{nodes: [], towers: [], encounters: []}
 
+  describe "the panel" do
     test "names the terrain in the game's words, lines fixed per class" do
       world = forest_world(tiles: %{{1, 1} => 0xA6, {2, 2} => 0x113, {3, 3} => 0xA2})
       panel = &Surveyor.panel(world, [], @no_sites, &1, &2, :arcanus)
@@ -206,6 +206,34 @@ defmodule Mirror.SurveyorTest do
     end
   end
 
+  describe "settleable tiles (STORY-035)" do
+    test "every legal site with its Maximum Pop; out: water, cities within 3, their own tiles" do
+      world = %{arcanus: layers(@forest, tiles: %{{0, 0} => @ocean}), myrror: layers(@ocean)}
+      tiles = Surveyor.settleable(world, [city(0, 30, 20)], @no_sites, :arcanus)
+      at = fn x, y -> Enum.find(tiles, &(&1.x == x and &1.y == y)) end
+
+      refute at.(0, 0)
+      refute at.(30, 20)
+      refute at.(33, 23)
+      assert %{max_pop: 10} = at.(10, 20)
+      # Distance 4 is allowed; its catchment shares tiles with the city.
+      assert %{max_pop: shared} = at.(34, 20)
+      assert shared < 10
+      # 60 x 40 tiles, less water, the city and the 7 x 7 around it.
+      assert length(tiles) == 2400 - 1 - 49
+    end
+
+    test "fog doesn't hide a tile or its catchment" do
+      world = %{arcanus: layers(@forest, explored: false), myrror: layers(@ocean)}
+
+      assert %{max_pop: 10} =
+               Enum.find(
+                 Surveyor.settleable(world, [], @no_sites, :arcanus),
+                 &(&1.x == 10 and &1.y == 20)
+               )
+    end
+  end
+
   describe "Freya - Dior (the game's own readouts, 2026-09-24)" do
     @save System.get_env(
             "MIRROR_SURVEYOR_SAVE",
@@ -281,6 +309,34 @@ defmodule Mirror.SurveyorTest do
                feature: ["Nightshade", "Protects city from spells"],
                resources: {:cannot_build, "less than 3 squares from any other city."}
              } = panel.({46, 16, :arcanus})
+    end
+
+    @tag skip:
+           (!File.exists?(@save) && "needs the frozen Dior save (MIRROR_SURVEYOR_SAVE)") ||
+             (!Blocks.layer_offset(:terrain) && "needs the save offsets: scripts/test_game.sh")
+    test "the settleable overlay agrees with the Surveyor card on every explored tile" do
+      {:ok, save} = SaveFile.load(@save)
+      {:ok, cities} = Cities.parse(save.raw)
+      {:ok, sites} = Sites.parse(save.raw)
+
+      for plane <- [:arcanus, :myrror] do
+        overlay =
+          MapSet.new(Surveyor.settleable(save.planes, cities, sites, plane), &{&1.x, &1.y})
+
+        for y <- 0..39, x <- 0..59 do
+          city? = Enum.any?(cities, &(&1.x == x and &1.y == y and &1.plane == plane))
+
+          expected =
+            case Surveyor.panel(save.planes, cities, sites, x, y, plane) do
+              :unexplored -> :skip
+              %{resources: {:cannot_build, _}} -> false
+              %{resources: %{}} -> not city?
+            end
+
+          if expected != :skip,
+            do: assert({x, y, plane, MapSet.member?(overlay, {x, y})} == {x, y, plane, expected})
+        end
+      end
     end
   end
 end

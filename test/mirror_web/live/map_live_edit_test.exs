@@ -308,6 +308,34 @@ defmodule MirrorWeb.MapLiveEditTest do
     end
   end
 
+  describe "settleable tiles and fog layers (STORY-035, STORY-036)" do
+    test "both are pushed with the map, off by default, and follow edits", %{
+      conn: conn,
+      save: save
+    } do
+      {:ok, view, html} = live(conn, ~p"/arcanus")
+      refute html =~ ~r/value="fog"[^>]*checked/
+      refute html =~ ~r/value="settleable"[^>]*checked/
+      assert html =~ ~r/value="cities"[^>]*checked/
+
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+
+      assert_push_event(view, "overlay_data", %{layer: "settleable", items: settleable})
+      refute Enum.any?(settleable, &match?(%{x: 38, y: 21}, &1))
+      assert Enum.all?(settleable, &(&1.max_pop in 0..25))
+
+      # SAVE1 is turn one: most of the map is fog; 15 is fully explored.
+      assert_push_event(view, "overlay_data", %{layer: "fog", items: fog})
+      assert %{explored: 0} = Enum.find(fog, &match?(%{x: 0, y: 0}, &1))
+      refute Enum.any?(fog, &match?(%{x: 38, y: 21}, &1))
+
+      render_click(view, "toggle_edit", %{})
+      render_click(view, "set_tool", %{"tool" => "cycle"})
+      pointer(view, "start", 10, 10)
+      assert_push_event(view, "overlay_data", %{layer: "settleable"})
+    end
+  end
+
   defp put_byte(raw, at, byte) do
     <<head::binary-size(^at), _, tail::binary>> = raw
     head <> <<byte>> <> tail

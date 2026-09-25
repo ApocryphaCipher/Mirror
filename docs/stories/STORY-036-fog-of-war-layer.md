@@ -1,7 +1,7 @@
 # STORY-036: Fog-of-war layer, off by default
 
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
-**Status:** open, nice-to-have
+**Status:** **Done** (2026-09-24), including the extra credit
 **Size:** small (extra credit: small to medium)
 **Requested by:** [Kevin](https://github.com/KevinAsbury), 2026-09-24
 
@@ -51,6 +51,21 @@ Mirror doesn't have to copy the game's fog drawing (Kevin, 2026-09-24).
   editing past the fog, and this layer shows where that fog is.
 - The explored map is the human player's only (kazzmir; the AI wizards'
   exploration isn't in this block).
+
+## Outcome
+
+- **Fog of war** is a Layers toggle, off by default.
+- **Unexplored tiles (0):** solid black.
+- **Partly explored tiles (1–14):** a translucent veil plus a 4 × 4
+  ordered dither. Both get heavier with the number of unexplored bits,
+  and the dither runs seamlessly across tiles. This is Mirror's own look,
+  not the game's.
+- It's drawn client-side from the `exploration` layer (`overlay_data`
+  layer `fog`).
+- **Checked in the browser on SAVE1 (turn one):** black everywhere
+  except around Deventor, with dithered edges.
+- **The Dior save shows no fog:** its explored map is all 15, from the
+  God-mode edit.
 
 ## Done when
 

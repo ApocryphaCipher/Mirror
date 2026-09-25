@@ -29,15 +29,18 @@ defmodule MirrorWeb.MapLive do
     computed_adj_mask: "Adjacency Mask"
   }
 
-  # Map-page overlay layers (STORY-009), bottom to top. Drawn client-side by
-  # map_overlays.js on a canvas above the terrain; each story that decodes a
-  # layer's save data fills it in.
+  # Map-page overlay layers (STORY-009), bottom to top, and whether each is
+  # on until the viewer changes it. Drawn client-side by map_overlays.js on a
+  # canvas above the terrain; each story that decodes a layer's save data
+  # fills it in.
   @overlay_layers [
-    {:roads, "Roads & specials", "STORY-013"},
-    {:auras, "Node auras", "STORY-008"},
-    {:sites, "Sites", "STORY-011"},
-    {:cities, "Cities", "STORY-010"},
-    {:units, "Units", "STORY-012"}
+    {:settleable, "Settleable tiles", "STORY-035", false},
+    {:roads, "Roads & specials", "STORY-013", true},
+    {:auras, "Node auras", "STORY-008", true},
+    {:sites, "Sites", "STORY-011", true},
+    {:cities, "Cities", "STORY-010", true},
+    {:units, "Units", "STORY-012", true},
+    {:fog, "Fog of war", "STORY-036", false}
   ]
 
   @phase_loop_max 32
@@ -1679,14 +1682,14 @@ defmodule MirrorWeb.MapLive do
               >
                 <summary class="cursor-pointer select-none font-semibold">Layers</summary>
                 <ul class="mt-2 space-y-1">
-                  <li :for={{layer, label, story} <- Enum.reverse(overlay_layers())}>
+                  <li :for={{layer, label, story, on} <- Enum.reverse(overlay_layers())}>
                     <label class="flex items-center gap-2" title={"Data arrives with #{story}"}>
                       <input
                         type="checkbox"
                         data-overlay-toggle
                         data-for="map-overlays"
                         value={layer}
-                        checked
+                        checked={on}
                         class="rounded border-white/20 bg-slate-900"
                       />
                       <span>{label}</span>
@@ -2049,6 +2052,7 @@ defmodule MirrorWeb.MapLive do
     |> assign(:active_stroke, nil)
     |> assign_state(socket.assigns.state)
     |> refresh_hover()
+    |> push_map_layers()
   end
 
   # Cheap state update (no re-encoding of layers) that keeps the
@@ -2189,6 +2193,7 @@ defmodule MirrorWeb.MapLive do
         |> maybe_push_updates(layer, updates, changes)
         |> emit_engine_delta(plane, layer, changes)
         |> refresh_hover()
+        |> push_map_layers()
 
       [] ->
         socket
@@ -2219,6 +2224,7 @@ defmodule MirrorWeb.MapLive do
         |> maybe_push_updates(layer, updates, changes)
         |> emit_engine_delta(plane, layer, changes)
         |> refresh_hover()
+        |> push_map_layers()
 
       [] ->
         socket
@@ -2737,6 +2743,7 @@ defmodule MirrorWeb.MapLive do
         |> maybe_push_updates(layer, updates, stroke.changes)
         |> emit_engine_delta(plane, layer, stroke.changes)
         |> assign_hover(x, y)
+        |> push_map_layers()
     end
   end
 
@@ -2882,11 +2889,47 @@ defmodule MirrorWeb.MapLive do
         {:error, _} -> socket
       end
 
-    push_event(socket, "overlay_data", %{
+    socket
+    |> push_event("overlay_data", %{
       layer: "cities",
       items: city_items(socket.assigns.state, socket.assigns.plane)
     })
+    |> push_map_layers()
   end
+
+  # The overlays computed from the map itself, pushed again after every
+  # edit: where a city could go (STORY-035), and the player's fog (STORY-036).
+  defp push_map_layers(%{assigns: %{lab?: true}} = socket), do: socket
+
+  defp push_map_layers(socket) do
+    %{state: state, plane: plane} = socket.assigns
+
+    socket
+    |> push_event("overlay_data", %{layer: "settleable", items: settleable_items(state, plane)})
+    |> push_event("overlay_data", %{layer: "fog", items: fog_items(state, plane)})
+  end
+
+  defp settleable_items(%{save: %{raw: raw}, planes: planes}, plane) do
+    with {:ok, cities} <- Cities.parse(raw),
+         {:ok, sites} <- Sites.parse(raw) do
+      Surveyor.settleable(planes, cities, sites, plane)
+    else
+      _ -> []
+    end
+  end
+
+  defp settleable_items(_state, _plane), do: []
+
+  # Unexplored (0) and partly explored (1-14) tiles; 15 is fully explored.
+  defp fog_items(%{save: %{}, planes: planes}, plane) do
+    exploration = planes |> Map.fetch!(plane) |> Map.fetch!(:exploration)
+
+    for {explored, i} <- Enum.with_index(:binary.bin_to_list(exploration)),
+        explored < 15,
+        do: %{x: rem(i, 60), y: div(i, 60), explored: explored}
+  end
+
+  defp fog_items(_state, _plane), do: []
 
   defp city_items(%{save: %{raw: raw}}, plane) do
     banners = Wizards.banners(raw)
