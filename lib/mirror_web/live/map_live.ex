@@ -318,7 +318,7 @@ defmodule MirrorWeb.MapLive do
            ) do
       state = %{state | save_path: save_path, original_planes: strip_computed(state.planes)}
       SessionStore.put(socket.assigns.session_id, state)
-      {:noreply, put_flash(assign_state(socket, state), :info, "Saved to #{save_path}.")}
+      {:noreply, put_flash(assign_state(socket, state), :info, saved_message(save_path))}
     else
       nil ->
         {:noreply, put_flash(socket, :error, "Load a save before saving.")}
@@ -2996,6 +2996,13 @@ defmodule MirrorWeb.MapLive do
     end
   end
 
+  defp saved_message(path) do
+    if SaveFile.game_loadable_name?(path),
+      do: "Saved to #{path}.",
+      else:
+        "Saved to #{path}. The game only loads SAVE1.GAM to SAVE9.GAM, so rename it to play it."
+  end
+
   defp push_brush(socket) do
     push_event(socket, "brush", %{tile: Map.get(socket.assigns.state.selection, :terrain, 0)})
   end
@@ -3035,21 +3042,12 @@ defmodule MirrorWeb.MapLive do
 
   defp changed_tile_count(_state), do: 0
 
+  # The next free SAVEn.GAM beside the loaded save; empty when all nine are
+  # taken, so the player picks one rather than get a name the game can't load.
   defp suggested_save_path(original) do
-    dir = Path.dirname(original)
-
-    taken =
-      dir
-      |> File.ls()
-      |> then(fn
-        {:ok, files} -> files
-        _ -> []
-      end)
-      |> MapSet.new(&String.upcase/1)
-
-    case Enum.find(1..9, &(not MapSet.member?(taken, "SAVE#{&1}.GAM"))) do
-      nil -> Path.join(dir, Path.basename(original, Path.extname(original)) <> "-edited.GAM")
-      n -> Path.join(dir, "SAVE#{n}.GAM")
+    case SaveFile.next_free_slot(Path.dirname(original)) do
+      {:ok, path} -> path
+      :none -> ""
     end
   end
 

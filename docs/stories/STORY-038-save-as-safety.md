@@ -1,7 +1,7 @@
 # STORY-038: Save as can overwrite the loaded save (and other save-safety gaps)
 
 **Parent:** [EPIC-008](../epics/EPIC-008-keeping-the-lights-on.md)
-**Status:** **items 1–5 fixed** (2026-09-25); item 6 (the `*-edited.GAM` suggestion) is still open
+**Status:** **Done** (2026-09-25): items 1–5 in #62, item 6 in #63
 **Size:** small to medium
 
 AGENTS.md §9: never overwrite the save that was loaded. Today that can
@@ -46,6 +46,14 @@ included:
 `test/mirror/save_file/write_test.exs` covers it: 7 tests, 5 of which fail
 on the old code. Drafted by the team's NUC (Qwen3.8), reviewed and
 corrected by Claude.
+
+## Outcome (item 6)
+
+When all nine slots are taken, Save as suggests nothing instead of an
+unloadable `*-edited.GAM`. Saving under any other name still works, with
+a flash saying the game only loads `SAVE1`–`SAVE9.GAM`.
+`SaveFile.next_free_slot/1` and `game_loadable_name?/1` have 7 tests.
+Drafted by the NUC in 57 s.
 
 ## Done when
 
