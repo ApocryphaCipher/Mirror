@@ -43,9 +43,18 @@ A city works the **21 tiles** of the 5 × 5 square around it, less the
 four corners. x wraps around at 60, and rows off the top or bottom of the
 map are dropped. **Unexplored tiles are skipped.**
 
-For an **empty site**, a tile inside **another city's** 21 tiles counts
-at half. A city's own tiles always count in full. (*Unchecked:* none of
-the six readouts had a shared tile.)
+A tile that **another city** also works is **shared**:
+
+- **Production:** a shared tile gives half its production, rounded down
+  per tile (a mountain 5 → 2, a forest 3 → 1), for a city and an empty
+  site alike. **Checked** on Steyr: three tiles shared with Bremen take
+  45% down to the **37%** the game shows. The same rule then gave Bremen's
+  +76% with no further change.
+- **Food:** a city counts shared tiles' food in full (Steyr's max pop
+  matches only that way). For an empty site, gama counts them at half.
+  *Unchecked.*
+- **Wild game** on a shared tile gives a city 1, not 2 (ReMoM).
+  *Unchecked.*
 
 ## Food and production per tile
 
@@ -83,8 +92,12 @@ These agree with the tile panel's own text where we have it ("Hills /
 
 ## Maximum Pop
 
-- **Existing city:** (half-food ÷ 2, rounded down) + **2 per wild game
-  tile** + 2 with a Granary + 3 with a Farmers' Market.
+- **Existing city:** its tiles' half-food, less **corrupted** tiles
+  (terrain flag `0x20`; unexplored tiles count here), **× 1.5 with
+  Gaia's Blessing** (slot `0x11`, rounded down), then ÷ 2 rounded down;
+  **halved by Famine** (slot `0x07`, rounded down); then + **2 per wild
+  game tile** + 2 with a Granary + 3 with a Farmers' Market. A Granary
+  that has been **replaced** (built flag 0) still counts.
 - **Empty site:** (2 × half-food + **1 per wild game tile**) ÷ 4,
   rounded down. The Surveyor counts in quarter food here and adds only a
   quarter food for wild game, although a city built there would get 2.
@@ -92,8 +105,10 @@ These agree with the tile panel's own text where we have it ("Hills /
   counting its wild game as for a city gives 19.
 - Capped at 25.
 
-*Not covered:* Gaia's Blessing (×1.5 food in ReMoM) and Famine (halves
-it) apply to existing cities in ReMoM; none of our cities had them.
+**Checked** by editing the save (below): Gaia's Blessing took Sidon from
+14 to **21** (29 half-food × 1.5 = 43 → 21). Famine took Steyr from 15 to
+**8** (26 → 13 → 6, + Granary 2). Konstanz, whose Granary is replaced by a
+Farmers' Market, shows **22** (15 + 2 + 3 + wild game 2).
 
 ## Prod Bonus
 
@@ -110,14 +125,16 @@ Inspirations (enchantment slot `0x12`) +100.
   The neighbours count even when unexplored.
 - **A city** then adds +50% if Nomad (race 11), plus the **road trade
   bonus** (each city joined by road adds its population in thousands,
-  half if the same race; *unchecked*, no roads yet). The total so far is
+  half if the same race). The total so far is
   capped at **3% per thousand people**. Then Merchants' Guild +100,
   Bank +50, Marketplace +50 and Prosperity (slot `0x13`) +100, uncapped.
 
 **Checked:** the cap is visible in the data. Cremona (3,000 people,
 coast +10, Nomad +50) shows **+9%**, and Capua and Sidon (4,000, the
 same) show **+12%**. Hamburg (5,000, no water or river) shows +50%, all
-from its Marketplace.
+from its Marketplace. The road bonus shows only through the cap so far:
+Steyr (7,000, river +20, roads +12) shows **+21%**. Without its roads it
+would be +20%, so the roads count, but their exact size is still unchecked.
 
 ## The six readouts
 
@@ -132,6 +149,32 @@ from its Marketplace.
 
 Dumps are in `~/.mirror/dev/DOSbox/ram-dumps-2026-09-23/` and the Evi
 vault (collection `mom-live-2026-09-23`).
+
+## Editing the save to test enchantments (2026-09-24)
+
+No city had a city enchantment, so we wrote them into "Freya - Dior"
+(`SAVE5.GAM`). The enchantment slot's value is the caster's player
+index + 1. We predicted the readouts with `gama resources SAVE5.GAM X Y`
+(committed before loading), then Kevin loaded the save and hovered.
+
+| City | Edit | Predicted | Game |
+| --- | --- | --- | --- |
+| Konstanz (38, 21) | Inspirations, Prosperity, Earth Gate, Nature Ward | 22, +160%, +150% | **same** |
+| Sidon (55, 29), Jafar's | Gaia's Blessing | 21, +6%, +12% | **same** |
+| Steyr (47, 16) | Famine (as if cast by Sharee), Stream of Life | 8, +45%, +21% | 8, **+37%**, +21% |
+| Bremen (51, 16), not edited | none | +76%, +15% (after the shared-tile fix) | "+76%", "15%" (from the hover log; max pop not captured) |
+
+Steyr's miss is what found the shared-tile rule above. Everything else
+matched first time. The edits also stuck in the game: the city screens
+list the enchantments (the hover log caught "Do you wish to turn off the
+Prosperity / Nature Ward / Stream of Life spell?"). The same edit made
+Freya's 22 "knowable" Nature spells (status 1) known (2). Her spell
+library is 214 bytes at wizard `+0x264` (spell *n* at byte *n* − 1; 0
+unknown, 1 knowable, 2 known, 3 researchable). The research list (`+0x34`,
+8 spells) and current research (`+0x262`) were left alone.
+
+The original save, the edited copy and the edit script are in
+`~/.mirror/dev/DOSbox/save-edits-2026-09-24/`.
 
 ## Where ReMoM misleads
 
@@ -152,9 +195,9 @@ readout confirms that the game really does this. Hamburg's readout
 
 ## Still open
 
-- Shared tiles (an empty site near another city): the half rule is
-  unchecked. One Surveyor hover near a city, with a dump, would settle it.
-- Road trade bonus, Gaia's Blessing, Famine, Inspirations, Prosperity:
-  none of the six cases had them.
+- Shared food for an empty site, and shared wild game: unchecked. One
+  Surveyor hover on an empty tile beside a city, with a checkpoint,
+  would settle the first.
+- Road trade below the cap: every road-linked city so far was capped.
 - Corruption: ReMoM's Surveyor loop does not exclude corrupted tiles,
   although a city's real food does. Unchecked.
