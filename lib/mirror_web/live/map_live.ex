@@ -3,8 +3,9 @@ defmodule MirrorWeb.MapLive do
   import Bitwise
 
   alias Mirror.Engine.{Delta, Session, SessionSupervisor, View}
-  alias Mirror.{OverlaySprites, Paths, SaveFile, SessionStore, Stats, TerrainLbx, TileAtlas}
-  alias Mirror.SaveFile.{Cities, Wizards}
+  alias Mirror.{OverlaySprites, Paths, SaveFile, SessionStore, Stats, Surveyor, TerrainLbx}
+  alias Mirror.TileAtlas
+  alias Mirror.SaveFile.{Cities, Sites, Wizards}
   alias Mirror.Map, as: MirrorMap
 
   @layers [
@@ -1740,11 +1741,60 @@ defmodule MirrorWeb.MapLive do
               → {Integer.mod(@hover.terrain + 1, TerrainLbx.tiles_per_plane())}
             </span>
           </div>
+
+          <.surveyor_card :if={@hover && @hover.survey && !@edit} survey={@hover.survey} />
         </div>
       <% end %>
     </Layouts.app>
     """
   end
+
+  attr :survey, :any, required: true
+
+  # The game's Surveyor panel for the hovered tile (STORY-034). An overlay,
+  # so it never shifts the map under the pointer.
+  defp surveyor_card(%{survey: :unexplored} = assigns) do
+    ~H"""
+    <div id="surveyor" class={surveyor_class()}>
+      <p class="font-semibold text-slate-200">Surveyor</p>
+      <p class="text-slate-500">Unexplored</p>
+    </div>
+    """
+  end
+
+  defp surveyor_card(assigns) do
+    ~H"""
+    <div id="surveyor" class={surveyor_class()}>
+      <p class="font-semibold text-slate-200">Surveyor</p>
+      <p class="text-amber-200">{@survey.terrain}</p>
+      <p :for={line <- @survey.lines} class="whitespace-pre">{line}</p>
+      <div :if={@survey.feature != []} id="surveyor-feature" class="mt-1 text-amber-200">
+        <p :for={line <- @survey.feature}>{line}</p>
+      </div>
+      <%= case @survey.resources do %>
+        <% {:cannot_build, reason} -> %>
+          <p id="surveyor-cannot-build" class="mt-2 text-slate-400">
+            Cities cannot be built {reason}
+          </p>
+        <% resources -> %>
+          <dl id="surveyor-resources" class="mt-2 grid grid-cols-[1fr_auto] gap-x-3 text-left">
+            <dt class="col-span-2 text-center text-amber-200">City Resources</dt>
+            <dt>Maximum Pop</dt>
+            <dd class="text-right">{resources.max_pop}</dd>
+            <dt>Prod Bonus</dt>
+            <dd class="text-right">+{resources.production}%</dd>
+            <dt>Gold Bonus</dt>
+            <dd class="text-right">+{resources.gold}%</dd>
+          </dl>
+      <% end %>
+    </div>
+    """
+  end
+
+  defp surveyor_class,
+    do:
+      "pointer-events-none fixed bottom-14 left-4 w-56 rounded-lg border border-white/10 " <>
+        "bg-slate-950/85 px-3 py-2 text-center font-mono text-xs text-slate-300 shadow-lg"
 
   attr :changed_tiles, :integer, required: true
   attr :armed, :boolean, required: true
@@ -2566,7 +2616,8 @@ defmodule MirrorWeb.MapLive do
           adj_mask: adj,
           rays: rays,
           engine_tile: engine_tile,
-          city: city_at(state, plane, x, y)
+          city: city_at(state, plane, x, y),
+          survey: survey(state, plane, x, y)
         }
       else
         nil
@@ -2859,6 +2910,16 @@ defmodule MirrorWeb.MapLive do
   end
 
   defp city_items(_state, _plane), do: []
+
+  # The Surveyor panel, from the session's planes so it follows edits.
+  defp survey(%{save: %{raw: raw}, planes: planes}, plane, x, y) do
+    with {:ok, cities} <- Cities.parse(raw),
+         {:ok, sites} <- Sites.parse(raw) do
+      Surveyor.panel(planes, cities, sites, x, y, plane)
+    else
+      _ -> nil
+    end
+  end
 
   defp city_at(%{save: %{raw: raw}}, plane, x, y) do
     case Cities.parse(raw) do

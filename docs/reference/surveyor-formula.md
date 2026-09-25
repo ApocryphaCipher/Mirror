@@ -226,6 +226,75 @@ empty site's wild game adds 2 quarter-food instead of 8. The Myrror
 readout confirms that the game really does this. Hamburg's readout
 (19, not 17) confirms that an existing city gets the full 2 food.
 
+## The tile panel
+
+The top of the panel, `Mirror.Surveyor.panel/6`. From ReMoM's Surveyor
+screen (read only), checked against the screenshots and the hover log.
+
+**The terrain's name** is the first class the tile fits, in this order:
+
+1. Forest `A3 B7 B8`, and the Nature node `A9`.
+2. Volcano `B3`, and the Chaos node `AA`.
+3. Mountain `A4`, `0x103..0x112`.
+4. Hills `AB`, `0x113..0x123`.
+5. Desert `A5 AE AF B0`, `0x124..0x1C3`.
+6. Swamp `A6 B1 B2`.
+7. Grasslands `A2 AC AD B4`, and the Sorcery node `A8`.
+8. Tundra `A7 B5 B6`, above `0x25A`.
+9. River, or River Mouth.
+10. Ocean: kinds 0 and `0x259`. ReMoM's test names only `0x259`, but
+    the hover log shows kind 0 without Shore's text.
+11. Shore: everything else.
+
+All 21 named screenshots match. A **River Mouth** is a river tile with
+ocean-like water (ocean, shore or lake, but not a one-tile lake) on one
+of its four sides. *Guess* beyond the one case we have, (26, 25) on
+Myrror, which has water to the east; ReMoM's version of this test looks
+garbled.
+
+**The lines are fixed per class,** not computed:
+
+| Class | Lines |
+| --- | --- |
+| Grasslands | `1   1/2 food` (the game pads with spaces) |
+| Forest, Hills | `1/2 food`, `+3% production` |
+| Mountain | `+5% production` |
+| Desert | `+3% production` |
+| Swamp | `1/2 food` (cities count 0) |
+| Shore | `1/2 food`, `+10% gold` |
+| River | `2 food`, `+20% gold` |
+| River Mouth | `1/2 food`, `+30% gold` |
+| Ocean, Tundra, Volcano | none |
+
+A corrupted tile shows "Corruption" instead of these lines.
+
+**What's on the tile,** checked in this order:
+1. a city ("Village of", its name);
+2. corruption (then nothing);
+3. a mineral, from the low four bits of the specials byte: Iron Ore,
+   Coal, Silver Ore, Gold Ore, Gems, Mithril Ore, Adamantium Ore, Quork
+   Crystals, Crysx Crystals, each with its effect;
+4. Wild Game ("+2 food");
+5. Nightshade ("Protects city from spells");
+6. an intact site: Tower, Cave, Dungeon, Temple, Keep, Lair, Ruins, or
+   Temple for kind 10. It reads "Unexplored" until looked at (*guess:*
+   encounter flag `0x02`);
+7. a node ("Sorcery Node" …) with "Magic Spirit", "Guardian Spirit" or
+   "Warped" once owned.
+
+**Where a city can't go,** in the game's order:
+1. water;
+2. a tower (either plane);
+3. a node;
+4. an intact site;
+5. another city on the plane at distance ≤ 3. Distance is the larger of
+   the x and y gaps, with x wrapping around the map.
+
+A city's own tile shows its City Resources. In the hover log, every
+"less than 3 squares" message was on a tile within 3 of a city, apart
+from 3 left over from the previous tile. Distance 3 came up 9 times, so
+3 is inside the limit. An unexplored tile shows nothing.
+
 ## Still open
 
 - Shared food for an empty site, and shared wild game: unchecked. One
@@ -233,3 +302,5 @@ readout confirms that the game really does this. Hamburg's readout
   (`gama resources` on the save gives the prediction).
 - Corruption: ReMoM's Surveyor loop does not exclude corrupted tiles,
   although a city's real food does. Unchecked.
+- The river-mouth test beyond the one mouth we've seen, and the site
+  flag that turns "Unexplored" into guard names.

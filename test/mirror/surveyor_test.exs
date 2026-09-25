@@ -2,7 +2,7 @@ defmodule Mirror.SurveyorTest do
   use ExUnit.Case, async: true
 
   alias Mirror.{SaveFile, Surveyor}
-  alias Mirror.SaveFile.{Blocks, Cities}
+  alias Mirror.SaveFile.{Blocks, Cities, Sites}
 
   @forest 0xA3
   @ocean 0x00
@@ -27,6 +27,8 @@ defmodule Mirror.SurveyorTest do
   defp city(index, x, y, opts \\ []) do
     %{
       index: index,
+      name: Keyword.get(opts, :name, "Testburg"),
+      size: Keyword.get(opts, :size, 1),
       x: x,
       y: y,
       plane: Keyword.get(opts, :plane, :arcanus),
@@ -114,6 +116,96 @@ defmodule Mirror.SurveyorTest do
              %{max_pop: 25, production: 63 + 100, gold: 100}
   end
 
+  describe "the panel" do
+    @no_sites %{nodes: [], towers: [], encounters: []}
+
+    test "names the terrain in the game's words, lines fixed per class" do
+      world = forest_world(tiles: %{{1, 1} => 0xA6, {2, 2} => 0x113, {3, 3} => 0xA2})
+      panel = &Surveyor.panel(world, [], @no_sites, &1, &2, :arcanus)
+
+      assert %{terrain: "Forest", lines: ["1/2 food", "+3% production"]} = panel.(10, 20)
+      # The panel's 1/2 food for swamp, which cities count as nothing.
+      assert %{terrain: "Swamp", lines: ["1/2 food"]} = panel.(1, 1)
+      assert %{terrain: "Hills"} = panel.(2, 2)
+      assert %{terrain: "Grasslands", lines: ["1   1/2 food"]} = panel.(3, 3)
+    end
+
+    test "a river beside open water is a River Mouth" do
+      river = 0xEE
+      world = forest_world(tiles: %{{5, 5} => river, {6, 5} => @ocean, {9, 9} => river})
+
+      assert %{terrain: "River Mouth", lines: ["1/2 food", "+30% gold"]} =
+               Surveyor.panel(world, [], @no_sites, 5, 5, :arcanus)
+
+      assert %{terrain: "River"} = Surveyor.panel(world, [], @no_sites, 9, 9, :arcanus)
+    end
+
+    test "shows the tile's special, or the city on it" do
+      world = forest_world(specials: %{{20, 20} => 4, {21, 5} => 64})
+      city = city(0, 30, 30, name: "Konstanz", size: 2)
+
+      assert %{feature: ["Gold Ore", "+3 gold"]} =
+               Surveyor.panel(world, [], @no_sites, 20, 20, :arcanus)
+
+      assert %{feature: ["Wild Game", "+2 food"]} =
+               Surveyor.panel(world, [], @no_sites, 21, 5, :arcanus)
+
+      assert %{feature: ["Village of", "Konstanz"], resources: %{max_pop: _}} =
+               Surveyor.panel(world, [city], @no_sites, 30, 30, :arcanus)
+    end
+
+    test "why a city can't go there, in the game's order" do
+      world = %{arcanus: layers(@forest, tiles: %{{0, 0} => @ocean}), myrror: layers(@forest)}
+
+      sites = %{
+        towers: [%{x: 5, y: 5, owner: nil}],
+        nodes: [
+          %{
+            x: 8,
+            y: 8,
+            plane: :arcanus,
+            type: :nature,
+            owner: nil,
+            warped: false,
+            guardian: false
+          }
+        ],
+        encounters: [%{x: 12, y: 12, plane: :arcanus, intact: true, kind: 7, looked_at: false}]
+      }
+
+      reason = fn x, y, plane ->
+        case Surveyor.panel(world, [city(0, 40, 20)], sites, x, y, plane).resources do
+          {:cannot_build, text} -> text
+          %{} -> :ok
+        end
+      end
+
+      assert reason.(0, 0, :arcanus) == "on water."
+      # A tower stands on both planes.
+      assert reason.(5, 5, :myrror) == "on towers."
+      assert reason.(8, 8, :arcanus) == "on magic nodes."
+      assert reason.(12, 12, :arcanus) == "on lairs."
+      assert reason.(12, 12, :myrror) == :ok
+      # "Less than 3 squares": 3 apart on either axis is still too close.
+      assert reason.(43, 23, :arcanus) == "less than 3 squares from any other city."
+      assert reason.(44, 20, :arcanus) == :ok
+      assert reason.(40, 20, :arcanus) == :ok
+    end
+
+    test "the too-close distance wraps around the world" do
+      world = forest_world()
+      far_west = city(0, 1, 20)
+
+      assert Surveyor.panel(world, [far_west], @no_sites, 58, 20, :arcanus).resources ==
+               {:cannot_build, "less than 3 squares from any other city."}
+    end
+
+    test "the game shows nothing for an unexplored tile" do
+      world = %{arcanus: layers(@forest, explored: false), myrror: layers(@forest)}
+      assert Surveyor.panel(world, [], @no_sites, 10, 10, :arcanus) == :unexplored
+    end
+  end
+
   describe "Freya - Dior (the game's own readouts, 2026-09-24)" do
     @save System.get_env(
             "MIRROR_SURVEYOR_SAVE",
@@ -147,6 +239,48 @@ defmodule Mirror.SurveyorTest do
         assert {name, Surveyor.city_resources(save.planes, cities, x, y, plane)} ==
                  {name, %{max_pop: max_pop, production: production, gold: gold}}
       end
+    end
+
+    # The panel's top half, from the screenshots and the fork's hover log.
+    @panels [
+      {{38, 21, :arcanus}, "Hills", ["Village of", "Konstanz"]},
+      {{47, 16, :arcanus}, "River", ["Village of", "Steyr"]},
+      {{55, 29, :arcanus}, "Grasslands", ["Hamlet of", "Sidon"]},
+      {{39, 6, :myrror}, "Tundra", ["Hamlet of", "Straatus"]},
+      {{40, 10, :myrror}, "Mountain", ["Hamlet of", "Blade Stone"]},
+      {{48, 11, :myrror}, "Swamp", ["Hamlet of", "Ebonsway"]},
+      {{31, 24, :arcanus}, "Forest", ["Hamlet of", "Posen"]},
+      {{31, 20, :arcanus}, "Hills", ["Village of", "Ozenwall"]},
+      {{34, 16, :arcanus}, "Forest", ["Hamlet of", "Speger"]}
+    ]
+
+    @tag skip:
+           (!File.exists?(@save) && "needs the frozen Dior save (MIRROR_SURVEYOR_SAVE)") ||
+             (!Blocks.layer_offset(:terrain) && "needs the save offsets: scripts/test_game.sh")
+    test "names each hovered tile and what's on it, and why a city can't go there" do
+      {:ok, save} = SaveFile.load(@save)
+      {:ok, cities} = Cities.parse(save.raw)
+      {:ok, sites} = Sites.parse(save.raw)
+      panel = fn {x, y, plane} -> Surveyor.panel(save.planes, cities, sites, x, y, plane) end
+
+      for {tile, terrain, feature} <- @panels do
+        assert %{terrain: ^terrain, feature: ^feature} = panel.(tile)
+      end
+
+      assert %{feature: ["Tower", "Unexplored"], resources: {:cannot_build, "on towers."}} =
+               panel.({48, 28, :arcanus})
+
+      assert %{feature: ["Dungeon", "Unexplored"], resources: {:cannot_build, "on lairs."}} =
+               panel.({39, 31, :arcanus})
+
+      assert %{feature: ["Chaos Node" | _], resources: {:cannot_build, "on magic nodes."}} =
+               panel.({41, 29, :arcanus})
+
+      assert %{
+               terrain: "Swamp",
+               feature: ["Nightshade", "Protects city from spells"],
+               resources: {:cannot_build, "less than 3 squares from any other city."}
+             } = panel.({46, 16, :arcanus})
     end
   end
 end

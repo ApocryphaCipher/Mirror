@@ -31,4 +31,4 @@
 - [STORY-031](STORY-031-spike-download-own-gog-copy.md): **spike**: script the download of the user's own GOG purchase (their GOG login), feeding `mix mirror.import_game` (EPIC-007)
 - [STORY-032](STORY-032-cities-walls-labels-verify.md): cities follow-up: walls, name labels, check size frame / flag colour against the real game (EPIC-004) **Done**
 - [STORY-033](STORY-033-cities-town-frames-rival-flags.md): cities: Town+ frames, rival flag colours, what `CITYNOWA` is for (EPIC-004)
-- [STORY-034](STORY-034-surveyor.md): Surveyor readout: a tile's food and bonuses, and the City Resources (max pop, production and gold bonus) a city there would get (EPIC-006)
+- [STORY-034](STORY-034-surveyor.md): Surveyor readout: a tile's food and bonuses, and the City Resources (max pop, production and gold bonus) a city there would get (EPIC-006) **Done**
