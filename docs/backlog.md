@@ -20,7 +20,10 @@ Unsorted, not yet promoted to a story.
   and re-run `mix mirror.import_game`.
 - Decode `TERRTYPE.LBX` properly (the original game's mask → tile table).
   Only needed if Mirror ever edits terrain.
-- `MIRROR_TERRAIN_OFFSET` etc. offsets are currently only set in
+- ~~Offsets unverified~~: done 2026-09-24. The game's own save writes
+  place all five blocks (docs/reference/save-to-ram-map.md), and
+  `config/config.exs` has them as defaults. The original note:
+  `MIRROR_TERRAIN_OFFSET` etc. offsets are currently only set in
   `scripts/dev_server.sh`, sourced from a community wiki rather than
   anything Kevin/Gemini derived themselves — worth a sanity pass (e.g.
   cross-check city/unit counts from the loaded save against what the game

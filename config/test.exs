@@ -7,6 +7,9 @@ config :mirror, MirrorWeb.Endpoint,
   secret_key_base: "FF+0l3rPGC+EKxnOQJzFQpYiv6tzDEUJQd4HpM28Ku1zHb1gAPGVAg6LHcURUVF6",
   server: false
 
+# Tests must not write the developer's stats file.
+config :mirror, stats_file: Path.join(System.tmp_dir!(), "mirror_test_stats.dets")
+
 # Print only warnings and errors during test
 config :logger, level: :warning
 

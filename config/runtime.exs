@@ -35,6 +35,10 @@ if tile_cache_dir = System.get_env("MIRROR_TILE_CACHE") do
   config :mirror, tile_cache_dir: tile_cache_dir
 end
 
+if stats_file = System.get_env("MIRROR_STATS_FILE") do
+  config :mirror, stats_file: stats_file
+end
+
 parse_offset = fn value ->
   case value do
     nil -> nil
