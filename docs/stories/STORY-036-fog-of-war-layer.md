@@ -40,8 +40,8 @@ Mirror doesn't have to copy the game's fog drawing (Kevin, 2026-09-24).
    - A plain fallback: a partial tile gets a translucent black, stronger
      when fewer bits are set.
 
-   A DOSBox check of what the bits mean would help place the dither
-   well, but it isn't required.
+   How the game itself draws these tiles is a very-low-priority backlog
+   item; nothing here waits on it.
 
 ## Notes
 
