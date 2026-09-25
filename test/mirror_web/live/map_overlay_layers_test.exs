@@ -26,7 +26,8 @@ defmodule MirrorWeb.MapOverlayLayersTest do
     end
   end
 
-  test "the Layers panel lists every overlay, top layer first, all on", %{conn: conn} do
+  test "the Layers panel lists every overlay, top layer first; fog and settleable start off",
+       %{conn: conn} do
     {:ok, view, _html} = live(conn, "/arcanus")
 
     toggles =
@@ -35,7 +36,15 @@ defmodule MirrorWeb.MapOverlayLayersTest do
       |> LazyHTML.from_fragment()
       |> LazyHTML.query("[data-overlay-panel] input[data-overlay-toggle][data-for=map-overlays]")
 
-    assert LazyHTML.attribute(toggles, "value") == ~w(units cities sites auras roads)
-    assert length(LazyHTML.attribute(toggles, "checked")) == 5
+    assert LazyHTML.attribute(toggles, "value") ==
+             ~w(fog units cities sites auras roads settleable)
+
+    checked =
+      view
+      |> render()
+      |> LazyHTML.from_fragment()
+      |> LazyHTML.query("[data-overlay-panel] input[data-overlay-toggle][checked]")
+
+    assert LazyHTML.attribute(checked, "value") == ~w(units cities sites auras roads)
   end
 end
