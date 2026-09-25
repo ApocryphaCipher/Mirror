@@ -14,6 +14,8 @@ defmodule Mirror.Surveyor do
   Production and gold are percentages.
   """
 
+  alias Mirror.SaveFile.Cities
+
   @width 60
   @height 40
 
@@ -235,6 +237,223 @@ defmodule Mirror.Surveyor do
     end)
     |> Enum.sum()
     |> min(3 * city.population)
+  end
+
+  @minerals %{
+    1 => ["Iron Ore", "Reduces normal unit cost by 5%"],
+    2 => ["Coal", "Reduces normal unit cost by 10%"],
+    3 => ["Silver Ore", "+2 gold"],
+    4 => ["Gold Ore", "+3 gold"],
+    5 => ["Gems", "+5 gold"],
+    6 => ["Mithril Ore", "+1 power"],
+    7 => ["Adamantium Ore", "+2 power"],
+    8 => ["Quork Crystals", "+3 power"],
+    9 => ["Crysx Crystals", "+5 power"]
+  }
+
+  # Encounter kinds the panel names; 1–3 are node guardians, named by the node.
+  @site_names %{
+    0 => "Tower",
+    4 => "Cave",
+    5 => "Dungeon",
+    6 => "Temple",
+    7 => "Keep",
+    8 => "Lair",
+    9 => "Ruins",
+    10 => "Temple"
+  }
+
+  @terrain_lines %{
+    "Grasslands" => ["1   1/2 food"],
+    "Forest" => ["1/2 food", "+3% production"],
+    "Mountain" => ["+5% production"],
+    "Hills" => ["1/2 food", "+3% production"],
+    "Desert" => ["+3% production"],
+    "Swamp" => ["1/2 food"],
+    "Tundra" => [],
+    "Volcano" => [],
+    "River" => ["2 food", "+20% gold"],
+    "River Mouth" => ["1/2 food", "+30% gold"],
+    "Shore" => ["1/2 food", "+10% gold"],
+    "Ocean" => []
+  }
+
+  @type panel ::
+          :unexplored
+          | %{
+              terrain: String.t(),
+              lines: [String.t()],
+              feature: [String.t()],
+              resources: resources() | {:cannot_build, String.t()}
+            }
+
+  @doc """
+  The Surveyor panel for the tile `{x, y}` on `plane`, in the game's words:
+  the terrain's name and lines ("Forest", "1/2 food", "+3% production"),
+  what's on the tile (a special, a city, a site or node), and City
+  Resources or why a city can't be built there. The game shows nothing for
+  an unexplored tile. `sites` come from `Mirror.SaveFile.Sites.parse/1`.
+
+  The text is fixed per terrain class, so it can disagree with the
+  numbers: swamp says "1/2 food" but a city counts it as 0.
+  """
+  @spec panel(map(), [map()], map(), non_neg_integer(), non_neg_integer(), plane()) :: panel()
+  def panel(planes, cities, sites, x, y, plane) do
+    layers = Map.fetch!(planes, plane)
+
+    if explored?(layers, x, y) do
+      name = terrain_name(layers, x, y)
+      city = Enum.find(cities, &match?(%{x: ^x, y: ^y, plane: ^plane}, &1))
+      corrupted? = corrupted?(layers, x, y)
+
+      %{
+        terrain: name,
+        lines: if(corrupted?, do: ["Corruption"], else: @terrain_lines[name]),
+        feature: feature(layers, sites, city, corrupted?, x, y, plane),
+        resources:
+          case settle_check(layers, cities, sites, city, x, y, plane) do
+            :ok -> city_resources(planes, cities, x, y, plane)
+            {:cannot_build, _reason} = cannot -> cannot
+          end
+      }
+    else
+      :unexplored
+    end
+  end
+
+  # The game's order: a tile is named by the first class it fits. A Sorcery
+  # node reads as Grasslands, a Chaos node as Volcano, a Nature node as
+  # Forest. Checked against 21 Surveyor screenshots.
+  defp terrain_name(layers, x, y) do
+    terrain = terrain(layers, x, y)
+
+    case kind(terrain) do
+      k when k in [0xA3, 0xB7, 0xB8, 0xA9] -> "Forest"
+      k when k in [0xAA, 0xB3] -> "Volcano"
+      k when k == 0xA4 or k in 0x103..0x112 -> "Mountain"
+      k when k == 0xAB or k in 0x113..0x123 -> "Hills"
+      k when k in [0xA5, 0xAE, 0xAF, 0xB0] or k in 0x124..0x1C3 -> "Desert"
+      k when k in [0xA6, 0xB1, 0xB2] -> "Swamp"
+      k when k in [0xA2, 0xAC, 0xAD, 0xB4, 0xA8] -> "Grasslands"
+      k when k in [0xA7, 0xB5, 0xB6] or k > 0x25A -> "Tundra"
+      _ -> water_name(layers, terrain, x, y)
+    end
+  end
+
+  defp water_name(layers, terrain, x, y) do
+    cond do
+      river?(terrain) and river_mouth?(layers, x, y) -> "River Mouth"
+      river?(terrain) -> "River"
+      kind(terrain) in [0, 0x259] -> "Ocean"
+      true -> "Shore"
+    end
+  end
+
+  # *guess* beyond one case: a river tile with open water on a side. The
+  # one River Mouth we have, Myrror (26, 25), has it to the east; ReMoM's
+  # reading of this test looks garbled.
+  defp river_mouth?(layers, x, y) do
+    Enum.any?([{0, -1}, {0, 1}, {-1, 0}, {1, 0}], fn {dx, dy} ->
+      (y + dy) in 0..(@height - 1)//1 and
+        ocean_like?(terrain(layers, Integer.mod(x + dx, @width), y + dy))
+    end)
+  end
+
+  defp ocean_like?(terrain), do: water?(terrain) and kind(terrain) != 0x12
+
+  defp feature(layers, sites, city, corrupted?, x, y, plane) do
+    special = byte(layers.minerals, x, y)
+
+    cond do
+      city ->
+        ["#{Cities.size_name(city.size)} of", city.name]
+
+      corrupted? ->
+        []
+
+      Map.has_key?(@minerals, Bitwise.band(special, 0x0F)) ->
+        @minerals[Bitwise.band(special, 0x0F)]
+
+      Bitwise.band(special, @wild_game) != 0 ->
+        ["Wild Game", "+2 food"]
+
+      Bitwise.band(special, 0x80) != 0 ->
+        ["Nightshade", "Protects city from spells"]
+
+      site = site_at(sites, x, y, plane) ->
+        site
+
+      true ->
+        []
+    end
+  end
+
+  # An intact site shows "Unexplored" until its guards have been seen; then
+  # the game names them, which needs the unit names (STORY-011), so Mirror
+  # shows just the site for now.
+  defp site_at(sites, x, y, plane) do
+    encounter =
+      Enum.find(sites.encounters, &match?(%{x: ^x, y: ^y, plane: ^plane, intact: true}, &1))
+
+    node = Enum.find(sites.nodes, &match?(%{x: ^x, y: ^y, plane: ^plane}, &1))
+
+    cond do
+      node ->
+        [node_name(node.type) | node_guard(node, encounter)]
+
+      encounter && Map.has_key?(@site_names, encounter.kind) ->
+        [@site_names[encounter.kind] | guards(encounter)]
+
+      true ->
+        nil
+    end
+  end
+
+  defp node_name(:sorcery), do: "Sorcery Node"
+  defp node_name(:nature), do: "Nature Node"
+  defp node_name(:chaos), do: "Chaos Node"
+  defp node_name(_), do: "Node"
+
+  defp node_guard(%{owner: nil}, nil), do: []
+  defp node_guard(%{owner: nil}, encounter), do: guards(encounter)
+  defp node_guard(%{warped: true}, _), do: ["Warped"]
+  defp node_guard(%{guardian: true}, _), do: ["Guardian Spirit"]
+  defp node_guard(_node, _), do: ["Magic Spirit"]
+
+  defp guards(%{looked_at: false}), do: ["Unexplored"]
+  defp guards(_encounter), do: []
+
+  # Where a city can't go, in the game's order and words. A city's own tile
+  # passes: the Surveyor shows its City Resources.
+  defp settle_check(layers, cities, sites, city, x, y, plane) do
+    cond do
+      water?(terrain(layers, x, y)) ->
+        {:cannot_build, "on water."}
+
+      Enum.any?(sites.towers, &match?(%{x: ^x, y: ^y}, &1)) ->
+        {:cannot_build, "on towers."}
+
+      Enum.any?(sites.nodes, &match?(%{x: ^x, y: ^y, plane: ^plane}, &1)) ->
+        {:cannot_build, "on magic nodes."}
+
+      Enum.any?(sites.encounters, &match?(%{x: ^x, y: ^y, plane: ^plane, intact: true}, &1)) ->
+        {:cannot_build, "on lairs."}
+
+      city ->
+        :ok
+
+      Enum.any?(cities, &(&1.plane == plane and distance(&1, x, y) <= 3)) ->
+        {:cannot_build, "less than 3 squares from any other city."}
+
+      true ->
+        :ok
+    end
+  end
+
+  # Tiles apart, the larger of the two axes, x wrapping around the world.
+  defp distance(city, x, y) do
+    dx = abs(city.x - x)
+    max(min(dx, @width - dx), abs(city.y - y))
   end
 
   defp terrain(layers, x, y) do

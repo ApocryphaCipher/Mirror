@@ -277,6 +277,37 @@ defmodule MirrorWeb.MapLiveEditTest do
     end
   end
 
+  describe "Surveyor (STORY-034)" do
+    test "hovering shows the tile, what's on it, and City Resources or why not", %{
+      conn: conn,
+      save: save
+    } do
+      {:ok, view, _} = live(conn, ~p"/arcanus")
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+
+      pointer(view, "hover", 38, 21)
+      card = view |> element("#surveyor") |> render() |> text_of()
+      assert card =~ ~r/Hills\s*1\/2 food\s*\+3% production\s*Hamlet of\s*Deventor/
+
+      assert card =~
+               ~r/City Resources\s*Maximum Pop\s*\d+\s*Prod Bonus\s*\+\d+%\s*Gold Bonus\s*\+\d+%/
+
+      pointer(view, "hover", 39, 20)
+
+      assert view |> element("#surveyor") |> render() |> text_of() =~
+               ~r/Mountain\s*\+5% production\s*Gold Ore\s*\+3 gold\s*Cities cannot be built less than 3 squares/
+
+      pointer(view, "hover", 0, 0)
+      assert view |> element("#surveyor") |> render() |> text_of() =~ ~r/Surveyor\s*Unexplored/
+    end
+
+    test "is a view-mode tool: edit mode hides it", %{conn: conn, save: save} do
+      view = editing(conn, save)
+      pointer(view, "hover", 38, 21)
+      refute has_element?(view, "#surveyor")
+    end
+  end
+
   defp put_byte(raw, at, byte) do
     <<head::binary-size(^at), _, tail::binary>> = raw
     head <> <<byte>> <> tail

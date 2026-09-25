@@ -1,8 +1,7 @@
 # STORY-034: Surveyor: what a tile is worth, and what a city there would get
 
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
-**Status:** in progress: the formula is in Mirror (`Mirror.Surveyor`);
-the view-mode readout is next. (Idea from Kevin, 2026-09-23, while
+**Status:** **Done** (2026-09-24). (Idea from Kevin, 2026-09-23, while
 playing through the live-RAM tool.)
 **Size:** medium (the display is small; getting the numbers right is the
 work)
@@ -63,11 +62,32 @@ city enchantments and road links. Its tests:
 - The six older readouts came from RAM dumps rather than saves, so they
   stay checked by gama.
 
-**Next:** the view-mode readout. The hover panel shows the tile lines in
-the game's words ("Hills / 1/2 food / +3% production"; swamp says 1/2
-food although cities count 0), then City Resources, or why a city can't
-be built there. The "less than 3 squares from any other city" distance
-rule still has to be checked against the hover log first.
+**The readout (2026-09-24):** in view mode, a Surveyor card (`#surveyor`,
+an overlay above the hover readout) shows the hovered tile the way the
+game's panel does:
+
+- the terrain's name and lines ("Hills / 1/2 food / +3% production");
+- the special, city, site or node on it ("Gold Ore / +3 gold", "Village
+  of / Konstanz", "Keep / Unexplored");
+- City Resources, or "Cities cannot be built on water. / on towers. /
+  on magic nodes. / on lairs. / less than 3 squares from any other city.";
+- nothing but "Unexplored" for a tile the player hasn't seen.
+
+`Mirror.Surveyor.panel/6` builds it, from `Mirror.SaveFile.Sites`
+(positions and kinds of nodes, towers and encounters). The rules are in
+[surveyor-formula.md](../reference/surveyor-formula.md#the-tile-panel).
+
+**Outcome against the definition of done:** the nine Dior tiles match
+Kevin's screenshots line for line: Hills, River, Grasslands, Tundra,
+Mountain, Swamp, Forest (twice) and Hills again, each with its city and
+City Resources. The frozen-save test also checks a Tower, a Dungeon, a
+Chaos Node and a Nightshade swamp against the hover log, each with its
+reason. Konstanz and Steyr were checked in the browser as well.
+
+Left for later, not needed here:
+- Explored sites name their guards: that needs the unit names
+  (STORY-011).
+- An empty site's shared-tile food is still unchecked in the game.
 
 The notes below are from before the formula was found. Candidates were:
 
