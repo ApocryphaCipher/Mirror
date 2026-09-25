@@ -23,6 +23,45 @@ defmodule Mirror.SaveFile do
           loaded_at: DateTime.t()
         }
 
+  # The game only loads these (STORY-038).
+  @slot_names for(n <- 1..9, do: "SAVE#{n}.GAM")
+
+  @doc """
+  Returns `{:ok, path}` where `path` is `dir`/`SAVEn.GAM` for the
+  lowest `n` in 1..9 whose file does not already exist in `dir`
+  (comparison is case-insensitive).
+
+  Returns `:none` when all nine slots are occupied.
+  A missing or unreadable directory is treated as empty.
+  This function never raises.
+  """
+  def next_free_slot(dir) do
+    taken =
+      dir
+      |> File.ls()
+      |> then(fn
+        {:ok, files} -> files
+        _ -> []
+      end)
+      |> MapSet.new(&String.upcase/1)
+
+    case Enum.find(1..9, &(not MapSet.member?(taken, "SAVE#{&1}.GAM"))) do
+      nil -> :none
+      n -> {:ok, Path.join(dir, "SAVE#{n}.GAM")}
+    end
+  end
+
+  @doc """
+  Returns `true` only when the basename of `path`, compared case-insensitively,
+  is exactly one of `SAVE1.GAM` through `SAVE9.GAM`.
+
+  Returns `false` for anything else (e.g. `"SAVE10.GAM"`, `"SAVE0.GAM"`,
+  `"foo-edited.GAM"`, `"SAVE1.GAM.bak"`).
+  """
+  def game_loadable_name?(path) do
+    String.upcase(Path.basename(path)) in @slot_names
+  end
+
   def load(path) do
     with {:ok, raw} <- File.read(path),
          {:ok, planes} <- decode_planes(raw),
