@@ -25,8 +25,10 @@ A tile is out if it is any of these:
 - within 3 tiles of another city on the plane (the larger of the x and y
   gaps, with x wrapping).
 
-The game also shows nothing for an unexplored tile. Decide whether the
-overlay follows the fog, or shows the whole map like the rest of Mirror.
+**Show the whole map**, fog or not, like the rest of Mirror (Kevin,
+2026-09-24). This is unlike the game, which shows nothing for an
+unexplored tile. The player's fog is its own layer:
+[STORY-036](STORY-036-fog-of-war-layer.md).
 
 ## Ideas
 
