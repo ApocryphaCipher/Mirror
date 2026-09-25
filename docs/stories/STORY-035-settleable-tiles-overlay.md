@@ -1,7 +1,7 @@
 # STORY-035: Highlight the tiles where a city can be built
 
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
-**Status:** open, nice-to-have
+**Status:** **Done** (2026-09-24)
 **Size:** small to medium
 **Requested by:** [Kevin](https://github.com/KevinAsbury), 2026-09-24
 **Builds on:** [STORY-034](STORY-034-surveyor.md) (Surveyor)
@@ -50,6 +50,22 @@ unexplored tile. The player's fog is its own layer:
   catchment set can be built once, not per tile).
 - Draw it like the other overlays: push the tiles (or a per-tile grade)
   as an `overlay_data` layer, and draw it client-side.
+
+## Outcome
+
+- **Settleable tiles** is a Layers toggle, off by default. The tint gets
+  greener with the Maximum Pop a city there would get.
+- `Mirror.Surveyor.settleable/4` computes it over the whole plane, and
+  treats every tile as explored.
+- It's pushed with the map and again after every edit (stroke end,
+  Cycle, undo, redo). Discard reloads it with the map.
+- **Speed:** 2 ms for Arcanus on the Dior save (496 tiles).
+- **Tests:**
+  - Synthetic: water, cities, distance 3 out and 4 in, shared tiles, fog
+    ignored.
+  - Real file: on every explored tile of both planes of the Dior save,
+    the overlay agrees with the Surveyor card.
+  - LiveView: pushed on load, off by default, re-pushed after an edit.
 
 ## Done when
 

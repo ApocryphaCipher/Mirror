@@ -321,6 +321,29 @@ defmodule Mirror.Surveyor do
     end
   end
 
+  @doc """
+  Every tile on `plane` where a new city could be built, with the Maximum
+  Pop a city there would get: `[%{x: x, y: y, max_pop: n}]` (STORY-035).
+
+  The same check as the Surveyor's, but over the whole map: unlike the
+  game, fog doesn't hide a tile, and a site's catchment counts as explored.
+  """
+  @spec settleable(map(), [map()], map(), plane()) :: [
+          %{x: non_neg_integer(), y: non_neg_integer(), max_pop: non_neg_integer()}
+        ]
+  def settleable(planes, cities, sites, plane) do
+    layers = %{Map.fetch!(planes, plane) | exploration: :binary.copy(<<1>>, @width * @height)}
+    claimed = claimed_tiles(cities, nil, plane)
+
+    for y <- 0..(@height - 1),
+        x <- 0..(@width - 1),
+        not Enum.any?(cities, &match?(%{x: ^x, y: ^y, plane: ^plane}, &1)),
+        settle_check(layers, cities, sites, nil, x, y, plane) == :ok do
+      worked = for tile <- catchment(x, y), do: {tile, MapSet.member?(claimed, tile)}
+      %{x: x, y: y, max_pop: min(site_max_pop(layers, worked), 25)}
+    end
+  end
+
   # The game's order: a tile is named by the first class it fits. A Sorcery
   # node reads as Grasslands, a Chaos node as Volcano, a Nature node as
   # Forest. Checked against 21 Surveyor screenshots.
