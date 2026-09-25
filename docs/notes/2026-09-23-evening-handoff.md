@@ -75,7 +75,8 @@ STORY-013 (roads/specials), STORY-008 (node auras).
   `find _build -name '*\[conflicted*' -delete && mix compile --force`,
   then restart. The cause is still unknown (not iCloud, Dropbox or Google
   Drive).
-- Running the dev server writes `priv/mirror_stats.dets`. Don't commit
-  it (`git checkout -- priv/mirror_stats.dets`).
+- ~~Running the dev server writes `priv/mirror_stats.dets`~~: fixed
+  2026-09-24. The stats now live in `~/.mirror/stats.dets`
+  (`MIRROR_STATS_FILE`), and the old file is untracked.
 - Open proposals waiting on Kevin: delete the dead
   `Mirror.Quality.SmoothingRules`, and remove the stray root `proposal.md`.

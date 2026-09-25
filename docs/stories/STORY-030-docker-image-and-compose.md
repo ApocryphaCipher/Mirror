@@ -29,13 +29,20 @@ Elixir/OTP versions in step with CI.
 - **Saves are in the same mount.** The importer puts `SAVEn.GAM` in the
   game folder, the Load box defaults to `$MIRROR_MOM_PATH/SAVE1.GAM`, and
   Save as writes next to the loaded file, so `/game` must be writable.
-- **Save-block offsets** (`MIRROR_TERRAIN_OFFSET` etc.) are set only in
-  `scripts/dev_server.sh` today. The container needs them too, so move them
-  into one place both can use (config defaults, or an env file compose
-  loads). Don't copy them into a third place.
-- **Stats DETS file**: `Mirror.Stats` writes `priv/mirror_stats.dets`
-  inside the app dir. In a release that belongs on a volume (or a
-  configurable path), not in the image.
+- **Save-block offsets:** nothing to do. `config/config.exs` has
+  defaults for all five (`Mirror.SaveFile.Blocks`), confirmed by the
+  game's own save writes (docs/reference/save-to-ram-map.md). The
+  `MIRROR_*_OFFSET` env vars only override them, so the container needs
+  none. The exports in `scripts/dev_server.sh` are now redundant: drop
+  them here, and check that `scripts/test_game.sh` still gets
+  `MIRROR_MOM_PATH`.
+- **Stats DETS file:** `Mirror.Stats` writes `Mirror.Paths.stats_file/0`,
+  which defaults to `~/.mirror/stats.dets` and can be overridden with
+  `MIRROR_STATS_FILE` (it's no longer in the repo; 2026-09-24). In the
+  container, point it into the mounted folder, e.g.
+  `MIRROR_STATS_FILE=/data/stats.dets` with `${MIRROR_HOME:-~/.mirror}`
+  mounted at `/data` (and the game at `/data/game`), so the stats
+  survive a rebuild.
 - **Assets**: the release needs `mix assets.deploy` (esbuild + tailwind).
   Tailwind's standalone macOS binary had signing trouble locally (see the
   backlog). Linux in Docker should be fine, but check.

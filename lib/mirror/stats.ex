@@ -100,7 +100,8 @@ defmodule Mirror.Stats do
         write_concurrency: true
       ])
 
-    dets_path = Application.app_dir(:mirror, "priv/mirror_stats.dets")
+    dets_path = Mirror.Paths.stats_file()
+    File.mkdir_p!(Path.dirname(dets_path))
     {:ok, dets} = :dets.open_file(@dets_table, file: to_charlist(dets_path))
 
     load_dets_into_ets(ets, dets)

@@ -31,6 +31,9 @@ mirror-*.tar
 # Ignore digested assets cache.
 /priv/static/cache_manifest.json
 
+# Written by the running app (Mirror.Stats); it lives in ~/.mirror now.
+/priv/mirror_stats.dets
+
 # In case you use Node.js/npm, you want to ignore these.
 npm-debug.log
 /assets/node_modules/

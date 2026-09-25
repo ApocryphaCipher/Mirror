@@ -14,4 +14,9 @@ defmodule Mirror.Paths do
   def tile_cache_dir do
     System.get_env("MIRROR_TILE_CACHE") || Application.get_env(:mirror, :tile_cache_dir)
   end
+
+  @doc "Where `Mirror.Stats` keeps its research data (DETS); outside the repo."
+  def stats_file do
+    System.get_env("MIRROR_STATS_FILE") || Application.get_env(:mirror, :stats_file)
+  end
 end
