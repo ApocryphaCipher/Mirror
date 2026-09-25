@@ -1,8 +1,9 @@
 # STORY-034: Surveyor: what a tile is worth, and what a city there would get
 
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
-**Status:** open (idea from Kevin, 2026-09-23, while playing through the
-live-RAM tool)
+**Status:** in progress: the formula is in Mirror (`Mirror.Surveyor`);
+the view-mode readout is next. (Idea from Kevin, 2026-09-23, while
+playing through the live-RAM tool.)
 **Size:** medium (the display is small; getting the numbers right is the
 work)
 
@@ -45,11 +46,28 @@ So there are two parts:
 **City Resources: solved (2026-09-24).** The formula is in
 [surveyor-formula.md](../reference/surveyor-formula.md). It was read in
 ReMoM, restated in our own words, and implemented in gama (`gama
-resources DUMP X Y [PLANE]`). It gives exactly the game's numbers for all six
-readouts above (Hamburg, Capua, Cremona, Sidon, Bloodrock and the empty
-Myrror site). Still unchecked: tiles shared with another city, road trade,
-and city enchantments. Mirror's Elixir version should port gama's
-`resources.py` (our own MIT code) and reuse the six cases as tests.
+resources DUMP X Y [PLANE]`). It gives exactly the game's numbers for all
+15 full readouts: the six above, and nine more from "Freya - Dior" (edited
+city enchantments, and Kevin's survey of road-linked cities). Only shared
+tiles' food for an *empty site* is still unchecked.
+
+**In Mirror (2026-09-24):** `Mirror.Surveyor.city_resources/5` ports
+gama's rules, and `Mirror.SaveFile.Cities` now decodes building statuses,
+city enchantments and road links. Its tests:
+
+- Synthetic worlds built in the test, one rule each.
+- The nine Dior readouts, read from a frozen copy of that session's
+  `SAVE9.GAM` at `~/.mirror/dev/surveyor-fixtures/` (outside the repo,
+  like all game files; the test is skipped without it, or point
+  `MIRROR_SURVEYOR_SAVE` at a copy).
+- The six older readouts came from RAM dumps rather than saves, so they
+  stay checked by gama.
+
+**Next:** the view-mode readout. The hover panel shows the tile lines in
+the game's words ("Hills / 1/2 food / +3% production"; swamp says 1/2
+food although cities count 0), then City Resources, or why a city can't
+be built there. The "less than 3 squares from any other city" distance
+rule still has to be checked against the hover log first.
 
 The notes below are from before the formula was found. Candidates were:
 

@@ -15,8 +15,9 @@ states the rules in our own words.
 has no licence, so nothing here is copied from it: the tables below are
 restated facts, and the code is our own.
 
-**Implementation:** gama's `src/gama/resources.py` (`gama resources DUMP X
-Y [PLANE]`).
+**Implementation:** `Mirror.Surveyor` (`lib/mirror/surveyor.ex`), ported
+from gama's `src/gama/resources.py` (`gama resources DUMP X Y [PLANE]`,
+which also reads RAM dumps).
 
 **Checked** on all six readouts recorded on screen (below), using the RAM
 dump taken while each was shown. Where our result differed from a literal
