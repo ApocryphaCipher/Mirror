@@ -159,7 +159,7 @@ defmodule Mirror.Stats do
     {:reply,
      %{
        schema_v: 1,
-       dataset_id: dataset_id,
+       dataset_id: format_key(dataset_id),
        exported_at: DateTime.utc_now() |> DateTime.to_unix(),
        data: data
      }, state}
@@ -240,5 +240,11 @@ defmodule Mirror.Stats do
     )
   end
 
-  defp format_key(key), do: key
+  # Keys and the dataset id are tuples, which JSON can't hold:
+  # {:hist, {:mom_classic, "a"}, :terrain, 5} -> "hist:mom_classic:a:terrain:5".
+  @doc false
+  def format_key(key) when is_tuple(key),
+    do: key |> Tuple.to_list() |> Enum.map_join(":", &format_key/1)
+
+  def format_key(key), do: to_string(key)
 end
