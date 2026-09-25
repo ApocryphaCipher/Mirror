@@ -311,9 +311,11 @@ defmodule MirrorWeb.MapLive do
     socket = assign(socket, :save_path_input, path)
 
     with %SaveFile{} = save <- state.save,
-         :ok <- guard_original(socket, save, target_path),
          {:ok, save_path} <-
-           SaveFile.write(%{save | planes: strip_computed(state.planes)}, target_path) do
+           SaveFile.write(
+             %{save | planes: strip_computed(state.planes)},
+             target_path || state.save_path
+           ) do
       state = %{state | save_path: save_path, original_planes: strip_computed(state.planes)}
       SessionStore.put(socket.assigns.session_id, state)
       {:noreply, put_flash(assign_state(socket, state), :info, saved_message(save_path))}
@@ -2991,16 +2993,6 @@ defmodule MirrorWeb.MapLive do
       action == "hover" -> true
       socket.assigns.edit -> action in ["start", "drag", "end"]
       true -> false
-    end
-  end
-
-  defp guard_original(socket, %SaveFile{path: original}, target_path) do
-    target = target_path || socket.assigns.state.save_path
-
-    if (not socket.assigns.lab? and target) && Path.expand(target) == Path.expand(original) do
-      {:error, :would_overwrite_original}
-    else
-      :ok
     end
   end
 

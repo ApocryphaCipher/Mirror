@@ -97,14 +97,80 @@ defmodule Mirror.SaveFile do
     end)
   end
 
-  def write(%__MODULE__{} = save, path \\ nil, opts \\ []) do
-    target = path || save.path
-    backup? = Keyword.get(opts, :backup, true)
-
-    with :ok <- maybe_backup(save.path, target, backup?),
+  @doc """
+  Writes `save` to `target`, never to the file it was loaded from
+  (AGENTS.md §9): that file is refused by path and by inode, so a symlink
+  or different letter case can't get round it. An existing `target` is
+  backed up to `target.bak` first (unless one exists, or `backup: false`),
+  and the write is atomic: a temporary file in the same folder, renamed
+  over `target`.
+  """
+  def write(%__MODULE__{} = save, target, opts \\ []) do
+    with :ok <- validate_target(target),
+         :ok <- check_not_original(save, target),
+         :ok <- maybe_backup(target, opts),
          {:ok, binary} <- serialize(save),
-         :ok <- File.write(target, binary) do
+         :ok <- atomic_write(target, binary) do
       {:ok, target}
+    end
+  end
+
+  defp validate_target(nil), do: {:error, :no_destination}
+  defp validate_target(""), do: {:error, :no_destination}
+  defp validate_target(_target), do: :ok
+
+  defp check_not_original(save, target) do
+    source = save.path
+
+    if is_nil(source) do
+      :ok
+    else
+      expanded_source = Path.expand(source)
+      expanded_target = Path.expand(target)
+
+      cond do
+        expanded_source == expanded_target ->
+          {:error, :would_overwrite_original}
+
+        true ->
+          with {:ok, s_stat} <- File.stat(source),
+               {:ok, t_stat} <- File.stat(target) do
+            if s_stat.inode == t_stat.inode and s_stat.major_device == t_stat.major_device do
+              {:error, :would_overwrite_original}
+            else
+              :ok
+            end
+          else
+            _ -> :ok
+          end
+      end
+    end
+  end
+
+  defp maybe_backup(target, opts) do
+    if Keyword.get(opts, :backup, true) and File.exists?(target) do
+      backup_path = target <> ".bak"
+
+      if File.exists?(backup_path) do
+        :ok
+      else
+        File.cp(target, backup_path)
+      end
+    else
+      :ok
+    end
+  end
+
+  defp atomic_write(target, binary) do
+    tmp = target <> ".tmp-" <> Integer.to_string(System.unique_integer([:positive]))
+
+    with :ok <- File.write(tmp, binary),
+         :ok <- File.rename(tmp, target) do
+      :ok
+    else
+      {:error, reason} ->
+        File.rm(tmp)
+        {:error, reason}
     end
   end
 
@@ -127,24 +193,4 @@ defmodule Mirror.SaveFile do
 
   defp plane_index(:arcanus), do: 0
   defp plane_index(:myrror), do: 1
-
-  defp maybe_backup(source_path, target_path, true) do
-    backup_path = target_path <> ".bak"
-
-    cond do
-      File.exists?(backup_path) ->
-        :ok
-
-      source_path != target_path and File.exists?(source_path) ->
-        File.cp(source_path, backup_path)
-
-      File.exists?(target_path) ->
-        File.cp(target_path, backup_path)
-
-      true ->
-        :ok
-    end
-  end
-
-  defp maybe_backup(_source_path, _target_path, false), do: :ok
 end
