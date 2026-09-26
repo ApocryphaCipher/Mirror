@@ -23,7 +23,7 @@ the battle table and the Surveyor numbers (computed on the fly).
 | [STORY-012](../stories/STORY-012-units-with-banner-plaques.md) units | **Ready** | x, y, plane, owner `+3`, type `+5` checked; all five banner colours checked (wizard `+0x16`); type → name via the game's own table; **dead units stay in the table with plane and owner `0xff`** until the turn ends, then the table is compacted (gama: 8 dead guardians gone by the next turn); skip them anyway | Whether a save written mid-turn holds any; neutral plaque colour; figure art per type (raw screenshots can check) |
 | [STORY-013](../stories/STORY-013-roads-minerals-corruption.md) specials | **Ready** | Minerals **4 Gold, 5 Gems, 7 Adamantium, 64 Wild game, 128 Nightshade** checked on screen; Myrror is the minerals map's second plane; Nightshade is not a city flag (compute it from the catchment) | 1, 2, 3, 6, 8, 9 (kazzmir only); corruption bit |
 | [STORY-033](../stories/STORY-033-cities-town-frames-rival-flags.md) cities | **Probably no rule change** | Size `+19` drives the title (Hamlet 1, Village 2). The map sprite followed population while `+19` lagged, but **the lag came from our RAM write** (it set 5,000 without the game's growth code); gama shows `+19` became 2 the first time Hamburg grew a thousand on its own (6,000). Rival banner colours all checked | Confirm on one more natural growth step; Town+ frames; flag pixel shades |
-| [STORY-034](../stories/STORY-034-surveyor.md) Surveyor | **Evidence yes, formula no** | 11 hovered tiles, 5 full City Resources readouts (Hamburg, Capua, Cremona, Sidon, Bloodrock), each with its catchment; proven computed, not stored | The formula (kazzmir's code, or derive it from the five cases) |
+| [STORY-034](../stories/STORY-034-surveyor.md) Surveyor | **Superseded: Done** | 11 hovered tiles, 5 full City Resources readouts; formula reverse-engineered and implemented (see [2026-09-24-surveyor-handoff.md](2026-09-24-surveyor-handoff.md) and [surveyor-formula.md](../reference/surveyor-formula.md)) | None (formula verified) |
 
 ## Record fields proven (beyond the stories)
 
@@ -76,7 +76,9 @@ the battle table and the Surveyor numbers (computed on the fly).
    next session to learn the cleared look.
 4. **STORY-033**, after one session watching Hamburg's size and sprite
    with raw screenshots (the new screenshot endpoint makes this cheap).
-5. **STORY-034** last: it needs a formula, not more evidence.
+5. ~~**STORY-034** last: it needs a formula, not more evidence.~~ *(Superseded:
+   the formula was derived and implemented in STORY-034; see
+   [2026-09-24-surveyor-handoff.md](2026-09-24-surveyor-handoff.md)).*
 
 Next play session: the nine checks above, each one checkpoint, with a
 dump and a raw screenshot. Most take a single click in the game.

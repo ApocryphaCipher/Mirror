@@ -1,6 +1,6 @@
 # EPIC-006: Map-first UI, with an edit mode
 
-**Status:** scoped, not started
+**Status:** in progress
 **Owner:** [Kevin](https://github.com/KevinAsbury)
 **Requested:** 2026-09-22. Kevin: "too many gadgets, gizmos, and levers
 assaulting my eyes." Now that the map renders correctly, `/arcanus` and
@@ -61,20 +61,20 @@ sample, and modifiers only as optional shortcuts. The ideas worth keeping:
 Suggested order: STORY-014 → STORY-015 → STORY-016 → STORY-021 →
 STORY-017 → then the rest as their EPIC-004 data stories land.
 
-- [STORY-014](../stories/STORY-014-ui-triage-and-lab-route.md): triage the UI; move research tools to a Lab route; delete MOMIME-only debug toggles
-- [STORY-015](../stories/STORY-015-view-mode-layout.md): view mode layout (full-window map, pan/zoom, hover readout)
-- [STORY-016](../stories/STORY-016-edit-mode-shell.md): edit mode shell (toggle, pick-a-layer, tools, undo/redo, Save as)
+- [STORY-014](../stories/STORY-014-ui-triage-and-lab-route.md): triage the UI; move research tools to a Lab route; delete MOMIME-only debug toggles **Done**
+- [STORY-015](../stories/STORY-015-view-mode-layout.md): view mode layout (full-window map, pan/zoom, hover readout) **Done**
+- [STORY-016](../stories/STORY-016-edit-mode-shell.md): edit mode shell (toggle, pick-a-layer, tools, undo/redo, Save as) **Done**
 - [STORY-017](../stories/STORY-017-terrain-editing-autotile.md): terrain editing with auto-tiling (paint types; game picks the picture)
 - [STORY-018](../stories/STORY-018-roads-specials-editing.md): roads, corruption and resource editing
 - [STORY-019](../stories/STORY-019-move-structures.md): select and move structures and unit stacks
 - [STORY-020](../stories/STORY-020-structure-editors.md): structure detail editors (city / lair / unit)
 - [STORY-021](../stories/STORY-021-save-round-trip-safety.md): save round-trip safety (byte-exact, and loads in the real game)
-- [STORY-022](../stories/STORY-022-bug-raw-value-paint-artifacts.md): **bug**: stray raw-value paint (wheel silently changes the brush; bare click paints) shows up as map artifacts
-- [STORY-023](../stories/STORY-023-bug-edit-paint-no-live-redraw.md): **bug**: painting in edit mode doesn't redraw the tile until reload
+- [STORY-022](../stories/STORY-022-bug-raw-value-paint-artifacts.md): **bug**: stray raw-value paint (wheel silently changes the brush; bare click paints) shows up as map artifacts **Partially fixed**
+- [STORY-023](../stories/STORY-023-bug-edit-paint-no-live-redraw.md): **bug**: painting in edit mode doesn't redraw the tile until reload **Fixed**
 - [STORY-024](../stories/STORY-024-tile-hover-highlight.md): highlight the tile under the cursor (nice-to-have)
 - [STORY-025](../stories/STORY-025-in-game-cursor.md): use the game's own mouse cursor over the map (nice-to-have)
-- [STORY-026](../stories/STORY-026-bug-discard-and-stuck-edit-state.md): **bug**: Discard does nothing; edits feel impossible to clear
-- [STORY-027](../stories/STORY-027-cycle-tile-tool.md): Cycle tool (click = next tile picture); Paint becomes its own tool
+- [STORY-026](../stories/STORY-026-bug-discard-and-stuck-edit-state.md): **bug**: Discard does nothing; edits feel impossible to clear **Fixed**
+- [STORY-027](../stories/STORY-027-cycle-tile-tool.md): Cycle tool (click = next tile picture); Paint becomes its own tool **Done**
 - [STORY-028](../stories/STORY-028-floating-tool-palette.md): floating emoji tool palette with Cycle instructions and a Paint panel (nice-to-have)
 - [STORY-029](../stories/STORY-029-safe-editing-see-everything.md): safe editing: see everything, flag impossible states (later; blocked on EPIC-004)
 - [STORY-034](../stories/STORY-034-surveyor.md): Surveyor readout: tile value and City Resources, matched against the game's Surveyor **Done**

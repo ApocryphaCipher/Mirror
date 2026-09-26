@@ -1,5 +1,11 @@
 # 2026-09-23 (evening): Handoff, start here
 
+> [!NOTE] Superseded
+> For current project status, see [2026-09-24-surveyor-handoff.md](2026-09-24-surveyor-handoff.md)
+> and [2026-09-24-ktlo-review.md](2026-09-24-ktlo-review.md). This note records the state on the
+> evening of 2026-09-23. Since this note was written, Surveyor (STORY-034), settleable tiles
+> grading (STORY-035), fog of war (STORY-036), and save-safety fixes (STORY-038) have landed.
+
 Read [../../AGENTS.md](../../AGENTS.md) first: it has the workflow, the checks, the
 game-file rules and the Elixir patterns. This note only covers where things
 stand. The earlier [2026-09-23-session-handoff.md](2026-09-23-session-handoff.md) is history.

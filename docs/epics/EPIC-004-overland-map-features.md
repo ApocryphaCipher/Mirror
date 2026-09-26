@@ -1,6 +1,6 @@
 # EPIC-004: Render towns, forts, towers, tombs, and other overland features
 
-**Status:** scoped into stories 2026-09-22 (STORY-006, STORY-009–013).
+**Status:** in progress. Cities are decoded and rendered with owner flags and size-appropriate frames (STORY-010, STORY-032). Sites are decoded (`Mirror.SaveFile.Sites`). Units (STORY-012), sites drawing (STORY-011), roads/minerals/corruption (STORY-013), and Town+ city frames / rival flags (STORY-033) remain.
 Scope widened by [Kevin](https://github.com/KevinAsbury) to include **units** (figure on a banner-colour
 plaque) and **per-layer on/off toggles**. Sprite and save-block survey:
 [../reference/overland-sprites-and-save-blocks.md](../reference/overland-sprites-and-save-blocks.md).
@@ -8,12 +8,12 @@ plaque) and **per-layer on/off toggles**. Sprite and save-block survey:
 **Found:** 2026-09-22, Kevin: "The towns, forts, towers, tombs, and other
 overland stuff is not showing either."
 
-## What this actually is
+## What this was (historical context from 2026-09-22)
 
-Not a bug — confirmed via `grep -rin "cit\(y\|ies\)\|fortress\|tower" lib/
-lib_web/` returning **zero results**. Mirror has never parsed or rendered
-cities, towers, lairs, ruins, or any other point-of-interest on the
-overland map. This is new scope, not a regression.
+When first investigated on 2026-09-22, Mirror had never parsed or rendered
+cities, towers, lairs, ruins, or any other point-of-interest. Today,
+cities are parsed (`Mirror.SaveFile.Cities`) and rendered (`map_overlays.js`),
+and encounter sites, towers and nodes are parsed (`Mirror.SaveFile.Sites`).
 
 ## What we know about where this data lives
 
@@ -35,41 +35,29 @@ byte offsets within each 114-byte record (from its `Load`/`Save` methods):
 
 - `+14` race, `+15` X, `+16` Y, `+17` plane (world), `+18` owner,
   `+20` population, `+21` worker/farmer ratio, `+24` growth rate (int16),
-  `+28` current production, `+34` active spells bitmask, `+67` enchantment
-  presence flags.
+  `+28` current production, `+31..+66` buildings statuses (including `+66`
+  walled flag), `+67..+92` enchantment presence flags.
 
 "Fortresses," "Towers," and "Encounter zones" (which almost certainly
 covers lairs, ruins, ancient/fallen temples, and Towers of Wizardry — the
-"tombs" Kevin mentioned) are **wiki-only so far** — `momedit` doesn't
-implement these at all (checked; no matching class exists in its source).
-These need their own verification before trusting the byte layout.
+"tombs" Kevin mentioned) were originally wiki-only, but the layouts have since
+been decoded and verified in `Mirror.SaveFile.Sites` and live RAM notes.
 
-## What's needed to actually render this
+## Implementation approach
 
-1. **Parse the blocks.** New `Mirror.SaveFile` extraction for cities (X/Y/
-   plane/name/owner at minimum to start) and encounter zones/towers
-   (X/Y/plane/type at minimum). Cities is the safer starting point — two
-   sources agree on its layout; encounter zones only has one.
-2. **Get the icon art.** *Update 2026-09-22:* prefer classic art now that
-   the full GOG install is available (see EPIC-002). City/tower/lair
-   sprites are most likely in `MAPBACK.LBX` (unverified, from memory; check
-   with `/tile-probe` and the `FONTS.LBX` palette). The MOMIME fallback
-   below still works. The MOMIME resource pack (same source as PR #4's
-   terrain art) has `overland/cities` and `overland/mapFeatures` folders —
-   **not yet copied** into `resources/` (PR #4 only pulled
-   `overland/terrain`). Need to pull those in and extend
-   `scripts/build_momime_resources_index.sh` accordingly, or fold them into
-   one script.
-3. **Render overlay markers.** New draw functions in `map_hooks.js`
-   (there's precedent — `drawFeatureOverlays`/`drawEmbeddedSpecialOverlay`
-   already exist for a different purpose and show the pattern: pick an
-   entry from a resource group, draw on top of the base tile). Cities
-   likely need something fancier eventually (different art per race/size
-   per the wiki's own city-view assets), but a single marker per city is a
-   reasonable first cut.
-4. **Wire it into the LiveView payload.** `push_tile_assets`/`map_live.ex`
-   would need to include parsed city/feature records alongside the terrain
-   layers it already pushes.
+1. **Parse the blocks.** Implemented: `Mirror.SaveFile.Cities` (X, Y, plane,
+   name, owner, size, pop, buildings, enchantments) and `Mirror.SaveFile.Sites`
+   (nodes, towers, encounter zones).
+2. **Get the icon art.** Classic LBX art from `MAPBACK.LBX` is used
+   (the MOMIME PNG fallback and indexing scripts discussed during early scoping
+   were superseded and deleted).
+3. **Render overlay markers.** Draw functions in `assets/js/map_overlays.js`
+   render cities (`MAPBACK #20`) with owner banner colours and size-appropriate
+   frames. (STORY-032 confirmed in DOSBox that walls do not alter the overland
+   sprite; wall status is decoded and displayed in the hover readout rather than
+   drawn on the map). Follow-ups will render sites and unit plaques.
+4. **Wire into LiveView payload.** `map_live.ex` pushes parsed city and
+   overlay records alongside terrain layers.
 
 ## Stories
 

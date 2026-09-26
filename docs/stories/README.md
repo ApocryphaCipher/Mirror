@@ -2,29 +2,29 @@
 - [STORY-002](STORY-002-stop-circular-terrain-source-heuristic.md): stop the terrain-source heuristic. Rescoped to a full-`u16` read and folded into STORY-005
 - [STORY-003](STORY-003-find-real-terrain-value-table.md): find the real terrain-value table. Done; it's `TERRAIN.LBX` entry 1
 - [STORY-004](STORY-004-add-river-volcano-node-kinds.md): river/volcano/node kinds. Obsolete for rendering
-- [STORY-005](STORY-005-render-from-terrain-lbx.md): render the map from `TERRAIN.LBX` in the app (EPIC-002). Implemented; MOMIME-path removal is the follow-up
+- [STORY-005](STORY-005-render-from-terrain-lbx.md): render the map from `TERRAIN.LBX` in the app (EPIC-002). **Done** (MOMIME removal completed in STORY-014)
 - [STORY-006](STORY-006-sprite-groundwork.md): sprite groundwork, full GOG install + named-sprite catalog (EPIC-004/005). **Done**
 - [STORY-007](STORY-007-live-terrain-animation.md): live terrain animation / ocean twinkle (EPIC-005)
-- [STORY-008](STORY-008-node-auras.md): node auras, Chaos / Nature / Sorcery sparkle (EPIC-005)
+- [STORY-008](STORY-008-node-auras.md): node auras, owner-coloured sparkle on melded nodes (EPIC-005)
 - [STORY-009](STORY-009-overlay-layer-toggles.md): overlay layers with on/off toggles (EPIC-004) **Done**
 - [STORY-010](STORY-010-cities.md): cities (EPIC-004) **Done**
 - [STORY-011](STORY-011-sites-towers-lairs.md): towers, fortresses, lairs, ruins, sites (EPIC-004)
 - [STORY-012](STORY-012-units-with-banner-plaques.md): units with banner-colour plaques (EPIC-004)
 - [STORY-013](STORY-013-roads-minerals-corruption.md): specials and bonuses (ores, gems, nightshade, wild game…), roads, corruption (EPIC-004)
-- [STORY-014](STORY-014-ui-triage-and-lab-route.md): triage the UI; research tools → Lab route (EPIC-006)
-- [STORY-015](STORY-015-view-mode-layout.md): view mode, full-window map with pan/zoom (EPIC-006)
-- [STORY-016](STORY-016-edit-mode-shell.md): edit mode shell (EPIC-006)
+- [STORY-014](STORY-014-ui-triage-and-lab-route.md): triage the UI; research tools → Lab route (EPIC-006) **Done**
+- [STORY-015](STORY-015-view-mode-layout.md): view mode, full-window map with pan/zoom (EPIC-006) **Done**
+- [STORY-016](STORY-016-edit-mode-shell.md): edit mode shell (EPIC-006) **Done**
 - [STORY-017](STORY-017-terrain-editing-autotile.md): terrain editing with auto-tiling via `TERRTYPE.LBX` (EPIC-006)
 - [STORY-018](STORY-018-roads-specials-editing.md): roads, corruption, resource editing (EPIC-006)
 - [STORY-019](STORY-019-move-structures.md): select and move structures and unit stacks (EPIC-006)
 - [STORY-020](STORY-020-structure-editors.md): structure detail editors (EPIC-006)
 - [STORY-021](STORY-021-save-round-trip-safety.md): save round-trip safety (EPIC-006)
-- [STORY-022](STORY-022-bug-raw-value-paint-artifacts.md): **bug**: stray raw-value paint shows up as map artifacts (EPIC-006)
-- [STORY-023](STORY-023-bug-edit-paint-no-live-redraw.md): **bug**: painting in edit mode doesn't redraw the tile until reload (EPIC-006)
+- [STORY-022](STORY-022-bug-raw-value-paint-artifacts.md): **bug**: stray raw-value paint shows up as map artifacts (EPIC-006) **Partially fixed**
+- [STORY-023](STORY-023-bug-edit-paint-no-live-redraw.md): **bug**: painting in edit mode doesn't redraw the tile until reload (EPIC-006) **Fixed**
 - [STORY-024](STORY-024-tile-hover-highlight.md): highlight the tile under the cursor (glow / lift; brush ghost in edit mode) (EPIC-006, nice-to-have)
 - [STORY-025](STORY-025-in-game-cursor.md): use the game's own mouse cursor over the map (found in `FONTS.LBX`) (EPIC-006, nice-to-have)
-- [STORY-026](STORY-026-bug-discard-and-stuck-edit-state.md): **bug**: Discard does nothing (in-app browser swallows `confirm()`); edits feel impossible to clear (EPIC-006)
-- [STORY-027](STORY-027-cycle-tile-tool.md): Cycle tool: click steps a tile to the next picture (#134 → #135); today's click-to-paint becomes the Paint tool (EPIC-006)
+- [STORY-026](STORY-026-bug-discard-and-stuck-edit-state.md): **bug**: Discard does nothing (in-app browser swallows `confirm()`); edits feel impossible to clear (EPIC-006) **Fixed**
+- [STORY-027](STORY-027-cycle-tile-tool.md): Cycle tool: click steps a tile to the next picture (#134 → #135); today's click-to-paint becomes the Paint tool (EPIC-006) **Done**
 - [STORY-028](STORY-028-floating-tool-palette.md): floating emoji tool palette (🔄 Cycle, 🎨 Paint) with Cycle instructions and a Paint panel (brush size, quick terrain buttons) (EPIC-006, nice-to-have)
 - [STORY-029](STORY-029-safe-editing-see-everything.md): safe map editing: see everything past the fog, and flag impossible states (units on water…) (EPIC-006, later; blocked on EPIC-004)
 - [STORY-030](STORY-030-docker-image-and-compose.md): Docker release image + `compose.yaml`, game files mounted read-only, never baked in (EPIC-007)
@@ -39,5 +39,5 @@
 - [STORY-039](STORY-039-edit-state-consistency.md): editor state gets out of step: discard, undo/redo, two tabs, engine sessions (EPIC-008)
 - [STORY-040](STORY-040-decoder-robustness.md): decoders that raise or accept malformed data on bad input (EPIC-008) **Done**
 - [STORY-041](STORY-041-edit-tests-in-ci.md): editing and save-safety tests are all skipped in CI; move them onto a synthetic save (EPIC-008)
-- [STORY-042](STORY-042-docs-truth-pass.md): docs truth pass: README, statuses, Surveyor doc, old notes (EPIC-008)
+- [STORY-042](STORY-042-docs-truth-pass.md): docs truth pass: README, statuses, Surveyor doc, old notes (EPIC-008) **Done**
 - [STORY-043](STORY-043-maintainability.md): maintainability: split map_live.ex, dead code (EPIC-008)

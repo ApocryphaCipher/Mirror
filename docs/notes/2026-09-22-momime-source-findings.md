@@ -1,5 +1,11 @@
 # 2026-09-22 (cont'd) — Found the real algorithm, and a working local setup
 
+> [!NOTE] Historical context (superseded)
+> This note documents findings from the MOMIME Java client during EPIC-001 research.
+> The MOMIME rendering path has since been retired in favour of native `TERRAIN.LBX`
+> decoding (EPIC-002, STORY-005, STORY-014; see [classic-terrain-format.md](../reference/classic-terrain-format.md)),
+> and save offsets are defined directly in `config/config.exs`.
+
 Two things happened this session that unblock EPIC-001:
 
 1. [Kevin](https://github.com/KevinAsbury) uploaded `MAGIC.zip` (the actual DOS Master of Magic install, LBX

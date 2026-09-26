@@ -35,8 +35,11 @@ unexplored tile. The player's fog is its own layer:
 - **Grade the tint** by the site's Maximum Pop (or by production or
   gold), so good sites stand out, not just legal ones. This is
   `Mirror.Surveyor.city_resources/5`.
-- **Hovering** a tinted tile already shows its full City Resources in the
-  Surveyor card.
+- **Hovering** a tinted tile shows its City Resources in the Surveyor
+  card (note: `settleable/4` grades sites treating the whole map as explored,
+  while `panel/6` hides unexplored tiles and `city_resources/5` excludes
+  unexplored catchment tiles for empty sites, so displayed values can differ
+  on maps with active fog).
 - **Recompute on edits.** Edit mode changes terrain and moves things, so
   the overlay should follow.
 
@@ -58,19 +61,20 @@ unexplored tile. The player's fog is its own layer:
 - `Mirror.Surveyor.settleable/4` computes it over the whole plane, and
   treats every tile as explored.
 - It's pushed with the map and again after every edit (stroke end,
-  Cycle, undo, redo). Discard reloads it with the map.
+  Cycle, undo, redo). *(Note: Discard currently omits `push_map_layers/1`,
+  leaving overlays stale after discard; tracked as a bug in STORY-039).*
 - **Speed:** 2 ms for Arcanus on the Dior save (496 tiles).
 - **Tests:**
   - Synthetic: water, cities, distance 3 out and 4 in, shared tiles, fog
     ignored.
-  - Real file: on every explored tile of both planes of the Dior save,
-    the overlay agrees with the Surveyor card.
+  - Real file: on every explored tile of both planes of the Dior save (where
+    all tiles are explored), the overlay agrees with the Surveyor card.
   - LiveView: pushed on load, off by default, re-pushed after an edit.
 
 ## Done when
 
 - A Layers toggle shows the settleable tiles on the current plane.
-- The tinted tiles agree with the Surveyor card on hover, including a
-  test that the tile at distance 3 from a city is out and distance 4 is
-  in.
+- The tinted tiles agree with the Surveyor card on hover for fully explored
+  areas, including a test that the tile at distance 3 from a city is out and
+  distance 4 is in.
 - It updates after an edit.

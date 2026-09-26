@@ -38,7 +38,9 @@
   (55, 29) blue, Bloodrock on Myrror (54, 23) purple, neutral Steyr
   (47, 16) at the size-2 frame; Myrror shows only Myrror's cities; the
   Cities toggle clears and restores the layer exactly.
-- Not done (STORY-032): walled cities (every city uses the unwalled
-  sprite), name labels, and confirming the size-class frame and the flag
-  recolour against the real game.
+- Follow-up (STORY-032, **Done**): verified against DOSBox screenshots that
+  walls do not change the overland sprite (MAPBACK #20 is used; walled status
+  is parsed and sent to the client), added city name hover readout, and confirmed
+  size frames (frame = size − 1) and owner flag shades. Town+ frames, rival flag
+  colours and `CITYNOWA` are tracked in STORY-033.
 

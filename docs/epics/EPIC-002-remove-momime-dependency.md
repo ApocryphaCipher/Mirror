@@ -1,10 +1,12 @@
 # EPIC-002: Get off the MOMIME PNG dependency — render from Mirror's own pipeline
 
-**Status:** spike succeeded 2026-09-22 — full map renders from raw `TERRAIN.LBX` outside the app; in-app implementation done (STORY-005). Remaining: delete the MOMIME path once Kevin has used the new one
+**Status:** **Done** (2026-09-22) — MOMIME dependency was completely removed in STORY-014; Mirror renders solely from raw `TERRAIN.LBX` (STORY-005). The "today" sections below are preserved as historical context.
 **Owner:** [Kevin](https://github.com/KevinAsbury)
 **Requested:** 2026-09-22, right after PR #4 (real smoothing rules) landed
 
-## Why
+## Why (historical context)
+
+*(Historical note: this reflects the state on 2026-09-22 prior to MOMIME removal.)*
 
 Mirror's original purpose (per Kevin, session start): read a Master of Magic
 save file and draw the map, **using the game's own assets read from the LBX

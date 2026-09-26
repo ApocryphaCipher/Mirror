@@ -16,10 +16,14 @@ Unsorted, not yet promoted to a story.
 - ~36 small GOG LBX files (`CMB*`, `ITEM*`, `SPELLS`, `SPECIAL/2`, …) are
   still only on [Kevin](https://github.com/KevinAsbury)'s Drive, not in `~/.mirror_assets/GOG`. Mirror doesn't
   read any of them (see `Mirror.GameFiles.manifest/0`), so this only matters
-  for exploring them in `/tile-probe`. If needed, copy the Drive folder over
-  and re-run `mix mirror.import_game`.
-- Decode `TERRTYPE.LBX` properly (the original game's mask → tile table).
-  Only needed if Mirror ever edits terrain.
+  for exploring them in `/tile-probe`. `mix mirror.import_game` only copies
+  the five manifest LBX files; to explore extra files, point `MIRROR_MOM_PATH`
+  directly at the complete install folder or copy the additional LBX files into
+  `~/.mirror/game` manually.
+- Decode `TERRTYPE.LBX` properly (the original game's mask → tile table) for
+  automatic terrain auto-tiling. Raw tile editing already exists; this is the
+  backbone needed for painting terrain *types* rather than individual tile
+  pictures. Tracked in [stories/STORY-017-terrain-editing-autotile.md](stories/STORY-017-terrain-editing-autotile.md).
 - ~~Offsets unverified~~: done 2026-09-24. The game's own save writes
   place all five blocks (docs/reference/save-to-ram-map.md), and
   `config/config.exs` has them as defaults. The original note:
@@ -51,8 +55,9 @@ Unsorted, not yet promoted to a story.
   lines of client-side MOMIME/shore/kind code. `Quality.SmoothingRules`
   is kept (standalone, tested) as a possible cross-check for STORY-017.
 - `/tile-probe`'s "Label tile" tagging (writes `priv/asset_map/*.json`
-  via `AssetMap`) no longer feeds rendering. Decide in STORY-006 whether
-  to repurpose it for the sprite catalog or delete it.
+  via `AssetMap`) no longer feeds rendering (which uses `Mirror.TerrainLbx`
+  directly). Decide whether to repurpose this tagging workflow for an
+  interactive sprite catalog tool, or remove the tagging controls and `AssetMap`.
 - ~~App renders with no CSS at all~~ — same root cause as above, fixed.
 - Draw tiles at native 20×18 aspect instead of stretched into square cells
   (canvas geometry change; see `Canvas_Geometry_Invariants` in codex-notes).
