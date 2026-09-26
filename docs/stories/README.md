@@ -37,7 +37,7 @@
 - [STORY-037](STORY-037-reveal-all.md): Reveal all: an edit that marks every tile explored for the player, saved with Save as (EPIC-006, nice-to-have)
 - [STORY-038](STORY-038-save-as-safety.md): **P1 bug**: Save as can overwrite the loaded save, plus other save-safety gaps (EPIC-008) **Done**
 - [STORY-039](STORY-039-edit-state-consistency.md): editor state gets out of step: discard, undo/redo, two tabs, engine sessions (EPIC-008)
-- [STORY-040](STORY-040-decoder-robustness.md): decoders that raise or accept malformed data on bad input (EPIC-008)
+- [STORY-040](STORY-040-decoder-robustness.md): decoders that raise or accept malformed data on bad input (EPIC-008) **Done**
 - [STORY-041](STORY-041-edit-tests-in-ci.md): editing and save-safety tests are all skipped in CI; move them onto a synthetic save (EPIC-008)
 - [STORY-042](STORY-042-docs-truth-pass.md): docs truth pass: README, statuses, Surveyor doc, old notes (EPIC-008)
 - [STORY-043](STORY-043-maintainability.md): maintainability: split map_live.ex, dead code (EPIC-008)

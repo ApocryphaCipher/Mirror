@@ -69,11 +69,16 @@ defmodule Mirror.SaveFile.Blocks do
     with {:ok, offset} <- plane_slice_offset(layer, plane_index) do
       size = layer_size(layer)
 
-      if byte_size(slice) != size do
-        {:error, {:slice_size_mismatch, layer}}
-      else
-        <<head::binary-size(^offset), _::binary-size(^size), tail::binary>> = binary
-        {:ok, <<head::binary, slice::binary, tail::binary>>}
+      cond do
+        byte_size(slice) != size ->
+          {:error, {:slice_size_mismatch, layer}}
+
+        byte_size(binary) < offset + size ->
+          {:error, {:short_binary, layer}}
+
+        true ->
+          <<head::binary-size(^offset), _::binary-size(^size), tail::binary>> = binary
+          {:ok, <<head::binary, slice::binary, tail::binary>>}
       end
     end
   end

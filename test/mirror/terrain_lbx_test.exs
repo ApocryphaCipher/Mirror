@@ -20,6 +20,15 @@ defmodule Mirror.TerrainLbxTest do
     end
   end
 
+  describe "check_minimap/1 (STORY-040)" do
+    test "a minimap table shorter than both planes is an error, not a later crash" do
+      assert TerrainLbx.check_minimap(:binary.copy(<<0>>, 2 * 762)) == :ok
+
+      assert TerrainLbx.check_minimap(:binary.copy(<<0>>, 2 * 762 - 1)) ==
+               {:error, :short_minimap}
+    end
+  end
+
   describe "record_pixels/2" do
     test "transposes column-major record pixels to row-major" do
       # Record 1 starts at byte 384; pixel byte = x * 18 + y (column-major).

@@ -61,22 +61,34 @@ defmodule Mirror.Engine.Fog do
     end
   end
 
-  defp empty_bitset(bits) when bits >= 0 do
-    <<0::size(bits)>>
+  # Bitsets are stored padded to whole bytes: set_bit/3 and the byte-wise
+  # helpers below work on bytes, and a map's tile count needn't be a
+  # multiple of 8.
+  defp padded(bits), do: div(bits + 7, 8) * 8
+
+  @doc false
+  def empty_bitset(bits) when bits >= 0, do: <<0::size(padded(bits))>>
+
+  @doc false
+  def normalize_bitset(nil, bits), do: empty_bitset(bits)
+
+  # An unpadded bitset (e.g. from Engine.Session) is padded with zeros.
+  def normalize_bitset(bitset, bits) when is_bitstring(bitset) do
+    cond do
+      bit_size(bitset) == padded(bits) ->
+        bitset
+
+      bit_size(bitset) == bits ->
+        <<bitset::bitstring, 0::size(padded(bits) - bits)>>
+
+      true ->
+        raise ArgumentError,
+              "bitset size mismatch: expected #{bits} bits, got #{bit_size(bitset)} bits"
+    end
   end
 
-  defp normalize_bitset(nil, bits), do: empty_bitset(bits)
-
-  defp normalize_bitset(bitset, bits) when is_bitstring(bitset) and bit_size(bitset) == bits do
-    bitset
-  end
-
-  defp normalize_bitset(bitset, bits) when is_bitstring(bitset) do
-    raise ArgumentError,
-          "bitset size mismatch: expected #{bits} bits, got #{bit_size(bitset)} bits"
-  end
-
-  defp set_bit(bitset, idx, value) when value in [0, 1] do
+  @doc false
+  def set_bit(bitset, idx, value) when value in [0, 1] do
     byte_index = div(idx, 8)
     bit_offset = rem(idx, 8)
     <<head::binary-size(^byte_index), byte, tail::binary>> = bitset

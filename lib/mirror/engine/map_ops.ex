@@ -50,15 +50,16 @@ defmodule Mirror.Engine.MapOps do
       when is_function(fun, 2) and is_integer(radius) do
     total = topo.w * topo.h
 
-    {keep_going, remaining} =
+    {keep_going, remaining, visited} =
       if Topology.in_bounds?(topo, cx, cy) do
-        {continue?(fun.(cx, cy)), total - 1}
+        {continue?(fun.(cx, cy)), total - 1, MapSet.new([{cx, cy}])}
       else
-        {true, total}
+        {true, total, MapSet.new()}
       end
 
     if keep_going do
-      {_coords, _remaining, _keep} = traverse_rings(topo, {cx, cy}, radius, remaining, true, fun)
+      {_coords, _remaining, _keep, _visited} =
+        traverse_rings(topo, {cx, cy}, radius, remaining, true, visited, fun)
     end
 
     :ok
@@ -117,113 +118,128 @@ defmodule Mirror.Engine.MapOps do
       when is_integer(radius) and is_function(fun, 3) do
     total = topo.w * topo.h
 
-    {remaining, acc} =
+    {remaining, acc, visited} =
       if Topology.in_bounds?(topo, cx, cy) do
-        {total - 1, fun.(cx, cy, acc)}
+        {total - 1, fun.(cx, cy, acc), MapSet.new([{cx, cy}])}
       else
-        {total, acc}
+        {total, acc, MapSet.new()}
       end
 
-    {_coords, _remaining, acc} =
-      traverse_rings_reduce(topo, {cx, cy}, radius, remaining, acc, fun)
+    {_coords, _remaining, acc, _visited} =
+      traverse_rings_reduce(topo, {cx, cy}, radius, remaining, acc, visited, fun)
 
     acc
   end
 
-  defp traverse_rings(_topo, coords, radius, remaining, keep_going, _fun)
+  defp traverse_rings(_topo, coords, radius, remaining, keep_going, visited, _fun)
        when radius <= 0 or remaining <= 0 or keep_going == false do
-    {coords, remaining, keep_going}
+    {coords, remaining, keep_going, visited}
   end
 
-  defp traverse_rings(%Topology{} = topo, coords, radius, remaining, keep_going, fun) do
-    Enum.reduce_while(1..radius, {coords, remaining, keep_going}, fn ring,
-                                                                     {coords, remaining, keep} ->
+  defp traverse_rings(%Topology{} = topo, coords, radius, remaining, keep_going, visited, fun) do
+    Enum.reduce_while(1..radius, {coords, remaining, keep_going, visited}, fn ring,
+                                                                              {coords, remaining,
+                                                                               keep, visited} ->
       if remaining <= 0 or keep == false do
-        {:halt, {coords, remaining, keep}}
+        {:halt, {coords, remaining, keep, visited}}
       else
         {coords, _in_bounds?} = step_coord(topo, coords, 5)
-        {coords, remaining, keep} = walk_sides(topo, coords, ring, remaining, keep, fun)
-        {:cont, {coords, remaining, keep}}
+
+        {coords, remaining, keep, visited} =
+          walk_sides(topo, coords, ring, remaining, keep, visited, fun)
+
+        {:cont, {coords, remaining, keep, visited}}
       end
     end)
   end
 
-  defp traverse_rings_reduce(_topo, coords, radius, remaining, acc, _fun)
+  defp traverse_rings_reduce(_topo, coords, radius, remaining, acc, visited, _fun)
        when radius <= 0 or remaining <= 0 do
-    {coords, remaining, acc}
+    {coords, remaining, acc, visited}
   end
 
-  defp traverse_rings_reduce(%Topology{} = topo, coords, radius, remaining, acc, fun) do
-    Enum.reduce_while(1..radius, {coords, remaining, acc}, fn ring, {coords, remaining, acc} ->
+  defp traverse_rings_reduce(%Topology{} = topo, coords, radius, remaining, acc, visited, fun) do
+    Enum.reduce_while(1..radius, {coords, remaining, acc, visited}, fn ring,
+                                                                       {coords, remaining, acc,
+                                                                        visited} ->
       if remaining <= 0 do
-        {:halt, {coords, remaining, acc}}
+        {:halt, {coords, remaining, acc, visited}}
       else
         {coords, _in_bounds?} = step_coord(topo, coords, 5)
-        {coords, remaining, acc} = walk_sides_reduce(topo, coords, ring, remaining, acc, fun)
-        {:cont, {coords, remaining, acc}}
+
+        {coords, remaining, acc, visited} =
+          walk_sides_reduce(topo, coords, ring, remaining, acc, visited, fun)
+
+        {:cont, {coords, remaining, acc, visited}}
       end
     end)
   end
 
-  defp walk_sides(topo, coords, ring, remaining, keep, fun) do
-    Enum.reduce_while([0, 2, 4, 6], {coords, remaining, keep}, fn dir,
-                                                                  {coords, remaining, keep} ->
+  defp walk_sides(topo, coords, ring, remaining, keep, visited, fun) do
+    Enum.reduce_while([0, 2, 4, 6], {coords, remaining, keep, visited}, fn dir,
+                                                                           {coords, remaining,
+                                                                            keep, visited} ->
       if remaining <= 0 or keep == false do
-        {:halt, {coords, remaining, keep}}
+        {:halt, {coords, remaining, keep, visited}}
       else
-        {coords, remaining, keep} = walk_steps(topo, coords, dir, ring * 2, remaining, keep, fun)
-        {:cont, {coords, remaining, keep}}
+        {coords, remaining, keep, visited} =
+          walk_steps(topo, coords, dir, ring * 2, remaining, keep, visited, fun)
+
+        {:cont, {coords, remaining, keep, visited}}
       end
     end)
   end
 
-  defp walk_sides_reduce(topo, coords, ring, remaining, acc, fun) do
-    Enum.reduce_while([0, 2, 4, 6], {coords, remaining, acc}, fn dir, {coords, remaining, acc} ->
+  defp walk_sides_reduce(topo, coords, ring, remaining, acc, visited, fun) do
+    Enum.reduce_while([0, 2, 4, 6], {coords, remaining, acc, visited}, fn dir,
+                                                                          {coords, remaining, acc,
+                                                                           visited} ->
       if remaining <= 0 do
-        {:halt, {coords, remaining, acc}}
+        {:halt, {coords, remaining, acc, visited}}
       else
-        {coords, remaining, acc} =
-          walk_steps_reduce(topo, coords, dir, ring * 2, remaining, acc, fun)
+        {coords, remaining, acc, visited} =
+          walk_steps_reduce(topo, coords, dir, ring * 2, remaining, acc, visited, fun)
 
-        {:cont, {coords, remaining, acc}}
+        {:cont, {coords, remaining, acc, visited}}
       end
     end)
   end
 
-  defp walk_steps(_topo, coords, _dir, steps, remaining, keep, _fun)
+  defp walk_steps(_topo, coords, _dir, steps, remaining, keep, visited, _fun)
        when steps <= 0 or remaining <= 0 or keep == false do
-    {coords, remaining, keep}
+    {coords, remaining, keep, visited}
   end
 
-  defp walk_steps(%Topology{} = topo, coords, dir, steps, remaining, keep, fun) do
+  defp walk_steps(%Topology{} = topo, coords, dir, steps, remaining, keep, visited, fun) do
     {coords, in_bounds?} = step_coord(topo, coords, dir)
 
-    {remaining, keep} =
-      if in_bounds? do
-        {remaining - 1, continue?(fun.(elem(coords, 0), elem(coords, 1)))}
+    {remaining, keep, visited} =
+      if in_bounds? and not MapSet.member?(visited, coords) do
+        {remaining - 1, continue?(fun.(elem(coords, 0), elem(coords, 1))),
+         MapSet.put(visited, coords)}
       else
-        {remaining, keep}
+        {remaining, keep, visited}
       end
 
-    walk_steps(topo, coords, dir, steps - 1, remaining, keep, fun)
+    walk_steps(topo, coords, dir, steps - 1, remaining, keep, visited, fun)
   end
 
-  defp walk_steps_reduce(_topo, coords, _dir, steps, remaining, acc, _fun)
+  defp walk_steps_reduce(_topo, coords, _dir, steps, remaining, acc, visited, _fun)
        when steps <= 0 or remaining <= 0 do
-    {coords, remaining, acc}
+    {coords, remaining, acc, visited}
   end
 
-  defp walk_steps_reduce(%Topology{} = topo, coords, dir, steps, remaining, acc, fun) do
+  defp walk_steps_reduce(%Topology{} = topo, coords, dir, steps, remaining, acc, visited, fun) do
     {coords, in_bounds?} = step_coord(topo, coords, dir)
 
-    {remaining, acc} =
-      if in_bounds? do
-        {remaining - 1, fun.(elem(coords, 0), elem(coords, 1), acc)}
+    {remaining, acc, visited} =
+      if in_bounds? and not MapSet.member?(visited, coords) do
+        {remaining - 1, fun.(elem(coords, 0), elem(coords, 1), acc), MapSet.put(visited, coords)}
       else
-        {remaining, acc}
+        {remaining, acc, visited}
       end
 
-    walk_steps_reduce(topo, coords, dir, steps - 1, remaining, acc, fun)
+    walk_steps_reduce(topo, coords, dir, steps - 1, remaining, acc, visited, fun)
   end
 
   defp step_coord(%Topology{} = topo, {x, y}, dir) do

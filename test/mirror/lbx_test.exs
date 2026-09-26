@@ -170,4 +170,14 @@ defmodule Mirror.LBXTest do
       assert binary_part(hd(city.frames).rgba, 0, 4) == <<0, 0, 0, 0>>
     end
   end
+
+  describe "RLE runs (STORY-040)" do
+    test "a repeat byte expands the next byte" do
+      assert Mirror.LBX.expand_rle(<<0xE2, 7, 5>>, []) == {:ok, <<7, 7, 7, 5>>}
+    end
+
+    test "a repeat byte with nothing after it is an error, not a pixel" do
+      assert Mirror.LBX.expand_rle(<<5, 0xE0>>, []) == {:error, :truncated_rle}
+    end
+  end
 end

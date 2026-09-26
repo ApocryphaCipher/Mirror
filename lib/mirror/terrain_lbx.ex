@@ -45,6 +45,11 @@ defmodule Mirror.TerrainLbx do
     end
   end
 
+  # `payload/1` reads a minimap index for every tile on both planes.
+  @doc false
+  def check_minimap(minimap) when byte_size(minimap) >= 2 * @tiles_per_plane, do: :ok
+  def check_minimap(_minimap), do: {:error, :short_minimap}
+
   @doc false
   def decode(%LBX{} = terrain, %LBX{} = fonts) do
     with {:ok, pointer_bin} <- LBX.read_entry(terrain, 1),
@@ -52,6 +57,7 @@ defmodule Mirror.TerrainLbx do
          {:ok, font_palette} <- LBX.read_entry(fonts, 2),
          true <-
            byte_size(pointer_bin) >= @tiles_per_plane * 2 * 2 || {:error, :short_pointer_table},
+         :ok <- check_minimap(minimap),
          true <- byte_size(font_palette) >= 768 || {:error, :short_palette} do
       pointers =
         for <<w::little-unsigned-16 <- binary_part(pointer_bin, 0, @tiles_per_plane * 4)>>,

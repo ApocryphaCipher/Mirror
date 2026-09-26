@@ -361,25 +361,35 @@ defmodule Mirror.LBX do
          acc
        ) do
     start = y + skip
-    pixels = if rle?, do: expand_rle(data, []), else: data
-    stop = start + byte_size(pixels)
 
-    if stop > height do
-      {:error, :column_overflow}
-    else
-      acc = [pixels, binary_part(base, y, skip) | acc]
-      decode_runs(rest, rle?, height, base, stop, acc)
+    with {:ok, pixels} <- run_pixels(data, rle?) do
+      stop = start + byte_size(pixels)
+
+      if stop > height do
+        {:error, :column_overflow}
+      else
+        acc = [pixels, binary_part(base, y, skip) | acc]
+        decode_runs(rest, rle?, height, base, stop, acc)
+      end
     end
   end
 
   defp decode_runs(_runs, _rle?, _height, _base, _y, _acc), do: {:error, :bad_run}
 
-  defp expand_rle(<<>>, acc), do: IO.iodata_to_binary(Enum.reverse(acc))
+  defp run_pixels(data, true), do: expand_rle(data, [])
+  defp run_pixels(data, false), do: {:ok, data}
 
-  defp expand_rle(<<repeat, value, rest::binary>>, acc) when repeat > 0xDF,
+  # A byte above 0xDF repeats the next byte; one at the very end has no byte
+  # to repeat, so the run is malformed.
+  @doc false
+  def expand_rle(<<>>, acc), do: {:ok, IO.iodata_to_binary(Enum.reverse(acc))}
+
+  def expand_rle(<<repeat, value, rest::binary>>, acc) when repeat > 0xDF,
     do: expand_rle(rest, [:binary.copy(<<value>>, repeat - 0xDF) | acc])
 
-  defp expand_rle(<<value, rest::binary>>, acc), do: expand_rle(rest, [value | acc])
+  def expand_rle(<<repeat>>, _acc) when repeat > 0xDF, do: {:error, :truncated_rle}
+
+  def expand_rle(<<value, rest::binary>>, acc), do: expand_rle(rest, [value | acc])
 
   defp columns_to_rows(columns, height) do
     columns = List.to_tuple(columns)
