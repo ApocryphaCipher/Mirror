@@ -35,4 +35,37 @@ defmodule Mirror.SessionStoreTest do
     assert_receive {:session_state_updated, ^session_id, %{counter: 42}, sender}
     assert sender == self()
   end
+
+  test "competing concurrent updates preserve all mutations without loss (STORY-039)" do
+    session_id = "test-session-#{System.unique_integer([:positive])}"
+    SessionStore.put(session_id, %{tiles: %{}})
+
+    # Both tasks read the same starting state
+    s0_1 = SessionStore.get(session_id)
+    s0_2 = SessionStore.get(session_id)
+    assert s0_1 == s0_2
+
+    # Task 1 updates tile {1, 1}
+    t1 =
+      Task.async(fn ->
+        SessionStore.update(session_id, fn current ->
+          Map.update!(current, :tiles, &Map.put(&1, {1, 1}, :grass))
+        end)
+      end)
+
+    # Task 2 updates tile {2, 2}
+    t2 =
+      Task.async(fn ->
+        SessionStore.update(session_id, fn current ->
+          Map.update!(current, :tiles, &Map.put(&1, {2, 2}, :mountain))
+        end)
+      end)
+
+    Task.await(t1)
+    Task.await(t2)
+
+    final = SessionStore.get(session_id)
+    assert final.tiles[{1, 1}] == :grass
+    assert final.tiles[{2, 2}] == :mountain
+  end
 end

@@ -164,6 +164,47 @@ defmodule MirrorWeb.MapLiveEditTest do
       assert changed(tab2) =~ "1 tile changed"
       assert changed(tab1) =~ "1 tile changed"
     end
+
+    test "competing concurrent edits from two tabs with same starting state both survive (STORY-039)",
+         %{conn: conn, save: save} do
+      session_id = "competing-tab-test-#{System.unique_integer([:positive])}"
+      conn1 = init_test_session(conn, %{"mirror_session_id" => session_id})
+      conn2 = init_test_session(conn, %{"mirror_session_id" => session_id})
+
+      {:ok, tab1, _} = live(conn1, ~p"/arcanus")
+      tab1 |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+
+      {:ok, tab2, _} = live(conn2, ~p"/arcanus")
+
+      # Both tabs enter edit mode with cycle tool
+      render_click(tab1, "toggle_edit", %{})
+      render_click(tab1, "set_tool", %{"tool" => "cycle"})
+      render_click(tab2, "toggle_edit", %{})
+      render_click(tab2, "set_tool", %{"tool" => "cycle"})
+
+      # Both tabs start from the same baseline state (0 edits)
+      assert changed(tab1) == ""
+      assert changed(tab2) == ""
+
+      # Both tabs execute edits concurrently without waiting on each other's broadcast
+      t1 = Task.async(fn -> click(tab1, 1, 1) end)
+      t2 = Task.async(fn -> click(tab2, 2, 2) end)
+      Task.await(t1)
+      Task.await(t2)
+
+      # Both edits survive in the synchronized SessionStore and in both tabs
+      state = Mirror.SessionStore.get(session_id)
+      plane = state.planes.arcanus.terrain
+
+      assert Mirror.Map.get_tile_u16_le(plane, 1, 1) !=
+               Mirror.Map.get_tile_u16_le(state.original_planes.arcanus.terrain, 1, 1)
+
+      assert Mirror.Map.get_tile_u16_le(plane, 2, 2) !=
+               Mirror.Map.get_tile_u16_le(state.original_planes.arcanus.terrain, 2, 2)
+
+      assert changed(tab1) =~ "2 tiles changed"
+      assert changed(tab2) =~ "2 tiles changed"
+    end
   end
 
   describe "Cycle tool (STORY-027)" do
