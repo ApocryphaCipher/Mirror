@@ -2,25 +2,24 @@ defmodule MirrorWeb.MapLiveEditTest do
   @moduledoc """
   View vs edit mode on the map pages (STORY-016, 022, 023, 026, 027).
 
-  Needs a real save: run `bash scripts/test_game.sh`. Works on a temp copy of
-  SAVE1.GAM, so the real file is never touched.
+  Uses a synthetic save fixture so editing, undo, discard, Save as and Surveyor
+  tests run unconditionally in CI without needing game files (STORY-041).
+  A handful of real-save tests run only when MIRROR_MOM_PATH and save offsets are present.
   """
   use MirrorWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
 
   @mom_path System.get_env("MIRROR_MOM_PATH")
-  @save_source @mom_path && Path.join(@mom_path, "SAVE1.GAM")
-  @has_save @save_source && File.exists?(@save_source) &&
-              System.get_env("MIRROR_TERRAIN_OFFSET") != nil
-
-  @moduletag skip: !@has_save && "needs MIRROR_MOM_PATH/SAVE1.GAM and MIRROR_*_OFFSET env"
+  @real_save_source @mom_path && Path.join(@mom_path, "SAVE1.GAM")
+  @has_real_save @real_save_source && File.exists?(@real_save_source) &&
+                   System.get_env("MIRROR_TERRAIN_OFFSET") != nil
 
   setup %{conn: conn} do
     dir = Path.join(System.tmp_dir!(), "mirror-edit-test-#{System.unique_integer([:positive])}")
     File.mkdir_p!(dir)
     save = Path.join(dir, "SAVE1.GAM")
-    File.cp!(@save_source, save)
+    File.write!(save, synthetic_save_bytes())
     on_exit(fn -> File.rm_rf!(dir) end)
 
     conn =
@@ -183,8 +182,8 @@ defmodule MirrorWeb.MapLiveEditTest do
       render_click(tab2, "set_tool", %{"tool" => "cycle"})
 
       # Both tabs start from the same baseline state (0 edits)
-      assert changed(tab1) == ""
-      assert changed(tab2) == ""
+      assert changed(tab1) =~ "0 tiles changed"
+      assert changed(tab2) =~ "0 tiles changed"
 
       # Both tabs execute edits concurrently without waiting on each other's broadcast
       t1 = Task.async(fn -> click(tab1, 1, 1) end)
@@ -428,8 +427,6 @@ defmodule MirrorWeb.MapLiveEditTest do
       assert_push_event(view, "overlay_data", %{layer: "cities", items: items})
       assert length(items) == 16
       assert %{x: 38, y: 21, size: 1, banner: :yellow, name: "Deventor", walled: false} in items
-
-      assert_push_event(view, "overlay_sprites", %{cities: %{city: %{width: 32, height: 30}}})
     end
 
     test "the hover readout names the city under the pointer (STORY-032)", %{
@@ -526,9 +523,161 @@ defmodule MirrorWeb.MapLiveEditTest do
     end
   end
 
+  describe "real-save integration" do
+    @tag skip: !@has_real_save && "needs MIRROR_MOM_PATH/SAVE1.GAM and MIRROR_*_OFFSET env"
+    test "loading real SAVE1.GAM pushes Arcanus cities and sprites", %{conn: conn, dir: dir} do
+      real_save = Path.join(dir, "REAL_SAVE1.GAM")
+      File.cp!(@real_save_source, real_save)
+
+      {:ok, view, _} = live(conn, ~p"/arcanus")
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => real_save}})
+
+      assert_push_event(view, "overlay_data", %{layer: "cities", items: items})
+      assert length(items) == 16
+      assert %{x: 38, y: 21, size: 1, banner: :yellow, name: "Deventor", walled: false} in items
+
+      assert_push_event(view, "overlay_sprites", %{cities: %{city: %{width: 32, height: 30}}})
+    end
+
+    @tag skip: !@has_real_save && "needs MIRROR_MOM_PATH/SAVE1.GAM and MIRROR_*_OFFSET env"
+    test "real SAVE1.GAM overwrite protection and Save as", %{conn: conn, dir: dir} do
+      real_save = Path.join(dir, "REAL_SAVE1.GAM")
+      File.cp!(@real_save_source, real_save)
+      view = editing(conn, real_save)
+      original = File.read!(real_save)
+      click(view, 1, 1)
+
+      html = view |> element("#save-form") |> render_submit(%{"save" => %{"path" => real_save}})
+      assert html =~ "won&#39;t overwrite"
+      assert File.read!(real_save) == original
+
+      target = Path.join(dir, "SAVE2.GAM")
+      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+      assert File.exists?(target)
+      assert byte_size(File.read!(target)) == byte_size(original)
+      assert File.read!(target) != original
+    end
+
+    @tag skip: !@has_real_save && "needs MIRROR_MOM_PATH/SAVE1.GAM and MIRROR_*_OFFSET env"
+    test "real SAVE1.GAM surveyor matches known readouts at Deventor", %{conn: conn, dir: dir} do
+      real_save = Path.join(dir, "REAL_SAVE1.GAM")
+      File.cp!(@real_save_source, real_save)
+
+      {:ok, view, _} = live(conn, ~p"/arcanus")
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => real_save}})
+
+      pointer(view, "hover", 38, 21)
+      card = view |> element("#surveyor") |> render() |> text_of()
+      assert card =~ ~r/Hills\s*1\/2 food\s*\+3% production\s*Hamlet of\s*Deventor/
+    end
+  end
+
+  @save_size 123_300
+  @forest 0xA3
+  @hills 0x113
+  @mountain 0x10A
+  @ocean 0x00
+
+  defp synthetic_save_bytes do
+    raw = :binary.copy(<<0>>, @save_size)
+
+    # 1. Sites region filled with 0xFF so unused records are off-map (x=255)
+    nodes_offset = 0x6058
+    sites_end = 0x6628 + 102 * 24
+    raw = put_bytes(raw, nodes_offset, :binary.copy(<<0xFF>>, sites_end - nodes_offset))
+
+    # Known tower and magic node from SitesTest
+    raw = put_bytes(raw, 0x6610, <<48, 28, 0xFF, 0>>)
+
+    raw =
+      put_bytes(raw, nodes_offset, <<42, 10, 0, 0, 5>> <> :binary.copy(<<0>>, 40) <> <<0, 2, 0>>)
+
+    # 2. Wizard 0 banner = 4 (Yellow)
+    raw = put_bytes(raw, 0x09E8 + 0x16, <<4>>)
+
+    # 3. Cities: 16 cities so length matches real SAVE1.GAM, with Deventor at (38, 21)
+    raw = put_bytes(raw, 0x09E0, <<16::little-16>>)
+
+    deventor =
+      String.pad_trailing("Deventor", 14, <<0>>) <>
+        <<5, 38, 21, 0, 0, 1, 4>> <>
+        :binary.copy(<<0>>, 10) <>
+        :binary.copy(<<0xFF>>, 36) <>
+        :binary.copy(<<0>>, 26) <>
+        :binary.copy(<<0>>, 8) <>
+        :binary.copy(<<0>>, 13)
+
+    raw = put_bytes(raw, 0x8AAC, deventor)
+
+    raw =
+      Enum.reduce(1..15, raw, fn i, acc ->
+        record =
+          String.pad_trailing("City#{i}", 14, <<0>>) <>
+            <<5, 10 + i * 2, 35, 0, 5, 1, 2>> <>
+            :binary.copy(<<0>>, 10) <>
+            :binary.copy(<<0xFF>>, 36) <>
+            :binary.copy(<<0>>, 26) <>
+            :binary.copy(<<0>>, 8) <>
+            :binary.copy(<<0>>, 13)
+
+        put_bytes(acc, 0x8AAC + i * 114, record)
+      end)
+
+    # 4. Terrain: 2400 tiles per plane.
+    # Default forest, (1, 1)=10, (2, 1)=20, (38, 21)=hills, (39, 20)=mountain, (4..6, 4..6)=ocean
+    arcanus_tiles =
+      for y <- 0..39, x <- 0..59, into: <<>> do
+        tile =
+          cond do
+            x == 1 and y == 1 -> 10
+            x == 2 and y == 1 -> 20
+            x == 38 and y == 21 -> @hills
+            x == 39 and y == 20 -> @mountain
+            x in 4..6 and y in 4..6 -> @ocean
+            true -> @forest
+          end
+
+        <<tile::little-16>>
+      end
+
+    myrror_tiles = :binary.copy(<<@ocean::little-16>>, 2400)
+    raw = put_bytes(raw, 0x002698, arcanus_tiles <> myrror_tiles)
+
+    # 5. Landmass
+    raw = put_bytes(raw, 0x004D98, :binary.copy(<<1>>, 4800))
+
+    # 6. Minerals: 4 (Gold Ore) at (39, 20)
+    minerals =
+      for y <- 0..39, x <- 0..59, into: <<>> do
+        val = if x == 39 and y == 20, do: 4, else: 0
+        <<val>>
+      end
+
+    raw = put_bytes(raw, 0x013554, minerals <> :binary.copy(<<0>>, 2400))
+
+    # 7. Exploration: 0 at (0, 0), 15 elsewhere
+    exploration =
+      for y <- 0..39, x <- 0..59, into: <<>> do
+        val = if x == 0 and y == 0, do: 0, else: 15
+        <<val>>
+      end
+
+    raw = put_bytes(raw, 0x014814, exploration <> :binary.copy(<<0>>, 2400))
+
+    # 8. Terrain flags
+    raw = put_bytes(raw, 0x01CBB8, :binary.copy(<<0>>, 4800))
+
+    raw
+  end
+
+  defp put_bytes(raw, at, bytes) do
+    size = byte_size(bytes)
+    <<head::binary-size(^at), _::binary-size(^size), tail::binary>> = raw
+    head <> bytes <> tail
+  end
+
   defp put_byte(raw, at, byte) do
-    <<head::binary-size(^at), _, tail::binary>> = raw
-    head <> <<byte>> <> tail
+    put_bytes(raw, at, <<byte>>)
   end
 
   defp ray_observations(dataset_id) do
