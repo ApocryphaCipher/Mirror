@@ -115,6 +115,10 @@ defmodule MirrorWeb.MapLive do
     end
   end
 
+  defp handle_edit_params(_requested, %{assigns: %{lab?: true}} = socket) do
+    {:noreply, socket}
+  end
+
   defp handle_edit_params(requested, socket) do
     edit = if requested, do: :terrain, else: nil
     socket = socket |> assign(:edit, edit) |> assign(:discard_armed, false) |> assign_forms()
@@ -1412,10 +1416,11 @@ defmodule MirrorWeb.MapLive do
                           phx-submit="set_bit_name"
                           class="flex items-center gap-3"
                         >
-                          <.input field={form[:bit]} type="hidden" />
+                          <.input field={form[:bit]} type="hidden" id={"bit_name_bit_#{bit}"} />
                           <span class="text-xs font-semibold text-slate-300">Bit {bit}</span>
                           <.input
                             field={form[:name]}
+                            id={"bit_name_name_#{bit}"}
                             type="text"
                             placeholder="Name"
                             class="flex-1 rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200 placeholder:text-slate-500"
