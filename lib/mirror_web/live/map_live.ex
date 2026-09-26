@@ -2371,8 +2371,14 @@ defmodule MirrorWeb.MapLive do
             end
           end)
 
-          Enum.each(stroke.changes, fn {x, y, _prev, _new} ->
-            update_ray_stats(state, new_plane, x, y)
+          ray_coords =
+            stroke.changes
+            |> Enum.flat_map(fn {x, y, _prev, _new} -> ray_update_coords(x, y) end)
+            |> Enum.uniq()
+
+          Enum.each(ray_coords, fn {cx, cy} ->
+            Mirror.Map.Rays.observe_tile(state.dataset_id, old_plane.terrain, cx, cy, -1)
+            Mirror.Map.Rays.observe_tile(state.dataset_id, new_plane.terrain, cx, cy, 1)
           end)
 
         _ ->
@@ -2403,7 +2409,7 @@ defmodule MirrorWeb.MapLive do
       case layer do
         :terrain ->
           update_adjacent_stats(state, old_plane, new_plane, x, y)
-          update_ray_stats(state, new_plane, x, y)
+          update_ray_stats(state, old_plane, new_plane, x, y)
 
         _ ->
           terrain_type =
@@ -2435,17 +2441,25 @@ defmodule MirrorWeb.MapLive do
     end
   end
 
-  defp update_ray_stats(state, plane_layers, x, y) do
+  defp update_ray_stats(state, old_plane, new_plane, x, y) do
     if state.dataset_id do
-      for dy <- -2..2, dx <- -2..2 do
-        nx = MirrorMap.wrap_x(x + dx)
-        ny = MirrorMap.clamp_y(y + dy)
+      coords = ray_update_coords(x, y)
 
-        if ny != :off do
-          Mirror.Map.Rays.observe_tile(state.dataset_id, plane_layers.terrain, nx, ny)
-        end
-      end
+      Enum.each(coords, fn {cx, cy} ->
+        Mirror.Map.Rays.observe_tile(state.dataset_id, old_plane.terrain, cx, cy, -1)
+        Mirror.Map.Rays.observe_tile(state.dataset_id, new_plane.terrain, cx, cy, 1)
+      end)
     end
+  end
+
+  defp ray_update_coords(x, y) do
+    for dy <- -2..2, dx <- -2..2 do
+      nx = MirrorMap.wrap_x(x + dx)
+      ny = MirrorMap.clamp_y(y + dy)
+      {nx, ny}
+    end
+    |> Enum.reject(fn {_nx, ny} -> ny == :off end)
+    |> Enum.uniq()
   end
 
   defp maybe_update_adj_mask(plane_layers, x, y, layer) do

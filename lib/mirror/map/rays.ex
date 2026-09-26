@@ -24,19 +24,19 @@ defmodule Mirror.Map.Rays do
     :ok
   end
 
-  def observe_tile(dataset_id, terrain_bin, x, y) do
+  def observe_tile(dataset_id, terrain_bin, x, y, delta \\ 1) do
     center_value = MirrorMap.get_tile_u16_le(terrain_bin, x, y)
     center_class = MirrorMap.terrain_class(center_value)
 
     rays = ray_observations(terrain_bin, x, y, center_class)
 
     Enum.each(rays, fn {dir, hit_class, dist} ->
-      Mirror.Stats.bump_ray(dataset_id, center_class, dir, hit_class, dist)
+      Mirror.Stats.bump_ray(dataset_id, center_class, dir, hit_class, dist, delta)
     end)
 
     pairings(rays)
     |> Enum.each(fn {left, right} ->
-      Mirror.Stats.bump_ray_pair(dataset_id, center_class, left, right)
+      Mirror.Stats.bump_ray_pair(dataset_id, center_class, left, right, delta)
     end)
   end
 

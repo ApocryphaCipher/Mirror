@@ -213,18 +213,25 @@ defmodule MirrorWeb.MapLiveEditTest do
       view = editing(conn, save, "cycle")
 
       before_hist = Mirror.Stats.histogram(dataset_id, :computed_adj_mask, :global)
+      before_rays = ray_observations(dataset_id)
 
       click(view, 5, 5)
       after_click_hist = Mirror.Stats.histogram(dataset_id, :computed_adj_mask, :global)
+      after_click_rays = ray_observations(dataset_id)
       assert after_click_hist != before_hist
+      assert after_click_rays != before_rays
 
       render_click(view, "undo", %{})
       after_undo_hist = Mirror.Stats.histogram(dataset_id, :computed_adj_mask, :global)
+      after_undo_rays = ray_observations(dataset_id)
       assert after_undo_hist == before_hist
+      assert after_undo_rays == before_rays
 
       render_click(view, "redo", %{})
       after_redo_hist = Mirror.Stats.histogram(dataset_id, :computed_adj_mask, :global)
+      after_redo_rays = ray_observations(dataset_id)
       assert after_redo_hist == after_click_hist
+      assert after_redo_rays == after_click_rays
     end
   end
 
@@ -481,5 +488,13 @@ defmodule MirrorWeb.MapLiveEditTest do
   defp put_byte(raw, at, byte) do
     <<head::binary-size(^at), _, tail::binary>> = raw
     head <> <<byte>> <> tail
+  end
+
+  defp ray_observations(dataset_id) do
+    Mirror.Stats.export(dataset_id).data
+    |> Enum.filter(fn {k, _v} ->
+      String.starts_with?(k, "ray:") or String.starts_with?(k, "ray_pair:")
+    end)
+    |> Map.new()
   end
 end
