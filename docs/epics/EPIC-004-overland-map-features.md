@@ -52,8 +52,10 @@ been decoded and verified in `Mirror.SaveFile.Sites` and live RAM notes.
    (the MOMIME PNG fallback and indexing scripts discussed during early scoping
    were superseded and deleted).
 3. **Render overlay markers.** Draw functions in `assets/js/map_overlays.js`
-   render cities (`MAPBACK #20`) with owner banner colours and wall states.
-   Follow-ups will render sites and unit plaques.
+   render cities (`MAPBACK #20`) with owner banner colours and size-appropriate
+   frames. (STORY-032 confirmed in DOSBox that walls do not alter the overland
+   sprite; wall status is decoded and displayed in the hover readout rather than
+   drawn on the map). Follow-ups will render sites and unit plaques.
 4. **Wire into LiveView payload.** `map_live.ex` pushes parsed city and
    overlay records alongside terrain layers.
 
