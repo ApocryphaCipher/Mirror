@@ -11,7 +11,10 @@ matches a reference decode pixel for pixel. Cities are drawn with
 owner-coloured flags and size-appropriate frames from `MAPBACK.LBX`. The map
 pages have a view mode (zoom, pan, hover readout with the full Surveyor card,
 and layer toggles for cities, settleable tile grading, and fog of war) and an
-edit mode (cycle or paint tiles, undo/redo, Save as). Other overland features
+edit mode (cycle or paint tiles, undo/redo, Save as). Note on editing: today's
+terrain editor updates terrain tiles and the recomputed adjacency mask only;
+it does **not** keep landmass/continent IDs consistent across land/water
+transitions (tracked in STORY-017 and STORY-029). Other overland features
 (units with banner plaques, towers, encounter sites, roads, specials) and node
 auras are next. The sprites for all of them are identified and decode correctly
 ([sprite catalog](docs/reference/overland-sprites-and-save-blocks.md)), but
@@ -62,7 +65,7 @@ Visit `localhost:4000`:
 ## Tests
 
 ```bash
-mix test                  # everything that doesn't need game files
+mix test                  # everything that doesn't need game files (including editing/save-safety tests)
 bash scripts/test_game.sh # real-file tests using dev_server.sh's game-file env
 ```
 
@@ -70,6 +73,12 @@ Tests that need real game files read from `MIRROR_MOM_PATH` (or a frozen save
 fixture for Surveyor tests, `MIRROR_SURVEYOR_SAVE`, which defaults to
 `~/.mirror/dev/surveyor-fixtures/SAVE9-dior-2026-09-24.GAM`) and are skipped
 when they are missing, so CI (which has no game files) runs `mix test` only.
+
+`scripts/test_game.sh` exports the variables from `scripts/dev_server.sh`
+(`MIRROR_MOM_PATH` and the save-block offsets), but does **not** set
+`MIRROR_SURVEYOR_SAVE`. Running the Surveyor real-save tests therefore requires
+manually exporting `MIRROR_SURVEYOR_SAVE` (or placing the frozen Dior save at the
+default fixture path).
 
 ## Contributing
 
