@@ -31,4 +31,27 @@ defmodule Mirror.Engine.SessionTest do
     tile = View.tile_truth(session_id, :arcanus, 0, 0)
     assert tile.terrain_u16 == 42
   end
+
+  test "stop/1 terminates session process and unregisters it (STORY-039)" do
+    {:ok, pid} = SessionSupervisor.start_session(seed: 1234)
+    save = synthetic_save()
+    {:ok, session_id} = Session.load_save(pid, save)
+
+    assert Process.alive?(pid)
+    assert Session.whereis(session_id) == pid
+
+    ref = Process.monitor(pid)
+    assert :ok = Session.stop(session_id)
+    assert_receive {:DOWN, ^ref, :process, ^pid, _}
+    assert Session.whereis(session_id) == nil
+  end
+
+  test "stop_session/1 terminates by pid (STORY-039)" do
+    {:ok, pid} = SessionSupervisor.start_session(seed: 1234)
+    assert Process.alive?(pid)
+    ref = Process.monitor(pid)
+    assert :ok = SessionSupervisor.stop_session(pid)
+    assert_receive {:DOWN, ^ref, :process, ^pid, _}
+    refute Process.alive?(pid)
+  end
 end

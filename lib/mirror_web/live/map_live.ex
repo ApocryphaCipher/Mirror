@@ -216,6 +216,8 @@ defmodule MirrorWeb.MapLive do
     state = socket.assigns.state
 
     if state.save do
+      stop_engine_session(state.engine_session_id)
+
       state = %{
         state
         | planes: with_computed_layers(state.original_planes),
@@ -230,7 +232,7 @@ defmodule MirrorWeb.MapLive do
       state =
         case start_engine_session(restored_save) do
           {:ok, engine_session_id} -> %{state | engine_session_id: engine_session_id}
-          {:error, _reason} -> state
+          {:error, _reason} -> %{state | engine_session_id: nil}
         end
 
       SessionStore.put(socket.assigns.session_id, state)
@@ -264,6 +266,7 @@ defmodule MirrorWeb.MapLive do
 
     case SaveFile.load(path) do
       {:ok, save} ->
+        stop_engine_session(socket.assigns.state.engine_session_id)
         planes = with_computed_layers(save.planes)
 
         state = %{
@@ -3398,6 +3401,8 @@ defmodule MirrorWeb.MapLive do
         state
 
       true ->
+        stop_engine_session(Map.get(state, :engine_session_id))
+
         case start_engine_session(state.save.path) do
           {:ok, engine_session_id} ->
             state = %{state | engine_session_id: engine_session_id}
@@ -3410,6 +3415,9 @@ defmodule MirrorWeb.MapLive do
     end
   end
 
+  defp stop_engine_session(nil), do: :ok
+  defp stop_engine_session(session_id), do: Session.stop(session_id)
+
   defp engine_session_alive?(nil), do: false
 
   defp engine_session_alive?(session_id) do
@@ -3420,16 +3428,36 @@ defmodule MirrorWeb.MapLive do
   end
 
   defp start_engine_session(%SaveFile{} = save) do
-    with {:ok, pid} <- SessionSupervisor.start_session(seed: System.unique_integer([:positive])),
-         {:ok, session_id} <- Session.load_save(pid, save) do
-      {:ok, session_id}
+    case SessionSupervisor.start_session(seed: System.unique_integer([:positive])) do
+      {:ok, pid} ->
+        case Session.load_save(pid, save) do
+          {:ok, session_id} ->
+            {:ok, session_id}
+
+          {:error, reason} ->
+            SessionSupervisor.stop_session(pid)
+            {:error, reason}
+        end
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
   defp start_engine_session(path) when is_binary(path) and path != "" do
-    with {:ok, pid} <- SessionSupervisor.start_session(seed: System.unique_integer([:positive])),
-         {:ok, session_id} <- Session.load_save(pid, path) do
-      {:ok, session_id}
+    case SessionSupervisor.start_session(seed: System.unique_integer([:positive])) do
+      {:ok, pid} ->
+        case Session.load_save(pid, path) do
+          {:ok, session_id} ->
+            {:ok, session_id}
+
+          {:error, reason} ->
+            SessionSupervisor.stop_session(pid)
+            {:error, reason}
+        end
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 

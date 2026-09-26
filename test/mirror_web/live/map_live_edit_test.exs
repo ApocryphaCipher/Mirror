@@ -109,6 +109,30 @@ defmodule MirrorWeb.MapLiveEditTest do
       render_click(view, "discard_edits", %{})
       refute has_element?(view, "#unsaved-notice")
     end
+
+    test "discard terminates superseded engine session (STORY-039)", %{conn: conn, save: save} do
+      session_id = "engine-term-test-#{System.unique_integer([:positive])}"
+      conn = init_test_session(conn, %{"mirror_session_id" => session_id})
+      view = editing(conn, save, "cycle")
+
+      state = Mirror.SessionStore.get(session_id)
+      old_engine_id = state.engine_session_id
+      assert old_engine_id != nil
+      old_pid = Mirror.Engine.Session.whereis(old_engine_id)
+      assert Process.alive?(old_pid)
+
+      click(view, 1, 1)
+      render_click(view, "arm_discard", %{})
+      render_click(view, "discard_edits", %{})
+
+      refute Process.alive?(old_pid)
+
+      new_engine_id = Mirror.SessionStore.get(session_id).engine_session_id
+      assert new_engine_id != nil
+      assert new_engine_id != old_engine_id
+      new_pid = Mirror.Engine.Session.whereis(new_engine_id)
+      assert Process.alive?(new_pid)
+    end
   end
 
   describe "multi-tab session synchronization (STORY-039)" do

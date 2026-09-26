@@ -53,9 +53,14 @@ defmodule Mirror.Engine.Session do
   @spec whereis(term()) :: pid() | nil
   def whereis(session_id) do
     case Registry.lookup(Mirror.Engine.Registry, session_id) do
-      [{pid, _}] -> pid
+      [{pid, _}] -> if Process.alive?(pid), do: pid, else: nil
       [] -> nil
     end
+  end
+
+  @spec stop(pid() | term()) :: :ok | {:error, :not_found}
+  def stop(pid_or_session_id) do
+    Mirror.Engine.SessionSupervisor.stop_session(pid_or_session_id)
   end
 
   @impl true
