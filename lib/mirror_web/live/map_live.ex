@@ -2860,17 +2860,55 @@ defmodule MirrorWeb.MapLive do
           updates
         end
 
-      push_event(socket, "engine_delta", %{
-        plane: Atom.to_string(socket.assigns.plane),
-        layer: Atom.to_string(layer),
-        layer_type: layer_type(layer),
-        delta_type: "tile_set",
-        changes: payload_changes
-      })
+      socket =
+        push_event(socket, "engine_delta", %{
+          plane: Atom.to_string(socket.assigns.plane),
+          layer: Atom.to_string(layer),
+          layer_type: layer_type(layer),
+          delta_type: "tile_set",
+          changes: payload_changes
+        })
+
+      maybe_push_adj_updates(socket, layer, payload_changes)
     else
       socket
     end
   end
+
+  defp maybe_push_adj_updates(socket, :terrain, payload_changes) do
+    plane = socket.assigns.plane
+
+    case socket.assigns.state.planes do
+      %{^plane => %{computed_adj_mask: computed_mask}} ->
+        adj_coords =
+          payload_changes
+          |> Enum.flat_map(fn %{x: x, y: y} -> MirrorMap.adj_update_coords(x, y) end)
+          |> Enum.uniq()
+
+        adj_changes =
+          Enum.map(adj_coords, fn {cx, cy} ->
+            val = MirrorMap.get_tile_u8(computed_mask, cx, cy)
+            %{x: cx, y: cy, value: val, new: val}
+          end)
+
+        if adj_changes != [] do
+          push_event(socket, "engine_delta", %{
+            plane: Atom.to_string(plane),
+            layer: "computed_adj_mask",
+            layer_type: "u8",
+            delta_type: "tile_set",
+            changes: adj_changes
+          })
+        else
+          socket
+        end
+
+      _ ->
+        socket
+    end
+  end
+
+  defp maybe_push_adj_updates(socket, _layer, _changes), do: socket
 
   defp emit_engine_delta(socket, plane, layer, changes) when is_list(changes) do
     state = socket.assigns.state

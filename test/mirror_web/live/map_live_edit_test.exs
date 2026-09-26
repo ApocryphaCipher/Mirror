@@ -217,6 +217,21 @@ defmodule MirrorWeb.MapLiveEditTest do
       })
     end
 
+    test "terrain edits push recomputed adjacency masks to client (STORY-039)",
+         %{conn: conn, save: save} do
+      view = editing(conn, save, "paint")
+      view |> element("#brush-form") |> render_change(%{"brush" => %{"tile" => "5"}})
+
+      pointer(view, "start", 1, 1)
+
+      assert_push_event(view, "engine_delta", %{
+        layer: "computed_adj_mask",
+        changes: adj_changes
+      })
+
+      assert Enum.any?(adj_changes, &match?(%{x: 1, y: 1}, &1))
+    end
+
     test "a stroke is undoable even if it never finishes", %{conn: conn, save: save} do
       view = editing(conn, save, "paint")
       view |> element("#brush-form") |> render_change(%{"brush" => %{"tile" => "5"}})
