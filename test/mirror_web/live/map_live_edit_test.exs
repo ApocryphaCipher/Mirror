@@ -111,6 +111,37 @@ defmodule MirrorWeb.MapLiveEditTest do
     end
   end
 
+  describe "multi-tab session synchronization (STORY-039)" do
+    test "two tabs on one session sync edits without overwriting", %{conn: conn, save: save} do
+      session_id = "two-tab-test-#{System.unique_integer([:positive])}"
+      conn1 = init_test_session(conn, %{"mirror_session_id" => session_id})
+      conn2 = init_test_session(conn, %{"mirror_session_id" => session_id})
+
+      {:ok, tab1, _} = live(conn1, ~p"/arcanus")
+      tab1 |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+
+      {:ok, tab2, _} = live(conn2, ~p"/arcanus")
+
+      # Tab 1 enters edit mode and paints a tile
+      render_click(tab1, "toggle_edit", %{})
+      render_click(tab1, "set_tool", %{"tool" => "cycle"})
+      click(tab1, 1, 1)
+
+      assert changed(tab1) =~ "1 tile changed"
+
+      # Tab 2 receives the synchronized state
+      render_click(tab2, "toggle_edit", %{})
+      assert changed(tab2) =~ "1 tile changed"
+
+      # Tab 2 changes tool (writing to SessionStore)
+      render_click(tab2, "set_tool", %{"tool" => "paint"})
+
+      # Verify Tab 1's edit was preserved in SessionStore and in both tabs
+      assert changed(tab2) =~ "1 tile changed"
+      assert changed(tab1) =~ "1 tile changed"
+    end
+  end
+
   describe "Cycle tool (STORY-027)" do
     test "click steps the tile +1; right-click and shift-click step back",
          %{conn: conn, save: save} do

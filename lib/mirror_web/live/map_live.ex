@@ -84,6 +84,10 @@ defmodule MirrorWeb.MapLive do
       |> assign(:save_path_input, state.save_path || "")
       |> assign_forms()
 
+    if connected?(socket) do
+      SessionStore.subscribe(session_id)
+    end
+
     if connected?(socket) and state.save do
       socket = push_map_state(socket)
       socket = push_map_reload(socket)
@@ -136,6 +140,31 @@ defmodule MirrorWeb.MapLive do
       end
 
     {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:session_state_updated, session_id, new_state, sender}, socket) do
+    if session_id == socket.assigns.session_id and sender != self() do
+      socket =
+        socket
+        |> assign_from_state(new_state)
+        |> assign_forms()
+        |> refresh_hover()
+
+      socket =
+        if connected?(socket) do
+          socket
+          |> push_map_state()
+          |> push_map_reload()
+          |> push_map_layers()
+        else
+          socket
+        end
+
+      {:noreply, socket}
+    else
+      {:noreply, socket}
+    end
   end
 
   @impl true
