@@ -27,9 +27,9 @@ defmodule Mirror.Engine.Session do
     GenServer.start_link(__MODULE__, opts, name: via(session_id))
   end
 
-  @spec load_save(pid(), String.t()) :: {:ok, term()} | {:error, term()}
-  def load_save(pid, path) do
-    GenServer.call(pid, {:load_save, path})
+  @spec load_save(pid(), String.t() | SaveFile.t()) :: {:ok, term()} | {:error, term()}
+  def load_save(pid, path_or_save) do
+    GenServer.call(pid, {:load_save, path_or_save})
   end
 
   @spec apply_delta(pid(), Delta.t()) :: :ok
@@ -78,54 +78,14 @@ defmodule Mirror.Engine.Session do
   end
 
   @impl true
-  def handle_call({:load_save, path}, _from, state) do
+  def handle_call({:load_save, %SaveFile{} = save}, _from, state) do
+    init_world_from_save(save, state)
+  end
+
+  def handle_call({:load_save, path}, _from, state) when is_binary(path) do
     case SaveFile.load(path) do
       {:ok, save} ->
-        topo =
-          Topology.new(w: Blocks.map_width(), h: Blocks.map_height(), wrap_x: true, wrap_y: false)
-
-        map_table =
-          :ets.new(:mirror_map, [
-            :set,
-            :protected,
-            read_concurrency: true,
-            write_concurrency: true
-          ])
-
-        layer_types =
-          Enum.reduce(@layer_map, %{}, fn {_source, {layer, type}}, acc ->
-            Map.put(acc, layer, type)
-          end)
-
-        layers =
-          Enum.reduce(save.planes, %{}, fn {plane, plane_layers}, acc ->
-            Enum.reduce(@layer_map, acc, fn {source_layer, {engine_layer, _type}}, acc ->
-              bin = Map.fetch!(plane_layers, source_layer)
-              key = {plane, engine_layer}
-              :ets.insert(map_table, {key, bin})
-              Map.put(acc, key, {:ets, map_table, key})
-            end)
-          end)
-
-        rng = Map.fetch!(state, :rng)
-
-        world = %World{
-          topology: topo,
-          planes: [:arcanus, :myrror],
-          layers: layers,
-          meta: %{seed: rng.seed, source: :save, version: 1}
-        }
-
-        session_id = Map.fetch!(state, :session_id)
-
-        {:reply, {:ok, session_id},
-         %{
-           state
-           | map_table: map_table,
-             layer_types: layer_types,
-             world: world,
-             save: save
-         }}
+        init_world_from_save(save, state)
 
       {:error, reason} ->
         {:reply, {:error, reason}, state}
@@ -135,6 +95,58 @@ defmodule Mirror.Engine.Session do
   def handle_call({:query, fun}, _from, state) do
     result = fun.(state)
     {:reply, result, state}
+  end
+
+  defp init_world_from_save(save, state) do
+    if is_reference(state.map_table) do
+      :ets.delete(state.map_table)
+    end
+
+    topo =
+      Topology.new(w: Blocks.map_width(), h: Blocks.map_height(), wrap_x: true, wrap_y: false)
+
+    map_table =
+      :ets.new(:mirror_map, [
+        :set,
+        :protected,
+        read_concurrency: true,
+        write_concurrency: true
+      ])
+
+    layer_types =
+      Enum.reduce(@layer_map, %{}, fn {_source, {layer, type}}, acc ->
+        Map.put(acc, layer, type)
+      end)
+
+    layers =
+      Enum.reduce(save.planes, %{}, fn {plane, plane_layers}, acc ->
+        Enum.reduce(@layer_map, acc, fn {source_layer, {engine_layer, _type}}, acc ->
+          bin = Map.fetch!(plane_layers, source_layer)
+          key = {plane, engine_layer}
+          :ets.insert(map_table, {key, bin})
+          Map.put(acc, key, {:ets, map_table, key})
+        end)
+      end)
+
+    rng = Map.fetch!(state, :rng)
+
+    world = %World{
+      topology: topo,
+      planes: [:arcanus, :myrror],
+      layers: layers,
+      meta: %{seed: rng.seed, source: :save, version: 1}
+    }
+
+    session_id = Map.fetch!(state, :session_id)
+
+    {:reply, {:ok, session_id},
+     %{
+       state
+       | map_table: map_table,
+         layer_types: layer_types,
+         world: world,
+         save: save
+     }}
   end
 
   @impl true

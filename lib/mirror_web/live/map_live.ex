@@ -194,10 +194,12 @@ defmodule MirrorWeb.MapLive do
           redo: %{arcanus: [], myrror: []}
       }
 
-      # The engine session mirrors edits via deltas; restart it from the file
-      # so hover (which reads the engine first) matches the restored map.
+      # The engine session mirrors edits via deltas; restart it from the restored
+      # planes so hover (which reads the engine first) matches the restored map.
+      restored_save = %{state.save | planes: state.original_planes}
+
       state =
-        case start_engine_session(state.save.path) do
+        case start_engine_session(restored_save) do
           {:ok, engine_session_id} -> %{state | engine_session_id: engine_session_id}
           {:error, _reason} -> state
         end
@@ -319,7 +321,9 @@ defmodule MirrorWeb.MapLive do
              %{save | planes: strip_computed(state.planes)},
              target_path || state.save_path
            ) do
-      state = %{state | save_path: save_path, original_planes: strip_computed(state.planes)}
+      saved_planes = strip_computed(state.planes)
+      save = %{save | path: save_path, planes: saved_planes}
+      state = %{state | save: save, save_path: save_path, original_planes: saved_planes}
       SessionStore.put(socket.assigns.session_id, state)
       {:noreply, put_flash(assign_state(socket, state), :info, saved_message(save_path))}
     else
@@ -3302,6 +3306,13 @@ defmodule MirrorWeb.MapLive do
     case Session.whereis(session_id) do
       nil -> false
       _pid -> true
+    end
+  end
+
+  defp start_engine_session(%SaveFile{} = save) do
+    with {:ok, pid} <- SessionSupervisor.start_session(seed: System.unique_integer([:positive])),
+         {:ok, session_id} <- Session.load_save(pid, save) do
+      {:ok, session_id}
     end
   end
 

@@ -242,6 +242,29 @@ defmodule MirrorWeb.MapLiveEditTest do
     assert changed(view) =~ "0 tiles changed"
   end
 
+  test "after Save as, discard reloads engine from last-saved planes (STORY-039)",
+       %{conn: conn, dir: dir, save: save} do
+    view = editing(conn, save)
+    start_1_1 = tile_at(view, 1, 1)
+    click(view, 1, 1)
+    saved_tile_1_1 = tile_at(view, 1, 1)
+    assert saved_tile_1_1 != start_1_1
+
+    target = Path.join(dir, "SAVE2.GAM")
+    view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+
+    # Paint another tile after Save as
+    click(view, 2, 2)
+    assert changed(view) =~ "1 tile changed"
+
+    # Discard edits: should restore to SAVE2.GAM planes, and hover inspection must match
+    render_click(view, "arm_discard", %{})
+    render_click(view, "discard_edits", %{})
+    assert changed(view) =~ "0 tiles changed"
+
+    assert tile_at(view, 1, 1) == saved_tile_1_1
+  end
+
   describe "cities overlay (STORY-010)" do
     test "loading a save pushes this plane's cities with owner banners", %{conn: conn, save: save} do
       {:ok, view, _} = live(conn, ~p"/arcanus")
