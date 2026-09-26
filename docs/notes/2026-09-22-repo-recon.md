@@ -1,5 +1,12 @@
 # 2026-09-22 — First-look recon
 
+> [!NOTE] Historical context (superseded)
+> This document records initial recon from 2026-09-22. The MOMIME PNG asset path
+> and tagging-based fallbacks have since been completely removed (EPIC-002, STORY-014).
+> Mirror renders directly from `TERRAIN.LBX` via `Mirror.TerrainLbx`
+> (see [classic-terrain-format.md](../reference/classic-terrain-format.md)), and
+> save-block offsets are configured with defaults in `config/config.exs`.
+
 Repo: `ApocryphaCipher/Mirror` (note: not "ApocraphaCypher" — org name is
 `ApocryphaCipher`, `y`→`y` but "Cypher"→"Cipher"). Cloned to
 `~/repo/elixir/Mirror`.

@@ -9,9 +9,10 @@ Lab. The hover readout shows plane, (x, y), and tile number (dec + hex).
 Pan/zoom is a CSS transform on the already-rendered canvas
 (`assets/js/map_viewport.js`), so it never re-renders, and pixels stay crisp
 via `image-rendering: pixelated`.
-**Deferred:** the **Edit** button (STORY-016), overlay toggles (STORY-009),
-and city/site/unit info in the readout (as EPIC-004 lands). Pinch-zoom on
-touch devices isn't implemented; wheel and trackpad scroll zoom are.
+**Remaining omissions:** unit stack details in the readout (STORY-012)
+and touch-device pinch-zoom (wheel and trackpad zoom are supported). The
+**Edit** button (STORY-016), overlay toggles (STORY-009, 035, 036), and
+city/site details in the Surveyor readout (STORY-010, 032, 034) are implemented.
 **Size:** medium
 
 ## What to do

@@ -1,6 +1,6 @@
 # Mirror docs
 
-**Picking this up? Read [notes/2026-09-23-evening-handoff.md](notes/2026-09-23-evening-handoff.md) first**, and
+**Picking this up? Read [notes/2026-09-24-surveyor-handoff.md](notes/2026-09-24-surveyor-handoff.md) and [notes/2026-09-24-ktlo-review.md](notes/2026-09-24-ktlo-review.md) first** (with [notes/2026-09-23-evening-handoff.md](notes/2026-09-23-evening-handoff.md) for prior history), and
 [../AGENTS.md](../AGENTS.md) for how we work (coding standards, git workflow, game-file rules).
 
 Working docs for the Mirror project (Master of Magic save-file viewer). Not shipped with the app — this is planning/notes scaffolding.

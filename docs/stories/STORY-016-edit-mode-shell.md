@@ -6,8 +6,10 @@ toggle `?edit=terrain`. The toolbar has a layer picker (Terrain live; Roads,
 Structures and Units shown disabled), a tile brush with a preview from the
 atlas, Undo/Redo, an "N tiles changed" counter with **Discard**, and
 **Save as** (suggests the next free `SAVEn.GAM`; refuses the loaded file).
-Input: left paints, right picks; wheel still zooms; space-drag or
-middle-drag pans. View mode is unchanged (hover only). Covered by
+Input varies by tool: Cycle (default) uses left-click to advance to the next
+tile picture and right-click or Shift-click to reverse; Paint uses left-click
+to paint the brush tile and right-click to pick/sample. Wheel zooms;
+space-drag or middle-drag pans. View mode is unchanged (hover only). Covered by
 `test/mirror_web/live/map_live_edit_test.exs` (needs game files).
 **Size:** medium
 

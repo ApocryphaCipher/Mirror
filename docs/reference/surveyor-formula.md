@@ -222,9 +222,10 @@ numbers above settle them:
   for production, unit cost, gold and power. Adding is what matches.
 
 One real quirk of the game is flagged in ReMoM as an original bug: an
-empty site's wild game adds 2 quarter-food instead of 8. The Myrror
-readout confirms that the game really does this. Hamburg's readout
-(19, not 17) confirms that an existing city gets the full 2 food.
+empty site's wild game adds only 1 quarter-food (halved again to 1/8 food when
+shared) instead of 8 quarter-food (2 whole food). The Myrror readout confirms
+that the game really does this. Hamburg's readout (19, not 17) confirms that
+an existing city gets the full 2 food.
 
 ## The tile panel
 
@@ -276,11 +277,11 @@ A corrupted tile shows "Corruption" instead of these lines.
    Crystals, Crysx Crystals, each with its effect;
 4. Wild Game ("+2 food");
 5. Nightshade ("Protects city from spells");
-6. an intact site: Tower, Cave, Dungeon, Temple, Keep, Lair, Ruins, or
+6. a node ("Sorcery Node" …) with "Magic Spirit", "Guardian Spirit" or
+   "Warped" once owned;
+7. an intact site: Tower, Cave, Dungeon, Temple, Keep, Lair, Ruins, or
    Temple for kind 10. It reads "Unexplored" until looked at (*guess:*
-   encounter flag `0x02`);
-7. a node ("Sorcery Node" …) with "Magic Spirit", "Guardian Spirit" or
-   "Warped" once owned.
+   encounter flag `0x02`).
 
 **Where a city can't go,** in the game's order:
 1. water;
@@ -290,10 +291,13 @@ A corrupted tile shows "Corruption" instead of these lines.
 5. another city on the plane at distance ≤ 3. Distance is the larger of
    the x and y gaps, with x wrapping around the map.
 
-A city's own tile shows its City Resources. In the hover log, every
-"less than 3 squares" message was on a tile within 3 of a city, apart
-from 3 left over from the previous tile. Distance 3 came up 9 times, so
-3 is inside the limit. An unexplored tile shows nothing.
+A city's own tile shows its City Resources, provided it passes the prior
+checks (water, towers, nodes, and intact sites are checked before existing
+cities). In the hover log, every "less than 3 squares" message was on a tile
+within 3 of a city, apart from 3 left over from the previous tile. Distance 3
+came up 9 times, so 3 is inside the limit. In the original game, an unexplored
+tile shows nothing on the Surveyor screen; Mirror renders a "Surveyor /
+Unexplored" card for unexplored tiles.
 
 ## Still open
 

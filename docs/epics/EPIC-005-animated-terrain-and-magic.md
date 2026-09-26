@@ -9,11 +9,10 @@
 The overland map should move the way the real game's does:
 
 - **Ocean twinkle**: water tiles cycle through their animation frames.
-- **Node auras**: magic sparkle hanging in the air over the tiles around
-  each node, coloured by realm:
-  - **Chaos**: volcano, red/orange
-  - **Nature**: bright green forest
-  - **Sorcery**: intense blue lake
+- **Node auras**: magic sparkle hanging in the air over the aura tiles around
+  each melded node, coloured in the **owner's banner colour** (checked in
+  live RAM; nodes belong to realms—Chaos volcano, Nature forest, Sorcery lake—but
+  sparkles take the melder's colour).
 
 ## What we already know
 

@@ -72,7 +72,9 @@ committed**, not even small fixtures cut from them.
   `~/.mirror_assets/GOG`; `MAGIC/` is an old partial CD install.)
 - Tests use **synthetic** binaries built in the test (see
   `test/mirror/lbx_test.exs`). Real-file tests read from `MIRROR_MOM_PATH`
-  and are skipped when it's missing:
+  (or specific frozen fixtures like `MIRROR_SURVEYOR_SAVE`, which defaults
+  to `~/.mirror/dev/surveyor-fixtures/SAVE9-dior-2026-09-24.GAM`) and are
+  skipped when missing:
 
   ```elixir
   @mom_path System.get_env("MIRROR_MOM_PATH", "")
@@ -153,11 +155,15 @@ These all bit a previous session:
 
 ## 9. Saves: editing safely
 
-- Never overwrite the save that was loaded; **Save as** writes a new
-  `SAVEn.GAM` (the game only loads `SAVE1`–`SAVE9`).
-- An edit must leave the save consistent (e.g. terrain edits keep
-  continent/landmass IDs consistent; see STORY-017 and STORY-029, and
-  STORY-021 for round-trip safety).
+- Never overwrite the save that was loaded; `SaveFile.write/3` universally
+  enforces this (by canonical path and device/inode) for all callers.
+  **Save as** suggests the next free `SAVE1.GAM`–`SAVE9.GAM` slot (or leaves
+  it empty if all 9 are taken). Arbitrary names can be written but the
+  UI warns that Master of Magic only loads `SAVE1`–`SAVE9`.
+- An edit must leave the save consistent. Today's raw terrain editor
+  updates terrain bytes and the derived adjacency mask only; updating
+  continent/landmass IDs across land/water transitions remains unfinished
+  work in STORY-017 and STORY-029 (see also STORY-021 for round-trip safety).
 - Don't leave test edits in a save someone else is using.
 
 ## 10. Testing

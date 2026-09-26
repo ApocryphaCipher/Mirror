@@ -10,9 +10,10 @@
 A **Fog of war** checkbox in the Layers panel, **off by default**. When
 it's on, black fog is painted over the tiles the player hasn't explored,
 so you see the map as the player does. When it's off, Mirror shows the
-whole map, as it does today. Other layers (cities, the Surveyor,
-[STORY-035](STORY-035-settleable-tiles-overlay.md)'s settleable tiles)
-keep showing everything either way.
+whole map, as it does today. While underlying data for other layers (cities,
+settleable tiles) is preserved, the visual fog draws on top and covers
+them on unexplored tiles. Independently of the fog checkbox, the Surveyor
+card always respects exploration and shows "Unexplored" for unexplored tiles.
 
 ## What's known
 

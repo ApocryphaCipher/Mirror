@@ -1,7 +1,7 @@
 # STORY-042: Docs truth pass
 
 **Parent:** [EPIC-008](../epics/EPIC-008-keeping-the-lights-on.md)
-**Status:** open, P2
+**Status:** **Done** (2026-09-26)
 **Size:** small to medium (docs only)
 
 The [review note](../notes/2026-09-24-ktlo-review.md#documentation-review-docs-versus-code)
@@ -42,6 +42,33 @@ docs PR, grouped as follows:
   - The tile-probe tagging decision belongs in its own item, not closed
     STORY-006.
   - Re-running the import doesn't copy the extra LBX files.
+
+## Outcome (2026-09-26)
+
+All 26 docs findings from the review note were verified and resolved:
+- **README & AGENTS.md:** Updated Status to include cities, layer toggles,
+  Surveyor readout, and fog; documented `MIRROR_SURVEYOR_SAVE` alongside
+  `MIRROR_MOM_PATH`; updated AGENTS.md with universal `SaveFile.write/3` original
+  protection, 9-slot limits, and the raw editor's landmass consistency limitation.
+- **Epics & stories:** Marked EPIC-002 Done and framed its "today" text as
+  historical; marked EPIC-006 in progress; corrected EPIC-004's status, historical
+  scope, and city block offsets (`+31..+66` buildings, `+67..+92` enchantments);
+  reconciled EPIC-005 and STORY-008 to owner banner colors for melded nodes;
+  synchronized completion marks in the stories index; updated STORY-010 with
+  STORY-032's outcome; updated STORY-015 deferred list and STORY-016 mouse
+  controls (Cycle vs Paint).
+- **surveyor-formula.md:** Reconciled empty-site wild game prose with the 1
+  quarter-food implementation; listed nodes before sites in feature checks;
+  qualified the existing-city settle check precedence; documented Mirror's
+  "Unexplored" placeholder card.
+- **STORY-035 & STORY-036:** Documented that settleable overlay treats the map as
+  explored while Surveyor respects fog; noted the Discard overlay refresh gap
+  (STORY-039); clarified visual fog layering over cities and settlement tint.
+- **Notes & index:** Added prominent historical/superseded notices to 2026-09-22
+  recon and MOMIME notes, 2026-09-23 evening handoff, and 2026-09-24 live RAM
+  evaluation; pointed `docs/README.md` at the latest handoffs.
+- **Backlog:** Clarified extra LBX exploration; linked TERRTYPE to STORY-017
+  auto-tiling; detached tile-probe tagging decision from closed STORY-006.
 
 ## Done when
 

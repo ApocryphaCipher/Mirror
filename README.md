@@ -7,10 +7,13 @@ terrain and save the result back to a new `.GAM`. It's a Phoenix/LiveView
 app; everything renders live in the browser.
 
 **Status:** terrain renders directly from the game's `TERRAIN.LBX` and
-matches a reference decode pixel for pixel. The map pages have a view mode
-(zoom, pan, hover readout) and an edit mode: cycle or paint tiles, undo/redo,
-Save as. Overland features (cities, units, towers, sites, roads, specials)
-are next. The sprites for all of them are identified and decode correctly
+matches a reference decode pixel for pixel. Cities are drawn with
+owner-coloured flags and size-appropriate frames from `MAPBACK.LBX`. The map
+pages have a view mode (zoom, pan, hover readout with the full Surveyor card,
+and layer toggles for cities, settleable tile grading, and fog of war) and an
+edit mode (cycle or paint tiles, undo/redo, Save as). Other overland features
+(units with banner plaques, towers, encounter sites, roads, specials) and node
+auras are next. The sprites for all of them are identified and decode correctly
 ([sprite catalog](docs/reference/overland-sprites-and-save-blocks.md)), but
 they aren't drawn on the map yet ([EPIC-004](docs/epics/EPIC-004-overland-map-features.md)).
 [docs/epics/](docs/epics/) is the living status; this paragraph is a summary.
@@ -46,9 +49,10 @@ bash scripts/dev_server.sh
 
 Visit `localhost:4000`:
 
-- `/arcanus`, `/myrror`: the map for each plane. Load a save with the path
-  field in the header (it defaults to `$MIRROR_MOM_PATH/SAVE1.GAM`), then
-  ✎ Edit to change terrain.
+- `/arcanus`, `/myrror`: the map for each plane. Pan, zoom, inspect tiles with
+  the Surveyor readout, and toggle layers (cities, settleable sites, fog of war).
+  Load a save with the path field in the header (it defaults to
+  `$MIRROR_MOM_PATH/SAVE1.GAM`), then ✎ Edit to cycle or paint terrain.
 - `/lab/arcanus`, `/lab/myrror`: the research workbench. Raw layers,
   value/bit labelling, histograms, the raw-value painter.
 - `/tile-probe`: the LBX explorer. Browse any LBX file's entries by name,
@@ -59,11 +63,13 @@ Visit `localhost:4000`:
 
 ```bash
 mix test                  # everything that doesn't need game files
-bash scripts/test_game.sh # everything, using dev_server.sh's game-file env
+bash scripts/test_game.sh # real-file tests using dev_server.sh's game-file env
 ```
 
-Tests that need real game files are skipped when `MIRROR_MOM_PATH` doesn't
-point at them, so CI (which has no game files) runs `mix test` only.
+Tests that need real game files read from `MIRROR_MOM_PATH` (or a frozen save
+fixture for Surveyor tests, `MIRROR_SURVEYOR_SAVE`, which defaults to
+`~/.mirror/dev/surveyor-fixtures/SAVE9-dior-2026-09-24.GAM`) and are skipped
+when they are missing, so CI (which has no game files) runs `mix test` only.
 
 ## Contributing
 
