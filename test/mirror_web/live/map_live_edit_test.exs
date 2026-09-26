@@ -109,6 +109,102 @@ defmodule MirrorWeb.MapLiveEditTest do
       render_click(view, "discard_edits", %{})
       refute has_element?(view, "#unsaved-notice")
     end
+
+    test "discard terminates superseded engine session (STORY-039)", %{conn: conn, save: save} do
+      session_id = "engine-term-test-#{System.unique_integer([:positive])}"
+      conn = init_test_session(conn, %{"mirror_session_id" => session_id})
+      view = editing(conn, save, "cycle")
+
+      state = Mirror.SessionStore.get(session_id)
+      old_engine_id = state.engine_session_id
+      assert old_engine_id != nil
+      old_pid = Mirror.Engine.Session.whereis(old_engine_id)
+      assert Process.alive?(old_pid)
+
+      click(view, 1, 1)
+      render_click(view, "arm_discard", %{})
+      render_click(view, "discard_edits", %{})
+
+      refute Process.alive?(old_pid)
+
+      new_engine_id = Mirror.SessionStore.get(session_id).engine_session_id
+      assert new_engine_id != nil
+      assert new_engine_id != old_engine_id
+      new_pid = Mirror.Engine.Session.whereis(new_engine_id)
+      assert Process.alive?(new_pid)
+    end
+  end
+
+  describe "multi-tab session synchronization (STORY-039)" do
+    test "two tabs on one session sync edits without overwriting", %{conn: conn, save: save} do
+      session_id = "two-tab-test-#{System.unique_integer([:positive])}"
+      conn1 = init_test_session(conn, %{"mirror_session_id" => session_id})
+      conn2 = init_test_session(conn, %{"mirror_session_id" => session_id})
+
+      {:ok, tab1, _} = live(conn1, ~p"/arcanus")
+      tab1 |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+
+      {:ok, tab2, _} = live(conn2, ~p"/arcanus")
+
+      # Tab 1 enters edit mode and paints a tile
+      render_click(tab1, "toggle_edit", %{})
+      render_click(tab1, "set_tool", %{"tool" => "cycle"})
+      click(tab1, 1, 1)
+
+      assert changed(tab1) =~ "1 tile changed"
+
+      # Tab 2 receives the synchronized state
+      render_click(tab2, "toggle_edit", %{})
+      assert changed(tab2) =~ "1 tile changed"
+
+      # Tab 2 changes tool (writing to SessionStore)
+      render_click(tab2, "set_tool", %{"tool" => "paint"})
+
+      # Verify Tab 1's edit was preserved in SessionStore and in both tabs
+      assert changed(tab2) =~ "1 tile changed"
+      assert changed(tab1) =~ "1 tile changed"
+    end
+
+    test "competing concurrent edits from two tabs with same starting state both survive (STORY-039)",
+         %{conn: conn, save: save} do
+      session_id = "competing-tab-test-#{System.unique_integer([:positive])}"
+      conn1 = init_test_session(conn, %{"mirror_session_id" => session_id})
+      conn2 = init_test_session(conn, %{"mirror_session_id" => session_id})
+
+      {:ok, tab1, _} = live(conn1, ~p"/arcanus")
+      tab1 |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+
+      {:ok, tab2, _} = live(conn2, ~p"/arcanus")
+
+      # Both tabs enter edit mode with cycle tool
+      render_click(tab1, "toggle_edit", %{})
+      render_click(tab1, "set_tool", %{"tool" => "cycle"})
+      render_click(tab2, "toggle_edit", %{})
+      render_click(tab2, "set_tool", %{"tool" => "cycle"})
+
+      # Both tabs start from the same baseline state (0 edits)
+      assert changed(tab1) == ""
+      assert changed(tab2) == ""
+
+      # Both tabs execute edits concurrently without waiting on each other's broadcast
+      t1 = Task.async(fn -> click(tab1, 1, 1) end)
+      t2 = Task.async(fn -> click(tab2, 2, 2) end)
+      Task.await(t1)
+      Task.await(t2)
+
+      # Both edits survive in the synchronized SessionStore and in both tabs
+      state = Mirror.SessionStore.get(session_id)
+      plane = state.planes.arcanus.terrain
+
+      assert Mirror.Map.get_tile_u16_le(plane, 1, 1) !=
+               Mirror.Map.get_tile_u16_le(state.original_planes.arcanus.terrain, 1, 1)
+
+      assert Mirror.Map.get_tile_u16_le(plane, 2, 2) !=
+               Mirror.Map.get_tile_u16_le(state.original_planes.arcanus.terrain, 2, 2)
+
+      assert changed(tab1) =~ "2 tiles changed"
+      assert changed(tab2) =~ "2 tiles changed"
+    end
   end
 
   describe "Cycle tool (STORY-027)" do
@@ -151,6 +247,32 @@ defmodule MirrorWeb.MapLiveEditTest do
       assert tile_at(view, 7, 7) == Integer.mod(start + 1, 762)
       render_click(view, "undo", %{})
       assert tile_at(view, 7, 7) == start
+    end
+
+    test "undo and redo keep research statistics in sync (STORY-039)", %{conn: conn, save: save} do
+      {:ok, dataset_id} = Mirror.Stats.dataset_id_from_path(save)
+      view = editing(conn, save, "cycle")
+
+      before_hist = Mirror.Stats.histogram(dataset_id, :computed_adj_mask, :global)
+      before_rays = ray_observations(dataset_id)
+
+      click(view, 5, 5)
+      after_click_hist = Mirror.Stats.histogram(dataset_id, :computed_adj_mask, :global)
+      after_click_rays = ray_observations(dataset_id)
+      assert after_click_hist != before_hist
+      assert after_click_rays != before_rays
+
+      render_click(view, "undo", %{})
+      after_undo_hist = Mirror.Stats.histogram(dataset_id, :computed_adj_mask, :global)
+      after_undo_rays = ray_observations(dataset_id)
+      assert after_undo_hist == before_hist
+      assert after_undo_rays == before_rays
+
+      render_click(view, "redo", %{})
+      after_redo_hist = Mirror.Stats.histogram(dataset_id, :computed_adj_mask, :global)
+      after_redo_rays = ray_observations(dataset_id)
+      assert after_redo_hist == after_click_hist
+      assert after_redo_rays == after_click_rays
     end
   end
 
@@ -198,6 +320,21 @@ defmodule MirrorWeb.MapLiveEditTest do
       })
     end
 
+    test "terrain edits push recomputed adjacency masks to client (STORY-039)",
+         %{conn: conn, save: save} do
+      view = editing(conn, save, "paint")
+      view |> element("#brush-form") |> render_change(%{"brush" => %{"tile" => "5"}})
+
+      pointer(view, "start", 1, 1)
+
+      assert_push_event(view, "engine_delta", %{
+        layer: "computed_adj_mask",
+        changes: adj_changes
+      })
+
+      assert Enum.any?(adj_changes, &match?(%{x: 1, y: 1}, &1))
+    end
+
     test "a stroke is undoable even if it never finishes", %{conn: conn, save: save} do
       view = editing(conn, save, "paint")
       view |> element("#brush-form") |> render_change(%{"brush" => %{"tile" => "5"}})
@@ -216,6 +353,24 @@ defmodule MirrorWeb.MapLiveEditTest do
       view = editing(conn, save, "paint")
       html = view |> element("#brush-form") |> render_change(%{"brush" => %{"tile" => "99999"}})
       assert html =~ ~s(value="761")
+    end
+
+    test "a drag starting on a matching tile paints subsequent tiles (STORY-039)",
+         %{conn: conn, save: save} do
+      view = editing(conn, save, "paint")
+      start_1_1 = tile_at(view, 1, 1)
+
+      view |> element("#brush-form") |> render_change(%{"brush" => %{"tile" => "#{start_1_1}"}})
+
+      pointer(view, "start", 1, 1)
+      pointer(view, "drag", 2, 1)
+      pointer(view, "end", 2, 1)
+
+      assert tile_at(view, 2, 1) == start_1_1
+      assert changed(view) =~ "1 tile changed"
+
+      render_click(view, "undo", %{})
+      assert changed(view) =~ "0 tiles changed"
     end
   end
 
@@ -240,6 +395,29 @@ defmodule MirrorWeb.MapLiveEditTest do
     render_click(view, "arm_discard", %{})
     render_click(view, "discard_edits", %{})
     assert changed(view) =~ "0 tiles changed"
+  end
+
+  test "after Save as, discard reloads engine from last-saved planes (STORY-039)",
+       %{conn: conn, dir: dir, save: save} do
+    view = editing(conn, save)
+    start_1_1 = tile_at(view, 1, 1)
+    click(view, 1, 1)
+    saved_tile_1_1 = tile_at(view, 1, 1)
+    assert saved_tile_1_1 != start_1_1
+
+    target = Path.join(dir, "SAVE2.GAM")
+    view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+
+    # Paint another tile after Save as
+    click(view, 2, 2)
+    assert changed(view) =~ "1 tile changed"
+
+    # Discard edits: should restore to SAVE2.GAM planes, and hover inspection must match
+    render_click(view, "arm_discard", %{})
+    render_click(view, "discard_edits", %{})
+    assert changed(view) =~ "0 tiles changed"
+
+    assert tile_at(view, 1, 1) == saved_tile_1_1
   end
 
   describe "cities overlay (STORY-010)" do
@@ -334,10 +512,30 @@ defmodule MirrorWeb.MapLiveEditTest do
       pointer(view, "start", 10, 10)
       assert_push_event(view, "overlay_data", %{layer: "settleable"})
     end
+
+    test "discard refreshes settleable and fog overlays (STORY-039)", %{conn: conn, save: save} do
+      view = editing(conn, save, "cycle")
+      pointer(view, "start", 10, 10)
+      assert_push_event(view, "overlay_data", %{layer: "settleable"})
+
+      render_click(view, "arm_discard", %{})
+      render_click(view, "discard_edits", %{})
+
+      assert_push_event(view, "overlay_data", %{layer: "settleable"})
+      assert_push_event(view, "overlay_data", %{layer: "fog"})
+    end
   end
 
   defp put_byte(raw, at, byte) do
     <<head::binary-size(^at), _, tail::binary>> = raw
     head <> <<byte>> <> tail
+  end
+
+  defp ray_observations(dataset_id) do
+    Mirror.Stats.export(dataset_id).data
+    |> Enum.filter(fn {k, _v} ->
+      String.starts_with?(k, "ray:") or String.starts_with?(k, "ray_pair:")
+    end)
+    |> Map.new()
   end
 end

@@ -22,7 +22,7 @@ a finding before fixing it, and add a test that fails without the fix
    can overwrite the loaded save, and other save-safety gaps. **Done**
 2. [STORY-039](../stories/STORY-039-edit-state-consistency.md) P2: the
    editor's state gets out of step (discard, undo/redo, two tabs, engine
-   sessions).
+   sessions). **Done**
 3. [STORY-040](../stories/STORY-040-decoder-robustness.md) P2: decoders
    that raise, or accept malformed data, on bad input. **Done**
 4. [STORY-041](../stories/STORY-041-edit-tests-in-ci.md) P2: editing and

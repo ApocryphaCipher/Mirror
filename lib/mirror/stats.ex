@@ -73,12 +73,12 @@ defmodule Mirror.Stats do
     GenServer.cast(__MODULE__, {:bump_hist, dataset_id, layer, scope, value, delta})
   end
 
-  def bump_ray(dataset_id, center_class, dir, hit_class, dist) do
-    GenServer.cast(__MODULE__, {:bump_ray, dataset_id, center_class, dir, hit_class, dist})
+  def bump_ray(dataset_id, center_class, dir, hit_class, dist, delta \\ 1) do
+    GenServer.cast(__MODULE__, {:bump_ray, dataset_id, center_class, dir, hit_class, dist, delta})
   end
 
-  def bump_ray_pair(dataset_id, center_class, left, right) do
-    GenServer.cast(__MODULE__, {:bump_ray_pair, dataset_id, center_class, left, right})
+  def bump_ray_pair(dataset_id, center_class, left, right, delta \\ 1) do
+    GenServer.cast(__MODULE__, {:bump_ray_pair, dataset_id, center_class, left, right, delta})
   end
 
   def export(dataset_id) do
@@ -172,15 +172,15 @@ defmodule Mirror.Stats do
     {:noreply, state}
   end
 
-  def handle_cast({:bump_ray, dataset_id, center_class, dir, hit_class, dist}, state) do
+  def handle_cast({:bump_ray, dataset_id, center_class, dir, hit_class, dist, delta}, state) do
     key = {:ray, dataset_id, center_class, dir, hit_class, dist}
-    bump_counter(key, 1)
+    bump_counter(key, delta)
     {:noreply, state}
   end
 
-  def handle_cast({:bump_ray_pair, dataset_id, center_class, left, right}, state) do
+  def handle_cast({:bump_ray_pair, dataset_id, center_class, left, right, delta}, state) do
     key = {:ray_pair, dataset_id, center_class, left, right}
-    bump_counter(key, 1)
+    bump_counter(key, delta)
     {:noreply, state}
   end
 
@@ -213,8 +213,19 @@ defmodule Mirror.Stats do
 
   defp bump_counter(key, delta) do
     case :ets.lookup(@table, key) do
-      [{^key, count}] -> :ets.insert(@table, {key, count + delta})
-      [] -> :ets.insert(@table, {key, delta})
+      [{^key, count}] ->
+        new_count = count + delta
+
+        if new_count <= 0 do
+          :ets.delete(@table, key)
+        else
+          :ets.insert(@table, {key, new_count})
+        end
+
+      [] ->
+        if delta > 0 do
+          :ets.insert(@table, {key, delta})
+        end
     end
   end
 

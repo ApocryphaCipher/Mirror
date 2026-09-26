@@ -15,6 +15,18 @@ defmodule Mirror.Engine.SessionSupervisor do
     DynamicSupervisor.start_child(__MODULE__, {Mirror.Engine.Session, opts})
   end
 
+  @spec stop_session(pid() | term()) :: :ok | {:error, :not_found}
+  def stop_session(pid) when is_pid(pid) do
+    DynamicSupervisor.terminate_child(__MODULE__, pid)
+  end
+
+  def stop_session(session_id) do
+    case Mirror.Engine.Session.whereis(session_id) do
+      nil -> {:error, :not_found}
+      pid -> DynamicSupervisor.terminate_child(__MODULE__, pid)
+    end
+  end
+
   @impl true
   def init(:ok) do
     DynamicSupervisor.init(strategy: :one_for_one)

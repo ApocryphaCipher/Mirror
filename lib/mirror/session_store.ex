@@ -19,15 +19,29 @@ defmodule Mirror.SessionStore do
   end
 
   def put(session_id, state) do
-    :ets.insert(@table, {session_id, state})
-    :ok
+    GenServer.call(__MODULE__, {:put, session_id, state, self()})
   end
 
   def update(session_id, fun) when is_function(fun, 1) do
-    state = get(session_id) || %{}
-    new_state = fun.(state)
-    put(session_id, new_state)
-    {:ok, new_state}
+    GenServer.call(__MODULE__, {:update, session_id, fun, self()})
+  end
+
+  def subscribe(session_id) do
+    Phoenix.PubSub.subscribe(Mirror.PubSub, topic(session_id))
+  end
+
+  def unsubscribe(session_id) do
+    Phoenix.PubSub.unsubscribe(Mirror.PubSub, topic(session_id))
+  end
+
+  defp topic(session_id), do: "mirror:session:#{session_id}"
+
+  defp broadcast_update(session_id, state, sender) do
+    Phoenix.PubSub.broadcast(
+      Mirror.PubSub,
+      topic(session_id),
+      {:session_state_updated, session_id, state, sender}
+    )
   end
 
   @impl true
@@ -41,5 +55,31 @@ defmodule Mirror.SessionStore do
     ])
 
     {:ok, state}
+  end
+
+  @impl true
+  def handle_call({:put, session_id, new_state, sender}, _from, state) do
+    :ets.insert(@table, {session_id, new_state})
+    broadcast_update(session_id, new_state, sender)
+    {:reply, :ok, state}
+  end
+
+  def handle_call({:update, session_id, fun, sender}, _from, state) do
+    current = get(session_id) || %{}
+
+    case fun.(current) do
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+
+      {new_state, result} ->
+        :ets.insert(@table, {session_id, new_state})
+        broadcast_update(session_id, new_state, sender)
+        {:reply, {:ok, new_state, result}, state}
+
+      new_state ->
+        :ets.insert(@table, {session_id, new_state})
+        broadcast_update(session_id, new_state, sender)
+        {:reply, {:ok, new_state}, state}
+    end
   end
 end
