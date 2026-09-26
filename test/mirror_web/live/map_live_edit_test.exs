@@ -236,6 +236,24 @@ defmodule MirrorWeb.MapLiveEditTest do
       html = view |> element("#brush-form") |> render_change(%{"brush" => %{"tile" => "99999"}})
       assert html =~ ~s(value="761")
     end
+
+    test "a drag starting on a matching tile paints subsequent tiles (STORY-039)",
+         %{conn: conn, save: save} do
+      view = editing(conn, save, "paint")
+      start_1_1 = tile_at(view, 1, 1)
+
+      view |> element("#brush-form") |> render_change(%{"brush" => %{"tile" => "#{start_1_1}"}})
+
+      pointer(view, "start", 1, 1)
+      pointer(view, "drag", 2, 1)
+      pointer(view, "end", 2, 1)
+
+      assert tile_at(view, 2, 1) == start_1_1
+      assert changed(view) =~ "1 tile changed"
+
+      render_click(view, "undo", %{})
+      assert changed(view) =~ "0 tiles changed"
+    end
   end
 
   test "save as refuses the loaded file, writes a new one, and discard restores",

@@ -2017,7 +2017,12 @@ defmodule MirrorWeb.MapLive do
 
     case change do
       nil ->
-        socket
+        stroke = %{
+          layer: layer,
+          changes: %{}
+        }
+
+        assign(socket, :active_stroke, stroke)
 
       {prev, new} ->
         stroke = %{
@@ -2040,6 +2045,7 @@ defmodule MirrorWeb.MapLive do
 
       {prev, new} ->
         stroke = socket.assigns.active_stroke
+        mode = if stroke.changes == %{}, do: :new, else: :update
 
         changes =
           Map.update(stroke.changes, {x, y}, {prev, new}, fn {old_prev, _old_new} ->
@@ -2050,7 +2056,7 @@ defmodule MirrorWeb.MapLive do
 
         socket
         |> assign(:active_stroke, stroke)
-        |> record_stroke(stroke, :update)
+        |> record_stroke(stroke, mode)
     end
   end
 
