@@ -208,10 +208,13 @@ defmodule MirrorWeb.MapLive do
         socket
         |> assign_from_state(state)
         |> assign_forms()
+        |> refresh_hover()
         |> put_flash(:info, "Edits discarded.")
 
       socket =
-        if connected?(socket), do: socket |> push_map_state() |> push_map_reload(), else: socket
+        if connected?(socket),
+          do: socket |> push_map_state() |> push_map_reload() |> push_map_layers(),
+          else: socket
 
       {:noreply, socket}
     else

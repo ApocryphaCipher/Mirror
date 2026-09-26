@@ -334,6 +334,18 @@ defmodule MirrorWeb.MapLiveEditTest do
       pointer(view, "start", 10, 10)
       assert_push_event(view, "overlay_data", %{layer: "settleable"})
     end
+
+    test "discard refreshes settleable and fog overlays (STORY-039)", %{conn: conn, save: save} do
+      view = editing(conn, save, "cycle")
+      pointer(view, "start", 10, 10)
+      assert_push_event(view, "overlay_data", %{layer: "settleable"})
+
+      render_click(view, "arm_discard", %{})
+      render_click(view, "discard_edits", %{})
+
+      assert_push_event(view, "overlay_data", %{layer: "settleable"})
+      assert_push_event(view, "overlay_data", %{layer: "fog"})
+    end
   end
 
   defp put_byte(raw, at, byte) do
