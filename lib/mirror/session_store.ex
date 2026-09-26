@@ -19,9 +19,7 @@ defmodule Mirror.SessionStore do
   end
 
   def put(session_id, state) do
-    :ets.insert(@table, {session_id, state})
-    broadcast_update(session_id, state, self())
-    :ok
+    GenServer.call(__MODULE__, {:put, session_id, state, self()})
   end
 
   def update(session_id, fun) when is_function(fun, 1) do
@@ -60,11 +58,28 @@ defmodule Mirror.SessionStore do
   end
 
   @impl true
-  def handle_call({:update, session_id, fun, sender}, _from, state) do
-    current = get(session_id) || %{}
-    new_state = fun.(current)
+  def handle_call({:put, session_id, new_state, sender}, _from, state) do
     :ets.insert(@table, {session_id, new_state})
     broadcast_update(session_id, new_state, sender)
-    {:reply, {:ok, new_state}, state}
+    {:reply, :ok, state}
+  end
+
+  def handle_call({:update, session_id, fun, sender}, _from, state) do
+    current = get(session_id) || %{}
+
+    case fun.(current) do
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+
+      {new_state, result} ->
+        :ets.insert(@table, {session_id, new_state})
+        broadcast_update(session_id, new_state, sender)
+        {:reply, {:ok, new_state, result}, state}
+
+      new_state ->
+        :ets.insert(@table, {session_id, new_state})
+        broadcast_update(session_id, new_state, sender)
+        {:reply, {:ok, new_state}, state}
+    end
   end
 end
