@@ -2263,8 +2263,45 @@ defmodule MirrorWeb.MapLive do
     new_plane = maybe_update_adj_mask_batch(new_plane, stroke, layer)
     new_planes = Map.put(state.planes, plane, new_plane)
     save = %{state.save | planes: strip_computed(new_planes)}
+    updated_state = %{state | planes: new_planes, save: save}
 
-    {%{state | planes: new_planes, save: save}, updates, layer}
+    update_stroke_stats(updated_state, plane, stroke, mode, plane_layers, new_plane)
+
+    {updated_state, updates, layer}
+  end
+
+  defp update_stroke_stats(state, plane, stroke, mode, old_plane, new_plane) do
+    if state.dataset_id do
+      layer = stroke.layer
+
+      case layer do
+        :terrain ->
+          coords =
+            stroke.changes
+            |> Enum.flat_map(fn {x, y, _prev, _new} -> MirrorMap.adj_update_coords(x, y) end)
+            |> Enum.uniq()
+
+          Enum.each(coords, fn {cx, cy} ->
+            old = MirrorMap.get_tile_u8(old_plane.computed_adj_mask, cx, cy)
+            new = MirrorMap.get_tile_u8(new_plane.computed_adj_mask, cx, cy)
+
+            if old != new do
+              Stats.bump_hist(state.dataset_id, :computed_adj_mask, :global, old, -1)
+              Stats.bump_hist(state.dataset_id, :computed_adj_mask, :global, new, 1)
+            end
+          end)
+
+          Enum.each(stroke.changes, fn {x, y, _prev, _new} ->
+            update_ray_stats(state, new_plane, x, y)
+          end)
+
+        _ ->
+          Enum.each(stroke.changes, fn {x, y, prev, new} ->
+            {prev_value, new_value} = if mode == :undo, do: {new, prev}, else: {prev, new}
+            update_stats(state, plane, layer, x, y, prev_value, new_value, old_plane, new_plane)
+          end)
+      end
+    end
   end
 
   defp tile_value(state, plane, layer, x, y) do

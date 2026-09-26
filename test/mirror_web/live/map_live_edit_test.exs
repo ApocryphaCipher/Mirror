@@ -152,6 +152,25 @@ defmodule MirrorWeb.MapLiveEditTest do
       render_click(view, "undo", %{})
       assert tile_at(view, 7, 7) == start
     end
+
+    test "undo and redo keep research statistics in sync (STORY-039)", %{conn: conn, save: save} do
+      {:ok, dataset_id} = Mirror.Stats.dataset_id_from_path(save)
+      view = editing(conn, save, "cycle")
+
+      before_hist = Mirror.Stats.histogram(dataset_id, :computed_adj_mask, :global)
+
+      click(view, 5, 5)
+      after_click_hist = Mirror.Stats.histogram(dataset_id, :computed_adj_mask, :global)
+      assert after_click_hist != before_hist
+
+      render_click(view, "undo", %{})
+      after_undo_hist = Mirror.Stats.histogram(dataset_id, :computed_adj_mask, :global)
+      assert after_undo_hist == before_hist
+
+      render_click(view, "redo", %{})
+      after_redo_hist = Mirror.Stats.histogram(dataset_id, :computed_adj_mask, :global)
+      assert after_redo_hist == after_click_hist
+    end
   end
 
   describe "Paint tool" do
