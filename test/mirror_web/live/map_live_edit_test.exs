@@ -703,6 +703,38 @@ defmodule MirrorWeb.MapLiveEditTest do
     end
   end
 
+  describe "sites layer (STORY-011)" do
+    test "overlays are pushed with the map and follow edits", %{conn: conn, dir: dir} do
+      save_with_sites = Path.join(dir, "SITES_TEST.GAM")
+      raw = synthetic_save_bytes()
+
+      # Write a tower at 0x6610 (already there: x=48, y=28, owner=255/nil -> unowned)
+      # Add an owned tower
+      raw = put_bytes(raw, 0x6610 + 4, <<49, 29, 0, 0>>)
+
+      # Encounters at 0x6628
+      # x=26, y=25, plane=0, intact=1, kind=7 (abandoned keep)
+      keep = <<26, 25, 0, 1, 7>> <> :binary.copy(<<0>>, 10) <> <<0>> <> :binary.copy(<<0>>, 8)
+      # x=28, y=21, plane=0, intact=0, kind=6 (ancient temple, cleared -> ignored)
+      cleared = <<28, 21, 0, 0, 6>> <> :binary.copy(<<0>>, 10) <> <<2>> <> :binary.copy(<<0>>, 8)
+
+      raw = put_bytes(raw, 0x6628, keep)
+      raw = put_bytes(raw, 0x6628 + 24, cleared)
+
+      File.write!(save_with_sites, raw)
+
+      {:ok, view, _} = live(conn, ~p"/arcanus")
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save_with_sites}})
+
+      assert_push_event(view, "overlay_data", %{layer: "sites", items: items})
+      assert length(items) == 3
+      assert %{x: 48, y: 28, sprite: "tower_unowned"} in items
+      assert %{x: 49, y: 29, sprite: "tower_owned"} in items
+      assert %{x: 26, y: 25, sprite: "abandoned_keep"} in items
+      refute Enum.any?(items, &(&1.x == 28 and &1.y == 21))
+    end
+  end
+
   describe "real-save integration" do
     @tag skip:
            !@has_real_save_and_sprites &&

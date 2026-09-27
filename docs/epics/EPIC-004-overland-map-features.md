@@ -1,6 +1,6 @@
 # EPIC-004: Render towns, forts, towers, tombs, and other overland features
 
-**Status:** in progress. Cities are decoded and rendered with owner flags and size-appropriate frames (STORY-010, STORY-032). Sites are decoded (`Mirror.SaveFile.Sites`). Roads, minerals/specials, and corruption are decoded and rendered (STORY-013). Units are decoded and rendered with banner-colour plaques (STORY-012). Sites drawing (STORY-011) and Town+ city frames / rival flags (STORY-033) remain.
+**Status:** in progress. Cities are decoded and rendered with owner flags and size-appropriate frames (STORY-010, STORY-032). Sites are decoded (`Mirror.SaveFile.Sites`) and drawn (STORY-011). Roads, minerals/specials, and corruption are decoded and rendered (STORY-013). Units are decoded and rendered with banner-colour plaques (STORY-012). Town+ city frames / rival flags (STORY-033) remain.
 Scope widened by [Kevin](https://github.com/KevinAsbury) to include **units** (figure on a banner-colour
 plaque) and **per-layer on/off toggles**. Sprite and save-block survey:
 [../reference/overland-sprites-and-save-blocks.md](../reference/overland-sprites-and-save-blocks.md).
@@ -69,7 +69,7 @@ STORY-011 → STORY-013.
 - [STORY-010](../stories/STORY-010-cities.md) (**Done**): cities
 - [STORY-032](../stories/STORY-032-cities-walls-labels-verify.md) (**Done**): cities follow-up: walls, name labels, check against the real game
 - [STORY-033](../stories/STORY-033-cities-town-frames-rival-flags.md): cities: Town+ frames, rival flag colours, `CITYNOWA`
-- [STORY-011](../stories/STORY-011-sites-towers-lairs.md): towers, fortresses, lairs, ruins and other sites
+- [STORY-011](../stories/STORY-011-sites-towers-lairs.md) (**Done**): towers, fortresses, lairs, ruins and other sites
 - [STORY-012](../stories/STORY-012-units-with-banner-plaques.md) (**Done**): units with banner-colour plaques
 - [STORY-013](../stories/STORY-013-roads-minerals-corruption.md) (**Done**): specials and bonuses (ores, gems, nightshade, wild game…), roads, corruption
 
