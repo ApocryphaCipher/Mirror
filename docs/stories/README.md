@@ -9,7 +9,7 @@
 - [STORY-009](STORY-009-overlay-layer-toggles.md): overlay layers with on/off toggles (EPIC-004) **Done**
 - [STORY-010](STORY-010-cities.md): cities (EPIC-004) **Done**
 - [STORY-011](STORY-011-sites-towers-lairs.md): towers, fortresses, lairs, ruins, sites (EPIC-004)
-- [STORY-012](STORY-012-units-with-banner-plaques.md): units with banner-colour plaques (EPIC-004)
+- [STORY-012](STORY-012-units-with-banner-plaques.md): units with banner-colour plaques (EPIC-004) **Done**
 - [STORY-013](STORY-013-roads-minerals-corruption.md): specials and bonuses (ores, gems, nightshade, wild game…), roads, corruption (EPIC-004) **Done**
 - [STORY-014](STORY-014-ui-triage-and-lab-route.md): triage the UI; research tools → Lab route (EPIC-006) **Done**
 - [STORY-015](STORY-015-view-mode-layout.md): view mode, full-window map with pan/zoom (EPIC-006) **Done**

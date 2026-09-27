@@ -623,8 +623,11 @@ defmodule MirrorWeb.MapLiveEditTest do
       refute html =~ ~r/value="settleable"[^>]*checked/
       assert html =~ ~r/value="roads"[^>]*checked/
       assert html =~ ~r/value="cities"[^>]*checked/
+      assert html =~ ~r/value="units"[^>]*checked/
 
       view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+
+      assert_push_event(view, "overlay_data", %{layer: "units", items: []})
 
       assert_push_event(view, "overlay_data", %{layer: "settleable", items: settleable})
       refute Enum.any?(settleable, &match?(%{x: 38, y: 21}, &1))
@@ -664,6 +667,38 @@ defmodule MirrorWeb.MapLiveEditTest do
       assert_push_event(view, "overlay_data", %{layer: "roads"})
       assert_push_event(view, "overlay_data", %{layer: "fog"})
     end
+
+    test "pushes visible units with banner colours and collapsed stacks (STORY-012)", %{
+      conn: conn,
+      dir: dir
+    } do
+      save_with_units = Path.join(dir, "UNITS_TEST.GAM")
+      raw = synthetic_save_bytes()
+
+      # Wizard 1 banner = 0 (Blue) at 0x9E8 + 1 * 0x4C8 + 0x16
+      raw = put_bytes(raw, 0x09E8 + 0x4C8 + 0x16, <<0>>)
+
+      # Set unit count = 3 at 0x0009E2
+      raw = put_bytes(raw, 0x0009E2, <<3::little-16>>)
+
+      # Unit 0: (25, 25, plane 0), owner 0 (Yellow), type 39, priority 2
+      u0 = <<25, 25, 0, 0, 2, 39, 0::size(96), 2, 0::size(104)>>
+      # Unit 1: (25, 25, plane 0), owner 1 (Blue), type 40, priority 5
+      u1 = <<25, 25, 0, 1, 2, 40, 0::size(96), 5, 0::size(104)>>
+      # Unit 2: (38, 21, plane 0) - inside Deventor city -> hidden!
+      u2 = <<38, 21, 0, 0, 2, 39, 0::size(96), 1, 0::size(104)>>
+
+      raw = put_bytes(raw, 0x00B734, u0 <> u1 <> u2)
+      File.write!(save_with_units, raw)
+
+      {:ok, view, _} = live(conn, ~p"/arcanus")
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save_with_units}})
+
+      assert_push_event(view, "overlay_data", %{layer: "units", items: items})
+      assert length(items) == 1
+      [visible] = items
+      assert visible == %{x: 25, y: 25, type: 40, banner: :blue}
+    end
   end
 
   describe "real-save integration" do
@@ -681,6 +716,10 @@ defmodule MirrorWeb.MapLiveEditTest do
       assert length(items) == 16
       assert %{x: 38, y: 21, size: 1, banner: :yellow, name: "Deventor", walled: false} in items
 
+      assert_push_event(view, "overlay_data", %{layer: "units", items: units})
+      # All 42 starting units in SAVE1 are garrisons inside cities, so none appear on the field
+      assert units == []
+
       assert_push_event(view, "overlay_data", %{layer: "roads", items: roads})
       # Arcanus has 35 roads + 35 specials
       assert length(roads) == 70
@@ -692,7 +731,9 @@ defmodule MirrorWeb.MapLiveEditTest do
         roads: %{c: %{width: 20, height: 18}},
         enchanted_roads: %{c: %{width: 20, height: 18}},
         specials: %{gold: %{width: 20, height: 18}},
-        corruption: %{corruption: %{width: 22, height: 18}}
+        corruption: %{corruption: %{width: 22, height: 18}},
+        plaques: %{blue: %{width: 20, height: 18}},
+        units: %{0 => %{width: 18, height: 16}}
       })
     end
 
