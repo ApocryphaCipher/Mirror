@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -49,6 +52,7 @@ jobs:
             -e SECRET_KEY_BASE="0000000000000000000000000000000000000000000000000000000000000000" \
             -e MIRROR_MOM_PATH=/game \
             -e MIRROR_STATS_FILE=/data/stats.dets \
+            -e MIRROR_ASSET_MAP=/data/asset_map \
             mirror:ci
           for i in $(seq 1 15); do
             code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:4000/arcanus || true)

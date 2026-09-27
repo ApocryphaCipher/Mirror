@@ -4,7 +4,7 @@ defmodule MirrorWeb.MapLiveEditTest do
 
   Uses a synthetic save fixture so editing, undo, discard, Save as and Surveyor
   tests run unconditionally in CI without needing game files (STORY-041).
-  A handful of real-save tests run only when MIRROR_MOM_PATH and save offsets are present.
+  A handful of real-save tests run only when MIRROR_MOM_PATH contains a real save (SAVE1.GAM).
   """
   use MirrorWeb.ConnCase, async: false
 
@@ -12,8 +12,7 @@ defmodule MirrorWeb.MapLiveEditTest do
 
   @mom_path System.get_env("MIRROR_MOM_PATH")
   @real_save_source @mom_path && Path.join(@mom_path, "SAVE1.GAM")
-  @has_real_save @real_save_source && File.exists?(@real_save_source) &&
-                   System.get_env("MIRROR_TERRAIN_OFFSET") != nil
+  @has_real_save @real_save_source && File.exists?(@real_save_source)
   @has_real_save_and_sprites @has_real_save &&
                                File.exists?(Path.join(@mom_path, "MAPBACK.LBX"))
 
@@ -528,7 +527,7 @@ defmodule MirrorWeb.MapLiveEditTest do
   describe "real-save integration" do
     @tag skip:
            !@has_real_save_and_sprites &&
-             "needs MIRROR_MOM_PATH/(SAVE1.GAM, MAPBACK.LBX) and MIRROR_*_OFFSET env"
+             "needs MIRROR_MOM_PATH/(SAVE1.GAM, MAPBACK.LBX)"
     test "loading real SAVE1.GAM pushes Arcanus cities and sprites", %{conn: conn, dir: dir} do
       real_save = Path.join(dir, "REAL_SAVE1.GAM")
       File.cp!(@real_save_source, real_save)
@@ -543,7 +542,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       assert_push_event(view, "overlay_sprites", %{cities: %{city: %{width: 32, height: 30}}})
     end
 
-    @tag skip: !@has_real_save && "needs MIRROR_MOM_PATH/SAVE1.GAM and MIRROR_*_OFFSET env"
+    @tag skip: !@has_real_save && "needs MIRROR_MOM_PATH/SAVE1.GAM"
     test "real SAVE1.GAM overwrite protection and Save as", %{conn: conn, dir: dir} do
       real_save = Path.join(dir, "REAL_SAVE1.GAM")
       File.cp!(@real_save_source, real_save)
@@ -562,7 +561,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       assert File.read!(target) != original
     end
 
-    @tag skip: !@has_real_save && "needs MIRROR_MOM_PATH/SAVE1.GAM and MIRROR_*_OFFSET env"
+    @tag skip: !@has_real_save && "needs MIRROR_MOM_PATH/SAVE1.GAM"
     test "real SAVE1.GAM surveyor matches known readouts at Deventor", %{conn: conn, dir: dir} do
       real_save = Path.join(dir, "REAL_SAVE1.GAM")
       File.cp!(@real_save_source, real_save)

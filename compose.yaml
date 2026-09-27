@@ -6,6 +6,7 @@ services:
     environment:
       MIRROR_MOM_PATH: /game
       MIRROR_STATS_FILE: /data/stats.dets
+      MIRROR_ASSET_MAP: /data/asset_map
       # Dev-only placeholder. A real deployment must set its own SECRET_KEY_BASE.
       SECRET_KEY_BASE: "0000000000000000000000000000000000000000000000000000000000000000"
     volumes:

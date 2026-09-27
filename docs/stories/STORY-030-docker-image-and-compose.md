@@ -1,7 +1,7 @@
 # STORY-030: Docker image and compose file
 
 **Parent:** [EPIC-007](../epics/EPIC-007-packaging-ci-and-repo-hygiene.md)
-**Status:** Done (2026-09-26)
+**Status:** open — verified the container boots and serves, but not against a real save; needs a human with game files to confirm rendering and Save-as
 **Size:** small–medium
 **Requested by:** [Kevin](https://github.com/KevinAsbury), 2026-09-23
 

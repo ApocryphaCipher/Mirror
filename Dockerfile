@@ -37,7 +37,7 @@ WORKDIR /app
 
 COPY --from=builder /app/_build/prod/rel/mirror ./
 
-RUN mkdir -p /game /data && chown -R mirror:mirror /game /data
+RUN mkdir -p /game /data/asset_map && chown -R mirror:mirror /game /data
 
 USER mirror
 
