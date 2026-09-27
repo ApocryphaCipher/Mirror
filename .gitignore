@@ -43,3 +43,5 @@ npm-debug.log
 /logs
 /momime
 /priv/tile_cache
+
+.aider.conf.yml
