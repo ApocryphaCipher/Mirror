@@ -135,7 +135,8 @@ defmodule Mirror.EditorTest do
       {state, stroke, change, updates} =
         Editor.start_stroke(state, :arcanus, :terrain, 0, 0, 0)
 
-      assert stroke == %{layer: :terrain, changes: %{}}
+      assert Map.take(stroke, [:layer, :changes]) == %{layer: :terrain, changes: %{}}
+      assert is_integer(stroke[:id])
       assert change == nil
       assert updates == []
       assert state.history.arcanus == []
@@ -204,7 +205,12 @@ defmodule Mirror.EditorTest do
       {state, {:applied, stroke, updates}} =
         Editor.apply_single_tile(state, :arcanus, :terrain_flags, 3, 3, 7)
 
-      assert stroke == %{layer: :terrain_flags, changes: [{3, 3, 0, 7}]}
+      assert Map.take(stroke, [:layer, :changes]) == %{
+               layer: :terrain_flags,
+               changes: [{3, 3, 0, 7}]
+             }
+
+      assert is_integer(stroke[:id])
       assert updates == [%{x: 3, y: 3, value: 7}]
       assert length(state.history.arcanus) == 1
       assert Editor.tile_value(state, :arcanus, :terrain_flags, 3, 3) == 7
@@ -212,6 +218,46 @@ defmodule Mirror.EditorTest do
       # Undo single tile
       {undone_state, {:applied, _updates, _layer, _changes}} = Editor.undo(state, :arcanus)
       assert Editor.tile_value(undone_state, :arcanus, :terrain_flags, 3, 3) == 0
+    end
+
+    test "concurrent stroke continuation preserves interleaved stroke from another tab (STORY-043)" do
+      state = make_test_state()
+
+      # Tab A starts a drag stroke on Arcanus at (1, 1)
+      {state, stroke_a, _change, _updates} =
+        Editor.start_stroke(state, :arcanus, :terrain, 1, 1, 10)
+
+      # Tab A continues drag to (1, 2)
+      {state, stroke_a, _change, _updates} =
+        Editor.apply_stroke_change(state, stroke_a, :arcanus, :terrain, 1, 2, 10)
+
+      # Tab B commits a separate single-tile stroke in between at (5, 5)
+      {state, stroke_b, _change, _updates} =
+        Editor.start_stroke(state, :arcanus, :terrain, 5, 5, 20)
+
+      assert length(state.history.arcanus) == 2
+      assert hd(state.history.arcanus).id == stroke_b.id
+
+      # Tab A continues drag to (1, 3)
+      {state, _stroke_a, _change, _updates} =
+        Editor.apply_stroke_change(state, stroke_a, :arcanus, :terrain, 1, 3, 10)
+
+      # Tab B's stroke must remain at the head of history and not be clobbered
+      assert length(state.history.arcanus) == 2
+      assert hd(state.history.arcanus).id == stroke_b.id
+
+      # Undoing once removes only Tab B's tile (5, 5), leaving Tab A's drag intact
+      {undone_b, _} = Editor.undo(state, :arcanus)
+      assert Editor.tile_value(undone_b, :arcanus, :terrain, 5, 5) == 0
+      assert Editor.tile_value(undone_b, :arcanus, :terrain, 1, 1) == 10
+      assert Editor.tile_value(undone_b, :arcanus, :terrain, 1, 2) == 10
+      assert Editor.tile_value(undone_b, :arcanus, :terrain, 1, 3) == 10
+
+      # Undoing a second time removes Tab A's whole drag
+      {undone_a, _} = Editor.undo(undone_b, :arcanus)
+      assert Editor.tile_value(undone_a, :arcanus, :terrain, 1, 1) == 0
+      assert Editor.tile_value(undone_a, :arcanus, :terrain, 1, 2) == 0
+      assert Editor.tile_value(undone_a, :arcanus, :terrain, 1, 3) == 0
     end
 
     test "discard restores planes and clears history and redo" do

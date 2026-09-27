@@ -221,6 +221,7 @@ defmodule MirrorWeb.MapLiveEditTest do
 
       # Simulate Tab B committing an edit directly into SessionStore (e.g. before Tab 1's broadcast arrives)
       current_store = Mirror.SessionStore.get(session_id)
+      tab1_edited_val = Mirror.Map.get_tile_u16_le(current_store.planes.arcanus.terrain, 1, 1)
       baseline_at_2_2 = Mirror.Map.get_tile_u16_le(current_store.planes.arcanus.terrain, 2, 2)
       tab2_edited_val = Integer.mod(baseline_at_2_2 + 10, 762)
 
@@ -236,12 +237,18 @@ defmodule MirrorWeb.MapLiveEditTest do
       # Both Tab 1's edit at (1, 1) and Tab 2's edit at (2, 2) must survive in SessionStore
       store_after = Mirror.SessionStore.get(session_id)
 
+      assert Mirror.Map.get_tile_u16_le(store_after.planes.arcanus.terrain, 1, 1) ==
+               tab1_edited_val
+
       assert Mirror.Map.get_tile_u16_le(store_after.planes.arcanus.terrain, 2, 2) ==
                tab2_edited_val
 
       # Both edits must survive in the file written to disk
       assert File.exists?(target_save)
       {:ok, loaded_save} = Mirror.SaveFile.load(target_save)
+
+      assert Mirror.Map.get_tile_u16_le(loaded_save.planes.arcanus.terrain, 1, 1) ==
+               tab1_edited_val
 
       assert Mirror.Map.get_tile_u16_le(loaded_save.planes.arcanus.terrain, 2, 2) ==
                tab2_edited_val
@@ -270,6 +277,63 @@ defmodule MirrorWeb.MapLiveEditTest do
       # The painted tile must be 42 from the authoritative current session
       store_after = Mirror.SessionStore.get(session_id)
       assert Mirror.Map.get_tile_u16_le(store_after.planes.arcanus.terrain, 3, 3) == 42
+    end
+
+    test "concurrent stroke continuation preserves interleaved stroke from another tab (STORY-043)",
+         %{conn: conn, save: save} do
+      session_id = "concurrent-drag-stroke-test-#{System.unique_integer([:positive])}"
+      conn1 = init_test_session(conn, %{"mirror_session_id" => session_id})
+      conn2 = init_test_session(conn, %{"mirror_session_id" => session_id})
+
+      {:ok, tab1, _} = live(conn1, ~p"/arcanus")
+      tab1 |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      render_click(tab1, "toggle_edit", %{})
+      render_click(tab1, "set_tool", %{"tool" => "paint"})
+
+      {:ok, tab2, _} = live(conn2, ~p"/arcanus")
+      render_click(tab2, "toggle_edit", %{})
+      render_click(tab2, "set_tool", %{"tool" => "cycle"})
+
+      # Baseline value at (5, 5)
+      start_store = Mirror.SessionStore.get(session_id)
+      baseline_at_5_5 = Mirror.Map.get_tile_u16_le(start_store.planes.arcanus.terrain, 5, 5)
+
+      # Tab 1 starts a drag stroke (pointer start at 1, 1 then drag to 1, 2)
+      pointer(tab1, "start", 1, 1)
+      pointer(tab1, "drag", 1, 2)
+
+      # Tab 2 commits a separate single-tile cycle stroke at (5, 5) in between Tab 1's moves
+      click(tab2, 5, 5)
+
+      # Tab 1 continues drag to (1, 3) and ends stroke
+      pointer(tab1, "drag", 1, 3)
+      pointer(tab1, "end", 1, 3)
+
+      # Both Tab 1's drag tiles and Tab 2's cycle tile are present
+      store_after = Mirror.SessionStore.get(session_id)
+
+      assert Mirror.Map.get_tile_u16_le(store_after.planes.arcanus.terrain, 5, 5) ==
+               Integer.mod(baseline_at_5_5 + 1, 762)
+
+      # Undoing once in Tab 1 pops Tab 2's stroke (the head of history)
+      render_click(tab1, "undo", %{})
+
+      store_after_undo = Mirror.SessionStore.get(session_id)
+      # Tab 2's tile was undone back to baseline
+      assert Mirror.Map.get_tile_u16_le(store_after_undo.planes.arcanus.terrain, 5, 5) ==
+               baseline_at_5_5
+
+      # Tab 1's drag tiles (1, 1), (1, 2), (1, 3) are still intact
+      brush_val = Map.get(start_store.selection, :terrain, 0)
+
+      assert Mirror.Map.get_tile_u16_le(store_after_undo.planes.arcanus.terrain, 1, 1) ==
+               brush_val
+
+      assert Mirror.Map.get_tile_u16_le(store_after_undo.planes.arcanus.terrain, 1, 2) ==
+               brush_val
+
+      assert Mirror.Map.get_tile_u16_le(store_after_undo.planes.arcanus.terrain, 1, 3) ==
+               brush_val
     end
   end
 

@@ -166,10 +166,12 @@ defmodule Mirror.Editor do
   """
   def start_stroke(state, plane, layer, x, y, value) do
     {next_state, change, updates} = apply_tile(state, plane, layer, x, y, value)
+    stroke_id = System.unique_integer([:positive, :monotonic])
 
     case change do
       nil ->
         stroke = %{
+          id: stroke_id,
           layer: layer,
           changes: %{}
         }
@@ -178,6 +180,7 @@ defmodule Mirror.Editor do
 
       {prev, new} ->
         stroke = %{
+          id: stroke_id,
           layer: layer,
           changes: %{{x, y} => {prev, new}}
         }
@@ -228,7 +231,12 @@ defmodule Mirror.Editor do
         {state, :none}
 
       {prev, new} ->
-        stroke = %{layer: layer, changes: [{x, y, prev, new}]}
+        stroke = %{
+          id: System.unique_integer([:positive, :monotonic]),
+          layer: layer,
+          changes: [{x, y, prev, new}]
+        }
+
         history = [stroke | Map.get(next_state.history, plane, [])]
         redo = Map.put(next_state.redo, plane, [])
 
@@ -349,12 +357,24 @@ defmodule Mirror.Editor do
   end
 
   defp record_stroke(state, plane, stroke, mode) do
-    entry = %{layer: stroke.layer, changes: stroke_change_list(stroke)}
+    stroke_id = Map.get(stroke, :id) || System.unique_integer([:positive, :monotonic])
+    entry = %{id: stroke_id, layer: stroke.layer, changes: stroke_change_list(stroke)}
+    plane_history = Map.get(state.history, plane, [])
 
     history =
-      case {mode, Map.get(state.history, plane, [])} do
-        {:update, [_current | rest]} -> [entry | rest]
-        {_, history} -> [entry | history]
+      case mode do
+        :update ->
+          if Enum.any?(plane_history, &(Map.get(&1, :id) == stroke_id)) do
+            Enum.map(plane_history, fn
+              %{id: ^stroke_id} -> entry
+              other -> other
+            end)
+          else
+            [entry | plane_history]
+          end
+
+        _ ->
+          [entry | plane_history]
       end
 
     %{
