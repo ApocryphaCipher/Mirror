@@ -58,8 +58,15 @@ docker compose up --build
 
 Builds the release image and starts Mirror on `localhost:4000`. Game files
 and saves are read from (and written to) `~/.mirror/game` via a bind mount
-(set `MIRROR_HOME` to use a different folder). Populate that folder first
-with `mix mirror.import_game` (or the equivalent inside the container).
+(set `MIRROR_HOME` to use a different folder).
+
+To import game files without an Elixir toolchain:
+
+```bash
+docker compose run --rm -v "/path/to/install:/source:ro" app bin/mirror eval 'Mirror.GameFiles.import("/source", "/game")'
+```
+
+(Or populate `~/.mirror/game` using `mix mirror.import_game /path/to/install` if you have Elixir installed.)
 
 Visit `localhost:4000`:
 

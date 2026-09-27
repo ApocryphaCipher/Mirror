@@ -33,6 +33,7 @@ RUN useradd --create-home --shell /usr/sbin/nologin mirror
 
 ENV HOME=/home/mirror
 ENV PHX_SERVER=true
+ENV MIRROR_ASSET_MAP=/data/asset_map
 WORKDIR /app
 
 COPY --from=builder /app/_build/prod/rel/mirror ./
