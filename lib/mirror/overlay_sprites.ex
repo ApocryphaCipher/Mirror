@@ -81,8 +81,8 @@ defmodule Mirror.OverlaySprites do
 
   @doc """
   `%{palette: base64 RGBA (index 0 transparent), cities: %{...}, roads: %{...},
-  enchanted_roads: %{...}, specials: %{...}, corruption: %{...}, plaques: %{...},
-  units: %{...}}`, each sprite `%{width, height, frames: [base64 indices]}`, or
+  enchanted_roads: %{...}, specials: %{...}, corruption: %{...}, sites: %{...},
+  plaques: %{...}, units: %{...}}`, each sprite `%{width, height, frames: [base64 indices]}`, or
   `{:error, reason}` when `MAPBACK.LBX` isn't in `dir`. `UNITS1.LBX`/`UNITS2.LBX`
   are both optional in `Mirror.GameFiles.manifest/0` (an install may have
   `MAPBACK.LBX` without them), so a missing unit bank degrades to an empty
