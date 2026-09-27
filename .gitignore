@@ -45,3 +45,4 @@ npm-debug.log
 /priv/tile_cache
 
 .aider.conf.yml
+.aider*

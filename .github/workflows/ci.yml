@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -33,3 +36,29 @@ jobs:
       # Game files are copyrighted and never in the repo, so tests that need
       # them (MIRROR_MOM_PATH) skip here; run scripts/test_game.sh locally.
       - run: mix test
+
+  docker-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t mirror:ci .
+      # A build that succeeds can still produce an image that fails to boot
+      # (e.g. a release that can't find its own runtime) — actually start it
+      # and check it serves a page, not just that `docker build` exits 0.
+      - name: Smoke-test the image actually boots and serves
+        run: |
+          docker run -d --name mirror-smoke -p 4000:4000 \
+            -e SECRET_KEY_BASE="0000000000000000000000000000000000000000000000000000000000000000" \
+            -e MIRROR_MOM_PATH=/game \
+            -e MIRROR_STATS_FILE=/data/stats.dets \
+            -e MIRROR_ASSET_MAP=/data/asset_map \
+            mirror:ci
+          for i in $(seq 1 15); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:4000/arcanus || true)
+            [ "$code" = "200" ] && echo "up after ${i}s" && exit 0
+            sleep 1
+          done
+          echo "Container never became healthy:"
+          docker logs mirror-smoke
+          exit 1
