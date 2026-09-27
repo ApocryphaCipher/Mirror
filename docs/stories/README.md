@@ -30,7 +30,7 @@
 - [STORY-030](STORY-030-docker-image-and-compose.md): Docker release image + `compose.yaml`, game files mounted read-write, never baked in (EPIC-007) **Done**
 - [STORY-031](STORY-031-spike-download-own-gog-copy.md): **spike**: script the download of the user's own GOG purchase (their GOG login), feeding `mix mirror.import_game` (EPIC-007)
 - [STORY-032](STORY-032-cities-walls-labels-verify.md): cities follow-up: walls, name labels, check size frame / flag colour against the real game (EPIC-004) **Done**
-- [STORY-033](STORY-033-cities-town-frames-rival-flags.md): cities: Town+ frames, rival flag colours, what `CITYNOWA` is for (EPIC-004)
+- [STORY-033](STORY-033-cities-town-frames-rival-flags.md): cities: Town+ frames, rival flag colours, what `CITYNOWA` is for (EPIC-004) **Done** (frame question; flags/CITYNOWA moved to backlog.md)
 - [STORY-034](STORY-034-surveyor.md): Surveyor readout: a tile's food and bonuses, and the City Resources (max pop, production and gold bonus) a city there would get (EPIC-006) **Done**
 - [STORY-035](STORY-035-settleable-tiles-overlay.md): overlay mode that highlights the tiles where a city can be built, optionally graded by Maximum Pop (EPIC-006, nice-to-have) **Done**
 - [STORY-036](STORY-036-fog-of-war-layer.md): fog-of-war layer, off by default, painting the game's black fog over unexplored tiles (EPIC-006, nice-to-have) **Done**

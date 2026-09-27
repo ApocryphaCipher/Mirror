@@ -16,7 +16,7 @@ top-level block table.
 | Fortresses | `0x0065f8` | 4 | 6 | **Yes** (kazzmir, checked: the wizards' capitals): x, y, plane, active. See [kazzmir-save-layouts.md](kazzmir-save-layouts.md) |
 | Towers of Wizardry | `0x006610` | 4 | 6 | kazzmir: x, y, owner (`0xFF` none), unknown; **no plane** (towers span both). See [kazzmir-save-layouts.md](kazzmir-save-layouts.md) |
 | Encounter zones | `0x006628` | `0x18` (24) | 99 + 3 | kazzmir: x/y/plane, intact, kind (0–10), guards, rewards, items. Partly checked. See [kazzmir-save-layouts.md](kazzmir-save-layouts.md) |
-| Cities | `0x008aac` | `0x72` (114) | 100 | **Yes** for name/race/x/y/plane/owner/size/pop: momedit + SAVE1's 27 cities (`Mirror.SaveFile.Cities`); count u16 at `0x0009e0`. `+19` size: 0 Outpost, 1 Hamlet, 2 Village (game titles); sprite frame = size − 1. Buildings `+34`..`+66` (1 built, 0xFF not, 0 replaced); **City Walls = `+66`** (verified in-game, STORY-032). `+24` population tens (u16): shown population = `+20` × 1000 + `+24` × 10 (verified by a live RAM write, [live-ram-map.md](live-ram-map.md)). Building id *n* is flagged at `+31+n` (Granary 29 → `+60`, City Walls 35 → `+66`; Marketplace is id 26); `+28` is the item in production, same ids (live RAM) |
+| Cities | `0x008aac` | `0x72` (114) | 100 | **Yes** for name/race/x/y/plane/owner/size/pop: momedit + SAVE1's 27 cities (`Mirror.SaveFile.Cities`); count u16 at `0x0009e0`. `+19` size: 0 Outpost, 1 Hamlet, 2 Village (game titles), but **not** what drives the overland sprite frame — see the Cities sprite section below (STORY-033): the frame is computed from population, and `+19` can go stale. Buildings `+34`..`+66` (1 built, 0xFF not, 0 replaced); **City Walls = `+66`** (verified in-game, STORY-032). `+24` population tens (u16): shown population = `+20` × 1000 + `+24` × 10 (verified by a live RAM write, [live-ram-map.md](live-ram-map.md)). Building id *n* is flagged at `+31+n` (Granary 29 → `+60`, City Walls 35 → `+66`; Marketplace is id 26); `+28` is the item in production, same ids (live RAM) |
 | Units | `0x00b734` | `0x20` (32) | 1000 + 9 | kazzmir: x/y/plane/owner, type `+5`, level, experience, enchantments… Checked on SAVE1's 42 units. Unit count at `0x0009e2`. See [kazzmir-save-layouts.md](kazzmir-save-layouts.md) |
 | Terrain flags map | `0x01cbb8` | 1 / tile | 2 × 2400 | **Partly:** `0x08` road (checked against a DOSBox shot), `0x10` enchanted road, `0x20` corruption (kazzmir). See [kazzmir-save-layouts.md](kazzmir-save-layouts.md) |
 | Minerals map | `0x013554` | 1 / tile | 2 × 2400 | **Yes** (kazzmir; SAVE1's values all fit): 1 iron … 9 crysx, 64 wild game, 128 nightshade. See [kazzmir-save-layouts.md](kazzmir-save-layouts.md) |
@@ -41,7 +41,7 @@ reasoned from the pictures, not yet confirmed against a save.
 
 | Sprite | Entry |
 | --- | --- |
-| Every city, walled or not: frame = size byte − 1 (outpost and hamlet both frame 0) | `MAPBACK.LBX #20/0..4` (`MAPCITY`) |
+| Every city, walled or not: frame from population, not the size byte (see below) | `MAPBACK.LBX #20/0..4` (`MAPCITY`) |
 | Unknown use; the same frames as `#20` without the stone ring | `MAPBACK.LBX #21/0..4` (`CITYNOWA`) |
 
 **Checked in the game (DOSBox, STORY-032).** Sources: SAVE1 and the
@@ -49,12 +49,28 @@ god-mode checkpoint saves `SAVE4`–`SAVE9`, lined up with window
 screenshots. DOSBox screenshots keep exact palette colours, so flag pixels
 can be read back as palette indices.
 
-- **Frame = size − 1, and walls don't change it.** Zwolle (size 0,
-  outpost) and Posen and Norport (size 1, hamlets) are all `#20` frame 0.
-  Ozenwall (size 2, village) is `#20` frame 1. Norport keeps frame 0 after
-  City Walls (`+66` = 1), and Ozenwall has no walls but its frame shows a
-  stone ring anyway. So the ring in frames 1–4 isn't City Walls.
-  *Not seen yet:* frames 2–4 (size 3+).
+- **Superseded 2026-09-27 (STORY-033):** frame is **not** `size − 1`.
+  It's computed live from **population**, independent of the save's
+  stored `+19` size byte, which can go stale (directly demonstrated in a
+  live DOSBox session: forcing size to 0 with population 24,000 still
+  drew a fully-developed city; forcing size to 4 with population 1,000
+  drew the smallest sprite, and the city's own "Pop Size" stat agreed).
+  Checked with a 25-city population grid, 1,000 to 25,000 in 1,000
+  steps: frame 0 up to population 4,000, frame 1 at 5,000-8,000, frame 2
+  at 9,000-12,000, frame 3 at 13,000-16,000, frame 4 (the sprite's last
+  frame) for 17,000 and up. **`frame = min(4, div(population - 1,
+  4000))`.** Cross-checked against unedited data: Bromburg at population
+  4,000 showed "Hamlet" (frame 0), matching. See
+  [STORY-033](../stories/STORY-033-cities-town-frames-rival-flags.md).
+  Superseded finding, kept for history: Zwolle (size 0, outpost) and
+  Posen and Norport (size 1, hamlets) were all seen as `#20` frame 0;
+  Ozenwall (size 2, village) as `#20` frame 1 — consistent with the
+  population rule (all under 4,000 shown as frame 0 works only
+  coincidentally for outposts/hamlets there; the real driver is
+  population, not size). Norport keeps frame 0 after City Walls
+  (`+66` = 1), and Ozenwall has no walls but its frame shows a stone ring
+  anyway — so the ring in frames 1–4 still isn't City Walls, that part
+  stands.
 - **Every city has a flag, outposts included.** An earlier note said
   outposts have none, but that city was a neutral hamlet (Posen) with a
   brown flag.
