@@ -66,3 +66,14 @@ Unsorted, not yet promoted to a story.
   `MAPBACK` masks `#0–#13` (*guess*). Confirm by setting one tile to 1, 2,
   4 and 8 with the DOSBox fork and screenshotting each. Mirror doesn't
   need this: STORY-036 uses its own dither (Kevin, 2026-09-24).
+- **Very low priority:** STORY-033's remaining two questions (rival
+  flag colours beyond the checked yellow case, and what `CITYNOWA`
+  `MAPBACK #21` is for). The population→frame formula, the story's main
+  question, is resolved (docs/reference/overland-sprites-and-save-blocks.md,
+  live DOSBox session 2026-09-27); a spot-check that day found red and
+  blue's flag pixels don't cleanly match the single-ramp rule confirmed
+  for yellow in STORY-032 (some pixels land outside the assumed ramp
+  entirely) — a real discrepancy, not yet resolved, and not worth
+  further DOSBox time for now (Kevin, 2026-09-27). Mirror keeps the
+  existing ramp-based guess for all colours until this is picked up
+  again.

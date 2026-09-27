@@ -41,7 +41,7 @@ reasoned from the pictures, not yet confirmed against a save.
 
 | Sprite | Entry |
 | --- | --- |
-| Every city, walled or not: frame = size byte − 1 (outpost and hamlet both frame 0) | `MAPBACK.LBX #20/0..4` (`MAPCITY`) |
+| Every city, walled or not: frame from population, not the size byte (see below) | `MAPBACK.LBX #20/0..4` (`MAPCITY`) |
 | Unknown use; the same frames as `#20` without the stone ring | `MAPBACK.LBX #21/0..4` (`CITYNOWA`) |
 
 **Checked in the game (DOSBox, STORY-032).** Sources: SAVE1 and the
@@ -49,12 +49,28 @@ god-mode checkpoint saves `SAVE4`–`SAVE9`, lined up with window
 screenshots. DOSBox screenshots keep exact palette colours, so flag pixels
 can be read back as palette indices.
 
-- **Frame = size − 1, and walls don't change it.** Zwolle (size 0,
-  outpost) and Posen and Norport (size 1, hamlets) are all `#20` frame 0.
-  Ozenwall (size 2, village) is `#20` frame 1. Norport keeps frame 0 after
-  City Walls (`+66` = 1), and Ozenwall has no walls but its frame shows a
-  stone ring anyway. So the ring in frames 1–4 isn't City Walls.
-  *Not seen yet:* frames 2–4 (size 3+).
+- **Superseded 2026-09-27 (STORY-033):** frame is **not** `size − 1`.
+  It's computed live from **population**, independent of the save's
+  stored `+19` size byte, which can go stale (directly demonstrated in a
+  live DOSBox session: forcing size to 0 with population 24,000 still
+  drew a fully-developed city; forcing size to 4 with population 1,000
+  drew the smallest sprite, and the city's own "Pop Size" stat agreed).
+  Checked with a 25-city population grid, 1,000 to 25,000 in 1,000
+  steps: frame 0 up to population 4,000, frame 1 at 5,000-8,000, frame 2
+  at 9,000-12,000, frame 3 at 13,000-16,000, frame 4 (the sprite's last
+  frame) for 17,000 and up. **`frame = min(4, div(population - 1,
+  4000))`.** Cross-checked against unedited data: Bromburg at population
+  4,000 showed "Hamlet" (frame 0), matching. See
+  [STORY-033](../stories/STORY-033-cities-town-frames-rival-flags.md).
+  Superseded finding, kept for history: Zwolle (size 0, outpost) and
+  Posen and Norport (size 1, hamlets) were all seen as `#20` frame 0;
+  Ozenwall (size 2, village) as `#20` frame 1 — consistent with the
+  population rule (all under 4,000 shown as frame 0 works only
+  coincidentally for outposts/hamlets there; the real driver is
+  population, not size). Norport keeps frame 0 after City Walls
+  (`+66` = 1), and Ozenwall has no walls but its frame shows a stone ring
+  anyway — so the ring in frames 1–4 still isn't City Walls, that part
+  stands.
 - **Every city has a flag, outposts included.** An earlier note said
   outposts have none, but that city was a neutral hamlet (Posen) with a
   brown flag.
