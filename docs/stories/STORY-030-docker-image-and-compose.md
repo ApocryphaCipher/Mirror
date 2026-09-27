@@ -1,7 +1,8 @@
 # STORY-030: Docker image and compose file
 
 **Parent:** [EPIC-007](../epics/EPIC-007-packaging-ci-and-repo-hygiene.md)
-**Status:** Done (2026-09-26)
+**Status:** open, in review (PR #69) — image builds but doesn't boot on the
+author's Mac; see Outcome below for why and what's next
 **Size:** small–medium
 **Requested by:** [Kevin](https://github.com/KevinAsbury), 2026-09-23
 
@@ -63,26 +64,56 @@ Elixir/OTP versions in step with CI.
 - CI builds the image (build only, no push) so the Dockerfile can't rot.
 - README's Quick start mentions the Docker route.
 
-## Outcome
+## Outcome (in progress — not Done, see below)
 
 Added `Dockerfile` (multi-stage: `hexpm/elixir` builder, `debian:bookworm-slim`
 runtime, non-root user, `MIX_ENV=prod` throughout), `compose.yaml` (bind-mounts
 `${MIRROR_HOME:-~/.mirror}/game:/game` and `${MIRROR_HOME:-~/.mirror}:/data`,
-dev-only `SECRET_KEY_BASE`), a `docker-build` CI job (build only, no push),
-and a README Quick start entry. Dropped the now-redundant `MIRROR_*_OFFSET`
-exports from `scripts/dev_server.sh` (`config/config.exs` already has correct
-defaults; confirmed `scripts/test_game.sh` still picks up `MIRROR_MOM_PATH`).
+dev-only `SECRET_KEY_BASE`), a `docker-build` CI job that builds the image
+*and* boots it + curls `/arcanus` (build succeeding isn't enough — see why
+below), and a README Quick start entry. Dropped the now-redundant
+`MIRROR_*_OFFSET` exports from `scripts/dev_server.sh` (`config/config.exs`
+already has correct defaults; confirmed `scripts/test_game.sh` still picks up
+`MIRROR_MOM_PATH`).
 
-**Verified, not just written:** ran `mix release` directly (outside Docker)
-to confirm the real output path is `_build/prod/rel/mirror/`, not
-`_build/releases/mirror/` as first drafted — fixed the `Dockerfile`'s `COPY`
-lines accordingly before this ever reached a PR.
+Drafted by Qwen3.8 via Aider (NUC). Reviewing it by actually running things,
+not reading the diff, turned up three real bugs, two fixed:
 
-**Not verified — no Docker daemon or Linux host available in this session:**
-an actual `docker compose up --build` end-to-end run (image build, asset
-pipeline under Docker's Linux tailwind/esbuild binaries, serving a save from
-a mounted game folder). `mix format`/`compile --warnings-as-errors` pass;
-`mix assets.deploy` under `MIX_ENV=prod` fails locally on this Mac with the
-already-known tailwind macOS-binary signing issue (see the backlog) — expected
-to work fine under Linux in the container, but genuinely untested. Please run
-`docker compose up --build` once for real before considering this airtight.
+1. **Fixed.** Base image tag `hexpm/elixir:1.20.4-otp-29.1` doesn't exist —
+   the real tag format includes the full OTP patch and base OS
+   (`1.20.4-erlang-29.1.1-debian-bookworm-20260918-slim`), confirmed against
+   Docker Hub's actual tag list, not guessed.
+2. **Fixed.** `mix release`'s real output is `_build/prod/rel/mirror/`, not
+   `_build/releases/mirror/` as first drafted — confirmed by running
+   `mix release` directly. Also: the Dockerfile only copied `bin/` and
+   `releases/` from it, missing the release's own `erts-*/` and `lib/`
+   directories entirely (the bundled Erlang runtime and compiled app code) —
+   changed to copy the whole release directory instead of cherry-picking.
+3. **Fixed.** The slim builder image has no `git`, needed because `mix.exs`
+   fetches the `heroicons` dependency straight from GitHub rather than Hex —
+   `mix deps.get` failed until `git` was added to the builder stage.
+
+**Unresolved — the image still doesn't boot on this Mac.** After all three
+fixes above, `docker build` succeeds, but `docker run` fails:
+```
+/app/releases/0.1.0/../../erts-17.1/bin/erl: exec: /app/erts-17.1/bin/erlexec: Exec format error
+```
+Checked the actual bytes: the *base* `hexpm/elixir` image's own
+`erts-17.1/bin/erlexec` is a correct Linux ELF binary (`7f 45 4c 46`). But
+after `mix release` bundles/copies it into `_build/prod/rel/mirror/erts-17.1/`,
+that same file comes out as a **macOS Mach-O binary** (`cf fa ed fe`) instead
+— reproduced from a fully clean `docker build --no-cache`, and with BuildKit's
+provenance/SBOM attestation explicitly disabled, so neither caching nor that
+metadata step explains it. I could not root-cause this further without more
+time; my best guess is something specific to Docker Desktop for Mac's
+virtualization on Apple Silicon (this machine), not a Dockerfile bug — but I
+haven't confirmed that, and CI (native Linux) may or may not hit the same
+thing since its `docker-build` job never previously *ran* the image, only
+built it (now it does, via the new boot-and-curl step above — that step will
+tell us whether this reproduces there).
+
+**Next step:** check whether CI's new boot-smoke step passes on GitHub's
+Linux runner. If it does, this was Docker-Desktop-for-Mac-specific and the
+story can go straight to Done. If it fails there too, this needs a real
+investigation (possibly `mix release`'s `:erts_dir` resolution, or a
+Docker Desktop VirtioFS interaction) before merging.
