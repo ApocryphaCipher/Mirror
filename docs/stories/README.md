@@ -27,7 +27,7 @@
 - [STORY-027](STORY-027-cycle-tile-tool.md): Cycle tool: click steps a tile to the next picture (#134 → #135); today's click-to-paint becomes the Paint tool (EPIC-006) **Done**
 - [STORY-028](STORY-028-floating-tool-palette.md): floating emoji tool palette (🔄 Cycle, 🎨 Paint) with Cycle instructions and a Paint panel (brush size, quick terrain buttons) (EPIC-006, nice-to-have)
 - [STORY-029](STORY-029-safe-editing-see-everything.md): safe map editing: see everything past the fog, and flag impossible states (units on water…) (EPIC-006, later; blocked on EPIC-004)
-- [STORY-030](STORY-030-docker-image-and-compose.md): Docker release image + `compose.yaml`, game files mounted read-only, never baked in (EPIC-007), PR #69 open — builds but doesn't boot yet, see story
+- [STORY-030](STORY-030-docker-image-and-compose.md): Docker release image + `compose.yaml`, game files mounted read-only, never baked in (EPIC-007) **Done**
 - [STORY-031](STORY-031-spike-download-own-gog-copy.md): **spike**: script the download of the user's own GOG purchase (their GOG login), feeding `mix mirror.import_game` (EPIC-007)
 - [STORY-032](STORY-032-cities-walls-labels-verify.md): cities follow-up: walls, name labels, check size frame / flag colour against the real game (EPIC-004) **Done**
 - [STORY-033](STORY-033-cities-town-frames-rival-flags.md): cities: Town+ frames, rival flag colours, what `CITYNOWA` is for (EPIC-004)

@@ -18,6 +18,7 @@ COPY mix.exs mix.lock ./
 RUN mix deps.get
 
 COPY . .
+RUN mix compile
 RUN mix assets.deploy
 RUN mix release
 
@@ -31,6 +32,7 @@ RUN apt-get update \
 RUN useradd --create-home --shell /usr/sbin/nologin mirror
 
 ENV HOME=/home/mirror
+ENV PHX_SERVER=true
 WORKDIR /app
 
 COPY --from=builder /app/_build/prod/rel/mirror ./

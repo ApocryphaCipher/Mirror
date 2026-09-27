@@ -1,0 +1,7 @@
+_build/
+deps/
+.elixir_ls/
+.git/
+priv/tile_cache/
+priv/static/assets/
+node_modules/
