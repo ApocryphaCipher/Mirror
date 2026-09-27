@@ -40,4 +40,4 @@
 - [STORY-040](STORY-040-decoder-robustness.md): decoders that raise or accept malformed data on bad input (EPIC-008) **Done**
 - [STORY-041](STORY-041-edit-tests-in-ci.md): editing and save-safety tests are all skipped in CI; move them onto a synthetic save (EPIC-008) **Done**
 - [STORY-042](STORY-042-docs-truth-pass.md): docs truth pass: README, statuses, Surveyor doc, old notes (EPIC-008) **Done**
-- [STORY-043](STORY-043-maintainability.md): maintainability: split map_live.ex, dead code (EPIC-008)
+- [STORY-043](STORY-043-maintainability.md): maintainability: split map_live.ex, dead code (EPIC-008) **Done**
