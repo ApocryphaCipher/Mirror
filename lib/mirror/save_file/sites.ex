@@ -25,6 +25,13 @@ defmodule Mirror.SaveFile.Sites do
   @towers {0x6610, 6, 4}
   @encounters {0x6628, 102, 24}
 
+  @doc false
+  def nodes_range, do: {elem(@nodes, 0), elem(@nodes, 1) * elem(@nodes, 2)}
+  @doc false
+  def towers_range, do: {elem(@towers, 0), elem(@towers, 1) * elem(@towers, 2)}
+  @doc false
+  def encounters_range, do: {elem(@encounters, 0), elem(@encounters, 1) * elem(@encounters, 2)}
+
   @node_types %{0 => :sorcery, 1 => :nature, 2 => :chaos}
 
   @type t :: %{nodes: [map()], towers: [map()], encounters: [map()]}

@@ -11,6 +11,9 @@ defmodule Mirror.SaveFile.Wizards do
   @records 6
   @banner 0x16
 
+  @doc false
+  def block_range, do: {@offset, @records * @record}
+
   @banners %{0 => :blue, 1 => :green, 2 => :purple, 3 => :red, 4 => :yellow}
 
   @doc "Owner index => banner colour (`:neutral` when not a wizard colour)."

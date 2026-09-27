@@ -35,6 +35,11 @@ defmodule Mirror.SaveFile.Units do
   @max 1009
   @count_offset 0x0009E2
 
+  @doc false
+  def block_range, do: {@offset, @max * @record}
+  @doc false
+  def count_offset, do: @count_offset
+
   @type unit :: %{
           index: non_neg_integer(),
           x: non_neg_integer(),

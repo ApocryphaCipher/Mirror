@@ -34,6 +34,11 @@ defmodule Mirror.SaveFile.Cities do
   @max 100
   @count_offset 0x9E0
 
+  @doc false
+  def block_range, do: {@offset, @max * @record}
+  @doc false
+  def count_offset, do: @count_offset
+
   @built 1
   @replaced 0
   @walls 35

@@ -87,6 +87,10 @@ committed**, not even small fixtures cut from them.
   sources `scripts/dev_server.sh`, which only exports `MIRROR_MOM_PATH` and the
   block offsets). Running the Surveyor real-save tests therefore requires
   manually exporting `MIRROR_SURVEYOR_SAVE` (or placing the fixture at its default
+  path). The round-trip tests read `MIRROR_TEMPLATE_SAVE` (an old CD install
+  template save outside the repo, defaults to `~/.mirror_assets/MAGIC/TEMPLATE.GAM`).
+  Like the surveyor save, `scripts/test_game.sh` does not set it, so it requires
+  manually exporting `MIRROR_TEMPLATE_SAVE` (or placing the fixture at its default
   path).
 
 - Before committing, check the diff for anything that came out of a game
@@ -163,6 +167,8 @@ These all bit a previous session:
 
 ## 9. Saves: editing safely
 
+- Real-game sign-off: every editing story must be manually tested against DOSBox.
+  See `docs/reference/real-game-acceptance.md` for the procedure.
 - Never overwrite the save that was loaded; `SaveFile.write/3` universally
   enforces this (by canonical path and device/inode) for all callers.
   **Save as** suggests the next free `SAVE1.GAM`–`SAVE9.GAM` slot (or leaves
