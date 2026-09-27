@@ -177,12 +177,30 @@ defmodule Mirror.SaveFile.RoadsTest do
     end
 
     test "unmapped minerals values produce no special items" do
-      for invalid <- [0, 10, 15, 63, 65, 127, 255] do
+      for invalid <- [0, 10, 15, 63] do
         assert Roads.special_for_value(invalid) == nil
 
         minerals = blank_plane() |> put_tile(12, 18, invalid)
         assert Roads.special_items(minerals) == []
       end
+    end
+
+    test "combined flag bytes decode the same way as Mirror.Surveyor" do
+      # 0x41 = ore nibble 1 (iron) with an unrelated high bit set. Surveyor
+      # (lib/mirror/surveyor.ex) masks the nibble, so this is iron, not
+      # unmapped (see Copilot review on PR #72).
+      assert Roads.special_for_value(0x41) == :iron
+      # 0x7F: nibble 0xF isn't an ore id, but the wild game bit (0x40) is set.
+      assert Roads.special_for_value(0x7F) == :wild_game
+      # 0xFF: nibble 0xF isn't an ore id; wild game (0x40) wins over
+      # nightshade (0x80) since Surveyor checks it first.
+      assert Roads.special_for_value(0xFF) == :wild_game
+      # 0x8F: nibble 0xF isn't an ore id, wild game bit is unset, nightshade
+      # bit (0x80) is set.
+      assert Roads.special_for_value(0x8F) == :nightshade
+
+      minerals = blank_plane() |> put_tile(12, 18, 0x41)
+      assert Roads.special_items(minerals) == [%{kind: :special, x: 12, y: 18, special: :iron}]
     end
   end
 
@@ -201,6 +219,25 @@ defmodule Mirror.SaveFile.RoadsTest do
     test "tiles without bit 0x20 produce no corruption item" do
       flags = blank_plane() |> put_tile(20, 25, 0x18)
       assert Roads.corruption_items(flags) == []
+    end
+  end
+
+  describe "empty or truncated planes" do
+    # 0..(limit - 1) is a descending range when limit is 0 (Elixir infers a
+    # -1 step whenever last < first), so the naive form iterates i = 0, -1
+    # instead of skipping the loop, and :binary.at/2 raises on an empty
+    # binary (see Copilot review on PR #72).
+    test "an empty terrain_flags plane returns no road or corruption items, not a crash" do
+      assert Roads.road_items(<<>>) == []
+      assert Roads.corruption_items(<<>>) == []
+    end
+
+    test "an empty minerals plane returns no special items, not a crash" do
+      assert Roads.special_items(<<>>) == []
+    end
+
+    test "items/3 with two empty planes returns an empty list, not a crash" do
+      assert Roads.items(<<>>, <<>>) == []
     end
   end
 

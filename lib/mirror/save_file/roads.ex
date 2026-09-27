@@ -29,9 +29,18 @@ defmodule Mirror.SaveFile.Roads do
     7 => :nw
   }
 
-  # Minerals map byte value (0x013554) to special name atom.
+  # Minerals map byte value (0x013554) to special name atom. Ore/gem/crystal
+  # ids live in the low nibble; wild game (0x40) and nightshade (0x80) are
+  # independent flag bits that can combine with an ore nibble or with each
+  # other on the same byte. Mirrors Mirror.Surveyor's own decoder
+  # (lib/mirror/surveyor.ex `feature/7`) bit-for-bit, so the overlay and the
+  # Surveyor tooltip never disagree about the same tile.
   # Ground truth: checked in live RAM and Surveyor (docs/reference/kazzmir-save-layouts.md).
   # Note: #78 is iron and #79 is coal.
+  @ore_nibble 0x0F
+  @wild_game_bit 0x40
+  @nightshade_bit 0x80
+
   @specials %{
     1 => :iron,
     2 => :coal,
@@ -41,20 +50,38 @@ defmodule Mirror.SaveFile.Roads do
     6 => :mithril,
     7 => :adamantium,
     8 => :quork,
-    9 => :crysx,
-    64 => :wild_game,
-    128 => :nightshade
+    9 => :crysx
   }
 
   @doc """
-  Map of minerals byte values to special icon names.
+  Map of ore/gem/crystal nibble values to special icon names. Excludes the
+  wild game and nightshade flag bits, which `special_for_value/1` checks
+  separately.
   """
   def specials_map, do: @specials
 
   @doc """
   Maps a minerals byte value to its special atom, or `nil` if unmapped / none.
+  Masks the ore/gem/crystal nibble and checks the wild game / nightshade flag
+  bits independently (same precedence as `Mirror.Surveyor`): an ore/gem/
+  crystal nibble wins over wild game, which wins over nightshade.
   """
-  def special_for_value(value) when is_integer(value), do: Map.get(@specials, value)
+  def special_for_value(value) when is_integer(value) do
+    cond do
+      Map.has_key?(@specials, value &&& @ore_nibble) ->
+        Map.fetch!(@specials, value &&& @ore_nibble)
+
+      (value &&& @wild_game_bit) != 0 ->
+        :wild_game
+
+      (value &&& @nightshade_bit) != 0 ->
+        :nightshade
+
+      true ->
+        nil
+    end
+  end
+
   def special_for_value(_), do: nil
 
   @doc """
@@ -125,7 +152,7 @@ defmodule Mirror.SaveFile.Roads do
   def road_items(flags, %Topology{} = topo) when is_binary(flags) do
     limit = min(byte_size(flags), topo.w * topo.h)
 
-    for i <- 0..(limit - 1),
+    for i <- 0..(limit - 1)//1,
         flag = :binary.at(flags, i),
         road?(flag) do
       x = rem(i, topo.w)
@@ -155,7 +182,7 @@ defmodule Mirror.SaveFile.Roads do
       when is_binary(minerals) and is_integer(w) and is_integer(h) do
     limit = min(byte_size(minerals), w * h)
 
-    for i <- 0..(limit - 1),
+    for i <- 0..(limit - 1)//1,
         val = :binary.at(minerals, i),
         special = special_for_value(val),
         special != nil do
@@ -179,7 +206,7 @@ defmodule Mirror.SaveFile.Roads do
   def corruption_items(flags, w, h) when is_binary(flags) and is_integer(w) and is_integer(h) do
     limit = min(byte_size(flags), w * h)
 
-    for i <- 0..(limit - 1),
+    for i <- 0..(limit - 1)//1,
         flag = :binary.at(flags, i),
         corrupted?(flag) do
       %{
