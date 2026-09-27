@@ -2687,6 +2687,10 @@ defmodule MirrorWeb.MapLive do
 
     socket
     |> push_event("overlay_data", %{
+      layer: "sites",
+      items: site_items(socket.assigns.state, socket.assigns.plane)
+    })
+    |> push_event("overlay_data", %{
       layer: "cities",
       items: city_items(socket.assigns.state, socket.assigns.plane)
     })
@@ -2744,6 +2748,51 @@ defmodule MirrorWeb.MapLive do
   end
 
   defp fog_items(_state, _plane), do: []
+
+  defp site_items(%{save: %{raw: raw}}, plane) do
+    case Sites.parse(raw) do
+      {:ok, %{towers: towers, encounters: encounters}} ->
+        tower_items =
+          for tower <- towers do
+            %{
+              x: tower.x,
+              y: tower.y,
+              sprite: if(tower.owner, do: "tower_owned", else: "tower_unowned")
+            }
+          end
+
+        encounter_items =
+          for encounter <- encounters, encounter.plane == plane, encounter.intact do
+            sprite =
+              case encounter.kind do
+                4 -> "mound"
+                8 -> "mound"
+                5 -> "ruins"
+                9 -> "ruins"
+                6 -> "ancient_temple"
+                7 -> "abandoned_keep"
+                10 -> "fallen_temple"
+                _ -> nil
+              end
+
+            if sprite do
+              %{
+                x: encounter.x,
+                y: encounter.y,
+                sprite: sprite
+              }
+            end
+          end
+          |> Enum.reject(&is_nil/1)
+
+        tower_items ++ encounter_items
+
+      {:error, _} ->
+        []
+    end
+  end
+
+  defp site_items(_state, _plane), do: []
 
   defp city_items(%{save: %{raw: raw}}, plane) do
     banners = Wizards.banners(raw)

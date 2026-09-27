@@ -94,6 +94,23 @@ const DRAWERS = {
     }
   },
 
+  // STORY-011: sites (towers and encounter zones)
+  sites(ctx, items, {tileSize, sprites}) {
+    if (!sprites?.sites) return
+
+    for (const item of items) {
+      const sprite = sprites.sites[item.sprite]
+      if (!sprite) continue
+
+      const w = Math.round((sprite.width * tileSize) / TILE_ART_W)
+      const h = Math.round((sprite.height * tileSize) / TILE_ART_H)
+      const image = sprites.image(`sites.${item.sprite}`, sprite, 0, null)
+      const left = Math.round((item.x + 0.5) * tileSize - w / 2)
+      const top = Math.round((item.y + 0.5) * tileSize - h / 2)
+      ctx.drawImage(image, left, top, w, h)
+    }
+  },
+
   // STORY-010/032. The game draws MAPBACK #20 at frame size - 1, walls or
   // not: outposts (size 0) and hamlets (1) show frame 0, villages (2) frame
   // 1, all with a flag, centred on the tile. Checked in DOSBox; Town and up

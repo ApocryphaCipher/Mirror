@@ -58,6 +58,17 @@ defmodule Mirror.OverlaySprites do
   # Corruption icon: MAPBACK.LBX #77 (22x18)
   @corruption %{corruption: 77}
 
+  # Sites: Towers of Wizardry and encounter zones (MAPBACK.LBX #69..#75)
+  @sites %{
+    tower_unowned: 69,
+    tower_owned: 70,
+    mound: 71,
+    ancient_temple: 72,
+    abandoned_keep: 73,
+    ruins: 74,
+    fallen_temple: 75
+  }
+
   # Unit plaques: MAPBACK.LBX #14..#19 (20x18, one per banner colour)
   @plaques %{
     blue: 14,
@@ -70,8 +81,8 @@ defmodule Mirror.OverlaySprites do
 
   @doc """
   `%{palette: base64 RGBA (index 0 transparent), cities: %{...}, roads: %{...},
-  enchanted_roads: %{...}, specials: %{...}, corruption: %{...}, plaques: %{...},
-  units: %{...}}`, each sprite `%{width, height, frames: [base64 indices]}`, or
+  enchanted_roads: %{...}, specials: %{...}, corruption: %{...}, sites: %{...},
+  plaques: %{...}, units: %{...}}`, each sprite `%{width, height, frames: [base64 indices]}`, or
   `{:error, reason}` when `MAPBACK.LBX` isn't in `dir`. `UNITS1.LBX`/`UNITS2.LBX`
   are both optional in `Mirror.GameFiles.manifest/0` (an install may have
   `MAPBACK.LBX` without them), so a missing unit bank degrades to an empty
@@ -88,6 +99,7 @@ defmodule Mirror.OverlaySprites do
          {:ok, enchanted_roads} <- sprites(mapback, @enchanted_roads),
          {:ok, specials} <- sprites(mapback, @specials),
          {:ok, corruption} <- sprites(mapback, @corruption),
+         {:ok, sites} <- sprites(mapback, @sites),
          {:ok, plaques} <- sprites(mapback, @plaques) do
       {:ok,
        %{
@@ -97,6 +109,7 @@ defmodule Mirror.OverlaySprites do
          enchanted_roads: enchanted_roads,
          specials: specials,
          corruption: corruption,
+         sites: sites,
          plaques: plaques,
          units: load_units(dir)
        }}

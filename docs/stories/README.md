@@ -8,7 +8,7 @@
 - [STORY-008](STORY-008-node-auras.md): node auras, owner-coloured sparkle on melded nodes (EPIC-005)
 - [STORY-009](STORY-009-overlay-layer-toggles.md): overlay layers with on/off toggles (EPIC-004) **Done**
 - [STORY-010](STORY-010-cities.md): cities (EPIC-004) **Done**
-- [STORY-011](STORY-011-sites-towers-lairs.md): towers, fortresses, lairs, ruins, sites (EPIC-004)
+- [STORY-011](STORY-011-sites-towers-lairs.md): towers, fortresses, lairs, ruins, sites (EPIC-004) **Done**
 - [STORY-012](STORY-012-units-with-banner-plaques.md): units with banner-colour plaques (EPIC-004) **Done**
 - [STORY-013](STORY-013-roads-minerals-corruption.md): specials and bonuses (ores, gems, nightshade, wild game…), roads, corruption (EPIC-004) **Done**
 - [STORY-014](STORY-014-ui-triage-and-lab-route.md): triage the UI; research tools → Lab route (EPIC-006) **Done**
@@ -41,3 +41,4 @@
 - [STORY-041](STORY-041-edit-tests-in-ci.md): editing and save-safety tests are all skipped in CI; move them onto a synthetic save (EPIC-008) **Done**
 - [STORY-042](STORY-042-docs-truth-pass.md): docs truth pass: README, statuses, Surveyor doc, old notes (EPIC-008) **Done**
 - [STORY-043](STORY-043-maintainability.md): maintainability: split map_live.ex, dead code (EPIC-008) **Done**
+- [STORY-044](STORY-044-bug-stale-overlays-across-tabs.md): **bug**: cities/units/sites overlays go stale on cross-tab save updates (EPIC-004)

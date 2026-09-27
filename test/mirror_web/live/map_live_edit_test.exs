@@ -703,6 +703,84 @@ defmodule MirrorWeb.MapLiveEditTest do
     end
   end
 
+  describe "sites layer (STORY-011)" do
+    # x, y, plane (0 Arcanus, 1 Myrror), intact (1/0), kind -> 24-byte encounter record.
+    defp encounter_bytes(x, y, plane, intact, kind) do
+      <<x, y, plane, intact, kind>> <> :binary.copy(<<0>>, 10) <> <<0>> <> :binary.copy(<<0>>, 8)
+    end
+
+    test "overlays are pushed with the map and follow edits", %{conn: conn, dir: dir} do
+      save_with_sites = Path.join(dir, "SITES_TEST.GAM")
+      raw = synthetic_save_bytes()
+
+      # Write a tower at 0x6610 (already there: x=48, y=28, owner=255/nil -> unowned)
+      # Add an owned tower
+      raw = put_bytes(raw, 0x6610 + 4, <<49, 29, 0, 0>>)
+
+      # Encounters at 0x6628, every intact kind that draws a sprite, plus the
+      # cases that must NOT draw: cleared, wrong plane, node guardian.
+      encounters = [
+        # {x, y, plane, intact, kind}
+        {26, 25, 0, 1, 7},
+        {28, 21, 0, 0, 6},
+        {10, 10, 0, 1, 4},
+        {11, 11, 0, 1, 8},
+        {12, 12, 0, 1, 5},
+        {13, 13, 0, 1, 9},
+        {14, 14, 0, 1, 10},
+        {17, 17, 0, 1, 6},
+        {15, 15, 1, 1, 7},
+        {16, 16, 0, 1, 3}
+      ]
+
+      raw =
+        encounters
+        |> Enum.with_index()
+        |> Enum.reduce(raw, fn {{x, y, plane, intact, kind}, i}, acc ->
+          put_bytes(acc, 0x6628 + i * 24, encounter_bytes(x, y, plane, intact, kind))
+        end)
+
+      File.write!(save_with_sites, raw)
+
+      {:ok, view, _} = live(conn, ~p"/arcanus")
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save_with_sites}})
+
+      assert_push_event(view, "overlay_data", %{layer: "sites", items: items})
+      assert length(items) == 9
+
+      # Towers: both planes, unconditionally.
+      assert %{x: 48, y: 28, sprite: "tower_unowned"} in items
+      assert %{x: 49, y: 29, sprite: "tower_owned"} in items
+
+      # Every intact kind on the viewed (Arcanus) plane maps to its sprite.
+      assert %{x: 26, y: 25, sprite: "abandoned_keep"} in items
+      assert %{x: 10, y: 10, sprite: "mound"} in items
+      assert %{x: 11, y: 11, sprite: "mound"} in items
+      assert %{x: 12, y: 12, sprite: "ruins"} in items
+      assert %{x: 13, y: 13, sprite: "ruins"} in items
+      assert %{x: 14, y: 14, sprite: "fallen_temple"} in items
+      assert %{x: 17, y: 17, sprite: "ancient_temple"} in items
+
+      # Cleared, wrong-plane, and node-guardian encounters draw nothing.
+      refute Enum.any?(items, &(&1.x == 28 and &1.y == 21))
+      refute Enum.any?(items, &(&1.x == 15 and &1.y == 15))
+      refute Enum.any?(items, &(&1.x == 16 and &1.y == 16))
+    end
+
+    test "encounters on the other plane show there instead", %{conn: conn, dir: dir} do
+      save_with_sites = Path.join(dir, "SITES_TEST_MYRROR.GAM")
+      raw = synthetic_save_bytes()
+      raw = put_bytes(raw, 0x6628, encounter_bytes(15, 15, 1, 1, 7))
+      File.write!(save_with_sites, raw)
+
+      {:ok, view, _} = live(conn, ~p"/myrror")
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save_with_sites}})
+
+      assert_push_event(view, "overlay_data", %{layer: "sites", items: items})
+      assert %{x: 15, y: 15, sprite: "abandoned_keep"} in items
+    end
+  end
+
   describe "real-save integration" do
     @tag skip:
            !@has_real_save_and_sprites &&
