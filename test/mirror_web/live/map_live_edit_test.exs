@@ -613,14 +613,15 @@ defmodule MirrorWeb.MapLiveEditTest do
     end
   end
 
-  describe "settleable tiles and fog layers (STORY-035, STORY-036)" do
-    test "both are pushed with the map, off by default, and follow edits", %{
+  describe "settleable tiles, roads, and fog layers (STORY-013, STORY-035, STORY-036)" do
+    test "overlays are pushed with the map and follow edits", %{
       conn: conn,
       save: save
     } do
       {:ok, view, html} = live(conn, ~p"/arcanus")
       refute html =~ ~r/value="fog"[^>]*checked/
       refute html =~ ~r/value="settleable"[^>]*checked/
+      assert html =~ ~r/value="roads"[^>]*checked/
       assert html =~ ~r/value="cities"[^>]*checked/
 
       view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
@@ -628,6 +629,12 @@ defmodule MirrorWeb.MapLiveEditTest do
       assert_push_event(view, "overlay_data", %{layer: "settleable", items: settleable})
       refute Enum.any?(settleable, &match?(%{x: 38, y: 21}, &1))
       assert Enum.all?(settleable, &(&1.max_pop in 0..25))
+
+      # STORY-013: roads, specials and corruption
+      assert_push_event(view, "overlay_data", %{layer: "roads", items: roads})
+
+      assert %{kind: :special, x: 39, y: 20, special: :gold} =
+               Enum.find(roads, &match?(%{x: 39, y: 20}, &1))
 
       # SAVE1 is turn one: most of the map is fog; 15 is fully explored.
       assert_push_event(view, "overlay_data", %{layer: "fog", items: fog})
@@ -638,17 +645,23 @@ defmodule MirrorWeb.MapLiveEditTest do
       render_click(view, "set_tool", %{"tool" => "cycle"})
       pointer(view, "start", 10, 10)
       assert_push_event(view, "overlay_data", %{layer: "settleable"})
+      assert_push_event(view, "overlay_data", %{layer: "roads"})
     end
 
-    test "discard refreshes settleable and fog overlays (STORY-039)", %{conn: conn, save: save} do
+    test "discard refreshes settleable, roads, and fog overlays (STORY-039)", %{
+      conn: conn,
+      save: save
+    } do
       view = editing(conn, save, "cycle")
       pointer(view, "start", 10, 10)
       assert_push_event(view, "overlay_data", %{layer: "settleable"})
+      assert_push_event(view, "overlay_data", %{layer: "roads"})
 
       render_click(view, "arm_discard", %{})
       render_click(view, "discard_edits", %{})
 
       assert_push_event(view, "overlay_data", %{layer: "settleable"})
+      assert_push_event(view, "overlay_data", %{layer: "roads"})
       assert_push_event(view, "overlay_data", %{layer: "fog"})
     end
   end
@@ -668,7 +681,19 @@ defmodule MirrorWeb.MapLiveEditTest do
       assert length(items) == 16
       assert %{x: 38, y: 21, size: 1, banner: :yellow, name: "Deventor", walled: false} in items
 
-      assert_push_event(view, "overlay_sprites", %{cities: %{city: %{width: 32, height: 30}}})
+      assert_push_event(view, "overlay_data", %{layer: "roads", items: roads})
+      # Arcanus has 35 roads + 35 specials
+      assert length(roads) == 70
+      assert Enum.any?(roads, &(&1.kind == :road))
+      assert Enum.any?(roads, &(&1.kind == :special))
+
+      assert_push_event(view, "overlay_sprites", %{
+        cities: %{city: %{width: 32, height: 30}},
+        roads: %{c: %{width: 20, height: 18}},
+        enchanted_roads: %{c: %{width: 20, height: 18}},
+        specials: %{gold: %{width: 20, height: 18}},
+        corruption: %{corruption: %{width: 22, height: 18}}
+      })
     end
 
     @tag skip: !@has_real_save && "needs MIRROR_MOM_PATH/SAVE1.GAM"

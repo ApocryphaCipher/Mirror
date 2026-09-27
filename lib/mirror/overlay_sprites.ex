@@ -14,10 +14,55 @@ defmodule Mirror.OverlaySprites do
   # the stone ring; its use is unknown.
   @cities %{city: 20, citynowa: 21}
 
+  # Normal roads: #45 centre piece + #46..#53 direction pieces (N, NE, E, SE, S, SW, W, NW)
+  @roads %{
+    c: 45,
+    n: 46,
+    ne: 47,
+    e: 48,
+    se: 49,
+    s: 50,
+    sw: 51,
+    w: 52,
+    nw: 53
+  }
+
+  # Enchanted roads: #54 centre piece + #55..#62 direction pieces (6 frames)
+  @enchanted_roads %{
+    c: 54,
+    n: 55,
+    ne: 56,
+    e: 57,
+    se: 58,
+    s: 59,
+    sw: 60,
+    w: 61,
+    nw: 62
+  }
+
+  # Specials (minerals, food): MAPBACK.LBX #78..#86, #91, #92
+  @specials %{
+    iron: 78,
+    coal: 79,
+    silver: 80,
+    gold: 81,
+    gems: 82,
+    mithril: 83,
+    adamantium: 84,
+    quork: 85,
+    crysx: 86,
+    nightshade: 91,
+    wild_game: 92
+  }
+
+  # Corruption icon: MAPBACK.LBX #77 (22x18)
+  @corruption %{corruption: 77}
+
   @doc """
-  `%{palette: base64 RGBA (index 0 transparent), cities: %{city: sprite,
-  citynowa: sprite}}`, each sprite `%{width, height, frames: [base64
-  indices]}`, or `{:error, reason}` when `MAPBACK.LBX` isn't in `dir`.
+  `%{palette: base64 RGBA (index 0 transparent), cities: %{...}, roads: %{...},
+  enchanted_roads: %{...}, specials: %{...}, corruption: %{...}}`, each sprite
+  `%{width, height, frames: [base64 indices]}`, or `{:error, reason}` when
+  `MAPBACK.LBX` isn't in `dir`.
   """
   def load(dir) when dir in [nil, ""], do: {:error, :no_mom_path}
 
@@ -25,8 +70,20 @@ defmodule Mirror.OverlaySprites do
     with {:ok, name} <- find(dir, "MAPBACK.LBX"),
          {:ok, mapback} <- LBX.open(Path.join(dir, name)),
          {:ok, palette} <- LBX.game_palette(dir),
-         {:ok, cities} <- sprites(mapback, @cities) do
-      {:ok, %{palette: Base.encode64(Palette.to_binary(palette)), cities: cities}}
+         {:ok, cities} <- sprites(mapback, @cities),
+         {:ok, roads} <- sprites(mapback, @roads),
+         {:ok, enchanted_roads} <- sprites(mapback, @enchanted_roads),
+         {:ok, specials} <- sprites(mapback, @specials),
+         {:ok, corruption} <- sprites(mapback, @corruption) do
+      {:ok,
+       %{
+         palette: Base.encode64(Palette.to_binary(palette)),
+         cities: cities,
+         roads: roads,
+         enchanted_roads: enchanted_roads,
+         specials: specials,
+         corruption: corruption
+       }}
     end
   end
 

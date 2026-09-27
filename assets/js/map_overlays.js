@@ -112,6 +112,50 @@ const DRAWERS = {
       ctx.drawImage(image, left, top, w, h)
     }
   },
+
+  // STORY-013: roads, specials/minerals, and corruption.
+  roads(ctx, items, {tileSize, sprites}) {
+    if (!sprites) return
+
+    for (const item of items) {
+      if (item.kind === "road") {
+        const pieces = item.pieces || (item.piece ? [item.piece] : [])
+        const groupKey = item.enchanted ? "enchanted_roads" : "roads"
+        const group = sprites[groupKey]
+        if (!group) continue
+
+        for (const piece of pieces) {
+          const sprite = group[piece]
+          if (!sprite) continue
+          const w = Math.round((sprite.width * tileSize) / TILE_ART_W)
+          const h = Math.round((sprite.height * tileSize) / TILE_ART_H)
+          const image = sprites.image(`${groupKey}.${piece}`, sprite, 0, null)
+          const left = Math.round((item.x + 0.5) * tileSize - w / 2)
+          const top = Math.round((item.y + 0.5) * tileSize - h / 2)
+          ctx.drawImage(image, left, top, w, h)
+        }
+      } else if (item.kind === "special") {
+        const key = item.special || item.type
+        const sprite = sprites.specials?.[key]
+        if (!sprite) continue
+        const w = Math.round((sprite.width * tileSize) / TILE_ART_W)
+        const h = Math.round((sprite.height * tileSize) / TILE_ART_H)
+        const image = sprites.image(`specials.${key}`, sprite, 0, null)
+        const left = Math.round((item.x + 0.5) * tileSize - w / 2)
+        const top = Math.round((item.y + 0.5) * tileSize - h / 2)
+        ctx.drawImage(image, left, top, w, h)
+      } else if (item.kind === "corruption") {
+        const sprite = sprites.corruption?.corruption
+        if (!sprite) continue
+        const w = Math.round((sprite.width * tileSize) / TILE_ART_W)
+        const h = Math.round((sprite.height * tileSize) / TILE_ART_H)
+        const image = sprites.image("corruption.corruption", sprite, 0, null)
+        const left = Math.round((item.x + 0.5) * tileSize - w / 2)
+        const top = Math.round((item.y + 0.5) * tileSize - h / 2)
+        ctx.drawImage(image, left, top, w, h)
+      }
+    }
+  },
 }
 
 // Decoded sprite frames, recoloured per banner on first use and cached.
