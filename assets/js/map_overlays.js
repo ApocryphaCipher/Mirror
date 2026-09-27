@@ -111,10 +111,9 @@ const DRAWERS = {
     }
   },
 
-  // STORY-010/032. The game draws MAPBACK #20 at frame size - 1, walls or
-  // not: outposts (size 0) and hamlets (1) show frame 0, villages (2) frame
-  // 1, all with a flag, centred on the tile. Checked in DOSBox; Town and up
-  // (frames 2-4) haven't been seen in-game yet.
+  // STORY-033: The game draws the city sprite (MAPBACK #20) using a frame
+  // computed from population: frame 0 up to 4,000, 1 at 5,000, 2 at 9,000,
+  // 3 at 13,000, 4 at 17,000 and up. MapLive explicitly provides the `frame`.
   cities(ctx, items, {tileSize, sprites}) {
     const sprite = sprites?.cities?.city
     if (!sprite) return
@@ -122,7 +121,7 @@ const DRAWERS = {
     const h = Math.round((sprite.height * tileSize) / TILE_ART_H)
 
     for (const city of items) {
-      const frame = Math.max(0, Math.min(city.size - 1, sprite.frames.length - 1))
+      const frame = Math.max(0, Math.min(city.frame, sprite.frames.length - 1))
       const image = sprites.image("cities.city", sprite, frame, city.banner)
       const left = Math.round((city.x + 0.5) * tileSize - w / 2)
       const top = Math.round((city.y + 0.5) * tileSize - h / 2)

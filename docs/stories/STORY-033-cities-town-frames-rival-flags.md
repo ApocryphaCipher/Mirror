@@ -36,7 +36,7 @@ see the backlog entry.
 
 ## Definition of done
 
-- Mirror draws the city frame from population using the table above, not
+- [x] Mirror draws the city frame from population using the table above, not
   the stale `+19` byte.
-- The sprite catalog (`docs/reference/overland-sprites-and-save-blocks.md`)
+- [x] The sprite catalog (`docs/reference/overland-sprites-and-save-blocks.md`)
   records the finding and formula.

@@ -558,7 +558,7 @@ defmodule MirrorWeb.MapLiveEditTest do
 
       assert_push_event(view, "overlay_data", %{layer: "cities", items: items})
       assert length(items) == 16
-      assert %{x: 38, y: 21, size: 1, banner: :yellow, name: "Deventor", walled: false} in items
+      assert %{x: 38, y: 21, frame: 0, banner: :yellow, name: "Deventor", walled: false} in items
     end
 
     test "the hover readout names the city under the pointer (STORY-032)", %{
@@ -581,6 +581,38 @@ defmodule MirrorWeb.MapLiveEditTest do
 
       pointer(view, "hover", 0, 0)
       refute has_element?(view, "#hover-city")
+    end
+
+    test "computes frame from population thresholds (STORY-033)", %{conn: conn, dir: dir} do
+      save_with_pops = Path.join(dir, "CITIES_POPS_TEST.GAM")
+      raw = synthetic_save_bytes()
+
+      # The 16 cities start at 0x8AAC, each 114 bytes. Byte +20 is population.
+      # We'll update the first 10 cities to have the specific populations.
+      pops = [1, 4, 5, 8, 9, 12, 13, 16, 17, 25]
+      expected_frames = [0, 0, 1, 1, 2, 2, 3, 3, 4, 4]
+
+      raw =
+        pops
+        |> Enum.with_index()
+        |> Enum.reduce(raw, fn {pop, i}, acc ->
+          offset = 0x8AAC + i * 114
+          put_byte(acc, offset + 20, pop)
+        end)
+
+      File.write!(save_with_pops, raw)
+
+      {:ok, view, _} = live(conn, ~p"/arcanus")
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save_with_pops}})
+
+      assert_push_event(view, "overlay_data", %{layer: "cities", items: items})
+
+      frames =
+        items
+        |> Enum.take(10)
+        |> Enum.map(& &1.frame)
+
+      assert frames == expected_frames
     end
   end
 
@@ -794,7 +826,7 @@ defmodule MirrorWeb.MapLiveEditTest do
 
       assert_push_event(view, "overlay_data", %{layer: "cities", items: items})
       assert length(items) == 16
-      assert %{x: 38, y: 21, size: 1, banner: :yellow, name: "Deventor", walled: false} in items
+      assert %{x: 38, y: 21, frame: 0, banner: :yellow, name: "Deventor", walled: false} in items
 
       assert_push_event(view, "overlay_data", %{layer: "units", items: units})
       # All 42 starting units in SAVE1 are garrisons inside cities, so none appear on the field

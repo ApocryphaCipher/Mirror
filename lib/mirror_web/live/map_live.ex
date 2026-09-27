@@ -2803,7 +2803,7 @@ defmodule MirrorWeb.MapLive do
           %{
             x: city.x,
             y: city.y,
-            size: city.size,
+            frame: min(4, div(max(0, city.population - 1), 4)),
             banner: Map.get(banners, city.owner, :neutral),
             name: city.name,
             walled: city.walled
