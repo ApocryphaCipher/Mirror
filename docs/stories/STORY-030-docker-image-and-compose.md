@@ -1,7 +1,7 @@
 # STORY-030: Docker image and compose file
 
 **Parent:** [EPIC-007](../epics/EPIC-007-packaging-ci-and-repo-hygiene.md)
-**Status:** open, not started
+**Status:** Done (2026-09-26)
 **Size:** small–medium
 **Requested by:** [Kevin](https://github.com/KevinAsbury), 2026-09-23
 
@@ -62,3 +62,27 @@ Elixir/OTP versions in step with CI.
   saves volume.
 - CI builds the image (build only, no push) so the Dockerfile can't rot.
 - README's Quick start mentions the Docker route.
+
+## Outcome
+
+Added `Dockerfile` (multi-stage: `hexpm/elixir` builder, `debian:bookworm-slim`
+runtime, non-root user, `MIX_ENV=prod` throughout), `compose.yaml` (bind-mounts
+`${MIRROR_HOME:-~/.mirror}/game:/game` and `${MIRROR_HOME:-~/.mirror}:/data`,
+dev-only `SECRET_KEY_BASE`), a `docker-build` CI job (build only, no push),
+and a README Quick start entry. Dropped the now-redundant `MIRROR_*_OFFSET`
+exports from `scripts/dev_server.sh` (`config/config.exs` already has correct
+defaults; confirmed `scripts/test_game.sh` still picks up `MIRROR_MOM_PATH`).
+
+**Verified, not just written:** ran `mix release` directly (outside Docker)
+to confirm the real output path is `_build/prod/rel/mirror/`, not
+`_build/releases/mirror/` as first drafted — fixed the `Dockerfile`'s `COPY`
+lines accordingly before this ever reached a PR.
+
+**Not verified — no Docker daemon or Linux host available in this session:**
+an actual `docker compose up --build` end-to-end run (image build, asset
+pipeline under Docker's Linux tailwind/esbuild binaries, serving a save from
+a mounted game folder). `mix format`/`compile --warnings-as-errors` pass;
+`mix assets.deploy` under `MIX_ENV=prod` fails locally on this Mac with the
+already-known tailwind macOS-binary signing issue (see the backlog) — expected
+to work fine under Linux in the container, but genuinely untested. Please run
+`docker compose up --build` once for real before considering this airtight.

@@ -50,6 +50,17 @@ sets the save-block offsets (`MIRROR_*_OFFSET`).
 bash scripts/dev_server.sh
 ```
 
+### Docker (no Elixir toolchain needed)
+
+```bash
+docker compose up --build
+```
+
+Builds the release image and starts Mirror on `localhost:4000`. Game files
+and saves are read from (and written to) `~/.mirror/game` via a bind mount
+(set `MIRROR_HOME` to use a different folder). Populate that folder first
+with `mix mirror.import_game` (or the equivalent inside the container).
+
 Visit `localhost:4000`:
 
 - `/arcanus`, `/myrror`: the map for each plane. Pan, zoom, inspect tiles with

@@ -33,3 +33,10 @@ jobs:
       # Game files are copyrighted and never in the repo, so tests that need
       # them (MIRROR_MOM_PATH) skip here; run scripts/test_game.sh locally.
       - run: mix test
+
+  docker-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t mirror:ci .
