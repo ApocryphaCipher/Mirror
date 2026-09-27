@@ -71,15 +71,23 @@ committed**, not even small fixtures cut from them.
   starts reading a new LBX file, add it there. (Kevin's full copies are in
   `~/.mirror_assets/GOG`; `MAGIC/` is an old partial CD install.)
 - Tests use **synthetic** binaries built in the test (see
-  `test/mirror/lbx_test.exs`). Real-file tests read from `MIRROR_MOM_PATH`
-  (or specific frozen fixtures like `MIRROR_SURVEYOR_SAVE`, which defaults
-  to `~/.mirror/dev/surveyor-fixtures/SAVE9-dior-2026-09-24.GAM`) and are
+  `test/mirror/lbx_test.exs` and `test/mirror_web/live/map_live_edit_test.exs`).
+  Real-file tests read from `MIRROR_MOM_PATH` (or specific frozen fixtures
+  like `MIRROR_SURVEYOR_SAVE`, which defaults to
+  `~/.mirror/dev/surveyor-fixtures/SAVE9-dior-2026-09-24.GAM`) and are
   skipped when missing:
 
   ```elixir
   @mom_path System.get_env("MIRROR_MOM_PATH", "")
   @tag skip: !File.exists?(Path.join(@mom_path, "MAPBACK.LBX")) && "needs MAPBACK.LBX"
   ```
+
+  The Surveyor real-save tests read `MIRROR_SURVEYOR_SAVE` (a frozen save outside
+  the repo). Note that `scripts/test_game.sh` does **not** set this variable (it
+  sources `scripts/dev_server.sh`, which only exports `MIRROR_MOM_PATH` and the
+  block offsets). Running the Surveyor real-save tests therefore requires
+  manually exporting `MIRROR_SURVEYOR_SAVE` (or placing the fixture at its default
+  path).
 
 - Before committing, check the diff for anything that came out of a game
   file.
@@ -161,9 +169,11 @@ These all bit a previous session:
   it empty if all 9 are taken). Arbitrary names can be written but the
   UI warns that Master of Magic only loads `SAVE1`–`SAVE9`.
 - An edit must leave the save consistent. Today's raw terrain editor
-  updates terrain bytes and the derived adjacency mask only; updating
-  continent/landmass IDs across land/water transitions remains unfinished
-  work in STORY-017 and STORY-029 (see also STORY-021 for round-trip safety).
+  updates terrain bytes and the derived adjacency mask only. It does
+  **not** keep landmass/continent IDs consistent across land/water transitions;
+  editing is not round-trip-safe for landmass IDs. Updating continent/landmass
+  IDs across transitions remains unfinished work tracked separately in
+  STORY-017 and STORY-029 (see also STORY-021 for round-trip safety).
 - Don't leave test edits in a save someone else is using.
 
 ## 10. Testing
@@ -184,7 +194,10 @@ These all bit a previous session:
   over from an earlier session is a mistake; stop it rather than running a
   second one (`lsof -iTCP:4000 -sTCP:LISTEN`).
 - zsh doesn't word-split `$VARS`, so `env $VARS mix test` silently passes
-  one argument. Use `scripts/test_game.sh`.
+  one argument. Use `scripts/test_game.sh`. Note that `scripts/test_game.sh`
+  sources `dev_server.sh` and does not set `MIRROR_SURVEYOR_SAVE`; to run
+  the Surveyor's frozen save tests as well, export `MIRROR_SURVEYOR_SAVE`
+  manually.
 
 ## 12. Documentation and tickets
 
