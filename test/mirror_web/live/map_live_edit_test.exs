@@ -206,6 +206,71 @@ defmodule MirrorWeb.MapLiveEditTest do
       assert changed(tab1) =~ "2 tiles changed"
       assert changed(tab2) =~ "2 tiles changed"
     end
+
+    test "saving from a tab with stale socket state preserves concurrent edits from another tab (STORY-043)",
+         %{conn: conn, dir: dir, save: save} do
+      session_id = "stale-save-test-#{System.unique_integer([:positive])}"
+      conn1 = init_test_session(conn, %{"mirror_session_id" => session_id})
+
+      {:ok, tab1, _} = live(conn1, ~p"/arcanus")
+      tab1 |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      render_click(tab1, "toggle_edit", %{})
+      render_click(tab1, "set_tool", %{"tool" => "cycle"})
+      click(tab1, 1, 1)
+      assert changed(tab1) =~ "1 tile changed"
+
+      # Simulate Tab B committing an edit directly into SessionStore (e.g. before Tab 1's broadcast arrives)
+      current_store = Mirror.SessionStore.get(session_id)
+      baseline_at_2_2 = Mirror.Map.get_tile_u16_le(current_store.planes.arcanus.terrain, 2, 2)
+      tab2_edited_val = Integer.mod(baseline_at_2_2 + 10, 762)
+
+      {tab2_state, _change, _updates} =
+        Mirror.Editor.apply_tile(current_store, :arcanus, :terrain, 2, 2, tab2_edited_val)
+
+      :ets.insert(:mirror_sessions, {session_id, tab2_state})
+
+      # Tab 1 now submits save to SAVE2.GAM with its stale socket assigns
+      target_save = Path.join(dir, "SAVE2.GAM")
+      tab1 |> element("#save-form") |> render_submit(%{"save" => %{"path" => target_save}})
+
+      # Both Tab 1's edit at (1, 1) and Tab 2's edit at (2, 2) must survive in SessionStore
+      store_after = Mirror.SessionStore.get(session_id)
+
+      assert Mirror.Map.get_tile_u16_le(store_after.planes.arcanus.terrain, 2, 2) ==
+               tab2_edited_val
+
+      # Both edits must survive in the file written to disk
+      assert File.exists?(target_save)
+      {:ok, loaded_save} = Mirror.SaveFile.load(target_save)
+
+      assert Mirror.Map.get_tile_u16_le(loaded_save.planes.arcanus.terrain, 2, 2) ==
+               tab2_edited_val
+    end
+
+    test "stroke resolves brush value from current session store even if tab socket selection is stale (STORY-043)",
+         %{conn: conn, save: save} do
+      session_id = "stale-brush-test-#{System.unique_integer([:positive])}"
+      conn1 = init_test_session(conn, %{"mirror_session_id" => session_id})
+
+      {:ok, tab1, _} = live(conn1, ~p"/arcanus")
+      tab1 |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      render_click(tab1, "toggle_edit", %{})
+      render_click(tab1, "set_tool", %{"tool" => "paint"})
+
+      # Simulate Tab B updating the active brush selection in SessionStore
+      # without Tab 1 having processed the broadcast
+      current_store = Mirror.SessionStore.get(session_id)
+      updated_selection = Map.put(current_store.selection, :terrain, 42)
+      :ets.insert(:mirror_sessions, {session_id, %{current_store | selection: updated_selection}})
+
+      # Tab 1 starts painting at (3, 3)
+      pointer(tab1, "start", 3, 3)
+      pointer(tab1, "end", 3, 3)
+
+      # The painted tile must be 42 from the authoritative current session
+      store_after = Mirror.SessionStore.get(session_id)
+      assert Mirror.Map.get_tile_u16_le(store_after.planes.arcanus.terrain, 3, 3) == 42
+    end
   end
 
   describe "Cycle tool (STORY-027)" do

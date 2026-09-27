@@ -305,13 +305,19 @@ defmodule MirrorWeb.MapLive do
     path = SaveManager.normalize_path(path)
     socket = assign(socket, :save_path_input, path)
 
-    case SaveManager.save(socket.assigns.state, path) do
-      {:ok, updated_state, save_path} ->
-        {:ok, state} =
-          SessionStore.update(socket.assigns.session_id, fn _current ->
-            updated_state
-          end)
+    update_result =
+      SessionStore.update(socket.assigns.session_id, fn current ->
+        case SaveManager.save(current, path) do
+          {:ok, updated_state, save_path} ->
+            {updated_state, save_path}
 
+          {:error, reason} ->
+            {:error, reason}
+        end
+      end)
+
+    case update_result do
+      {:ok, state, save_path} ->
         {:noreply,
          put_flash(assign_state(socket, state), :info, SaveManager.saved_message(save_path))}
 
@@ -2005,10 +2011,11 @@ defmodule MirrorWeb.MapLive do
 
   defp start_stroke(socket, layer, x, y, value \\ nil) do
     plane = socket.assigns.plane
-    val = value || Map.get(socket.assigns.state.selection, layer, 0)
 
     {:ok, state, {stroke, change, updates}} =
       SessionStore.update(socket.assigns.session_id, fn current ->
+        val = value || Map.get(current.selection, layer, 0)
+
         {next_state, stroke, change, updates} =
           Editor.start_stroke(current, plane, layer, x, y, val)
 
@@ -2032,11 +2039,12 @@ defmodule MirrorWeb.MapLive do
 
   defp apply_stroke_change(socket, layer, x, y) do
     plane = socket.assigns.plane
-    val = Map.get(socket.assigns.state.selection, layer, 0)
     active_stroke = socket.assigns.active_stroke
 
     {:ok, state, {stroke, change, updates}} =
       SessionStore.update(socket.assigns.session_id, fn current ->
+        val = Map.get(current.selection, layer, 0)
+
         {next_state, stroke, change, updates} =
           Editor.apply_stroke_change(current, active_stroke, plane, layer, x, y, val)
 
