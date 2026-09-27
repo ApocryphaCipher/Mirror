@@ -14,6 +14,8 @@ defmodule MirrorWeb.MapLiveEditTest do
   @real_save_source @mom_path && Path.join(@mom_path, "SAVE1.GAM")
   @has_real_save @real_save_source && File.exists?(@real_save_source) &&
                    System.get_env("MIRROR_TERRAIN_OFFSET") != nil
+  @has_real_save_and_sprites @has_real_save &&
+                               File.exists?(Path.join(@mom_path, "MAPBACK.LBX"))
 
   setup %{conn: conn} do
     dir = Path.join(System.tmp_dir!(), "mirror-edit-test-#{System.unique_integer([:positive])}")
@@ -524,7 +526,9 @@ defmodule MirrorWeb.MapLiveEditTest do
   end
 
   describe "real-save integration" do
-    @tag skip: !@has_real_save && "needs MIRROR_MOM_PATH/SAVE1.GAM and MIRROR_*_OFFSET env"
+    @tag skip:
+           !@has_real_save_and_sprites &&
+             "needs MIRROR_MOM_PATH/(SAVE1.GAM, MAPBACK.LBX) and MIRROR_*_OFFSET env"
     test "loading real SAVE1.GAM pushes Arcanus cities and sprites", %{conn: conn, dir: dir} do
       real_save = Path.join(dir, "REAL_SAVE1.GAM")
       File.cp!(@real_save_source, real_save)
