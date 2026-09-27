@@ -2,8 +2,20 @@ defmodule MirrorWeb.MapLive do
   use MirrorWeb, :live_view
   import Bitwise
 
-  alias Mirror.Engine.{Delta, Session, SessionSupervisor, View}
-  alias Mirror.{OverlaySprites, Paths, SaveFile, SessionStore, Stats, Surveyor, TerrainLbx}
+  alias Mirror.Engine.{Delta, Session, View}
+
+  alias Mirror.{
+    Editor,
+    OverlaySprites,
+    Paths,
+    SaveFile,
+    SaveManager,
+    SessionStore,
+    Stats,
+    Surveyor,
+    TerrainLbx
+  }
+
   alias Mirror.TileAtlas
   alias Mirror.SaveFile.{Cities, Sites, Wizards}
   alias Mirror.Map, as: MirrorMap
@@ -60,7 +72,7 @@ defmodule MirrorWeb.MapLive do
     state =
       session_id
       |> SessionStore.get()
-      |> normalize_state()
+      |> SaveManager.normalize_state()
 
     socket =
       socket
@@ -72,7 +84,7 @@ defmodule MirrorWeb.MapLive do
       |> assign(:discard_armed, false)
       |> assign(:fresh_mount, true)
 
-    state = ensure_engine_session(state, session_id, connected?(socket))
+    state = SaveManager.ensure_engine_session(state, session_id, connected?(socket))
 
     socket =
       socket
@@ -80,7 +92,7 @@ defmodule MirrorWeb.MapLive do
       |> assign(:active_stroke, nil)
       |> assign(:hover, nil)
       |> assign(:tile_assets, nil)
-      |> assign(:load_path, default_load_path())
+      |> assign(:load_path, SaveManager.default_load_path())
       |> assign(:save_path_input, state.save_path || "")
       |> assign_forms()
 
@@ -129,7 +141,7 @@ defmodule MirrorWeb.MapLive do
       if edit && socket.assigns.state.active_layer != :terrain do
         {:ok, state} =
           SessionStore.update(socket.assigns.session_id, fn current ->
-            ensure_layer_visible(%{current | active_layer: :terrain}, :terrain)
+            SaveManager.ensure_layer_visible(%{current | active_layer: :terrain}, :terrain)
           end)
 
         socket |> assign_from_state(state) |> assign_forms()
@@ -152,9 +164,11 @@ defmodule MirrorWeb.MapLive do
   @impl true
   def handle_info({:session_state_updated, session_id, new_state, sender}, socket) do
     if session_id == socket.assigns.session_id and sender != self() do
+      current_state = SessionStore.get(session_id) || new_state
+
       socket =
         socket
-        |> assign_from_state(new_state)
+        |> assign_from_state(current_state)
         |> assign_forms()
         |> refresh_hover()
 
@@ -225,23 +239,8 @@ defmodule MirrorWeb.MapLive do
 
     case SessionStore.update(socket.assigns.session_id, fn current ->
            if current.save do
-             stop_engine_session(current.engine_session_id)
-
-             state = %{
-               current
-               | planes: with_computed_layers(current.original_planes),
-                 history: %{arcanus: [], myrror: []},
-                 redo: %{arcanus: [], myrror: []}
-             }
-
-             # The engine session mirrors edits via deltas; restart it from the restored
-             # planes so hover (which reads the engine first) matches the restored map.
-             restored_save = %{state.save | planes: state.original_planes}
-
-             case start_engine_session(restored_save) do
-               {:ok, engine_session_id} -> %{state | engine_session_id: engine_session_id}
-               {:error, _reason} -> %{state | engine_session_id: nil}
-             end
+             {state, restored_save} = Editor.discard(current)
+             SaveManager.restore_engine_session(state, restored_save)
            else
              current
            end
@@ -268,58 +267,22 @@ defmodule MirrorWeb.MapLive do
 
   @impl true
   def handle_event("load_save", %{"load" => %{"path" => path}}, socket) do
-    path = normalize_path(path)
+    path = SaveManager.normalize_path(path)
 
     socket =
       socket
       |> assign(:load_path, path)
       |> assign_forms()
 
-    case SaveFile.load(path) do
-      {:ok, save} ->
-        stop_engine_session(socket.assigns.state.engine_session_id)
-        planes = with_computed_layers(save.planes)
-
-        state = %{
-          save: save,
-          planes: planes,
-          original_planes: save.planes,
-          active_layer: :terrain,
-          selection: default_selection(),
-          history: %{arcanus: [], myrror: []},
-          redo: %{arcanus: [], myrror: []},
-          save_path: save.path,
-          dataset_id: save.dataset_id,
-          render_mode: socket.assigns.state.render_mode || :tiles,
-          phase_index: socket.assigns.state.phase_index || 0,
-          snapshot_mode: Map.get(socket.assigns.state, :snapshot_mode, true),
-          snapshot_values: %{},
-          phase_loop_len: Map.get(socket.assigns.state, :phase_loop_len),
-          phase_loop_status:
-            normalize_phase_loop_status(
-              Map.get(socket.assigns.state, :phase_loop_status, :unknown)
-            ),
-          phase_loop_detecting: false,
-          engine_session_id: nil,
-          engine_player_id: Map.get(socket.assigns.state, :engine_player_id, :observer)
-        }
-
-        state =
-          case start_engine_session(path) do
-            {:ok, engine_session_id} -> %{state | engine_session_id: engine_session_id}
-            {:error, _reason} -> state
-          end
-
-        state = normalize_state(state)
-
+    case SaveManager.load(path, socket.assigns.state) do
+      {:ok, state, normalized_path} ->
         SessionStore.put(socket.assigns.session_id, state)
-        observe_stats(state)
 
         socket =
           socket
           |> assign_from_state(state)
           |> assign_forms()
-          |> put_flash(:info, "Loaded save from #{path}.")
+          |> put_flash(:info, "Loaded save from #{normalized_path}.")
 
         socket =
           if connected?(socket) do
@@ -333,59 +296,33 @@ defmodule MirrorWeb.MapLive do
 
         {:noreply, socket}
 
-      {:error, {:missing_offset, layer}} ->
-        {:noreply,
-         put_flash(
-           socket,
-           :error,
-           "Missing block offset for #{layer}. Set config before loading."
-         )}
-
-      {:error, :enoent} when path in [nil, ""] ->
-        {:noreply, put_flash(socket, :error, "Provide a save path before loading.")}
-
-      {:error, :enoent} ->
-        {:noreply, put_flash(socket, :error, "Save file not found at #{path}. Check the path.")}
-
       {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Unable to load save: #{inspect(reason)}")}
+        {:noreply, put_flash(socket, :error, SaveManager.load_error_message(reason, path))}
     end
   end
 
   def handle_event("save_file", %{"save" => %{"path" => path}}, socket) do
-    path = normalize_path(path)
-    target_path = if path == "", do: nil, else: path
-    state = socket.assigns.state
+    path = SaveManager.normalize_path(path)
     socket = assign(socket, :save_path_input, path)
 
-    with %SaveFile{} = save <- state.save,
-         {:ok, save_path} <-
-           SaveFile.write(
-             %{save | planes: strip_computed(state.planes)},
-             target_path || state.save_path
-           ) do
-      {:ok, state} =
-        SessionStore.update(socket.assigns.session_id, fn current ->
-          saved_planes = strip_computed(current.planes)
-          save = %{current.save | path: save_path, planes: saved_planes}
-          %{current | save: save, save_path: save_path, original_planes: saved_planes}
-        end)
+    update_result =
+      SessionStore.update(socket.assigns.session_id, fn current ->
+        case SaveManager.save(current, path) do
+          {:ok, updated_state, save_path} ->
+            {updated_state, save_path}
 
-      {:noreply, put_flash(assign_state(socket, state), :info, saved_message(save_path))}
-    else
-      nil ->
-        {:noreply, put_flash(socket, :error, "Load a save before saving.")}
+          {:error, reason} ->
+            {:error, reason}
+        end
+      end)
 
-      {:error, :would_overwrite_original} ->
+    case update_result do
+      {:ok, state, save_path} ->
         {:noreply,
-         put_flash(
-           socket,
-           :error,
-           "Choose a new file name: Save as won't overwrite the file you loaded."
-         )}
+         put_flash(assign_state(socket, state), :info, SaveManager.saved_message(save_path))}
 
       {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Save failed: #{inspect(reason)}")}
+        {:noreply, put_flash(socket, :error, SaveManager.save_error_message(reason))}
     end
   end
 
@@ -393,7 +330,10 @@ defmodule MirrorWeb.MapLive do
     {:ok, state} =
       SessionStore.update(socket.assigns.session_id, fn current ->
         layer_atom = Enum.find(@layers, current.active_layer, &(&1 |> Atom.to_string() == layer))
-        current |> Map.put(:active_layer, layer_atom) |> ensure_layer_visible(layer_atom)
+
+        current
+        |> Map.put(:active_layer, layer_atom)
+        |> SaveManager.ensure_layer_visible(layer_atom)
       end)
 
     socket =
@@ -2070,55 +2010,64 @@ defmodule MirrorWeb.MapLive do
   end
 
   defp start_stroke(socket, layer, x, y, value \\ nil) do
-    {socket, change} = apply_tile_change(socket, layer, x, y, value)
+    plane = socket.assigns.plane
 
-    case change do
-      nil ->
-        stroke = %{
-          layer: layer,
-          changes: %{}
-        }
+    {:ok, state, {stroke, change, updates}} =
+      SessionStore.update(socket.assigns.session_id, fn current ->
+        val = value || Map.get(current.selection, layer, 0)
 
-        assign(socket, :active_stroke, stroke)
+        {next_state, stroke, change, updates} =
+          Editor.start_stroke(current, plane, layer, x, y, val)
 
-      {prev, new} ->
-        stroke = %{
-          layer: layer,
-          changes: %{{x, y} => {prev, new}}
-        }
+        {next_state, {stroke, change, updates}}
+      end)
 
-        socket
-        |> assign(:active_stroke, stroke)
-        |> record_stroke(stroke, :new)
+    changes = change && [{x, y, elem(change, 0), elem(change, 1)}]
+
+    socket =
+      socket
+      |> assign(:active_stroke, stroke)
+      |> assign_state(state)
+      |> maybe_push_updates(layer, updates, changes)
+
+    if changes do
+      emit_engine_delta(socket, plane, layer, changes)
+    else
+      socket
     end
   end
 
   defp apply_stroke_change(socket, layer, x, y) do
-    {socket, change} = apply_tile_change(socket, layer, x, y)
+    plane = socket.assigns.plane
+    active_stroke = socket.assigns.active_stroke
 
-    case change do
-      nil ->
-        socket
+    {:ok, state, {stroke, change, updates}} =
+      SessionStore.update(socket.assigns.session_id, fn current ->
+        val = Map.get(current.selection, layer, 0)
 
-      {prev, new} ->
-        stroke = socket.assigns.active_stroke
-        mode = if stroke.changes == %{}, do: :new, else: :update
+        {next_state, stroke, change, updates} =
+          Editor.apply_stroke_change(current, active_stroke, plane, layer, x, y, val)
 
-        changes =
-          Map.update(stroke.changes, {x, y}, {prev, new}, fn {old_prev, _old_new} ->
-            {old_prev, new}
-          end)
+        {next_state, {stroke, change, updates}}
+      end)
 
-        stroke = %{stroke | changes: changes}
+    changes = change && [{x, y, elem(change, 0), elem(change, 1)}]
 
-        socket
-        |> assign(:active_stroke, stroke)
-        |> record_stroke(stroke, mode)
+    socket =
+      socket
+      |> assign(:active_stroke, stroke)
+      |> assign_state(state)
+      |> maybe_push_updates(layer, updates, changes)
+
+    if changes do
+      emit_engine_delta(socket, plane, layer, changes)
+    else
+      socket
     end
   end
 
-  # The stroke is already in the undo history (record_stroke/3 writes it as
-  # it's painted), so finishing just closes it.
+  # The stroke is already in the undo history (Editor records it incrementally),
+  # so finishing just closes it.
   defp finalize_stroke(socket, _stroke) do
     socket
     |> assign(:active_stroke, nil)
@@ -2131,36 +2080,6 @@ defmodule MirrorWeb.MapLive do
   # unsaved-edits counter honest.
   defp assign_state(socket, state) do
     assign(socket, state: state, changed_tiles: changed_tile_count(state))
-  end
-
-  # Write the in-progress stroke into the plane's undo history on every tile,
-  # not only at pointer-up: if the LiveView restarts mid-stroke (code reload,
-  # crash, navigation), the painted tiles are already in the session and must
-  # stay undoable (STORY-022).
-  defp record_stroke(socket, stroke, mode) do
-    plane = socket.assigns.plane
-    entry = %{layer: stroke.layer, changes: stroke_change_list(stroke)}
-
-    {:ok, state} =
-      SessionStore.update(socket.assigns.session_id, fn current ->
-        history =
-          case {mode, Map.get(current.history, plane, [])} do
-            {:update, [_current | rest]} -> [entry | rest]
-            {_, history} -> [entry | history]
-          end
-
-        %{
-          current
-          | history: Map.put(current.history, plane, history),
-            redo: Map.put(current.redo, plane, [])
-        }
-      end)
-
-    assign_state(socket, state)
-  end
-
-  defp stroke_change_list(stroke) do
-    Enum.map(stroke.changes, fn {{x, y}, {prev, new}} -> {x, y, prev, new} end)
   end
 
   defp sample_tile(socket, layer, x, y) do
@@ -2183,92 +2102,11 @@ defmodule MirrorWeb.MapLive do
     end
   end
 
-  defp apply_tile_change(socket, layer, x, y, value \\ nil) do
-    plane = socket.assigns.plane
-
-    cond do
-      layer == :computed_adj_mask ->
-        {socket, nil}
-
-      not valid_coord?(x, y) ->
-        {socket, nil}
-
-      true ->
-        {:ok, updated_state, {change, updates}} =
-          SessionStore.update(socket.assigns.session_id, fn current ->
-            val = value || Map.get(current.selection, layer, 0)
-            {next_state, chg, upds} = do_apply_change(current, plane, layer, x, y, val)
-            {next_state, {chg, upds}}
-          end)
-
-        changes = change && [{x, y, elem(change, 0), elem(change, 1)}]
-
-        socket =
-          socket
-          |> assign(:state, updated_state)
-          |> maybe_push_updates(layer, updates, changes)
-
-        socket =
-          if changes do
-            emit_engine_delta(socket, plane, layer, changes)
-          else
-            socket
-          end
-
-        {socket, change}
-    end
-  end
-
-  defp do_apply_change(state, plane, layer, x, y, value) do
-    old_plane = Map.fetch!(state.planes, plane)
-
-    {new_plane, prev_value} =
-      if layer in @u16_layers do
-        {updated, prev} = MirrorMap.put_tile_u16_le(old_plane[layer], x, y, value)
-        {Map.put(old_plane, layer, updated), prev}
-      else
-        {updated, prev} = MirrorMap.put_tile_u8(old_plane[layer], x, y, value)
-        {Map.put(old_plane, layer, updated), prev}
-      end
-
-    if prev_value == value do
-      {state, nil, []}
-    else
-      new_plane = maybe_update_adj_mask(new_plane, x, y, layer)
-      new_planes = Map.put(state.planes, plane, new_plane)
-      save = %{state.save | planes: strip_computed(new_planes)}
-      updated_state = %{state | planes: new_planes, save: save}
-
-      update_stats(updated_state, plane, layer, x, y, prev_value, value, old_plane, new_plane)
-
-      updates = [%{x: x, y: y, value: value}]
-      {updated_state, {prev_value, value}, updates}
-    end
-  end
-
   defp apply_undo(socket) do
     plane = socket.assigns.plane
 
     case SessionStore.update(socket.assigns.session_id, fn current ->
-           history = Map.get(current.history, plane, [])
-
-           case history do
-             [stroke | rest] ->
-               {next_state, updates, layer} = apply_stroke(current, plane, stroke, :undo)
-               changes = stroke_changes(stroke, :undo)
-               redo = [stroke | Map.get(next_state.redo, plane, [])]
-
-               next_state = %{
-                 next_state
-                 | history: Map.put(next_state.history, plane, rest),
-                   redo: Map.put(next_state.redo, plane, redo)
-               }
-
-               {next_state, {:applied, updates, layer, changes}}
-
-             [] ->
-               {current, :none}
-           end
+           Editor.undo(current, plane)
          end) do
       {:ok, state, {:applied, updates, layer, changes}} ->
         socket
@@ -2287,25 +2125,7 @@ defmodule MirrorWeb.MapLive do
     plane = socket.assigns.plane
 
     case SessionStore.update(socket.assigns.session_id, fn current ->
-           redo = Map.get(current.redo, plane, [])
-
-           case redo do
-             [stroke | rest] ->
-               {next_state, updates, layer} = apply_stroke(current, plane, stroke, :redo)
-               changes = stroke_changes(stroke, :redo)
-               history = [stroke | Map.get(next_state.history, plane, [])]
-
-               next_state = %{
-                 next_state
-                 | history: Map.put(next_state.history, plane, history),
-                   redo: Map.put(next_state.redo, plane, rest)
-               }
-
-               {next_state, {:applied, updates, layer, changes}}
-
-             [] ->
-               {current, :none}
-           end
+           Editor.redo(current, plane)
          end) do
       {:ok, state, {:applied, updates, layer, changes}} ->
         socket
@@ -2320,190 +2140,7 @@ defmodule MirrorWeb.MapLive do
     end
   end
 
-  defp apply_stroke(state, plane, stroke, mode) do
-    layer = stroke.layer
-    plane_layers = Map.fetch!(state.planes, plane)
-
-    {updated_layer, updates} =
-      Enum.reduce(stroke.changes, {plane_layers[layer], []}, fn {x, y, prev, new},
-                                                                {acc, updates} ->
-        value = if mode == :undo, do: prev, else: new
-
-        {updated, _old} =
-          if layer in @u16_layers do
-            MirrorMap.put_tile_u16_le(acc, x, y, value)
-          else
-            MirrorMap.put_tile_u8(acc, x, y, value)
-          end
-
-        {updated, [%{x: x, y: y, value: value} | updates]}
-      end)
-
-    new_plane = Map.put(plane_layers, layer, updated_layer)
-    new_plane = maybe_update_adj_mask_batch(new_plane, stroke, layer)
-    new_planes = Map.put(state.planes, plane, new_plane)
-    save = %{state.save | planes: strip_computed(new_planes)}
-    updated_state = %{state | planes: new_planes, save: save}
-
-    update_stroke_stats(updated_state, plane, stroke, mode, plane_layers, new_plane)
-
-    {updated_state, updates, layer}
-  end
-
-  defp update_stroke_stats(state, plane, stroke, mode, old_plane, new_plane) do
-    if state.dataset_id do
-      layer = stroke.layer
-
-      case layer do
-        :terrain ->
-          adj_coords =
-            stroke.changes
-            |> Enum.flat_map(fn {x, y, _prev, _new} -> MirrorMap.adj_update_coords(x, y) end)
-            |> Enum.uniq()
-
-          Enum.each(adj_coords, fn {cx, cy} ->
-            old = MirrorMap.get_tile_u8(old_plane.computed_adj_mask, cx, cy)
-            new = MirrorMap.get_tile_u8(new_plane.computed_adj_mask, cx, cy)
-
-            if old != new do
-              Stats.bump_hist(state.dataset_id, :computed_adj_mask, :global, old, -1)
-              Stats.bump_hist(state.dataset_id, :computed_adj_mask, :global, new, 1)
-            end
-          end)
-
-          ray_coords =
-            stroke.changes
-            |> Enum.flat_map(fn {x, y, _prev, _new} -> ray_update_coords(x, y) end)
-            |> Enum.uniq()
-
-          Enum.each(ray_coords, fn {cx, cy} ->
-            Mirror.Map.Rays.observe_tile(state.dataset_id, old_plane.terrain, cx, cy, -1)
-            Mirror.Map.Rays.observe_tile(state.dataset_id, new_plane.terrain, cx, cy, 1)
-          end)
-
-        _ ->
-          Enum.each(stroke.changes, fn {x, y, prev, new} ->
-            {prev_value, new_value} = if mode == :undo, do: {new, prev}, else: {prev, new}
-            update_stats(state, plane, layer, x, y, prev_value, new_value, old_plane, new_plane)
-          end)
-      end
-    end
-  end
-
-  defp tile_value(state, plane, layer, x, y) do
-    plane_layers = Map.fetch!(state.planes, plane)
-
-    if valid_coord?(x, y) do
-      if layer in @u16_layers do
-        MirrorMap.get_tile_u16_le(plane_layers[layer], x, y)
-      else
-        MirrorMap.get_tile_u8(plane_layers[layer], x, y)
-      end
-    else
-      nil
-    end
-  end
-
-  defp update_stats(state, plane, layer, x, y, prev_value, new_value, old_plane, new_plane) do
-    if state.dataset_id do
-      case layer do
-        :terrain ->
-          update_adjacent_stats(state, old_plane, new_plane, x, y)
-          update_ray_stats(state, old_plane, new_plane, x, y)
-
-        _ ->
-          terrain_type =
-            MirrorMap.terrain_type(MirrorMap.get_tile_u16_le(new_plane.terrain, x, y))
-
-          Stats.bump_hist(state.dataset_id, layer, :global, prev_value, -1)
-          Stats.bump_hist(state.dataset_id, layer, :global, new_value, 1)
-          Stats.bump_hist(state.dataset_id, layer, {:plane, plane}, prev_value, -1)
-          Stats.bump_hist(state.dataset_id, layer, {:plane, plane}, new_value, 1)
-          Stats.bump_hist(state.dataset_id, layer, {:terrain_type, terrain_type}, prev_value, -1)
-          Stats.bump_hist(state.dataset_id, layer, {:terrain_type, terrain_type}, new_value, 1)
-      end
-    end
-  end
-
-  defp update_adjacent_stats(state, old_plane, new_plane, x, y) do
-    if state.dataset_id do
-      coords = MirrorMap.adj_update_coords(x, y)
-
-      Enum.each(coords, fn {cx, cy} ->
-        old = MirrorMap.get_tile_u8(old_plane.computed_adj_mask, cx, cy)
-        new = MirrorMap.get_tile_u8(new_plane.computed_adj_mask, cx, cy)
-
-        if old != new do
-          Stats.bump_hist(state.dataset_id, :computed_adj_mask, :global, old, -1)
-          Stats.bump_hist(state.dataset_id, :computed_adj_mask, :global, new, 1)
-        end
-      end)
-    end
-  end
-
-  defp update_ray_stats(state, old_plane, new_plane, x, y) do
-    if state.dataset_id do
-      coords = ray_update_coords(x, y)
-
-      Enum.each(coords, fn {cx, cy} ->
-        Mirror.Map.Rays.observe_tile(state.dataset_id, old_plane.terrain, cx, cy, -1)
-        Mirror.Map.Rays.observe_tile(state.dataset_id, new_plane.terrain, cx, cy, 1)
-      end)
-    end
-  end
-
-  defp ray_update_coords(x, y) do
-    for dy <- -2..2, dx <- -2..2 do
-      nx = MirrorMap.wrap_x(x + dx)
-      ny = MirrorMap.clamp_y(y + dy)
-      {nx, ny}
-    end
-    |> Enum.reject(fn {_nx, ny} -> ny == :off end)
-    |> Enum.uniq()
-  end
-
-  defp maybe_update_adj_mask(plane_layers, x, y, layer) do
-    if layer == :terrain do
-      coords = MirrorMap.adj_update_coords(x, y)
-
-      updated =
-        Enum.reduce(coords, plane_layers.computed_adj_mask, fn {cx, cy}, acc ->
-          value = MirrorMap.adj_mask(plane_layers.terrain, cx, cy)
-          {updated_bin, _old} = MirrorMap.put_tile_u8(acc, cx, cy, value)
-          updated_bin
-        end)
-
-      Map.put(plane_layers, :computed_adj_mask, updated)
-    else
-      plane_layers
-    end
-  end
-
-  defp maybe_update_adj_mask_batch(plane_layers, stroke, layer) do
-    if layer == :terrain do
-      coords =
-        stroke.changes
-        |> Enum.flat_map(fn {x, y, _prev, _new} -> MirrorMap.adj_update_coords(x, y) end)
-        |> Enum.uniq()
-
-      updated =
-        Enum.reduce(coords, plane_layers.computed_adj_mask, fn {cx, cy}, acc ->
-          value = MirrorMap.adj_mask(plane_layers.terrain, cx, cy)
-          {updated_bin, _old} = MirrorMap.put_tile_u8(acc, cx, cy, value)
-          updated_bin
-        end)
-
-      Map.put(plane_layers, :computed_adj_mask, updated)
-    else
-      plane_layers
-    end
-  end
-
-  defp strip_computed(planes) do
-    Enum.into(planes, %{}, fn {plane_key, layers} ->
-      {plane_key, Map.drop(layers, [:computed_adj_mask])}
-    end)
-  end
+  defp tile_value(state, plane, layer, x, y), do: Editor.tile_value(state, plane, layer, x, y)
 
   defp phase_loop_len(%{phase_loop_len: len}) when is_integer(len) and len > 0, do: len
   defp phase_loop_len(_), do: nil
@@ -2585,7 +2222,7 @@ defmodule MirrorWeb.MapLive do
       end
 
     layer_visibility = effective_layer_visibility(socket, state)
-    layer_opacity = Map.get(state, :layer_opacity, default_layer_opacity())
+    layer_opacity = Map.get(state, :layer_opacity, SaveManager.default_layer_opacity())
 
     assign(socket,
       state: state,
@@ -2631,7 +2268,7 @@ defmodule MirrorWeb.MapLive do
       with true <- socket.assigns[:edit] != nil,
            %SaveFile{path: original} when is_binary(original) <- state.save,
            true <- save_input in ["", original] do
-        suggested_save_path(original)
+        SaveManager.suggested_save_path(original)
       else
         _ -> save_input
       end
@@ -2859,32 +2496,14 @@ defmodule MirrorWeb.MapLive do
     plane = socket.assigns.plane
 
     case SessionStore.update(socket.assigns.session_id, fn current ->
-           {next_state, change, updates} = do_apply_change(current, plane, layer, x, y, value)
-
-           case change do
-             nil ->
-               {current, :none}
-
-             {prev, new} ->
-               stroke = %{layer: layer, changes: [{x, y, prev, new}]}
-               history = [stroke | Map.get(next_state.history, plane, [])]
-               redo = Map.put(next_state.redo, plane, [])
-
-               next_state = %{
-                 next_state
-                 | history: Map.put(next_state.history, plane, history),
-                   redo: redo
-               }
-
-               {next_state, {:applied, stroke, updates}}
-           end
+           Editor.apply_single_tile(current, plane, layer, x, y, value)
          end) do
       {:ok, _state, :none} ->
         socket
 
       {:ok, updated_state, {:applied, stroke, updates}} ->
         socket
-        |> assign(:state, updated_state)
+        |> assign_state(updated_state)
         |> maybe_push_updates(layer, updates, stroke.changes)
         |> emit_engine_delta(plane, layer, stroke.changes)
         |> assign_hover(x, y)
@@ -2896,7 +2515,7 @@ defmodule MirrorWeb.MapLive do
     state = socket.assigns.state
 
     layer_visibility = effective_layer_visibility(socket, state)
-    layer_opacity = Map.get(state, :layer_opacity, default_layer_opacity())
+    layer_opacity = Map.get(state, :layer_opacity, SaveManager.default_layer_opacity())
 
     push_event(socket, "map_state", %{
       layer: Atom.to_string(state.active_layer),
@@ -2917,7 +2536,7 @@ defmodule MirrorWeb.MapLive do
     values = Base.encode64(Map.fetch!(plane_layers, layer))
 
     layer_visibility = effective_layer_visibility(socket, state)
-    layer_opacity = Map.get(state, :layer_opacity, default_layer_opacity())
+    layer_opacity = Map.get(state, :layer_opacity, SaveManager.default_layer_opacity())
 
     push_event(socket, "map_reload", %{
       plane: Atom.to_string(plane),
@@ -3024,12 +2643,6 @@ defmodule MirrorWeb.MapLive do
 
     socket
   end
-
-  defp stroke_changes(stroke, :undo) do
-    Enum.map(stroke.changes, fn {x, y, prev, new} -> {x, y, new, prev} end)
-  end
-
-  defp stroke_changes(stroke, :redo), do: stroke.changes
 
   defp maybe_push_tile_assets(socket) do
     state = socket.assigns.state
@@ -3162,7 +2775,7 @@ defmodule MirrorWeb.MapLive do
 
   defp effective_layer_visibility(socket, state) do
     if socket.assigns[:lab?] do
-      Map.get(state, :layer_visibility, default_layer_visibility(state.active_layer))
+      Map.get(state, :layer_visibility, SaveManager.default_layer_visibility(state.active_layer))
     else
       Map.new(@layers, &{&1, &1 == :terrain})
     end
@@ -3177,60 +2790,11 @@ defmodule MirrorWeb.MapLive do
     end
   end
 
-  defp saved_message(path) do
-    if SaveFile.game_loadable_name?(path),
-      do: "Saved to #{path}.",
-      else:
-        "Saved to #{path}. The game only loads SAVE1.GAM to SAVE9.GAM, so rename it to play it."
-  end
-
   defp push_brush(socket) do
     push_event(socket, "brush", %{tile: Map.get(socket.assigns.state.selection, :terrain, 0)})
   end
 
-  defp with_computed_layers(planes) do
-    Enum.into(planes, %{}, fn {plane_key, plane_layers} ->
-      computed = MirrorMap.computed_adj_mask(plane_layers.terrain)
-      {plane_key, Map.put(plane_layers, :computed_adj_mask, computed)}
-    end)
-  end
-
-  # Tiles (either plane, any saved layer) that differ from the loaded or
-  # last-saved version.
-  defp changed_tile_count(%{save: nil}), do: 0
-
-  defp changed_tile_count(%{planes: planes, original_planes: originals})
-       when is_map(planes) and is_map(originals) do
-    for {plane, original_layers} <- originals, reduce: 0 do
-      acc ->
-        current_layers = Map.get(planes, plane, %{})
-
-        changed =
-          for {layer, original} <- original_layers,
-              current = Map.get(current_layers, layer),
-              is_binary(current) and is_binary(original),
-              current != original,
-              width = if(layer in @u16_layers, do: 2, else: 1),
-              idx <- 0..(div(byte_size(original), width) - 1),
-              binary_part(original, idx * width, width) !=
-                binary_part(current, idx * width, width),
-              into: MapSet.new(),
-              do: idx
-
-        acc + MapSet.size(changed)
-    end
-  end
-
-  defp changed_tile_count(_state), do: 0
-
-  # The next free SAVEn.GAM beside the loaded save; empty when all nine are
-  # taken, so the player picks one rather than get a name the game can't load.
-  defp suggested_save_path(original) do
-    case SaveFile.next_free_slot(Path.dirname(original)) do
-      {:ok, path} -> path
-      :none -> ""
-    end
-  end
+  defp changed_tile_count(state), do: Editor.changed_tile_count(state)
 
   defp edit_path(:arcanus), do: ~p"/arcanus?edit=terrain"
   defp edit_path(:myrror), do: ~p"/myrror?edit=terrain"
@@ -3277,19 +2841,8 @@ defmodule MirrorWeb.MapLive do
 
   defp hex_byte(_value), do: "0x00"
 
-  defp original_tile_value(state, plane, layer, x, y) do
-    with planes when is_map(planes) <- Map.get(state, :original_planes),
-         plane_layers when is_map(plane_layers) <- Map.get(planes, plane),
-         binary when is_binary(binary) <- Map.get(plane_layers, layer) do
-      if layer in @u16_layers do
-        MirrorMap.get_tile_u16_le(binary, x, y)
-      else
-        MirrorMap.get_tile_u8(binary, x, y)
-      end
-    else
-      _ -> nil
-    end
-  end
+  defp original_tile_value(state, plane, layer, x, y),
+    do: Editor.original_tile_value(state, plane, layer, x, y)
 
   defp tool_and_layer(socket, button, mods) do
     layer = if socket.assigns.edit, do: :terrain, else: socket.assigns.state.active_layer
@@ -3304,19 +2857,9 @@ defmodule MirrorWeb.MapLive do
     {tool, layer}
   end
 
-  defp valid_coord?(x, y) do
-    x in 0..(MirrorMap.width() - 1) and y in 0..(MirrorMap.height() - 1)
-  end
+  defp valid_coord?(x, y), do: Editor.valid_coord?(x, y)
 
-  defp clamp_value(:terrain, value), do: value |> max(0) |> min(TerrainLbx.tiles_per_plane() - 1)
-
-  defp clamp_value(layer, value) do
-    if layer in @u16_layers do
-      value |> max(0) |> min(65_535)
-    else
-      value |> max(0) |> min(255)
-    end
-  end
+  defp clamp_value(layer, value), do: Editor.clamp_value(layer, value)
 
   defp parse_int(nil, fallback), do: fallback
   defp parse_int(value, _fallback) when is_integer(value), do: value
@@ -3330,47 +2873,6 @@ defmodule MirrorWeb.MapLive do
 
   defp truthy?(value) do
     value in [true, "true", "1", 1, "on"]
-  end
-
-  defp default_layer_visibility(active_layer) do
-    Enum.into(@layers, %{}, fn layer ->
-      visible = layer == :terrain || layer == active_layer
-      {layer, visible}
-    end)
-  end
-
-  defp default_layer_opacity do
-    Enum.into(@layers, %{}, fn layer ->
-      {layer, if(layer == :terrain, do: 100, else: 70)}
-    end)
-  end
-
-  defp normalize_layer_visibility(active_layer, visibility) when is_map(visibility) do
-    Enum.into(@layers, %{}, fn layer ->
-      default_visible = layer == :terrain || layer == active_layer
-      value = Map.get(visibility, layer, default_visible)
-      {layer, if(layer == :terrain, do: true, else: value)}
-    end)
-  end
-
-  defp normalize_layer_visibility(active_layer, _visibility) do
-    default_layer_visibility(active_layer)
-  end
-
-  defp normalize_layer_opacity(opacity) when is_map(opacity) do
-    defaults = default_layer_opacity()
-
-    Enum.into(@layers, %{}, fn layer ->
-      {layer, Map.get(opacity, layer, Map.fetch!(defaults, layer))}
-    end)
-  end
-
-  defp normalize_layer_opacity(_opacity), do: default_layer_opacity()
-
-  defp ensure_layer_visible(state, layer) do
-    visibility = Map.get(state, :layer_visibility, default_layer_visibility(state.active_layer))
-    visibility = visibility |> Map.put(:terrain, true) |> Map.put(layer, true)
-    Map.put(state, :layer_visibility, visibility)
   end
 
   defp parse_opacity(value) when is_integer(value) do
@@ -3390,212 +2892,6 @@ defmodule MirrorWeb.MapLive do
     Enum.into(map || %{}, %{}, fn {key, value} ->
       {to_string(key), value}
     end)
-  end
-
-  defp normalize_state(nil) do
-    %{
-      save: nil,
-      planes: %{},
-      original_planes: nil,
-      active_layer: :terrain,
-      selection: default_selection(),
-      history: %{arcanus: [], myrror: []},
-      redo: %{arcanus: [], myrror: []},
-      save_path: nil,
-      dataset_id: nil,
-      render_mode: :tiles,
-      phase_index: 0,
-      snapshot_mode: true,
-      snapshot_values: %{},
-      phase_loop_len: nil,
-      phase_loop_status: :unknown,
-      phase_loop_detecting: false,
-      debug_terrain_kinds: false,
-      debug_coast_audit: false,
-      debug_shore_semantics: false,
-      layer_visibility: default_layer_visibility(:terrain),
-      layer_opacity: default_layer_opacity(),
-      engine_session_id: nil,
-      engine_player_id: :observer
-    }
-  end
-
-  defp normalize_state(state) do
-    state =
-      state
-      |> Map.put_new(:active_layer, :terrain)
-      |> Map.put_new(:selection, default_selection())
-      |> Map.put_new(:history, %{arcanus: [], myrror: []})
-      |> Map.put_new(:redo, %{arcanus: [], myrror: []})
-      |> Map.put_new(:render_mode, :tiles)
-      |> Map.put_new(:phase_index, 0)
-      |> Map.put_new(:snapshot_mode, true)
-      |> Map.put_new(:snapshot_values, %{})
-      |> Map.put_new(:original_planes, Map.get(state, :save) && Map.get(state.save, :planes))
-      |> Map.put_new(:phase_loop_len, nil)
-      |> Map.put_new(:phase_loop_status, :unknown)
-      |> Map.update(:phase_loop_status, :unknown, &normalize_phase_loop_status/1)
-      |> Map.put_new(:phase_loop_detecting, false)
-      |> Map.put_new(:debug_terrain_kinds, false)
-      |> Map.put_new(:debug_coast_audit, false)
-      |> Map.put_new(:debug_shore_semantics, false)
-      |> Map.put_new(:engine_session_id, nil)
-      |> Map.put_new(:engine_player_id, :observer)
-
-    visibility = normalize_layer_visibility(state.active_layer, Map.get(state, :layer_visibility))
-    opacity = normalize_layer_opacity(Map.get(state, :layer_opacity))
-
-    state
-    |> Map.put(:layer_visibility, visibility)
-    |> Map.put(:layer_opacity, opacity)
-  end
-
-  defp ensure_engine_session(state, session_id, connected?) do
-    cond do
-      not connected? ->
-        state
-
-      is_nil(state.save) ->
-        state
-
-      engine_session_alive?(Map.get(state, :engine_session_id)) ->
-        state
-
-      true ->
-        stop_engine_session(Map.get(state, :engine_session_id))
-
-        case start_engine_session(state.save.path) do
-          {:ok, engine_session_id} ->
-            {:ok, state} =
-              SessionStore.update(session_id, fn current ->
-                %{current | engine_session_id: engine_session_id}
-              end)
-
-            state
-
-          {:error, _reason} ->
-            state
-        end
-    end
-  end
-
-  defp stop_engine_session(nil), do: :ok
-  defp stop_engine_session(session_id), do: Session.stop(session_id)
-
-  defp engine_session_alive?(nil), do: false
-
-  defp engine_session_alive?(session_id) do
-    case Session.whereis(session_id) do
-      nil -> false
-      _pid -> true
-    end
-  end
-
-  defp start_engine_session(%SaveFile{} = save) do
-    case SessionSupervisor.start_session(seed: System.unique_integer([:positive])) do
-      {:ok, pid} ->
-        case Session.load_save(pid, save) do
-          {:ok, session_id} ->
-            {:ok, session_id}
-
-          {:error, reason} ->
-            SessionSupervisor.stop_session(pid)
-            {:error, reason}
-        end
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
-
-  defp start_engine_session(path) when is_binary(path) and path != "" do
-    case SessionSupervisor.start_session(seed: System.unique_integer([:positive])) do
-      {:ok, pid} ->
-        case Session.load_save(pid, path) do
-          {:ok, session_id} ->
-            {:ok, session_id}
-
-          {:error, reason} ->
-            SessionSupervisor.stop_session(pid)
-            {:error, reason}
-        end
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
-
-  defp start_engine_session(_path), do: {:error, :missing_path}
-
-  defp default_load_path do
-    case Paths.mom_path() do
-      nil -> ""
-      "" -> ""
-      path -> Path.join(path, "SAVE1.GAM")
-    end
-  end
-
-  defp normalize_path(nil), do: ""
-
-  defp normalize_path(path) do
-    path = String.trim(path || "")
-
-    case path do
-      "" ->
-        ""
-
-      _ ->
-        path
-        |> String.trim("\"")
-        |> String.trim("'")
-        |> Path.expand()
-    end
-  end
-
-  defp default_selection do
-    Enum.into(@layers, %{}, fn layer -> {layer, 0} end)
-  end
-
-  defp observe_stats(%{dataset_id: nil}), do: :ok
-
-  defp observe_stats(state) do
-    Stats.ensure_dataset(state.dataset_id)
-
-    u8_layers = @layers -- @u16_layers
-    global_init = Enum.into(u8_layers, %{}, fn layer -> {layer, empty_hist()} end)
-
-    {global, _} =
-      Enum.reduce(state.planes, {global_init, :ok}, fn {plane, layers}, {global_acc, _} ->
-        global_acc =
-          Enum.reduce(u8_layers, global_acc, fn layer, acc ->
-            hist = histogram_from_binary(Map.fetch!(layers, layer))
-            Stats.set_histogram(state.dataset_id, layer, {:plane, plane}, hist)
-            Map.update!(acc, layer, &sum_hist(&1, hist))
-          end)
-
-        Mirror.Map.Rays.observe_plane(state.dataset_id, layers.terrain)
-        {global_acc, :ok}
-      end)
-
-    Enum.each(global, fn {layer, hist} ->
-      Stats.set_histogram(state.dataset_id, layer, :global, hist)
-    end)
-  end
-
-  defp histogram_from_binary(binary) do
-    binary
-    |> :binary.bin_to_list()
-    |> Enum.reduce(List.duplicate(0, 256), fn value, acc ->
-      List.update_at(acc, value, &(&1 + 1))
-    end)
-  end
-
-  defp empty_hist do
-    List.duplicate(0, 256)
-  end
-
-  defp sum_hist(left, right) do
-    Enum.zip_with(left, right, fn a, b -> a + b end)
   end
 
   defp hist_entries(%{dataset_id: nil}, _layer), do: []

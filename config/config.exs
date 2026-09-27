@@ -12,7 +12,6 @@ config :mirror,
   terrain_water_values: [0],
   mom_path: nil,
   asset_map_dir: Path.expand("../priv/asset_map", __DIR__),
-  tile_cache_dir: Path.expand("../priv/tile_cache", __DIR__),
   # Research stats (Mirror.Stats), kept outside the repo: the app writes it.
   stats_file: Path.expand("~/.mirror/stats.dets")
 

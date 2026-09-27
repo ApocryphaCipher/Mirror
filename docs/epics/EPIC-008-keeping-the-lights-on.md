@@ -1,6 +1,6 @@
 # EPIC-008: Keeping the Lights On
 
-**Status:** open (review done 2026-09-24)
+**Status:** Done (closed 2026-09-26)
 **Requested by:** [Kevin](https://github.com/KevinAsbury), 2026-09-24
 
 ## Goal
@@ -30,7 +30,9 @@ a finding before fixing it, and add a test that fails without the fix
 5. [STORY-042](../stories/STORY-042-docs-truth-pass.md) P2: a docs pass
    (README, epics and story statuses, the Surveyor doc, old notes). **Done**
 6. [STORY-043](../stories/STORY-043-maintainability.md) P3: `map_live.ex`
-   (3,400 lines) and dead code.
+   (3,400 lines) and dead code. **Done**
+
+With all six stories completed and verified, EPIC-008 is closed.
 
 Already covered elsewhere, so not duplicated: terrain edits don't keep
 the landmass (continent) IDs consistent. That's
