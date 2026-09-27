@@ -156,6 +156,34 @@ const DRAWERS = {
       }
     }
   },
+
+  // STORY-012: units on the map with owner banner-colour plaques.
+  units(ctx, items, {tileSize, sprites}) {
+    if (!sprites) return
+
+    for (const item of items) {
+      const banner = item.banner || "neutral"
+      const plaque = sprites.plaques?.[banner] || sprites.plaques?.neutral
+      if (plaque) {
+        const pw = Math.round((plaque.width * tileSize) / TILE_ART_W)
+        const ph = Math.round((plaque.height * tileSize) / TILE_ART_H)
+        const pImg = sprites.image(`plaques.${banner}`, plaque, 0, null)
+        const pLeft = Math.round((item.x + 0.5) * tileSize - pw / 2)
+        const pTop = Math.round((item.y + 0.5) * tileSize - ph / 2)
+        ctx.drawImage(pImg, pLeft, pTop, pw, ph)
+      }
+
+      const figure = sprites.units?.[item.type]
+      if (figure) {
+        const fw = Math.round((figure.width * tileSize) / TILE_ART_W)
+        const fh = Math.round((figure.height * tileSize) / TILE_ART_H)
+        const fImg = sprites.image(`units.${item.type}`, figure, 0, null)
+        const fLeft = Math.round((item.x + 0.5) * tileSize - fw / 2)
+        const fTop = Math.round((item.y + 0.5) * tileSize - fh / 2)
+        ctx.drawImage(fImg, fLeft, fTop, fw, fh)
+      }
+    }
+  },
 }
 
 // Decoded sprite frames, recoloured per banner on first use and cached.

@@ -17,7 +17,7 @@ defmodule MirrorWeb.MapLive do
   }
 
   alias Mirror.TileAtlas
-  alias Mirror.SaveFile.{Cities, Roads, Sites, Wizards}
+  alias Mirror.SaveFile.{Cities, Roads, Sites, Units, Wizards}
   alias Mirror.Map, as: MirrorMap
 
   @layers [
@@ -2690,6 +2690,10 @@ defmodule MirrorWeb.MapLive do
       layer: "cities",
       items: city_items(socket.assigns.state, socket.assigns.plane)
     })
+    |> push_event("overlay_data", %{
+      layer: "units",
+      items: unit_items(socket.assigns.state, socket.assigns.plane)
+    })
     |> push_map_layers()
   end
 
@@ -2763,6 +2767,21 @@ defmodule MirrorWeb.MapLive do
   end
 
   defp city_items(_state, _plane), do: []
+
+  defp unit_items(%{save: %{raw: raw}}, plane) do
+    banners = Wizards.banners(raw)
+
+    for unit <- Units.items(raw, plane) do
+      %{
+        x: unit.x,
+        y: unit.y,
+        type: unit.type,
+        banner: Map.get(banners, unit.owner, :neutral)
+      }
+    end
+  end
+
+  defp unit_items(_state, _plane), do: []
 
   # The Surveyor panel, from the session's planes so it follows edits.
   defp survey(%{save: %{raw: raw}, planes: planes}, plane, x, y) do

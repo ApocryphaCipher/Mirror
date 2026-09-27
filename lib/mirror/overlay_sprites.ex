@@ -58,23 +58,37 @@ defmodule Mirror.OverlaySprites do
   # Corruption icon: MAPBACK.LBX #77 (22x18)
   @corruption %{corruption: 77}
 
+  # Unit plaques: MAPBACK.LBX #14..#19 (20x18, one per banner colour)
+  @plaques %{
+    blue: 14,
+    green: 15,
+    purple: 16,
+    red: 17,
+    yellow: 18,
+    neutral: 19
+  }
+
   @doc """
   `%{palette: base64 RGBA (index 0 transparent), cities: %{...}, roads: %{...},
-  enchanted_roads: %{...}, specials: %{...}, corruption: %{...}}`, each sprite
-  `%{width, height, frames: [base64 indices]}`, or `{:error, reason}` when
-  `MAPBACK.LBX` isn't in `dir`.
+  enchanted_roads: %{...}, specials: %{...}, corruption: %{...}, plaques: %{...},
+  units: %{...}}`, each sprite `%{width, height, frames: [base64 indices]}`, or
+  `{:error, reason}` when `MAPBACK.LBX` isn't in `dir`. `UNITS1.LBX`/`UNITS2.LBX`
+  are both optional in `Mirror.GameFiles.manifest/0` (an install may have
+  `MAPBACK.LBX` without them), so a missing unit bank degrades to an empty
+  `units` map rather than failing the whole load and hiding cities/roads/etc.
   """
   def load(dir) when dir in [nil, ""], do: {:error, :no_mom_path}
 
   def load(dir) do
-    with {:ok, name} <- find(dir, "MAPBACK.LBX"),
-         {:ok, mapback} <- LBX.open(Path.join(dir, name)),
+    with {:ok, mapback_name} <- find(dir, "MAPBACK.LBX"),
+         {:ok, mapback} <- LBX.open(Path.join(dir, mapback_name)),
          {:ok, palette} <- LBX.game_palette(dir),
          {:ok, cities} <- sprites(mapback, @cities),
          {:ok, roads} <- sprites(mapback, @roads),
          {:ok, enchanted_roads} <- sprites(mapback, @enchanted_roads),
          {:ok, specials} <- sprites(mapback, @specials),
-         {:ok, corruption} <- sprites(mapback, @corruption) do
+         {:ok, corruption} <- sprites(mapback, @corruption),
+         {:ok, plaques} <- sprites(mapback, @plaques) do
       {:ok,
        %{
          palette: Base.encode64(Palette.to_binary(palette)),
@@ -82,8 +96,25 @@ defmodule Mirror.OverlaySprites do
          roads: roads,
          enchanted_roads: enchanted_roads,
          specials: specials,
-         corruption: corruption
+         corruption: corruption,
+         plaques: plaques,
+         units: load_units(dir)
        }}
+    end
+  end
+
+  # UNITS1.LBX/UNITS2.LBX are optional (Mirror.GameFiles.manifest/0): fall
+  # back to no unit figures rather than failing the whole sprite load.
+  defp load_units(dir) do
+    with {:ok, u1_name} <- find(dir, "UNITS1.LBX"),
+         {:ok, u1} <- LBX.open(Path.join(dir, u1_name)),
+         {:ok, u2_name} <- find(dir, "UNITS2.LBX"),
+         {:ok, u2} <- LBX.open(Path.join(dir, u2_name)),
+         {:ok, units1} <- unit_sprites(u1, 0..119//1, 0),
+         {:ok, units2} <- unit_sprites(u2, 0..77//1, 120) do
+      Map.merge(units1, units2)
+    else
+      _ -> %{}
     end
   end
 
@@ -101,6 +132,24 @@ defmodule Mirror.OverlaySprites do
 
         {:error, reason} ->
           {:halt, {:error, {:sprite, index, reason}}}
+      end
+    end)
+  end
+
+  defp unit_sprites(lbx, range, offset) do
+    Enum.reduce_while(range, {:ok, %{}}, fn i, {:ok, acc} ->
+      case LBX.decode_image(lbx, i, palette: :grayscale) do
+        {:ok, image} ->
+          sprite = %{
+            width: image.width,
+            height: image.height,
+            frames: Enum.map(image.frames, &Base.encode64(&1.indices))
+          }
+
+          {:cont, {:ok, Map.put(acc, offset + i, sprite)}}
+
+        {:error, reason} ->
+          {:halt, {:error, {:unit_sprite, offset + i, reason}}}
       end
     end)
   end
