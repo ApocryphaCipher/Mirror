@@ -409,7 +409,7 @@ defmodule Mirror.Editor do
   defp stroke_changes(stroke, :redo), do: stroke.changes
 
   defp update_stroke_stats(state, plane, stroke, mode, old_plane, new_plane) do
-    if state.dataset_id do
+    if dataset_id = Map.get(state, :dataset_id) do
       layer = stroke.layer
 
       case layer do
@@ -424,8 +424,8 @@ defmodule Mirror.Editor do
             new = MirrorMap.get_tile_u8(new_plane.computed_adj_mask, cx, cy)
 
             if old != new do
-              Stats.bump_hist(state.dataset_id, :computed_adj_mask, :global, old, -1)
-              Stats.bump_hist(state.dataset_id, :computed_adj_mask, :global, new, 1)
+              Stats.bump_hist(dataset_id, :computed_adj_mask, :global, old, -1)
+              Stats.bump_hist(dataset_id, :computed_adj_mask, :global, new, 1)
             end
           end)
 
@@ -435,8 +435,8 @@ defmodule Mirror.Editor do
             |> Enum.uniq()
 
           Enum.each(ray_coords, fn {cx, cy} ->
-            Mirror.Map.Rays.observe_tile(state.dataset_id, old_plane.terrain, cx, cy, -1)
-            Mirror.Map.Rays.observe_tile(state.dataset_id, new_plane.terrain, cx, cy, 1)
+            Mirror.Map.Rays.observe_tile(dataset_id, old_plane.terrain, cx, cy, -1)
+            Mirror.Map.Rays.observe_tile(dataset_id, new_plane.terrain, cx, cy, 1)
           end)
 
         _ ->
@@ -449,7 +449,7 @@ defmodule Mirror.Editor do
   end
 
   defp update_stats(state, plane, layer, x, y, prev_value, new_value, old_plane, new_plane) do
-    if state.dataset_id do
+    if dataset_id = Map.get(state, :dataset_id) do
       case layer do
         :terrain ->
           update_adjacent_stats(state, old_plane, new_plane, x, y)
@@ -459,18 +459,18 @@ defmodule Mirror.Editor do
           terrain_type =
             MirrorMap.terrain_type(MirrorMap.get_tile_u16_le(new_plane.terrain, x, y))
 
-          Stats.bump_hist(state.dataset_id, layer, :global, prev_value, -1)
-          Stats.bump_hist(state.dataset_id, layer, :global, new_value, 1)
-          Stats.bump_hist(state.dataset_id, layer, {:plane, plane}, prev_value, -1)
-          Stats.bump_hist(state.dataset_id, layer, {:plane, plane}, new_value, 1)
-          Stats.bump_hist(state.dataset_id, layer, {:terrain_type, terrain_type}, prev_value, -1)
-          Stats.bump_hist(state.dataset_id, layer, {:terrain_type, terrain_type}, new_value, 1)
+          Stats.bump_hist(dataset_id, layer, :global, prev_value, -1)
+          Stats.bump_hist(dataset_id, layer, :global, new_value, 1)
+          Stats.bump_hist(dataset_id, layer, {:plane, plane}, prev_value, -1)
+          Stats.bump_hist(dataset_id, layer, {:plane, plane}, new_value, 1)
+          Stats.bump_hist(dataset_id, layer, {:terrain_type, terrain_type}, prev_value, -1)
+          Stats.bump_hist(dataset_id, layer, {:terrain_type, terrain_type}, new_value, 1)
       end
     end
   end
 
   defp update_adjacent_stats(state, old_plane, new_plane, x, y) do
-    if state.dataset_id do
+    if dataset_id = Map.get(state, :dataset_id) do
       coords = MirrorMap.adj_update_coords(x, y)
 
       Enum.each(coords, fn {cx, cy} ->
@@ -478,20 +478,20 @@ defmodule Mirror.Editor do
         new = MirrorMap.get_tile_u8(new_plane.computed_adj_mask, cx, cy)
 
         if old != new do
-          Stats.bump_hist(state.dataset_id, :computed_adj_mask, :global, old, -1)
-          Stats.bump_hist(state.dataset_id, :computed_adj_mask, :global, new, 1)
+          Stats.bump_hist(dataset_id, :computed_adj_mask, :global, old, -1)
+          Stats.bump_hist(dataset_id, :computed_adj_mask, :global, new, 1)
         end
       end)
     end
   end
 
   defp update_ray_stats(state, old_plane, new_plane, x, y) do
-    if state.dataset_id do
+    if dataset_id = Map.get(state, :dataset_id) do
       coords = ray_update_coords(x, y)
 
       Enum.each(coords, fn {cx, cy} ->
-        Mirror.Map.Rays.observe_tile(state.dataset_id, old_plane.terrain, cx, cy, -1)
-        Mirror.Map.Rays.observe_tile(state.dataset_id, new_plane.terrain, cx, cy, 1)
+        Mirror.Map.Rays.observe_tile(dataset_id, old_plane.terrain, cx, cy, -1)
+        Mirror.Map.Rays.observe_tile(dataset_id, new_plane.terrain, cx, cy, 1)
       end)
     end
   end

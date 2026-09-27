@@ -2,13 +2,14 @@ defmodule MirrorWeb.MapLive do
   use MirrorWeb, :live_view
   import Bitwise
 
-  alias Mirror.Engine.{Delta, Session, SessionSupervisor, View}
+  alias Mirror.Engine.{Delta, Session, View}
 
   alias Mirror.{
     Editor,
     OverlaySprites,
     Paths,
     SaveFile,
+    SaveManager,
     SessionStore,
     Stats,
     Surveyor,
@@ -71,7 +72,7 @@ defmodule MirrorWeb.MapLive do
     state =
       session_id
       |> SessionStore.get()
-      |> normalize_state()
+      |> SaveManager.normalize_state()
 
     socket =
       socket
@@ -83,7 +84,7 @@ defmodule MirrorWeb.MapLive do
       |> assign(:discard_armed, false)
       |> assign(:fresh_mount, true)
 
-    state = ensure_engine_session(state, session_id, connected?(socket))
+    state = SaveManager.ensure_engine_session(state, session_id, connected?(socket))
 
     socket =
       socket
@@ -91,7 +92,7 @@ defmodule MirrorWeb.MapLive do
       |> assign(:active_stroke, nil)
       |> assign(:hover, nil)
       |> assign(:tile_assets, nil)
-      |> assign(:load_path, default_load_path())
+      |> assign(:load_path, SaveManager.default_load_path())
       |> assign(:save_path_input, state.save_path || "")
       |> assign_forms()
 
@@ -140,7 +141,7 @@ defmodule MirrorWeb.MapLive do
       if edit && socket.assigns.state.active_layer != :terrain do
         {:ok, state} =
           SessionStore.update(socket.assigns.session_id, fn current ->
-            ensure_layer_visible(%{current | active_layer: :terrain}, :terrain)
+            SaveManager.ensure_layer_visible(%{current | active_layer: :terrain}, :terrain)
           end)
 
         socket |> assign_from_state(state) |> assign_forms()
@@ -238,16 +239,8 @@ defmodule MirrorWeb.MapLive do
 
     case SessionStore.update(socket.assigns.session_id, fn current ->
            if current.save do
-             stop_engine_session(current.engine_session_id)
-
              {state, restored_save} = Editor.discard(current)
-
-             # The engine session mirrors edits via deltas; restart it from the restored
-             # planes so hover (which reads the engine first) matches the restored map.
-             case start_engine_session(restored_save) do
-               {:ok, engine_session_id} -> %{state | engine_session_id: engine_session_id}
-               {:error, _reason} -> %{state | engine_session_id: nil}
-             end
+             SaveManager.restore_engine_session(state, restored_save)
            else
              current
            end
@@ -274,58 +267,22 @@ defmodule MirrorWeb.MapLive do
 
   @impl true
   def handle_event("load_save", %{"load" => %{"path" => path}}, socket) do
-    path = normalize_path(path)
+    path = SaveManager.normalize_path(path)
 
     socket =
       socket
       |> assign(:load_path, path)
       |> assign_forms()
 
-    case SaveFile.load(path) do
-      {:ok, save} ->
-        stop_engine_session(socket.assigns.state.engine_session_id)
-        planes = with_computed_layers(save.planes)
-
-        state = %{
-          save: save,
-          planes: planes,
-          original_planes: save.planes,
-          active_layer: :terrain,
-          selection: default_selection(),
-          history: %{arcanus: [], myrror: []},
-          redo: %{arcanus: [], myrror: []},
-          save_path: save.path,
-          dataset_id: save.dataset_id,
-          render_mode: socket.assigns.state.render_mode || :tiles,
-          phase_index: socket.assigns.state.phase_index || 0,
-          snapshot_mode: Map.get(socket.assigns.state, :snapshot_mode, true),
-          snapshot_values: %{},
-          phase_loop_len: Map.get(socket.assigns.state, :phase_loop_len),
-          phase_loop_status:
-            normalize_phase_loop_status(
-              Map.get(socket.assigns.state, :phase_loop_status, :unknown)
-            ),
-          phase_loop_detecting: false,
-          engine_session_id: nil,
-          engine_player_id: Map.get(socket.assigns.state, :engine_player_id, :observer)
-        }
-
-        state =
-          case start_engine_session(path) do
-            {:ok, engine_session_id} -> %{state | engine_session_id: engine_session_id}
-            {:error, _reason} -> state
-          end
-
-        state = normalize_state(state)
-
+    case SaveManager.load(path, socket.assigns.state) do
+      {:ok, state, normalized_path} ->
         SessionStore.put(socket.assigns.session_id, state)
-        observe_stats(state)
 
         socket =
           socket
           |> assign_from_state(state)
           |> assign_forms()
-          |> put_flash(:info, "Loaded save from #{path}.")
+          |> put_flash(:info, "Loaded save from #{normalized_path}.")
 
         socket =
           if connected?(socket) do
@@ -339,59 +296,27 @@ defmodule MirrorWeb.MapLive do
 
         {:noreply, socket}
 
-      {:error, {:missing_offset, layer}} ->
-        {:noreply,
-         put_flash(
-           socket,
-           :error,
-           "Missing block offset for #{layer}. Set config before loading."
-         )}
-
-      {:error, :enoent} when path in [nil, ""] ->
-        {:noreply, put_flash(socket, :error, "Provide a save path before loading.")}
-
-      {:error, :enoent} ->
-        {:noreply, put_flash(socket, :error, "Save file not found at #{path}. Check the path.")}
-
       {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Unable to load save: #{inspect(reason)}")}
+        {:noreply, put_flash(socket, :error, SaveManager.load_error_message(reason, path))}
     end
   end
 
   def handle_event("save_file", %{"save" => %{"path" => path}}, socket) do
-    path = normalize_path(path)
-    target_path = if path == "", do: nil, else: path
-    state = socket.assigns.state
+    path = SaveManager.normalize_path(path)
     socket = assign(socket, :save_path_input, path)
 
-    with %SaveFile{} = save <- state.save,
-         {:ok, save_path} <-
-           SaveFile.write(
-             %{save | planes: strip_computed(state.planes)},
-             target_path || state.save_path
-           ) do
-      {:ok, state} =
-        SessionStore.update(socket.assigns.session_id, fn current ->
-          saved_planes = strip_computed(current.planes)
-          save = %{current.save | path: save_path, planes: saved_planes}
-          %{current | save: save, save_path: save_path, original_planes: saved_planes}
-        end)
+    case SaveManager.save(socket.assigns.state, path) do
+      {:ok, updated_state, save_path} ->
+        {:ok, state} =
+          SessionStore.update(socket.assigns.session_id, fn _current ->
+            updated_state
+          end)
 
-      {:noreply, put_flash(assign_state(socket, state), :info, saved_message(save_path))}
-    else
-      nil ->
-        {:noreply, put_flash(socket, :error, "Load a save before saving.")}
-
-      {:error, :would_overwrite_original} ->
         {:noreply,
-         put_flash(
-           socket,
-           :error,
-           "Choose a new file name: Save as won't overwrite the file you loaded."
-         )}
+         put_flash(assign_state(socket, state), :info, SaveManager.saved_message(save_path))}
 
       {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Save failed: #{inspect(reason)}")}
+        {:noreply, put_flash(socket, :error, SaveManager.save_error_message(reason))}
     end
   end
 
@@ -399,7 +324,10 @@ defmodule MirrorWeb.MapLive do
     {:ok, state} =
       SessionStore.update(socket.assigns.session_id, fn current ->
         layer_atom = Enum.find(@layers, current.active_layer, &(&1 |> Atom.to_string() == layer))
-        current |> Map.put(:active_layer, layer_atom) |> ensure_layer_visible(layer_atom)
+
+        current
+        |> Map.put(:active_layer, layer_atom)
+        |> SaveManager.ensure_layer_visible(layer_atom)
       end)
 
     socket =
@@ -2205,7 +2133,6 @@ defmodule MirrorWeb.MapLive do
   end
 
   defp tile_value(state, plane, layer, x, y), do: Editor.tile_value(state, plane, layer, x, y)
-  defp strip_computed(planes), do: Editor.strip_computed(planes)
 
   defp phase_loop_len(%{phase_loop_len: len}) when is_integer(len) and len > 0, do: len
   defp phase_loop_len(_), do: nil
@@ -2287,7 +2214,7 @@ defmodule MirrorWeb.MapLive do
       end
 
     layer_visibility = effective_layer_visibility(socket, state)
-    layer_opacity = Map.get(state, :layer_opacity, default_layer_opacity())
+    layer_opacity = Map.get(state, :layer_opacity, SaveManager.default_layer_opacity())
 
     assign(socket,
       state: state,
@@ -2333,7 +2260,7 @@ defmodule MirrorWeb.MapLive do
       with true <- socket.assigns[:edit] != nil,
            %SaveFile{path: original} when is_binary(original) <- state.save,
            true <- save_input in ["", original] do
-        suggested_save_path(original)
+        SaveManager.suggested_save_path(original)
       else
         _ -> save_input
       end
@@ -2580,7 +2507,7 @@ defmodule MirrorWeb.MapLive do
     state = socket.assigns.state
 
     layer_visibility = effective_layer_visibility(socket, state)
-    layer_opacity = Map.get(state, :layer_opacity, default_layer_opacity())
+    layer_opacity = Map.get(state, :layer_opacity, SaveManager.default_layer_opacity())
 
     push_event(socket, "map_state", %{
       layer: Atom.to_string(state.active_layer),
@@ -2601,7 +2528,7 @@ defmodule MirrorWeb.MapLive do
     values = Base.encode64(Map.fetch!(plane_layers, layer))
 
     layer_visibility = effective_layer_visibility(socket, state)
-    layer_opacity = Map.get(state, :layer_opacity, default_layer_opacity())
+    layer_opacity = Map.get(state, :layer_opacity, SaveManager.default_layer_opacity())
 
     push_event(socket, "map_reload", %{
       plane: Atom.to_string(plane),
@@ -2840,7 +2767,7 @@ defmodule MirrorWeb.MapLive do
 
   defp effective_layer_visibility(socket, state) do
     if socket.assigns[:lab?] do
-      Map.get(state, :layer_visibility, default_layer_visibility(state.active_layer))
+      Map.get(state, :layer_visibility, SaveManager.default_layer_visibility(state.active_layer))
     else
       Map.new(@layers, &{&1, &1 == :terrain})
     end
@@ -2855,28 +2782,11 @@ defmodule MirrorWeb.MapLive do
     end
   end
 
-  defp saved_message(path) do
-    if SaveFile.game_loadable_name?(path),
-      do: "Saved to #{path}.",
-      else:
-        "Saved to #{path}. The game only loads SAVE1.GAM to SAVE9.GAM, so rename it to play it."
-  end
-
   defp push_brush(socket) do
     push_event(socket, "brush", %{tile: Map.get(socket.assigns.state.selection, :terrain, 0)})
   end
 
-  defp with_computed_layers(planes), do: Editor.with_computed_layers(planes)
   defp changed_tile_count(state), do: Editor.changed_tile_count(state)
-
-  # The next free SAVEn.GAM beside the loaded save; empty when all nine are
-  # taken, so the player picks one rather than get a name the game can't load.
-  defp suggested_save_path(original) do
-    case SaveFile.next_free_slot(Path.dirname(original)) do
-      {:ok, path} -> path
-      :none -> ""
-    end
-  end
 
   defp edit_path(:arcanus), do: ~p"/arcanus?edit=terrain"
   defp edit_path(:myrror), do: ~p"/myrror?edit=terrain"
@@ -2957,47 +2867,6 @@ defmodule MirrorWeb.MapLive do
     value in [true, "true", "1", 1, "on"]
   end
 
-  defp default_layer_visibility(active_layer) do
-    Enum.into(@layers, %{}, fn layer ->
-      visible = layer == :terrain || layer == active_layer
-      {layer, visible}
-    end)
-  end
-
-  defp default_layer_opacity do
-    Enum.into(@layers, %{}, fn layer ->
-      {layer, if(layer == :terrain, do: 100, else: 70)}
-    end)
-  end
-
-  defp normalize_layer_visibility(active_layer, visibility) when is_map(visibility) do
-    Enum.into(@layers, %{}, fn layer ->
-      default_visible = layer == :terrain || layer == active_layer
-      value = Map.get(visibility, layer, default_visible)
-      {layer, if(layer == :terrain, do: true, else: value)}
-    end)
-  end
-
-  defp normalize_layer_visibility(active_layer, _visibility) do
-    default_layer_visibility(active_layer)
-  end
-
-  defp normalize_layer_opacity(opacity) when is_map(opacity) do
-    defaults = default_layer_opacity()
-
-    Enum.into(@layers, %{}, fn layer ->
-      {layer, Map.get(opacity, layer, Map.fetch!(defaults, layer))}
-    end)
-  end
-
-  defp normalize_layer_opacity(_opacity), do: default_layer_opacity()
-
-  defp ensure_layer_visible(state, layer) do
-    visibility = Map.get(state, :layer_visibility, default_layer_visibility(state.active_layer))
-    visibility = visibility |> Map.put(:terrain, true) |> Map.put(layer, true)
-    Map.put(state, :layer_visibility, visibility)
-  end
-
   defp parse_opacity(value) when is_integer(value) do
     value |> min(100) |> max(0)
   end
@@ -3015,212 +2884,6 @@ defmodule MirrorWeb.MapLive do
     Enum.into(map || %{}, %{}, fn {key, value} ->
       {to_string(key), value}
     end)
-  end
-
-  defp normalize_state(nil) do
-    %{
-      save: nil,
-      planes: %{},
-      original_planes: nil,
-      active_layer: :terrain,
-      selection: default_selection(),
-      history: %{arcanus: [], myrror: []},
-      redo: %{arcanus: [], myrror: []},
-      save_path: nil,
-      dataset_id: nil,
-      render_mode: :tiles,
-      phase_index: 0,
-      snapshot_mode: true,
-      snapshot_values: %{},
-      phase_loop_len: nil,
-      phase_loop_status: :unknown,
-      phase_loop_detecting: false,
-      debug_terrain_kinds: false,
-      debug_coast_audit: false,
-      debug_shore_semantics: false,
-      layer_visibility: default_layer_visibility(:terrain),
-      layer_opacity: default_layer_opacity(),
-      engine_session_id: nil,
-      engine_player_id: :observer
-    }
-  end
-
-  defp normalize_state(state) do
-    state =
-      state
-      |> Map.put_new(:active_layer, :terrain)
-      |> Map.put_new(:selection, default_selection())
-      |> Map.put_new(:history, %{arcanus: [], myrror: []})
-      |> Map.put_new(:redo, %{arcanus: [], myrror: []})
-      |> Map.put_new(:render_mode, :tiles)
-      |> Map.put_new(:phase_index, 0)
-      |> Map.put_new(:snapshot_mode, true)
-      |> Map.put_new(:snapshot_values, %{})
-      |> Map.put_new(:original_planes, Map.get(state, :save) && Map.get(state.save, :planes))
-      |> Map.put_new(:phase_loop_len, nil)
-      |> Map.put_new(:phase_loop_status, :unknown)
-      |> Map.update(:phase_loop_status, :unknown, &normalize_phase_loop_status/1)
-      |> Map.put_new(:phase_loop_detecting, false)
-      |> Map.put_new(:debug_terrain_kinds, false)
-      |> Map.put_new(:debug_coast_audit, false)
-      |> Map.put_new(:debug_shore_semantics, false)
-      |> Map.put_new(:engine_session_id, nil)
-      |> Map.put_new(:engine_player_id, :observer)
-
-    visibility = normalize_layer_visibility(state.active_layer, Map.get(state, :layer_visibility))
-    opacity = normalize_layer_opacity(Map.get(state, :layer_opacity))
-
-    state
-    |> Map.put(:layer_visibility, visibility)
-    |> Map.put(:layer_opacity, opacity)
-  end
-
-  defp ensure_engine_session(state, session_id, connected?) do
-    cond do
-      not connected? ->
-        state
-
-      is_nil(state.save) ->
-        state
-
-      engine_session_alive?(Map.get(state, :engine_session_id)) ->
-        state
-
-      true ->
-        stop_engine_session(Map.get(state, :engine_session_id))
-
-        case start_engine_session(state.save.path) do
-          {:ok, engine_session_id} ->
-            {:ok, state} =
-              SessionStore.update(session_id, fn current ->
-                %{current | engine_session_id: engine_session_id}
-              end)
-
-            state
-
-          {:error, _reason} ->
-            state
-        end
-    end
-  end
-
-  defp stop_engine_session(nil), do: :ok
-  defp stop_engine_session(session_id), do: Session.stop(session_id)
-
-  defp engine_session_alive?(nil), do: false
-
-  defp engine_session_alive?(session_id) do
-    case Session.whereis(session_id) do
-      nil -> false
-      _pid -> true
-    end
-  end
-
-  defp start_engine_session(%SaveFile{} = save) do
-    case SessionSupervisor.start_session(seed: System.unique_integer([:positive])) do
-      {:ok, pid} ->
-        case Session.load_save(pid, save) do
-          {:ok, session_id} ->
-            {:ok, session_id}
-
-          {:error, reason} ->
-            SessionSupervisor.stop_session(pid)
-            {:error, reason}
-        end
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
-
-  defp start_engine_session(path) when is_binary(path) and path != "" do
-    case SessionSupervisor.start_session(seed: System.unique_integer([:positive])) do
-      {:ok, pid} ->
-        case Session.load_save(pid, path) do
-          {:ok, session_id} ->
-            {:ok, session_id}
-
-          {:error, reason} ->
-            SessionSupervisor.stop_session(pid)
-            {:error, reason}
-        end
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
-
-  defp start_engine_session(_path), do: {:error, :missing_path}
-
-  defp default_load_path do
-    case Paths.mom_path() do
-      nil -> ""
-      "" -> ""
-      path -> Path.join(path, "SAVE1.GAM")
-    end
-  end
-
-  defp normalize_path(nil), do: ""
-
-  defp normalize_path(path) do
-    path = String.trim(path || "")
-
-    case path do
-      "" ->
-        ""
-
-      _ ->
-        path
-        |> String.trim("\"")
-        |> String.trim("'")
-        |> Path.expand()
-    end
-  end
-
-  defp default_selection do
-    Enum.into(@layers, %{}, fn layer -> {layer, 0} end)
-  end
-
-  defp observe_stats(%{dataset_id: nil}), do: :ok
-
-  defp observe_stats(state) do
-    Stats.ensure_dataset(state.dataset_id)
-
-    u8_layers = @layers -- @u16_layers
-    global_init = Enum.into(u8_layers, %{}, fn layer -> {layer, empty_hist()} end)
-
-    {global, _} =
-      Enum.reduce(state.planes, {global_init, :ok}, fn {plane, layers}, {global_acc, _} ->
-        global_acc =
-          Enum.reduce(u8_layers, global_acc, fn layer, acc ->
-            hist = histogram_from_binary(Map.fetch!(layers, layer))
-            Stats.set_histogram(state.dataset_id, layer, {:plane, plane}, hist)
-            Map.update!(acc, layer, &sum_hist(&1, hist))
-          end)
-
-        Mirror.Map.Rays.observe_plane(state.dataset_id, layers.terrain)
-        {global_acc, :ok}
-      end)
-
-    Enum.each(global, fn {layer, hist} ->
-      Stats.set_histogram(state.dataset_id, layer, :global, hist)
-    end)
-  end
-
-  defp histogram_from_binary(binary) do
-    binary
-    |> :binary.bin_to_list()
-    |> Enum.reduce(List.duplicate(0, 256), fn value, acc ->
-      List.update_at(acc, value, &(&1 + 1))
-    end)
-  end
-
-  defp empty_hist do
-    List.duplicate(0, 256)
-  end
-
-  defp sum_hist(left, right) do
-    Enum.zip_with(left, right, fn a, b -> a + b end)
   end
 
   defp hist_entries(%{dataset_id: nil}, _layer), do: []
