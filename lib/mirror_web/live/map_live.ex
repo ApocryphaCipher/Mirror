@@ -17,7 +17,7 @@ defmodule MirrorWeb.MapLive do
   }
 
   alias Mirror.TileAtlas
-  alias Mirror.SaveFile.{Cities, Sites, Wizards}
+  alias Mirror.SaveFile.{Cities, Roads, Sites, Wizards}
   alias Mirror.Map, as: MirrorMap
 
   @layers [
@@ -2694,7 +2694,8 @@ defmodule MirrorWeb.MapLive do
   end
 
   # The overlays computed from the map itself, pushed again after every
-  # edit: where a city could go (STORY-035), and the player's fog (STORY-036).
+  # edit: where a city could go (STORY-035), roads, specials and corruption
+  # (STORY-013), and the player's fog (STORY-036).
   defp push_map_layers(%{assigns: %{lab?: true}} = socket), do: socket
 
   defp push_map_layers(socket) do
@@ -2702,8 +2703,21 @@ defmodule MirrorWeb.MapLive do
 
     socket
     |> push_event("overlay_data", %{layer: "settleable", items: settleable_items(state, plane)})
+    |> push_event("overlay_data", %{layer: "roads", items: road_items(state, plane)})
     |> push_event("overlay_data", %{layer: "fog", items: fog_items(state, plane)})
   end
+
+  defp road_items(%{save: %{}, planes: planes}, plane) do
+    with {:ok, plane_layers} <- Map.fetch(planes, plane),
+         {:ok, flags} <- Map.fetch(plane_layers, :terrain_flags),
+         {:ok, minerals} <- Map.fetch(plane_layers, :minerals) do
+      Roads.items(flags, minerals)
+    else
+      _ -> []
+    end
+  end
+
+  defp road_items(_state, _plane), do: []
 
   defp settleable_items(%{save: %{raw: raw}, planes: planes}, plane) do
     with {:ok, cities} <- Cities.parse(raw),

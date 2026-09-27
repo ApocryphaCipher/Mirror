@@ -1,14 +1,7 @@
 # STORY-013: Specials and bonuses (ores, gems, nightshade, wild game…), roads and corruption
 
 **Parent:** [EPIC-004](../epics/EPIC-004-overland-map-features.md)
-**Status:** open, ready. Minerals values, terrain-flag bits (road
-`0x08`, enchanted road `0x10`, corruption `0x20`) and road-piece
-selection are in [kazzmir-save-layouts.md](../reference/kazzmir-save-layouts.md); the roads are checked
-against a DOSBox shot. **Don't lose the specials:** [Kevin](https://github.com/KevinAsbury)
-(2026-09-23) flagged the bonus tiles as easy to forget next to lairs and
-towers. They get their own map layer and toggle (STORY-009), their own
-editing tool later (STORY-018/028), and a place in the edit checker
-(STORY-029).
+**Status:** **Done** (2026-09-26). Roads, minerals/specials, and corruption decoded and rendered.
 **Live RAM (2026-09-24):** minerals 4, 5, 7, 64, 128 checked on screen via Surveyor. See [the evaluation](../notes/2026-09-24-live-ram-evaluation.md).
 **Size:** medium
 
@@ -47,3 +40,17 @@ guesses.
 
 - Roads, minerals and corruption in `SAVE1.GAM` match the real game's
   overland view.
+
+## Outcome
+
+- Pure module `Mirror.SaveFile.Roads` decodes roads, specials, and corruption from the `:terrain_flags` and `:minerals` save blocks (`0x01cbb8` and `0x013554`).
+- Road piece selection reuses `Mirror.Engine.Topology` (60×40, `wrap_x: true`, `wrap_y: false`) to connect to road neighbours in N, NE, E, SE, S, SW, W, NW order starting from the centre piece (`:c`).
+- Normal roads (bit `0x08`, `MAPBACK #45..#53`, 1 frame) and enchanted roads (bit `0x10`, `MAPBACK #54..#62`, frame 0) are selected based on the tile flag; connected neighbours with either road bit connect.
+- Minerals map values 1–9, 64, 128 decode to iron, coal, silver, gold, gems, mithril, adamantium, quork crystals, crysx crystals, wild game, and nightshade (`MAPBACK #78..#86`, `#92`, `#91`).
+- Corruption bit `0x20` decodes to a corruption item (`MAPBACK #77`, 22×18).
+- `Mirror.OverlaySprites` loads the road, enchanted road, special, and corruption sprite entries from `MAPBACK.LBX`.
+- `MapLive` pushes the combined `"roads"` layer items via `push_map_layers/1`.
+- `assets/js/map_overlays.js` implements `DRAWERS.roads`, drawing road pieces, special icons, and corruption centered on the tile and scaled by `tileSize / TILE_ART_W`.
+- Unit tests in `test/mirror/save_file/roads_test.exs` test piece selection (0, 1, multiple neighbours, x-wrap at 0/59, y-clamp at 0/39), enchanted vs. normal road choice, all 11 minerals values, and corruption bit handling using synthetic binary fixtures.
+- Real-file and LiveView tests in `test/mirror_web/live/map_live_edit_test.exs` and `test/mirror/overlay_sprites_test.exs` verify `SAVE1.GAM` and `MAPBACK.LBX` integration.
+- *Unverified*: in-game appearance of corruption tiles (no corruption tiles in `SAVE1`–`SAVE9`).
