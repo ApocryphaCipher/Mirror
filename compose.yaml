@@ -7,6 +7,13 @@ services:
       MIRROR_MOM_PATH: /game
       MIRROR_STATS_FILE: /data/stats.dets
       MIRROR_ASSET_MAP: /data/asset_map
+      # Without this, config/runtime.exs falls back to PHX_HOST's default
+      # ("example.com"), and Phoenix's check_origin rejects the browser's
+      # real localhost origin on every LiveView socket connection - it still
+      # serves plain HTTP fine, but LiveView falls back to slow long-polling
+      # and never stops retrying. Set this to match whatever host you
+      # actually browse to.
+      PHX_HOST: localhost
       # Dev-only placeholder. A real deployment must set its own SECRET_KEY_BASE.
       SECRET_KEY_BASE: "0000000000000000000000000000000000000000000000000000000000000000"
     volumes:

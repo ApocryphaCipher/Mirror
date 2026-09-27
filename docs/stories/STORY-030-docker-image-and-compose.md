@@ -1,7 +1,7 @@
 # STORY-030: Docker image and compose file
 
 **Parent:** [EPIC-007](../epics/EPIC-007-packaging-ci-and-repo-hygiene.md)
-**Status:** open — verified the container boots and serves, but not against a real save; needs a human with game files to confirm rendering and Save-as
+**Status:** Done — verified end-to-end with real game files, including a Save-as round-trip
 **Size:** small–medium
 **Requested by:** [Kevin](https://github.com/KevinAsbury), 2026-09-23
 
@@ -118,8 +118,10 @@ instead, on both this Mac and CI.
 for real (not just `docker build`, and not just an equivalent `docker run`)
 against this Mac's own `~/.mirror` — the container starts, Bandit binds
 `:4000`, and `curl localhost:4000/arcanus` returns `200` with a logged
-`GET /arcanus` / `Sent 200`. Did not test with actual game files mounted
-(none were pointed at `~/.mirror/game` during this check) or a Save-as
-round-trip inside the container; those are worth a spot-check with a real
-save before you rely on this daily, but the container itself, the release,
-and the HTTP path are all confirmed working, not assumed.
+`GET /arcanus` / `Sent 200`.
+
+**Confirmed with real game files (Kevin, 2026-09-26):** loaded a real save
+through the mounted `/game` folder and ran Save as inside the container —
+it wrote to `/game/SAVE3.GAM`, i.e. next to the loaded file in the bind
+mount, exactly as designed. Rendering and the save round-trip both work
+against actual game data, closing the one gap left open above.
