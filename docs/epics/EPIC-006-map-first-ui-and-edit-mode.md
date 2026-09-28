@@ -68,7 +68,7 @@ STORY-017 → then the rest as their EPIC-004 data stories land.
 - [STORY-018](../stories/STORY-018-roads-specials-editing.md): roads, corruption and resource editing
 - [STORY-019](../stories/STORY-019-move-structures.md): select and move structures and unit stacks
 - [STORY-020](../stories/STORY-020-structure-editors.md): structure detail editors (city / lair / unit)
-- [STORY-021](../stories/STORY-021-save-round-trip-safety.md): save round-trip safety (in progress — automated checks done, DOSBox visual sign-off pending)
+- [STORY-021](../stories/STORY-021-save-round-trip-safety.md): save round-trip safety (byte-exact, and loads in the real game) **Done**
 - [STORY-022](../stories/STORY-022-bug-raw-value-paint-artifacts.md): **bug**: stray raw-value paint (wheel silently changes the brush; bare click paints) shows up as map artifacts **Partially fixed**
 - [STORY-023](../stories/STORY-023-bug-edit-paint-no-live-redraw.md): **bug**: painting in edit mode doesn't redraw the tile until reload **Fixed**
 - [STORY-024](../stories/STORY-024-tile-hover-highlight.md): highlight the tile under the cursor (nice-to-have)
