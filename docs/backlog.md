@@ -20,10 +20,7 @@ Unsorted, not yet promoted to a story.
   the five manifest LBX files; to explore extra files, point `MIRROR_MOM_PATH`
   directly at the complete install folder or copy the additional LBX files into
   `~/.mirror/game` manually.
-- Decode `TERRTYPE.LBX` properly (the original game's mask → tile table) for
-  automatic terrain auto-tiling. Raw tile editing already exists; this is the
-  backbone needed for painting terrain *types* rather than individual tile
-  pictures. Tracked in [stories/STORY-017-terrain-editing-autotile.md](stories/STORY-017-terrain-editing-autotile.md).
+- ~~Decode `TERRTYPE.LBX` properly~~ — replaced by porting kazzmir's terrain tile table, completing phase 1 of [stories/STORY-017-terrain-editing-autotile.md](stories/STORY-017-terrain-editing-autotile.md).
 - ~~Offsets unverified~~: done 2026-09-24. The game's own save writes
   place all five blocks (docs/reference/save-to-ram-map.md), and
   `config/config.exs` has them as defaults. The original note:

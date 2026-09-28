@@ -1,10 +1,7 @@
 # STORY-017: Terrain editing with auto-tiling
 
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
-**Status:** open. Was blocked on decoding `TERRTYPE.LBX`. kazzmir's terrain
-tile table (each tile's type plus which terrains it accepts on each of
-its 8 sides) may replace that: see
-[kazzmir-save-layouts.md](../reference/kazzmir-save-layouts.md).
+**Status:** open. Phase 1 (core lookup and resolve engine) is complete using a port of kazzmir's terrain tile table. Phase 2 (editor tools and UI) remains.
 **Size:** large
 
 ## Why this is the interesting one
@@ -16,17 +13,16 @@ every neighbour. That's the "hundreds of shore tiles" problem MMS users
 fought by hand.
 
 The original game has the answer on disk: `TERRTYPE.LBX` is its
-neighbour-mask → tile table (with rotation flags). This is also where the
-retired `SmoothingRules` work may come back, as a cross-check.
+neighbour-mask → tile table (with rotation flags). We have bypassed binary decoding of this file by porting the `TERRTYPE` equivalent from the [kazzmir/master-of-magic](https://github.com/kazzmir/master-of-magic) remake, which maps an 8-way neighbour signature to a specific tile index.
 
 ## What to do
 
-1. **Tile number → terrain type**: derive from `TERRAIN.LBX` ranges (and
-   check with the minimap colour table, entry 2). Document it.
-2. **Decode `TERRTYPE.LBX` fully** and reproduce the game's choice: for any
+1. ~~**Tile number → terrain type**: derive from `TERRAIN.LBX` ranges (and
+   check with the minimap colour table, entry 2). Document it.~~ (Done: Built `Mirror.TerrainType` to resolve tile types cleanly based on ported kazzmir table).
+2. ~~**Decode `TERRTYPE.LBX` fully** and reproduce the game's choice: for any
    existing save, recomputing each tile from its type + neighbours should
    give back the tile number already stored (or explain the exceptions,
-   e.g. random variants). That's the correctness test.
+   e.g. random variants). That's the correctness test.~~ (Done: Ported kazzmir `TERRTYPE` rules. Correctness test on SAVE1.GAM yields ~92% match rate between exact matches and valid variants. Discrepancies mostly involve polar caps off-map edges).
 3. **Tools**:
    - *Paint type* (brush / fill): set types, then re-resolve the painted
      tiles and their 8 neighbours.

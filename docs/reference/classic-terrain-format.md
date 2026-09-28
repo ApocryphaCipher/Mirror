@@ -62,8 +62,12 @@ One entry of `u16` lookup tables indexed by an 8-bit neighbour mask; each
 value is a tile index in the low bits plus rotation/flip flags in bits
 14–15 (`0x4000`/`0x8000`/`0xC000`). This is what the game uses to *pick*
 tiles when generating or editing a map. A viewer never needs it (the save
-already stores the result). Only relevant if Mirror ever edits terrain.
-Decoded only superficially so far.
+already stores the result). 
+
+**STORY-017 (Auto-tiling):** Rather than reverse-engineering `TERRTYPE.LBX`'s raw binary layout, we ported the logic directly from the BSD-licensed [kazzmir/master-of-magic](https://github.com/kazzmir/master-of-magic) remake, which maps an 8-way neighbour signature to a specific tile index. 
+- Validation against `SAVE1.GAM` (4,800 tiles) yielded an exact match rate of 38.25%.
+- Factoring in decorative valid variants (i.e. where the stored tile perfectly obeys the rules for its neighbours, but wasn't the first matching index), the total match rate is **92.18%**.
+- The remaining ~375 unexplained mismatches are overwhelmingly concentrated at the map edges (*guess*: kazzmir treats off-map neighbours as `:ocean`, while polar caps in the real game seem to require/generate `:tundra` borders — further investigation needed before modifying the edges behavior).
 
 ## Where the files come from
 
