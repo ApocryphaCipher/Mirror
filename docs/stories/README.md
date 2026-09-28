@@ -18,7 +18,7 @@
 - [STORY-018](STORY-018-roads-specials-editing.md): roads, corruption, resource editing (EPIC-006)
 - [STORY-019](STORY-019-move-structures.md): select and move structures and unit stacks (EPIC-006)
 - [STORY-020](STORY-020-structure-editors.md): structure detail editors (EPIC-006)
-- [STORY-021](STORY-021-save-round-trip-safety.md): save round-trip safety (EPIC-006)
+- [STORY-021](STORY-021-save-round-trip-safety.md): save round-trip safety (EPIC-006) **In progress (DOSBox sign-off pending)**
 - [STORY-022](STORY-022-bug-raw-value-paint-artifacts.md): **bug**: stray raw-value paint shows up as map artifacts (EPIC-006) **Partially fixed**
 - [STORY-023](STORY-023-bug-edit-paint-no-live-redraw.md): **bug**: painting in edit mode doesn't redraw the tile until reload (EPIC-006) **Fixed**
 - [STORY-024](STORY-024-tile-hover-highlight.md): highlight the tile under the cursor (glow / lift; brush ghost in edit mode) (EPIC-006, nice-to-have)
