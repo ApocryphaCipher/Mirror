@@ -4,7 +4,8 @@ defmodule Mirror.TerrainType do
 
   This table and resolution algorithm are ported directly from the BSD-3 licensed
   kazzmir/master-of-magic remake (commit `e824e98`), specifically the
-  `game/magic/terrain/{terrain.go,map.go}` files.
+  `game/magic/terrain/{terrain.go,map.go}` files. Full license text and
+  copyright notice: `NOTICE.md`.
   """
 
   @external_resource "priv/kazzmir_terrain_table.json"
@@ -112,22 +113,44 @@ defmodule Mirror.TerrainType do
   @doc """
   Finds the first valid tile number for the given `region` on the specified `plane`.
 
-  Tiles are scanned in ascending index order. To optimize, only tiles whose intrinsic
-  `:center` terrain type equals `region[:center]` are considered.
+  `region` **must** include `:center` (the terrain type being resolved — what
+  you're painting, or the tile's own current type when re-resolving after a
+  neighbour changed). Every tile's own `:center` rule requires exactly its own
+  terrain type, so restricting the scan to tiles whose type equals
+  `region[:center]` returns the same first match kazzmir's two-phase
+  `FindMatchingTile` would (its `OnlyTiles[center]` fast path, then a
+  full-plane fallback that in practice can never find a different-typed tile,
+  since every tile enforces its own `Center` rule whenever `:center` is
+  present in the match).
+
+  This is a deliberate difference from kazzmir: `FindMatchingTile` falls back
+  to scanning the *entire* plane when `:center` is absent from `match`,
+  ignoring type entirely — a call shape that in this codebase's usage never
+  happens on purpose. Rather than port that fallback silently, a missing
+  `:center` is a caller error here.
+
+  Tiles are scanned in ascending index order — order matters, since more than
+  one tile can satisfy the same `region` (e.g. decorative variants).
   """
   @spec resolve_tile(map(), :arcanus | :myrror) :: integer() | nil
   def resolve_tile(region, plane) when plane in [:arcanus, :myrror] and is_map(region) do
-    center_type = Map.get(region, :center)
-    offset = if plane == :myrror, do: 0x2FA, else: 0
+    case Map.fetch(region, :center) do
+      {:ok, center_type} ->
+        offset = if plane == :myrror, do: 0x2FA, else: 0
 
-    match =
-      Enum.find(@tiles, fn {_index, t_type, rules} ->
-        t_type == center_type and matches_rules?(rules, region)
-      end)
+        match =
+          Enum.find(@tiles, fn {_index, t_type, rules} ->
+            t_type == center_type and matches_rules?(rules, region)
+          end)
 
-    case match do
-      {index, _, _} -> index + offset
-      nil -> nil
+        case match do
+          {index, _, _} -> index + offset
+          nil -> nil
+        end
+
+      :error ->
+        raise ArgumentError,
+              "resolve_tile/2 requires :center in region, got: #{inspect(region)}"
     end
   end
 end

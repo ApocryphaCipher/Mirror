@@ -15,15 +15,23 @@ including graphics dependencies unrelated to this export); to regenerate
 
 ```bash
 git clone --depth 50 https://github.com/kazzmir/master-of-magic.git /tmp/kazzmir-mom
-mkdir -p /tmp/kazzmir-mom/cmd/terrainexport
-cp main.go /tmp/kazzmir-mom/cmd/terrainexport/
 cd /tmp/kazzmir-mom
+git checkout e824e98
+mkdir -p cmd/terrainexport
+cp /path/to/Mirror/scripts/kazzmir_terrain_export/main.go cmd/terrainexport/
 go build ./cmd/terrainexport/
 ./terrainexport > /path/to/Mirror/priv/kazzmir_terrain_table.json
 ```
 
-Output: a JSON array, one entry per Arcanus tile index `0..0x2F9` (761),
-each `{index, terrain_type, compatibilities}` where `compatibilities` is
+The `git checkout e824e98` step matters: without it, a later rerun builds
+against whatever kazzmir's `main` branch has become, which may not match
+`priv/kazzmir_terrain_table.json`'s current contents or this README's
+description of them. Re-pin (and update this doc) deliberately if you
+want to pick up a newer commit.
+
+Output: a JSON array, one entry per Arcanus tile index `0..0x2F9`
+inclusive (762 entries), each `{index, terrain_type, compatibilities}`
+where `compatibilities` is
 keyed by direction (`Center`, `North`, `NorthEast`, `East`, `SouthEast`,
 `South`, `SouthWest`, `West`, `NorthWest`) and holds `{type: "any_of" |
 "none_of", terrains: [...]}`. Myrror tiles reuse this same table, offset

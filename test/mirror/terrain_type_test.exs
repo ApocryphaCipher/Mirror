@@ -5,6 +5,90 @@ defmodule Mirror.TerrainTypeTest do
   alias Mirror.Map, as: MMap
   alias Mirror.Engine.Topology
 
+  @myrror_start 0x2FA
+  # Ocean, tolerant of Ocean-or-Shore on every side.
+  @tile_ocean_loose 0
+  # Ocean, but strictly Ocean-only on every side (a "deep ocean" variant).
+  @tile_ocean_strict 601
+  # Shore, requiring non-Ocean/Shore specifically to its SouthEast.
+  @tile_shore 2
+  # Grass with only a :center rule — every other direction is unconstrained.
+  @tile_grass_unconstrained 162
+
+  describe "terrain_type/1" do
+    test "looks up Arcanus tiles directly" do
+      assert TerrainType.terrain_type(@tile_ocean_loose) == :ocean
+      assert TerrainType.terrain_type(@tile_ocean_strict) == :ocean
+      assert TerrainType.terrain_type(@tile_shore) == :shore
+    end
+
+    test "maps Myrror tiles back to their Arcanus equivalent" do
+      assert TerrainType.terrain_type(@tile_ocean_loose + @myrror_start) == :ocean
+      assert TerrainType.terrain_type(@tile_shore + @myrror_start) == :shore
+    end
+
+    test "returns nil for out-of-range or negative tile numbers" do
+      assert TerrainType.terrain_type(-1) == nil
+      assert TerrainType.terrain_type(99_999) == nil
+    end
+  end
+
+  describe "matches?/2" do
+    test "any_of: a direction's neighbour must be one of the allowed types" do
+      assert TerrainType.matches?(@tile_ocean_loose, %{0 => :shore, center: :ocean})
+      refute TerrainType.matches?(@tile_ocean_loose, %{0 => :grass, center: :ocean})
+    end
+
+    test "the strict-ocean variant rejects a Shore neighbour the loose one accepts" do
+      assert TerrainType.matches?(@tile_ocean_loose, %{0 => :shore, center: :ocean})
+      refute TerrainType.matches?(@tile_ocean_strict, %{0 => :shore, center: :ocean})
+    end
+
+    test "none_of: a direction's neighbour must not be one of the forbidden types" do
+      # Tile 2 requires non-Ocean/Shore specifically to its SouthEast (direction 3).
+      assert TerrainType.matches?(@tile_shore, %{3 => :grass, center: :shore})
+      refute TerrainType.matches?(@tile_shore, %{3 => :ocean, center: :shore})
+      refute TerrainType.matches?(@tile_shore, %{3 => :shore, center: :shore})
+    end
+
+    test "a direction with no rule at all is unconstrained" do
+      assert TerrainType.matches?(@tile_grass_unconstrained, %{
+               0 => :ocean,
+               4 => :volcano,
+               center: :grass
+             })
+    end
+
+    test "works the same for the Myrror-offset tile number" do
+      assert TerrainType.matches?(@tile_shore + @myrror_start, %{3 => :grass, center: :shore})
+      refute TerrainType.matches?(@tile_shore + @myrror_start, %{3 => :ocean, center: :shore})
+    end
+  end
+
+  describe "resolve_tile/2" do
+    test "returns the first matching tile in ascending index order" do
+      # Both 0 and 601 satisfy an all-ocean region; 0 comes first.
+      region = for dir <- 0..7, into: %{center: :ocean}, do: {dir, :ocean}
+      assert TerrainType.resolve_tile(region, :arcanus) == @tile_ocean_loose
+    end
+
+    test "offsets the result by the Myrror start index on the Myrror plane" do
+      region = for dir <- 0..7, into: %{center: :ocean}, do: {dir, :ocean}
+      assert TerrainType.resolve_tile(region, :myrror) == @tile_ocean_loose + @myrror_start
+    end
+
+    test "returns nil when no tile satisfies the region" do
+      # No Ocean tile allows Grass as a direct neighbour.
+      assert TerrainType.resolve_tile(%{0 => :grass, center: :ocean}, :arcanus) == nil
+    end
+
+    test "raises when :center is missing, instead of silently returning nil" do
+      assert_raise ArgumentError, ~r/requires :center/, fn ->
+        TerrainType.resolve_tile(%{0 => :ocean}, :arcanus)
+      end
+    end
+  end
+
   @mom_path System.get_env("MIRROR_MOM_PATH")
   @save1_path @mom_path && Path.join(@mom_path, "SAVE1.GAM")
   @has_save1 @save1_path && File.exists?(@save1_path)
