@@ -18,7 +18,7 @@ defmodule Mirror.SaveBlockDiff do
   def diff(before_binary, after_binary)
       when byte_size(before_binary) == byte_size(after_binary) do
     diff_offsets =
-      for i <- 0..(byte_size(before_binary) - 1),
+      for i <- 0..(byte_size(before_binary) - 1)//1,
           :binary.at(before_binary, i) != :binary.at(after_binary, i),
           do: i
 
