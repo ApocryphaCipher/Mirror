@@ -173,18 +173,21 @@ defmodule Mirror.TerrainTypeTest do
       nx = MMap.wrap_x(x + dx)
       ny = MMap.clamp_y(y + dy)
 
-      neighbor_type =
-        case ny do
-          :off ->
-            # Kazzmir off-map default
-            :ocean
+      case ny do
+        :off ->
+          # Off the north/south edge: no neighbour exists, so no constraint
+          # applies for this direction. Confirmed against live DOSBox RAM
+          # (2026-09-28): forcing :ocean here left every north/south edge
+          # tile unexplained; leaving the direction unconstrained resolves
+          # them all, including the (0,0) corner. See
+          # docs/reference/classic-terrain-format.md.
+          acc
 
-          _ ->
-            neighbor_raw = MMap.get_tile_u16_le(terrain_bin, nx, ny)
-            TerrainType.terrain_type(neighbor_raw) || :unknown
-        end
-
-      Map.put(acc, dir, neighbor_type)
+        _ ->
+          neighbor_raw = MMap.get_tile_u16_le(terrain_bin, nx, ny)
+          neighbor_type = TerrainType.terrain_type(neighbor_raw) || :unknown
+          Map.put(acc, dir, neighbor_type)
+      end
     end)
   end
 end

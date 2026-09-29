@@ -2,9 +2,10 @@
 
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
 **Status:** open. Phase 1 (core lookup and resolve engine, item 1 below)
-is done; item 2's correctness test is at 92.18% with a genuine
-unexplained gap at the polar edge (see item 2). Phase 2 (editor tools and
-UI, items 3–4) remains untouched.
+is done; item 2's polar-edge gap is resolved (see item 2) and the
+correctness test's remaining unexplained mismatches are an unrelated,
+low-priority decorative-variant ordering question. Phase 2 (editor tools
+and UI, items 3–4) remains untouched.
 **Size:** large
 
 ## Why this is the interesting one
@@ -25,16 +26,22 @@ neighbour-mask → tile table (with rotation flags). We have bypassed binary dec
 2. **Decode `TERRTYPE.LBX` fully** and reproduce the game's choice: for any
    existing save, recomputing each tile from its type + neighbours should
    give back the tile number already stored (or explain the exceptions,
-   e.g. random variants). That's the correctness test. **Partially done:**
-   ported kazzmir's table and resolve algorithm
-   (`Mirror.TerrainType`); the correctness test on `SAVE1.GAM` gives a
-   92.18% match rate (38.25% exact index, another 53.9% a different but
-   still rule-satisfying "decorative variant" tile — both count as
-   explained). The remaining ~7.8% (concentrated at the map's north/polar
-   edge) is **not yet explained** — see
-   `docs/reference/classic-terrain-format.md`'s `TERRTYPE.LBX` section,
-   marked *guess*. Don't treat this item as closed until that's resolved
-   or the exception is properly documented, not just guessed at.
+   e.g. random variants). That's the correctness test. **Done for the
+   polar-edge question:** ported kazzmir's table and resolve algorithm
+   (`Mirror.TerrainType`); the correctness test on `SAVE1.GAM` originally
+   gave a 92.18% match rate with ~375 unexplained mismatches concentrated
+   at the map's north/south edges. Checked live against a running game via
+   the DOSBox Staging memory API (2026-09-28, see
+   `docs/reference/live-ram-map.md`): kazzmir's off-map default
+   (`:ocean` for a neighbour past row 0/39) was wrong — leaving that
+   direction unconstrained instead resolves every edge tile on both
+   planes, including the (0,0) corner. Fixed in
+   `test/mirror/terrain_type_test.exs`'s `build_region`; unexplained
+   mismatches dropped to 195, none on the edge rows. The remaining 195 are
+   an unrelated, low-priority "strict vs loose ocean variant" ordering
+   question (interior tiles, not edges) — see
+   `docs/reference/classic-terrain-format.md`'s `TERRTYPE.LBX` section for
+   detail.
 3. **Tools**:
    - *Paint type* (brush / fill): set types, then re-resolve the painted
      tiles and their 8 neighbours.
