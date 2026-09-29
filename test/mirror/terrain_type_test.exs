@@ -93,6 +93,50 @@ defmodule Mirror.TerrainTypeTest do
   @save1_path @mom_path && Path.join(@mom_path, "SAVE1.GAM")
   @has_save1 @save1_path && File.exists?(@save1_path)
 
+  describe "build_region/3 at the map's north/south edges" do
+    # A uniform all-ocean plane (60x40 u16 tiles, tile 0 == :ocean everywhere)
+    # is enough to prove which directions build_region omits — no real save
+    # needed, so this runs in CI even where SAVE1.GAM isn't available.
+    @ocean_plane :binary.copy(<<0, 0>>, 60 * 40)
+
+    test "omits North/NorthEast/NorthWest at row 0" do
+      region = build_region(@ocean_plane, 5, 0)
+
+      refute Map.has_key?(region, 0)
+      refute Map.has_key?(region, 1)
+      refute Map.has_key?(region, 7)
+
+      assert region[:center] == :ocean
+      assert region[2] == :ocean
+      assert region[3] == :ocean
+      assert region[4] == :ocean
+      assert region[5] == :ocean
+      assert region[6] == :ocean
+    end
+
+    test "omits South/SouthEast/SouthWest at the last row" do
+      region = build_region(@ocean_plane, 5, MMap.height() - 1)
+
+      refute Map.has_key?(region, 3)
+      refute Map.has_key?(region, 4)
+      refute Map.has_key?(region, 5)
+
+      assert region[:center] == :ocean
+      assert region[0] == :ocean
+      assert region[1] == :ocean
+      assert region[2] == :ocean
+      assert region[6] == :ocean
+      assert region[7] == :ocean
+    end
+
+    test "an interior row omits nothing" do
+      region = build_region(@ocean_plane, 5, 20)
+
+      assert map_size(region) == 9
+      assert Enum.all?(0..7, &Map.has_key?(region, &1))
+    end
+  end
+
   @tag skip: !@has_save1 && "needs SAVE1.GAM"
   test "validates terrain resolution against real save" do
     {:ok, save} = SaveFile.load(@save1_path)
