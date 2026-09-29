@@ -65,9 +65,9 @@ tiles when generating or editing a map. A viewer never needs it (the save
 already stores the result). 
 
 **STORY-017 (Auto-tiling):** Rather than reverse-engineering `TERRTYPE.LBX`'s raw binary layout, we ported the logic directly from the BSD-licensed [kazzmir/master-of-magic](https://github.com/kazzmir/master-of-magic) remake, which maps an 8-way neighbour signature to a specific tile index. 
-- Validation against `SAVE1.GAM` (4,800 tiles) yielded an exact match rate of 38.25%.
-- Factoring in decorative valid variants (i.e. where the stored tile perfectly obeys the rules for its neighbours, but wasn't the first matching index), the total match rate is **92.18%**.
-- The remaining ~375 unexplained mismatches are overwhelmingly concentrated at the map edges (*guess*: kazzmir treats off-map neighbours as `:ocean`, while polar caps in the real game seem to require/generate `:tundra` borders — further investigation needed before modifying the edges behavior).
+- Validation against `SAVE1.GAM` (4,800 tiles) yielded an exact match rate of 38.25% (later 40.35%, see below).
+- Factoring in decorative valid variants (i.e. where the stored tile perfectly obeys the rules for its neighbours, but wasn't the first matching index), the total match rate was **92.18%**, with ~375 unexplained mismatches concentrated at the map's north/south edges.
+- **Resolved 2026-09-28:** kazzmir's off-map default (treating a north/south neighbour past row 0/39 as `:ocean`) was wrong. Checked live against a running game via the DOSBox Staging memory API (`docs/reference/live-ram-map.md`): a fresh random map's row 0, row 39, and the (0,0) corner tile all failed to resolve under `:ocean`, but resolved correctly (exact or valid variant, 100% of edge tiles on both planes) when the off-map direction is left **unconstrained** instead — i.e. the tile simply has no rule for a direction that doesn't exist, rather than a synthetic ocean neighbour. Applying this to `test/mirror/terrain_type_test.exs`'s `build_region` against `SAVE1.GAM` cut unexplained mismatches from 375 to 195, and eliminated them entirely on the edge rows (0/60 unexplained on all four edge rows, both planes). The remaining 195 unexplained mismatches are unrelated: interior ocean tiles where the game stored tile 601 (a "strict" all-ocean variant) where the resolver's ascending-index scan finds tile 0 (the "loose" variant) first — a decorative-variant ordering question, not an edge-handling one.
 
 ## Where the files come from
 
