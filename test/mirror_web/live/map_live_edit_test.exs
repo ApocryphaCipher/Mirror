@@ -366,6 +366,44 @@ defmodule MirrorWeb.MapLiveEditTest do
       assert tile_at(view, 6, 6) == 761
     end
 
+    test "undo and redo of a painted type revert terrain and landmass together, and push both layers",
+         %{conn: conn, save: save} do
+      session_id = "paint-type-undo-test-#{System.unique_integer([:positive])}"
+      conn = init_test_session(conn, %{"mirror_session_id" => session_id})
+
+      {:ok, view, _} = live(conn, ~p"/arcanus")
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      render_click(view, "toggle_edit", %{})
+
+      before = Mirror.SessionStore.get(session_id)
+
+      cells = Mirror.TerrainPaint.brush_cells(30, 20, 3)
+
+      {:ok, painted, {:applied, _entry, layers}} =
+        Mirror.SessionStore.update(session_id, fn current ->
+          {next, outcome, _report} = Mirror.Editor.paint_type(current, :arcanus, cells, :grass)
+          {next, outcome}
+        end)
+
+      assert Enum.map(layers, & &1.layer) == [:terrain, :landmass]
+      assert painted.planes.arcanus.landmass != before.planes.arcanus.landmass
+
+      render_click(view, "undo", %{})
+      assert_push_event(view, "engine_delta", %{layer: "terrain"})
+      assert_push_event(view, "engine_delta", %{layer: "landmass"})
+
+      undone = Mirror.SessionStore.get(session_id)
+      assert undone.planes == before.planes
+      assert undone.history.arcanus == []
+
+      render_click(view, "redo", %{})
+      assert_push_event(view, "engine_delta", %{layer: "terrain"})
+      assert_push_event(view, "engine_delta", %{layer: "landmass"})
+
+      redone = Mirror.SessionStore.get(session_id)
+      assert redone.planes == painted.planes
+    end
+
     test "each click is one undo step, pushed live", %{conn: conn, save: save} do
       view = editing(conn, save)
       start = tile_at(view, 7, 7)

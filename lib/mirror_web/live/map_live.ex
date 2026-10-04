@@ -2102,42 +2102,44 @@ defmodule MirrorWeb.MapLive do
     end
   end
 
-  defp apply_undo(socket) do
+  defp apply_undo(socket), do: apply_history_step(socket, &Editor.undo/2)
+
+  defp apply_redo(socket), do: apply_history_step(socket, &Editor.redo/2)
+
+  # An undo or redo step may cover several layers (terrain and landmass for a
+  # painted type); each layer's updates go to the client and the engine.
+  defp apply_history_step(socket, step) do
     plane = socket.assigns.plane
 
-    case SessionStore.update(socket.assigns.session_id, fn current ->
-           Editor.undo(current, plane)
-         end) do
+    case SessionStore.update(socket.assigns.session_id, fn current -> step.(current, plane) end) do
       {:ok, state, {:applied, updates, layer, changes}} ->
-        socket
-        |> assign_state(state)
-        |> maybe_push_updates(layer, updates, changes)
-        |> emit_engine_delta(plane, layer, changes)
-        |> refresh_hover()
-        |> push_map_layers()
+        finish_history_step(socket, state, plane, [
+          %{layer: layer, updates: updates, changes: changes}
+        ])
+
+      {:ok, state, {:applied, updates, layer, changes, extras}} ->
+        parts = [%{layer: layer, updates: updates, changes: changes} | extras]
+        finish_history_step(socket, state, plane, parts)
 
       {:ok, _state, :none} ->
         socket
     end
   end
 
-  defp apply_redo(socket) do
-    plane = socket.assigns.plane
-
-    case SessionStore.update(socket.assigns.session_id, fn current ->
-           Editor.redo(current, plane)
-         end) do
-      {:ok, state, {:applied, updates, layer, changes}} ->
-        socket
-        |> assign_state(state)
-        |> maybe_push_updates(layer, updates, changes)
-        |> emit_engine_delta(plane, layer, changes)
-        |> refresh_hover()
-        |> push_map_layers()
-
-      {:ok, _state, :none} ->
-        socket
-    end
+  defp finish_history_step(socket, state, plane, parts) do
+    parts
+    |> Enum.reduce(assign_state(socket, state), fn %{
+                                                     layer: layer,
+                                                     updates: updates,
+                                                     changes: changes
+                                                   },
+                                                   acc ->
+      acc
+      |> maybe_push_updates(layer, updates, changes)
+      |> emit_engine_delta(plane, layer, changes)
+    end)
+    |> refresh_hover()
+    |> push_map_layers()
   end
 
   defp tile_value(state, plane, layer, x, y), do: Editor.tile_value(state, plane, layer, x, y)

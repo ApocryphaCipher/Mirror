@@ -46,6 +46,10 @@ defmodule Mirror.Landmass do
           | {:landmass_has_mixed_ids, atom(), {integer(), integer()}, [integer()]}
           | {:id_shared, integer(), [{atom(), {integer(), integer()}}]}
 
+  @doc "The plane keys, in the order the layer is processed."
+  @spec plane_keys() :: [atom()]
+  def plane_keys, do: @planes
+
   @doc "Is this tile number, on row `y`, land for the landmass layer?"
   @spec land?(integer(), integer()) :: boolean()
   def land?(tile_number, y) do
@@ -168,12 +172,27 @@ defmodule Mirror.Landmass do
   become 0. IDs stay unique across both planes. A layer that already follows
   the rule comes back unchanged.
 
+  With `only: :arcanus` (or `:myrror`, or a list) just those planes are
+  recomputed: the other plane's layer is returned exactly as given and its IDs are
+  treated as taken, so an edit on one plane can never reuse or reassign an ID
+  that the other plane carries, even if that plane is itself inconsistent.
+
   Returns `{:error, :out_of_ids}` if more than 255 landmasses would be needed.
   """
-  @spec repair(plane_bins(), plane_bins()) :: {:ok, plane_bins()} | {:error, :out_of_ids}
-  def repair(terrain, landmass) do
+  @spec repair(plane_bins(), plane_bins(), keyword()) ::
+          {:ok, plane_bins()} | {:error, :out_of_ids}
+  def repair(terrain, landmass, opts \\ []) do
+    fix = opts |> Keyword.get(:only, @planes) |> List.wrap()
+
+    reserved =
+      for plane <- @planes -- fix,
+          id <- :binary.bin_to_list(Map.fetch!(landmass, plane)),
+          id != 0,
+          into: MapSet.new(),
+          do: id
+
     comps =
-      for plane <- @planes,
+      for plane <- fix,
           comp <- components(Map.fetch!(terrain, plane)) do
         lm = Map.fetch!(landmass, plane)
 
@@ -192,8 +211,8 @@ defmodule Mirror.Landmass do
     ordered = Enum.sort_by(Enum.with_index(comps), fn {{_, comp, _}, i} -> {-length(comp), i} end)
 
     {assigned, unassigned, claimed} =
-      Enum.reduce(ordered, {[], [], MapSet.new()}, fn {{plane, comp, ranked}, i},
-                                                      {done, todo, claimed} ->
+      Enum.reduce(ordered, {[], [], reserved}, fn {{plane, comp, ranked}, i},
+                                                  {done, todo, claimed} ->
         case Enum.find(ranked, &(not MapSet.member?(claimed, &1))) do
           nil -> {done, [{i, plane, comp} | todo], claimed}
           id -> {[{i, plane, comp, id} | done], todo, MapSet.put(claimed, id)}
@@ -218,18 +237,22 @@ defmodule Mirror.Landmass do
 
       {:ok,
        Map.new(@planes, fn plane ->
-         ids =
-           by_plane
-           |> Map.get(plane, [])
-           |> Enum.flat_map(fn {comp, id} -> Enum.map(comp, &{&1, id}) end)
-           |> Map.new()
+         if plane in fix do
+           ids =
+             by_plane
+             |> Map.get(plane, [])
+             |> Enum.flat_map(fn {comp, id} -> Enum.map(comp, &{&1, id}) end)
+             |> Map.new()
 
-         bin =
-           for y <- 0..(@height - 1), x <- 0..(@width - 1), into: <<>> do
-             <<Map.get(ids, {x, y}, 0)::unsigned-integer-size(8)>>
-           end
+           bin =
+             for y <- 0..(@height - 1), x <- 0..(@width - 1), into: <<>> do
+               <<Map.get(ids, {x, y}, 0)::unsigned-integer-size(8)>>
+             end
 
-         {plane, bin}
+           {plane, bin}
+         else
+           {plane, Map.fetch!(landmass, plane)}
+         end
        end)}
     end
   end

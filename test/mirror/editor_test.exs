@@ -3,6 +3,7 @@ defmodule Mirror.EditorTest do
 
   alias Mirror.Editor
   alias Mirror.SaveFile
+  alias Mirror.TerrainPaint
 
   defp make_test_state do
     arcanus_terrain = :binary.copy(<<0::little-16>>, 2400)
@@ -274,6 +275,212 @@ defmodule Mirror.EditorTest do
       assert discarded_state.history == %{arcanus: [], myrror: []}
       assert discarded_state.redo == %{arcanus: [], myrror: []}
       assert restored_save.planes == state.original_planes
+    end
+  end
+
+  describe "compound edits and painting a type (STORY-017)" do
+    alias Mirror.Landmass
+    alias Mirror.Map, as: MMap
+
+    defp make_paint_state do
+      ocean = :binary.copy(<<0::little-16>>, 2400)
+      zeros = :binary.copy(<<0>>, 2400)
+      layers = %{terrain: ocean, terrain_flags: zeros, landmass: zeros}
+      raw_planes = %{arcanus: layers, myrror: layers}
+
+      %{
+        save: %SaveFile{path: "/fake/SAVE1.GAM", planes: raw_planes, raw: <<>>},
+        planes: Editor.with_computed_layers(raw_planes),
+        original_planes: raw_planes,
+        active_layer: :terrain,
+        selection: %{terrain: 0},
+        history: %{arcanus: [], myrror: []},
+        redo: %{arcanus: [], myrror: []},
+        dataset_id: nil
+      }
+    end
+
+    defp layer(state, plane, name), do: state.planes[plane][name]
+
+    defp landmass_ids(state, plane) do
+      bin = layer(state, plane, :landmass)
+
+      for y <- 0..39, x <- 0..59, id = MMap.get_tile_u8(bin, x, y), id != 0, do: {{x, y}, id}
+    end
+
+    test "apply_compound records one history step covering both layers" do
+      state = make_paint_state()
+
+      {state, {:applied, entry, layers}} =
+        Editor.apply_compound(state, :arcanus, [
+          {:terrain, [{5, 5, 162}, {6, 5, 162}]},
+          {:landmass, [{5, 5, 3}, {6, 5, 3}]}
+        ])
+
+      assert length(state.history.arcanus) == 1
+      assert entry.layer == :terrain
+      assert [%{layer: :landmass}] = entry.also
+      assert Enum.map(layers, & &1.layer) == [:terrain, :landmass]
+      assert Editor.tile_value(state, :arcanus, :terrain, 5, 5) == 162
+      assert Editor.tile_value(state, :arcanus, :landmass, 6, 5) == 3
+    end
+
+    test "apply_compound with nothing to change is :none and leaves history alone" do
+      state = make_paint_state()
+
+      assert {^state, :none} =
+               Editor.apply_compound(state, :arcanus, [
+                 {:terrain, [{5, 5, 0}]},
+                 {:landmass, [{5, 5, 0}]}
+               ])
+    end
+
+    test "one undo reverts every layer, one redo restores them, and the shapes carry the extras" do
+      base = make_paint_state()
+
+      {state, _} =
+        Editor.apply_compound(base, :arcanus, [
+          {:terrain, [{5, 5, 162}]},
+          {:landmass, [{5, 5, 3}]}
+        ])
+
+      {undone, {:applied, updates, :terrain, changes, [extra]}} = Editor.undo(state, :arcanus)
+      assert updates == [%{x: 5, y: 5, value: 0}]
+      assert changes == [{5, 5, 162, 0}]
+
+      assert %{layer: :landmass, updates: [%{x: 5, y: 5, value: 0}], changes: [{5, 5, 3, 0}]} =
+               extra
+
+      assert layer(undone, :arcanus, :terrain) == layer(base, :arcanus, :terrain)
+      assert layer(undone, :arcanus, :landmass) == layer(base, :arcanus, :landmass)
+      assert undone.history.arcanus == [] and length(undone.redo.arcanus) == 1
+
+      {redone, {:applied, _, :terrain, _, [extra]}} = Editor.redo(undone, :arcanus)
+      assert extra.layer == :landmass
+      assert layer(redone, :arcanus, :terrain) == layer(state, :arcanus, :terrain)
+      assert layer(redone, :arcanus, :landmass) == layer(state, :arcanus, :landmass)
+    end
+
+    test "single-layer steps keep the four-element undo result" do
+      state = make_paint_state()
+      {state, {:applied, _, _}} = Editor.apply_single_tile(state, :arcanus, :terrain, 1, 1, 7)
+      assert {_, {:applied, _updates, :terrain, _changes}} = Editor.undo(state, :arcanus)
+    end
+
+    test "paint_type paints, re-tiles and numbers the new landmass in one undo step" do
+      base = make_paint_state()
+      cells = TerrainPaint.brush_cells(30, 20, 3)
+
+      {state, {:applied, _entry, layers}, report} =
+        Editor.paint_type(base, :arcanus, cells, :grass)
+
+      assert report.skipped == [] and report.unresolved == [] and report.stale == []
+      assert Enum.map(layers, & &1.layer) == [:terrain, :landmass]
+      assert length(state.history.arcanus) == 1
+
+      # a 3x3 island: nine tiles with one non-zero ID; shore cells and sea stay 0
+      ids = landmass_ids(state, :arcanus)
+      assert length(ids) == 9
+      assert ids |> Enum.map(&elem(&1, 1)) |> Enum.uniq() |> length() == 1
+
+      # the whole result follows the landmass rule
+      terrain = Map.new([:arcanus, :myrror], &{&1, layer(state, &1, :terrain)})
+      landmass = Map.new([:arcanus, :myrror], &{&1, layer(state, &1, :landmass)})
+      assert Landmass.violations(terrain, landmass) == []
+
+      # the other plane is untouched
+      assert state.planes.myrror == base.planes.myrror
+
+      # one undo gives back both layers exactly
+      {undone, {:applied, _, :terrain, _, [_]}} = Editor.undo(state, :arcanus)
+      assert undone.planes == base.planes
+      assert Editor.changed_tile_count(undone) == 0
+    end
+
+    test "painting a bridge joins two landmasses under one ID, and undo splits them again" do
+      base = make_paint_state()
+
+      {state, _, _} =
+        Editor.paint_type(base, :arcanus, TerrainPaint.brush_cells(10, 20, 3), :grass)
+
+      {state, _, _} =
+        Editor.paint_type(state, :arcanus, TerrainPaint.brush_cells(18, 20, 3), :grass)
+
+      assert state.planes.arcanus.landmass
+             |> :binary.bin_to_list()
+             |> Enum.reject(&(&1 == 0))
+             |> Enum.uniq()
+             |> length() == 2
+
+      {joined, {:applied, _entry, _layers}, report} =
+        Editor.paint_type(state, :arcanus, for(x <- 12..16, do: {x, 20}), :grass)
+
+      assert report.unresolved == []
+
+      assert joined.planes.arcanus.landmass
+             |> :binary.bin_to_list()
+             |> Enum.reject(&(&1 == 0))
+             |> Enum.uniq()
+             |> length() == 1
+
+      {split, {:applied, _, _, _, _}} = Editor.undo(joined, :arcanus)
+      assert split.planes == state.planes
+    end
+
+    test "painting does not touch the other plane's landmass IDs" do
+      base = make_paint_state()
+
+      {state, _, _} =
+        Editor.paint_type(base, :myrror, TerrainPaint.brush_cells(30, 20, 3), :grass)
+
+      {state, _, _} =
+        Editor.paint_type(state, :arcanus, TerrainPaint.brush_cells(30, 20, 3), :grass)
+
+      arcanus = state |> landmass_ids(:arcanus) |> Enum.map(&elem(&1, 1)) |> Enum.uniq()
+      myrror = state |> landmass_ids(:myrror) |> Enum.map(&elem(&1, 1)) |> Enum.uniq()
+      assert [a] = arcanus
+      assert [m] = myrror
+      assert a != m
+    end
+
+    test "a paint that changes nothing is :none" do
+      base = make_paint_state()
+
+      assert {^base, :none, %{skipped: _, unresolved: _, stale: _}} =
+               Editor.paint_type(base, :arcanus, [{10, 10}], :water)
+    end
+
+    test "running out of landmass IDs changes nothing and says so" do
+      base = make_paint_state()
+      islands = for x <- 0..58//2, y <- 2..36//2, do: {x, y}
+      islands = Enum.take(islands, 255)
+
+      grass =
+        for {x, y} <- islands,
+            reduce: layer(base, :arcanus, :terrain),
+            do: (acc -> elem(MMap.put_tile_u16_le(acc, x, y, 162), 0))
+
+      terrain = %{arcanus: grass, myrror: layer(base, :myrror, :terrain)}
+
+      landmass0 = %{
+        arcanus: layer(base, :arcanus, :landmass),
+        myrror: layer(base, :myrror, :landmass)
+      }
+
+      {:ok, repaired} = Landmass.repair(terrain, landmass0)
+
+      state = put_in(base, [:planes, :arcanus, :terrain], grass)
+      state = put_in(state, [:planes, :arcanus, :landmass], repaired.arcanus)
+
+      assert {^state, {:error, :out_of_ids}, _report} =
+               Editor.paint_type(state, :arcanus, [{45, 20}], :grass)
+    end
+
+    test "a state without landmass data gets just the terrain change" do
+      state = make_test_state()
+      {state, {:applied, _, layers}, _} = Editor.paint_type(state, :arcanus, [{30, 20}], :grass)
+      assert Enum.map(layers, & &1.layer) == [:terrain]
+      assert Editor.tile_value(state, :arcanus, :terrain, 30, 20) == 162
     end
   end
 end

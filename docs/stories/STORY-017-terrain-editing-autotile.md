@@ -5,10 +5,10 @@
 is done, and item 2 is closed: the polar-edge gap and the sparkle-ocean
 mismatches are explained (live checks, 2026-09-28 and 2026-10-04). Phase 2
 has started: the paint engine (`Mirror.TerrainPaint`, item 3's brush and fill)
-and the landmass rule (`Mirror.Landmass`) are done. Still open: the editor
-integration (one undo step covering terrain and landmass), the tools and
-palette in the UI, the cycle and stamp tools, and smoothing of impossible
-coastlines. Item 4 is handled for now by exclusion: rivers, lakes, nodes and
+and the landmass rule (`Mirror.Landmass`) are done, and `Editor.paint_type/4`
+applies a painted type with its landmass IDs as one undo step. Still open: the
+tools and palette in the UI, the cycle and stamp tools, and smoothing of
+impossible coastlines. Item 4 is handled for now by exclusion: rivers, lakes, nodes and
 volcanoes are not painted (see item 4).
 **Size:** large
 
@@ -48,12 +48,13 @@ neighbour-mask → tile table (with rotation flags). We have bypassed binary dec
    three fresh worlds on 2026-10-04; see `docs/reference/classic-terrain-format.md`'s
    `TERRTYPE.LBX` section. Item 2 is closed. For painting, ocean is tile 0,
    or 601 about 20% of the time.
-3. **Tools** (engine done, editor integration open: `Mirror.TerrainPaint`
-   resolves a painted type to tiles with brush and fill helpers, tested on
-   real maps; still to do: one undo step that covers terrain and landmass
-   together, the tool in the LiveView and palette, warnings for the
-   `skipped` / `unresolved` / `stale` cells it reports, and smoothing of
-   impossible coastlines):
+3. **Tools** (engine and editor step done: `Mirror.TerrainPaint` resolves a
+   painted type to tiles with brush and fill helpers, tested on real maps,
+   and `Editor.paint_type/4` records the terrain and landmass changes as one
+   undo step, with undo/redo in the LiveView covering both layers; still to
+   do: the tool in the LiveView and palette, warnings for the `skipped` /
+   `unresolved` / `stale` cells it reports, and smoothing of impossible
+   coastlines):
    - *Paint type* (brush / fill): set types, then re-resolve the painted
      tiles and their 8 neighbours. **Keep a neighbour's existing tile if it
      still matches** (the game does; checked on a live Raise Volcano, 6 of 6,

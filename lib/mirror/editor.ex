@@ -8,7 +8,7 @@ defmodule Mirror.Editor do
   """
 
   alias Mirror.Map, as: MirrorMap
-  alias Mirror.{Stats, TerrainLbx}
+  alias Mirror.{Landmass, Stats, TerrainLbx, TerrainPaint}
 
   @layers [
     :terrain,
@@ -251,14 +251,153 @@ defmodule Mirror.Editor do
   end
 
   @doc """
+  Applies one edit that changes several layers at once and records it as a
+  **single undo step** (so undo and redo restore every layer together).
+
+  `edits` is a list of `{layer, [{x, y, value}]}`, for example terrain tiles plus
+  the landmass IDs that go with them. The first layer that actually changes is the
+  entry's main layer; the others ride along in its `:also` list.
+
+  Returns `{state, :none}` when nothing changed, otherwise
+  `{updated_state, {:applied, entry, layers}}` where `layers` is a list of
+  `%{layer: layer, updates: [...], changes: [{x, y, prev, new}]}`, one per layer
+  that changed, ready for the client and the engine.
+  """
+  def apply_compound(state, plane, edits) when is_list(edits) do
+    {next_state, layers} =
+      Enum.reduce(edits, {state, []}, fn {layer, tile_edits}, {acc_state, acc_layers} ->
+        {st, changes, updates} =
+          Enum.reduce(tile_edits, {acc_state, [], []}, fn {x, y, value}, {s, cs, us} ->
+            case apply_tile(s, plane, layer, x, y, value) do
+              {s2, {prev, new}, u} -> {s2, [{x, y, prev, new} | cs], u ++ us}
+              {s2, nil, _} -> {s2, cs, us}
+            end
+          end)
+
+        case changes do
+          [] ->
+            {st, acc_layers}
+
+          _ ->
+            part = %{layer: layer, updates: Enum.reverse(updates), changes: Enum.reverse(changes)}
+            {st, acc_layers ++ [part]}
+        end
+      end)
+
+    case layers do
+      [] ->
+        {state, :none}
+
+      [main | rest] ->
+        entry = %{
+          id: System.unique_integer([:positive, :monotonic]),
+          layer: main.layer,
+          changes: main.changes,
+          also: Enum.map(rest, &%{layer: &1.layer, changes: &1.changes})
+        }
+
+        history = [entry | Map.get(next_state.history, plane, [])]
+
+        updated_state = %{
+          next_state
+          | history: Map.put(next_state.history, plane, history),
+            redo: Map.put(next_state.redo, plane, [])
+        }
+
+        {updated_state, {:applied, entry, layers}}
+    end
+  end
+
+  @doc """
+  Paints a terrain type (`:water`, `:grass`, ... see `Mirror.TerrainPaint.kinds/0`)
+  onto `cells` of `plane`, re-tiling around them, and keeps the landmass layer
+  consistent, all as one undo step.
+
+  Returns `{state, outcome, report}`. `report` is `%{skipped, unresolved, stale}`
+  from `Mirror.TerrainPaint.paint/3` (cells not painted or left unfixed), so the
+  caller can warn. `outcome` is:
+
+    * `:none`: nothing changed;
+    * `{:applied, entry, layers}`: as for `apply_compound/3`;
+    * `{:error, :out_of_ids}`: more landmasses than the layer can number; nothing
+      was changed.
+
+  The landmass IDs are recomputed for this plane only (`Mirror.Landmass.repair/3`
+  with `only:`), never touching the other plane's layer. A state without landmass
+  data (a fixture, say) just gets the terrain change.
+  """
+  def paint_type(state, plane, cells, kind) do
+    terrain = get_in(state, [:planes, plane, :terrain])
+    result = TerrainPaint.paint(terrain, cells, kind)
+    report = Map.take(result, [:skipped, :unresolved, :stale])
+
+    if result.changes == [] do
+      {state, :none, report}
+    else
+      terrain_edits = Enum.map(result.changes, fn {x, y, _prev, new} -> {x, y, new} end)
+
+      case landmass_edits(state, plane, result.changes) do
+        {:ok, landmass_edits} ->
+          {next, outcome} =
+            apply_compound(state, plane, [{:terrain, terrain_edits}, {:landmass, landmass_edits}])
+
+          {next, outcome, report}
+
+        {:error, reason} ->
+          {state, {:error, reason}, report}
+      end
+    end
+  end
+
+  # The landmass IDs that change for `plane` once the terrain changes are applied.
+  defp landmass_edits(state, plane, terrain_changes) do
+    planes = state.planes
+    layers = Map.get(planes, plane, %{})
+
+    if Enum.all?(Landmass.plane_keys(), fn p ->
+         is_binary(get_in(planes, [p, :terrain])) and is_binary(get_in(planes, [p, :landmass]))
+       end) do
+      new_terrain =
+        Enum.reduce(terrain_changes, layers.terrain, fn {x, y, _prev, new}, acc ->
+          elem(MirrorMap.put_tile_u16_le(acc, x, y, new), 0)
+        end)
+
+      terrain = Map.new(Landmass.plane_keys(), &{&1, get_in(planes, [&1, :terrain])})
+      terrain = Map.put(terrain, plane, new_terrain)
+      landmass = Map.new(Landmass.plane_keys(), &{&1, get_in(planes, [&1, :landmass])})
+
+      with {:ok, repaired} <- Landmass.repair(terrain, landmass, only: plane) do
+        old = layers.landmass
+        new = Map.fetch!(repaired, plane)
+
+        edits =
+          for y <- 0..(MirrorMap.height() - 1),
+              x <- 0..(MirrorMap.width() - 1),
+              value = MirrorMap.get_tile_u8(new, x, y),
+              value != MirrorMap.get_tile_u8(old, x, y),
+              do: {x, y, value}
+
+        {:ok, edits}
+      end
+    else
+      {:ok, []}
+    end
+  end
+
+  @doc """
   Undoes the most recent stroke on `plane`.
+
+  Returns `{state, {:applied, updates, layer, changes}}`, or
+  `{state, {:applied, updates, layer, changes, extras}}` when the step also covered
+  other layers (see `apply_compound/3`); `extras` is a list of
+  `%{layer: layer, updates: [...], changes: [...]}`.
   """
   def undo(state, plane) do
     history = Map.get(state.history, plane, [])
 
     case history do
       [stroke | rest] ->
-        {next_state, updates, layer} = apply_stroke(state, plane, stroke, :undo)
+        {next_state, updates, layer, extras} = apply_stroke(state, plane, stroke, :undo)
         changes = stroke_changes(stroke, :undo)
         redo = [stroke | Map.get(next_state.redo, plane, [])]
 
@@ -268,7 +407,7 @@ defmodule Mirror.Editor do
             redo: Map.put(next_state.redo, plane, redo)
         }
 
-        {next_state, {:applied, updates, layer, changes}}
+        {next_state, applied(updates, layer, changes, extras)}
 
       [] ->
         {state, :none}
@@ -283,7 +422,7 @@ defmodule Mirror.Editor do
 
     case redo do
       [stroke | rest] ->
-        {next_state, updates, layer} = apply_stroke(state, plane, stroke, :redo)
+        {next_state, updates, layer, extras} = apply_stroke(state, plane, stroke, :redo)
         changes = stroke_changes(stroke, :redo)
         history = [stroke | Map.get(next_state.history, plane, [])]
 
@@ -293,7 +432,7 @@ defmodule Mirror.Editor do
             redo: Map.put(next_state.redo, plane, rest)
         }
 
-        {next_state, {:applied, updates, layer, changes}}
+        {next_state, applied(updates, layer, changes, extras)}
 
       [] ->
         {state, :none}
@@ -392,7 +531,30 @@ defmodule Mirror.Editor do
     changes
   end
 
+  # One history entry: its main layer, then any further layers it covers.
   defp apply_stroke(state, plane, stroke, mode) do
+    {state, updates, layer} = apply_stroke_layer(state, plane, stroke, mode)
+
+    {state, extras} =
+      Enum.reduce(Map.get(stroke, :also, []), {state, []}, fn part, {acc, extras} ->
+        {acc, part_updates, part_layer} = apply_stroke_layer(acc, plane, part, mode)
+
+        extra = %{
+          layer: part_layer,
+          updates: part_updates,
+          changes: stroke_changes(part, mode)
+        }
+
+        {acc, [extra | extras]}
+      end)
+
+    {state, updates, layer, Enum.reverse(extras)}
+  end
+
+  defp applied(updates, layer, changes, []), do: {:applied, updates, layer, changes}
+  defp applied(updates, layer, changes, extras), do: {:applied, updates, layer, changes, extras}
+
+  defp apply_stroke_layer(state, plane, stroke, mode) do
     layer = stroke.layer
     plane_layers = Map.fetch!(state.planes, plane)
 
