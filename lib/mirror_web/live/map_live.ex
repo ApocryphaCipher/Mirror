@@ -1643,16 +1643,22 @@ defmodule MirrorWeb.MapLive do
                 </label>
               </.form>
 
+              <%!-- Always present while the tool is active, with changing text, so a
+                   screen reader announces each result politely. --%>
               <span
-                :if={@tool == :type && @paint_report && @paint_report[:message]}
+                :if={@tool == :type}
                 id="paint-report"
+                role="status"
+                aria-live="polite"
                 class={[
                   "text-xs",
-                  elem(@paint_report.message, 0) == :warn && "text-amber-200",
-                  elem(@paint_report.message, 0) == :ok && "text-emerald-200"
+                  @paint_report[:message] && elem(@paint_report.message, 0) == :warn &&
+                    "text-amber-200",
+                  @paint_report[:message] && elem(@paint_report.message, 0) == :ok &&
+                    "text-emerald-200"
                 ]}
               >
-                {elem(@paint_report.message, 1)}
+                {@paint_report[:message] && elem(@paint_report.message, 1)}
               </span>
 
               <.form
@@ -1663,7 +1669,7 @@ defmodule MirrorWeb.MapLive do
                 phx-change="set_quick_tile"
                 class="flex items-center gap-1.5"
               >
-                <span class="text-slate-400">Quick</span>
+                <label for="quick-tile" class="text-slate-400">Quick</label>
                 <select
                   id="quick-tile"
                   name="quick[tile]"
@@ -2203,13 +2209,13 @@ defmodule MirrorWeb.MapLive do
         |> push_layer_parts(plane, parts)
         |> note_paint(
           report,
-          layer_changes(parts, :terrain),
-          layer_changes(parts, :landmass),
+          changed_cells(parts, :terrain),
+          length(changed_cells(parts, :landmass)),
           reset?
         )
 
       :none ->
-        note_paint(socket, report, 0, 0, reset?)
+        note_paint(socket, report, [], 0, reset?)
 
       {:error, :out_of_ids} ->
         assign(socket, :paint_report, %{
@@ -2218,49 +2224,34 @@ defmodule MirrorWeb.MapLive do
     end
   end
 
-  defp layer_changes(parts, layer) do
+  defp changed_cells(parts, layer) do
     case Enum.find(parts, &(&1.layer == layer)) do
-      nil -> 0
-      %{changes: changes} -> length(changes)
+      nil -> []
+      %{changes: changes} -> for {x, y, _prev, _new} <- changes, do: {x, y}
     end
   end
 
-  # Keeps a running report over a drag: tiles changed add up, skipped and
-  # unresolved cells accumulate, and a stale neighbour drops out once a later step
-  # re-tiles it.
-  defp note_paint(socket, report, changed, landmass, reset?) do
-    previous =
+  # Keeps a running report over a drag that describes the current map (see
+  # PaintTool.merge_report/5): cells counted once, stale warnings that later steps
+  # fixed gone, the landmass repair noted only when the layer really was out of step.
+  defp note_paint(socket, report, changed_cells, landmass_changes, reset?) do
+    running =
       case {reset?, socket.assigns.paint_report} do
-        {false, %{changed: _} = prev} ->
-          prev
-
-        _ ->
-          %{
-            changed: 0,
-            landmass: 0,
-            skipped: MapSet.new(),
-            unresolved: MapSet.new(),
-            stale: MapSet.new()
-          }
+        {false, %{touched: _} = prev} -> prev
+        _ -> PaintTool.new_report()
       end
 
-    combined = %{
-      changed: previous.changed + changed,
-      landmass: previous.landmass + landmass,
-      skipped: MapSet.union(previous.skipped, MapSet.new(report.skipped)),
-      unresolved: MapSet.union(previous.unresolved, MapSet.new(report.unresolved)),
-      stale: MapSet.union(previous.stale, MapSet.new(report.stale))
-    }
-
-    assign(
-      socket,
-      :paint_report,
-      Map.put(
-        combined,
-        :message,
-        PaintTool.summary(combined, combined.changed, combined.landmass)
+    merged =
+      PaintTool.merge_report(
+        running,
+        report,
+        changed_cells,
+        landmass_changes,
+        tile_state(socket)
       )
-    )
+
+    message = PaintTool.summary(merged, MapSet.size(merged.touched), merged.landmass)
+    assign(socket, :paint_report, Map.put(merged, :message, message))
   end
 
   defp push_layer_parts(socket, plane, parts) do

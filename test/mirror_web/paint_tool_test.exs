@@ -95,20 +95,140 @@ defmodule MirrorWeb.PaintToolTest do
       assert text =~ "3 neighbouring tiles may not match"
     end
 
-    test "a paint that had to repair far more landmass IDs than it changed tiles says so" do
+    test "a paint that had to repair an out-of-step landmass layer says so" do
       assert {:warn, text} = PaintTool.summary(report(), 1, 2160)
       assert text =~ "1 tile changed"
       assert text =~ "landmass layer repaired on 2160 tiles"
+    end
 
-      # an ordinary paint touches about as many IDs as tiles: no note
-      assert {:ok, "9 tiles changed"} = PaintTool.summary(report(), 9, 1)
-      assert {:ok, "9 tiles changed"} = PaintTool.summary(report(), 9, 9)
+    test "an ordinary paint says nothing about the landmass layer, however many IDs it renumbered" do
+      assert {:ok, "9 tiles changed"} = PaintTool.summary(report(), 9)
+      assert {:ok, "9 tiles changed"} = PaintTool.summary(report(), 9, 0)
     end
 
     test "works with sets as well as lists" do
       assert {:warn, text} = PaintTool.summary(report(MapSet.new([{1, 1}])), 0)
       assert text =~ "0 tiles changed"
       assert text =~ "1 left alone"
+    end
+  end
+
+  describe "the running report over a drag" do
+    alias Mirror.Map, as: MMap
+
+    defp ocean, do: :binary.copy(<<0, 0>>, 2400)
+    defp put(terrain, x, y, tile), do: elem(MMap.put_tile_u16_le(terrain, x, y, tile), 0)
+
+    defp step_report(opts \\ []),
+      do:
+        Map.merge(
+          %{skipped: [], unresolved: [], stale: [], landmass_out_of_step: false},
+          Map.new(opts)
+        )
+
+    test "starts empty" do
+      r = PaintTool.new_report()
+      assert MapSet.size(r.touched) == 0 and r.landmass == 0
+    end
+
+    test "a cell a drag crosses twice is counted once" do
+      r =
+        PaintTool.merge_report(
+          PaintTool.new_report(),
+          step_report(),
+          [{1, 1}, {2, 1}],
+          0,
+          ocean()
+        )
+
+      r = PaintTool.merge_report(r, step_report(), [{2, 1}, {3, 1}], 0, ocean())
+      assert MapSet.size(r.touched) == 3
+    end
+
+    test "a stale cell that a later step re-tiled stops warning" do
+      # (10, 10) holds a shore tile that does not fit an all-ocean neighbourhood
+      broken = put(ocean(), 10, 10, 2)
+
+      r =
+        PaintTool.merge_report(
+          PaintTool.new_report(),
+          step_report(stale: [{10, 10}]),
+          [],
+          0,
+          broken
+        )
+
+      assert MapSet.member?(r.stale, {10, 10})
+
+      # a later step fixes it (the tile is plain ocean again)
+      r = PaintTool.merge_report(r, step_report(), [{10, 10}], 0, ocean())
+      refute MapSet.member?(r.stale, {10, 10})
+    end
+
+    test "a stale cell also stops warning when a neighbour's change makes its tile fit again" do
+      broken = put(ocean(), 10, 10, 2)
+
+      r =
+        PaintTool.merge_report(
+          PaintTool.new_report(),
+          step_report(stale: [{10, 10}]),
+          [],
+          0,
+          broken
+        )
+
+      # the cell itself did not change, but the terrain now fits it (it is not in changed_cells)
+      r = PaintTool.merge_report(r, step_report(), [{11, 10}], 0, ocean())
+      assert MapSet.size(r.stale) == 0
+    end
+
+    test "a stale cell that is still wrong keeps warning" do
+      broken = put(ocean(), 10, 10, 2)
+
+      r =
+        PaintTool.merge_report(
+          PaintTool.new_report(),
+          step_report(stale: [{10, 10}]),
+          [],
+          0,
+          broken
+        )
+
+      r = PaintTool.merge_report(r, step_report(), [{30, 30}], 0, broken)
+      assert MapSet.member?(r.stale, {10, 10})
+    end
+
+    test "an unresolved cell that a later step painted drops out; skipped cells stay" do
+      r =
+        PaintTool.merge_report(
+          PaintTool.new_report(),
+          step_report(unresolved: [{5, 5}], skipped: [{6, 6}]),
+          [],
+          0,
+          ocean()
+        )
+
+      assert MapSet.member?(r.unresolved, {5, 5})
+
+      r = PaintTool.merge_report(r, step_report(), [{5, 5}], 0, ocean())
+      refute MapSet.member?(r.unresolved, {5, 5})
+      assert MapSet.member?(r.skipped, {6, 6})
+    end
+
+    test "landmass changes are counted only when the layer was out of step before the paint" do
+      r =
+        PaintTool.merge_report(
+          PaintTool.new_report(),
+          step_report(landmass_out_of_step: false),
+          [],
+          500,
+          ocean()
+        )
+
+      assert r.landmass == 0
+
+      r = PaintTool.merge_report(r, step_report(landmass_out_of_step: true), [], 2160, ocean())
+      assert r.landmass == 2160
     end
   end
 end

@@ -14,8 +14,8 @@ and layer toggles for cities, settleable tile grading, and fog of war) and an
 edit mode (paint a terrain type with auto-tiling, cycle or paint raw tiles,
 undo/redo, Save as). Note on editing: **Paint type** keeps the landmass/continent
 IDs consistent; the raw tools (Cycle, Paint tile) update terrain tiles and the
-recomputed adjacency mask only and do **not** (tracked in STORY-017 and
-STORY-029). Other overland features
+recomputed adjacency mask only and do **not** keep the landmass/continent IDs
+consistent (tracked in STORY-017 and STORY-029). Other overland features
 (units with banner plaques, towers, encounter sites, roads, specials) and node
 auras are next. The sprites for all of them are identified and decode correctly
 ([sprite catalog](docs/reference/overland-sprites-and-save-blocks.md)), but

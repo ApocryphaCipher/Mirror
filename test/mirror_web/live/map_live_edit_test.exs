@@ -909,6 +909,36 @@ defmodule MirrorWeb.MapLiveEditTest do
       refute has_element?(view, "#brush-form")
     end
 
+    test "the status line is a polite live region from the start, so each result is announced",
+         %{conn: conn, save: save} do
+      view = editing(conn, save, "type")
+
+      assert has_element?(view, "#paint-report[role=status][aria-live=polite]")
+      assert report(view) == ""
+
+      click(view, 30, 20)
+      assert has_element?(view, "#paint-report[role=status][aria-live=polite]")
+      assert report(view) =~ "9 tiles changed"
+    end
+
+    test "joining two islands does not claim the landmass layer was repaired", %{
+      conn: conn,
+      save: save
+    } do
+      view = editing(conn, save, "type")
+      paint_form(view, %{"kind" => "forest", "size" => "5", "fill" => "false"})
+      click(view, 20, 20)
+      click(view, 28, 20)
+
+      # a one-tile-wide bridge: it renumbers a whole island's landmass IDs, but the layer
+      # was fine, so the status must not say it was repaired
+      paint_form(view, %{"kind" => "forest", "size" => "1", "fill" => "false"})
+      for x <- 23..25, do: click(view, x, 20)
+
+      assert report(view) =~ "tile"
+      refute report(view) =~ "landmass"
+    end
+
     test "painting grass over the ocean re-tiles the tiles around it", %{conn: conn, save: save} do
       view = editing(conn, save, "type")
       assert tile_at(view, 30, 20) == 0
@@ -1076,6 +1106,8 @@ defmodule MirrorWeb.MapLiveEditTest do
       view = editing(conn, save, "paint")
 
       assert has_element?(view, "#quick-tile-form #quick-tile")
+      # the visible word is a real label for the dropdown
+      assert has_element?(view, "#quick-tile-form label[for=quick-tile]", "Quick")
       html = view |> element("#quick-tile") |> render()
       assert html =~ "Grassland (162)" and html =~ "Ocean (0)" and html =~ "Tundra (167)"
 

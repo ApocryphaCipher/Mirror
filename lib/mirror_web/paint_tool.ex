@@ -83,16 +83,58 @@ defmodule MirrorWeb.PaintTool do
   def kind_of_type(type), do: if(type in TerrainPaint.kinds(), do: type)
 
   @doc """
+  An empty running report for a paint stroke: the cells touched so far, the landmass
+  IDs repaired, and the cells left alone (`skipped`), not drawn (`unresolved`) or
+  possibly wrong (`stale`).
+  """
+  def new_report do
+    %{
+      touched: MapSet.new(),
+      landmass: 0,
+      skipped: MapSet.new(),
+      unresolved: MapSet.new(),
+      stale: MapSet.new()
+    }
+  end
+
+  @doc """
+  Adds one paint step to a stroke's running report.
+
+  `report` is what `Mirror.Editor.paint_type/5` returned, `changed_cells` the terrain
+  cells that step changed, `landmass_changes` how many landmass IDs it changed, and
+  `terrain` the plane's terrain bytes now. The report describes the *current* map:
+
+    * tiles changed counts each cell once, however often a drag crosses it;
+    * `unresolved` drops cells a later step did paint;
+    * `stale` keeps only cells whose tile still does not match its neighbours in
+      `terrain`, so a cell fixed later (or whose neighbour was fixed) stops warning;
+    * the landmass count only grows when the layer really was out of step before the
+      paint (`report.landmass_out_of_step`), not whenever a merge renumbered IDs.
+  """
+  def merge_report(running, report, changed_cells, landmass_changes, terrain) do
+    changed = MapSet.new(changed_cells)
+    stale = MapSet.union(running.stale, MapSet.new(report.stale))
+
+    %{
+      touched: MapSet.union(running.touched, changed),
+      landmass: running.landmass + if(report.landmass_out_of_step, do: landmass_changes, else: 0),
+      skipped: MapSet.union(running.skipped, MapSet.new(report.skipped)),
+      unresolved:
+        running.unresolved
+        |> MapSet.difference(changed)
+        |> MapSet.union(MapSet.new(report.unresolved)),
+      stale: MapSet.new(TerrainPaint.mismatched(terrain, stale))
+    }
+  end
+
+  @doc """
   A one-line summary of a paint for the toolbar: `{level, text}` where `level` is
   `:ok` or `:warn`. `report` has the sets of `skipped`, `unresolved` and `stale`
-  cells; `changed` is how many terrain tiles changed and `landmass` how many
-  landmass IDs.
-
-  The landmass layer is normally touched only around the painted cells. If a paint
-  had to fix many more IDs than it changed tiles, the save's landmass layer was out
-  of step with its terrain (an earlier raw edit, say) and the summary says so.
+  cells; `changed` is how many terrain tiles changed and `landmass_repaired` how many
+  landmass IDs were fixed because the save's layer was out of step with its terrain
+  (0 for an ordinary paint, which keeps the layer in step without comment).
   """
-  def summary(report, changed, landmass \\ 0) do
+  def summary(report, changed, landmass_repaired \\ 0) do
     warnings =
       [
         {Enum.count(report.skipped), "left alone (river, lake, node, volcano or polar row)"},
@@ -104,10 +146,12 @@ defmodule MirrorWeb.PaintTool do
       |> Enum.map(fn {n, text} -> "#{n} #{text}" end)
 
     warnings =
-      if landmass > changed,
+      if landmass_repaired > 0,
         do:
           warnings ++
-            ["landmass layer repaired on #{landmass} tiles (it was out of step with the terrain)"],
+            [
+              "landmass layer repaired on #{landmass_repaired} tiles (it was out of step with the terrain)"
+            ],
         else: warnings
 
     base = "#{changed} #{if changed == 1, do: "tile", else: "tiles"} changed"

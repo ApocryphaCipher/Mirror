@@ -106,6 +106,25 @@ defmodule Mirror.LandmassTest do
       assert [{:landmass_has_mixed_ids, :arcanus, {5, 5}, [3, 4]}] = Landmass.violations(t, l)
     end
 
+    test "only: checks just those planes, but an ID shared with the other plane still counts" do
+      a = block(5, 5, 2, 2)
+      # Arcanus is fine; Myrror is not (water carrying ID 1)
+      t = planes(terrain(a), terrain(%{}))
+      l = planes(lm(ids_for(a, 7)), lm(%{{3, 3} => 1}))
+
+      assert Landmass.violations(t, l) != []
+      assert Landmass.violations(t, l, only: :arcanus) == []
+      assert [{:water_has_id, :myrror, {3, 3}, 1}] = Landmass.violations(t, l, only: :myrror)
+
+      # the same ID on both planes is Arcanus's problem too
+      l_shared = planes(lm(ids_for(a, 7)), lm(%{{3, 3} => 7}))
+      assert [{:id_shared, 7, _owners}] = Landmass.violations(t, l_shared, only: :arcanus)
+
+      assert_raise ArgumentError, ~r/unknown plane/, fn ->
+        Landmass.violations(t, l, only: :nowhere)
+      end
+    end
+
     test "one ID on two landmasses, including across planes" do
       a = %{{5, 5} => @grass, {20, 5} => @grass}
       t = planes(terrain(a), terrain(%{{9, 9} => @grass}))

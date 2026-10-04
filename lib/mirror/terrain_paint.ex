@@ -125,6 +125,19 @@ defmodule Mirror.TerrainPaint do
   end
 
   @doc """
+  Of `cells`, those whose tile does not match their neighbourhood in `terrain` as it
+  is now. Used to keep a running list of `stale` cells honest over a drag: a cell
+  stops being stale when a later step fixes it, or fixes what it sat next to.
+  """
+  @spec mismatched(binary(), Enumerable.t()) :: [cell()]
+  def mismatched(terrain, cells) do
+    for {x, y} = cell <- Enum.uniq(cells),
+        region = Map.put(region(terrain, %{}, cell), :center, type_at(terrain, %{}, cell)),
+        not TerrainType.matches?(MMap.get_tile_u16_le(terrain, x, y), region),
+        do: cell
+  end
+
+  @doc """
   Paints `kind` onto `cells` of `terrain`. Returns the tile changes
   (`{x, y, previous, new}`, ready for the editor's undo history) and what was
   not done:
