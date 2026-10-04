@@ -27,9 +27,10 @@ def read_terrain():
 
 
 def looks_like_a_map(t):
-    # A generated map is mostly ocean (0/601) with tiles all below 762.
+    # A generated map is mostly ocean (0/601) with some land, all tiles below
+    # 762. A blank (all-zero) block is all "ocean", so land is required too.
     ocean = sum(1 for v in t if v in (0, 601))
-    return max(t) < 762 and ocean > 800
+    return max(t) < 762 and ocean > 800 and ocean < len(t)
 
 
 def main():
@@ -41,7 +42,10 @@ def main():
     targets = {int(x) for x in args.targets.split(",")}
     os.makedirs(os.path.dirname(LOG), exist_ok=True)
 
-    last, stable, logged = None, 0, set()
+    # `logged`: written to the log. `captured`: its checkpoint succeeded (or none was
+    # wanted), so a failed checkpoint is retried on a later poll without
+    # logging the map twice.
+    last, stable, logged, captured = None, 0, set(), set()
     print(f"watching for tiles {sorted(targets)}; Ctrl-C to stop", flush=True)
     while True:
         try:
@@ -53,22 +57,29 @@ def main():
         digest = hashlib.sha256(raw).hexdigest()[:12]
         stable = stable + 1 if digest == last else 0
         last = digest
-        if stable >= 1 and digest not in logged and looks_like_a_map(t):
-            logged.add(digest)
+        if stable >= 1 and digest not in captured and looks_like_a_map(t):
             found = {}
             for plane in (0, 1):
                 c = collections.Counter(t[plane * 2400:(plane + 1) * 2400])
                 for tile in targets:
                     if c[tile]:
                         found.setdefault(tile, [0, 0])[plane] = c[tile]
-            row = {"time": time.strftime("%Y-%m-%dT%H:%M:%S"), "map": digest, "found": found}
-            with open(LOG, "a") as f:
-                f.write(json.dumps(row) + "\n")
-            print(("FOUND " if found else "new map ") + json.dumps(row), flush=True)
+            if digest not in logged:
+                logged.add(digest)
+                row = {"time": time.strftime("%Y-%m-%dT%H:%M:%S"), "map": digest, "found": found}
+                with open(LOG, "a") as f:
+                    f.write(json.dumps(row) + "\n")
+                print(("FOUND " if found else "new map ") + json.dumps(row), flush=True)
             if found and not args.no_checkpoint:
                 name = f"rare tiles {sorted(found)} map {digest}"
-                subprocess.run(["bash", os.path.join(HERE, "live_session.sh"), "cp", name,
-                                f"terrain_watch: tile(s) {found}"], check=False)
+                done = subprocess.run(["bash", os.path.join(HERE, "live_session.sh"), "cp", name,
+                                       f"terrain_watch: tile(s) {found}"], check=False)
+                if done.returncode == 0:
+                    captured.add(digest)
+                else:
+                    print(f"checkpoint failed for map {digest}; will retry", flush=True)
+            else:
+                captured.add(digest)
         time.sleep(args.interval)
 
 
