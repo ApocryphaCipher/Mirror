@@ -3,8 +3,9 @@
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
 **Status:** open. Phase 1 (core lookup and resolve engine, item 1 below)
 is done; item 2's polar-edge gap is resolved (see item 2) and the
-correctness test's remaining unexplained mismatches are an unrelated,
-low-priority decorative-variant ordering question. Phase 2 (editor tools
+correctness test's remaining unexplained mismatches are explained: they
+are the randomly placed animated "sparkle" ocean, tile 601 (live check
+2026-10-04). Phase 2 (editor tools
 and UI, items 3–4) remains untouched.
 **Size:** large
 
@@ -38,13 +39,19 @@ neighbour-mask → tile table (with rotation flags). We have bypassed binary dec
    planes, including the (0,0) corner. Fixed in
    `test/mirror/terrain_type_test.exs`'s `build_region`; unexplained
    mismatches dropped to 195, none on the edge rows. The remaining 195 are
-   an unrelated, low-priority "strict vs loose ocean variant" ordering
-   question (interior tiles, not edges) — see
-   `docs/reference/classic-terrain-format.md`'s `TERRTYPE.LBX` section for
-   detail.
+   interior ocean tiles stored as tile 601, the animated "sparkle" ocean
+   (4 frames, the only animated ocean tile), which the game scatters at
+   random, about 1 tile in 5, with no neighbour rule. Checked live on
+   three fresh worlds on 2026-10-04; see `docs/reference/classic-terrain-format.md`'s
+   `TERRTYPE.LBX` section. Item 2 is closed. For painting, ocean is tile 0,
+   or 601 about 20% of the time.
 3. **Tools**:
    - *Paint type* (brush / fill): set types, then re-resolve the painted
-     tiles and their 8 neighbours.
+     tiles and their 8 neighbours. **Keep a neighbour's existing tile if it
+     still matches** (the game does; checked on a live Raise Volcano, 6 of 6,
+     and a Change Terrain, 4 of 4, changed neighbours identical to the
+     resolver's pick, see
+     `docs/reference/classic-terrain-format.md`).
    - *Cycle picture* (MMS "L/R"): step through variants of the same type
      without changing the type.
    - *Stamp exact tile*: pick from a tile palette, or eyedrop any tile on

@@ -124,6 +124,33 @@ Kevin's session; `gama surveyor hits.jsonl`).
   the map is 12 x 10 tiles of 20 x 18 pixels from screen row 20, INT 33h
   x runs 0..639, and x wraps at 60.
 
+## Session scripts (2026-10-04)
+
+All in `scripts/`; they only read through the API (writes stay off).
+
+- `live_session.sh start | cp "name" | status`: launches the fork with the
+  webserver and file log on; `cp` is `gama checkpoint` with the vault set;
+  `status` lists the latest checkpoints.
+- `terrain_watch.py [--targets 18,33,179]`: polls the terrain block (RAM
+  `0x72630`) and logs every new map to `~/.mirror/dev/DOSbox/terrain-watch.jsonl`.
+  When a target tile number shows up it takes a checkpoint by itself. Use it
+  to hunt for rare tiles while someone rolls New Games.
+- `block_watch.py`: follows terrain, minerals (`0x760B0`), explored map
+  (`0x78690`) and terrain flags (`0x773A0`) and prints every changed tile as it
+  happens. Use it to see what a spell does to the map.
+
+**Giving a wizard a spell: edit a copy of the save, don't write RAM.** With
+writes off, the way is to edit the `.GAM` and load it (use **Load**, not
+Save: saving from the running game overwrites the edit). Offsets in the
+player's wizard record (save `0x09E8`, record 0): spell library `+0x264`
+(byte *n* - 1 for spell *n*; set 2), casting skill left / nominal `+0x54` /
+`+0x56`, mana `+0x25c`, books `+0x5a`. The spell numbers are the record
+index in `SPELLDAT.LBX` (36-byte records from file offset `0x224`; record 0
+is "None"): Earth Lore 10, Change Terrain 15, Raise Volcano 98. The explored
+map is at save `0x14814` (15 = fully explored). Back the save up first.
+Used for the Raise Volcano and Change Terrain checks in
+[classic-terrain-format.md](classic-terrain-format.md).
+
 ## How to work with it
 
 The game is turn-based, so Kevin stops at a **checkpoint** (a screen that
