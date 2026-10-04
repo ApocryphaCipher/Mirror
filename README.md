@@ -11,10 +11,11 @@ matches a reference decode pixel for pixel. Cities are drawn with
 owner-coloured flags and size-appropriate frames from `MAPBACK.LBX`. The map
 pages have a view mode (zoom, pan, hover readout with the full Surveyor card,
 and layer toggles for cities, settleable tile grading, and fog of war) and an
-edit mode (cycle or paint tiles, undo/redo, Save as). Note on editing: today's
-terrain editor updates terrain tiles and the recomputed adjacency mask only;
-it does **not** keep landmass/continent IDs consistent across land/water
-transitions (tracked in STORY-017 and STORY-029). Other overland features
+edit mode (paint a terrain type with auto-tiling, cycle or paint raw tiles,
+undo/redo, Save as). Note on editing: **Paint type** keeps the landmass/continent
+IDs consistent; the raw tools (Cycle, Paint tile) update terrain tiles and the
+recomputed adjacency mask only and do **not** (tracked in STORY-017 and
+STORY-029). Other overland features
 (units with banner plaques, towers, encounter sites, roads, specials) and node
 auras are next. The sprites for all of them are identified and decode correctly
 ([sprite catalog](docs/reference/overland-sprites-and-save-blocks.md)), but
@@ -73,7 +74,7 @@ Visit `localhost:4000`:
 - `/arcanus`, `/myrror`: the map for each plane. Pan, zoom, inspect tiles with
   the Surveyor readout, and toggle layers (cities, settleable sites, fog of war).
   Load a save with the path field in the header (it defaults to
-  `$MIRROR_MOM_PATH/SAVE1.GAM`), then ✎ Edit to cycle or paint terrain.
+  `$MIRROR_MOM_PATH/SAVE1.GAM`), then ✎ Edit. **Paint type** paints water or a land type (dropdown, brush 1×1 to 5×5, fill; right-click picks the terrain under the pointer) and re-tiles the coast and edges around it; **Paint tile** writes one exact tile number (with a quick pick of plain tiles) and leaves neighbours alone; **Cycle** steps a tile to the next picture. Undo and redo cover everything, including the landmass layer.
 - `/lab/arcanus`, `/lab/myrror`: the research workbench. Raw layers,
   value/bit labelling, histograms, the raw-value painter.
 - `/tile-probe`: the LBX explorer. Browse any LBX file's entries by name,

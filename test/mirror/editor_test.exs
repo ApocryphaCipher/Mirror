@@ -483,6 +483,99 @@ defmodule Mirror.EditorTest do
       assert split.planes == state.planes
     end
 
+    test "calls sharing a stroke id fold into one undo step; each call still returns only its own changes" do
+      base = make_paint_state()
+      stroke = 777
+
+      {s1, {:applied, e1, l1}, _} =
+        Editor.paint_type(base, :arcanus, TerrainPaint.brush_cells(10, 20, 3), :grass,
+          stroke: stroke
+        )
+
+      {s2, {:applied, _e2, l2}, _} =
+        Editor.paint_type(s1, :arcanus, TerrainPaint.brush_cells(20, 20, 3), :grass,
+          stroke: stroke
+        )
+
+      assert e1.id == stroke
+      assert length(s2.history.arcanus) == 1
+      assert hd(s2.history.arcanus).id == stroke
+
+      # the second call's layers are just its own changes, not the whole stroke
+      second_tiles =
+        l2
+        |> Enum.find(&(&1.layer == :terrain))
+        |> Map.fetch!(:changes)
+        |> Enum.map(&{elem(&1, 0), elem(&1, 1)})
+
+      assert Enum.all?(second_tiles, fn {x, _} -> x >= 18 end)
+      assert length(l1) == 2
+
+      {undone, {:applied, _, :terrain, _, [_]}} = Editor.undo(s2, :arcanus)
+      assert undone.planes == base.planes
+      assert undone.history.arcanus == []
+
+      {redone, _} = Editor.redo(undone, :arcanus)
+      assert redone.planes == s2.planes
+    end
+
+    test "without a stroke id every paint is its own undo step" do
+      base = make_paint_state()
+      {s1, _, _} = Editor.paint_type(base, :arcanus, TerrainPaint.brush_cells(10, 20, 3), :grass)
+      {s2, _, _} = Editor.paint_type(s1, :arcanus, TerrainPaint.brush_cells(20, 20, 3), :grass)
+      assert length(s2.history.arcanus) == 2
+    end
+
+    test "a stroke that paints the same cells twice keeps the first previous value and the last new one" do
+      base = make_paint_state()
+      cells = TerrainPaint.brush_cells(30, 20, 3)
+
+      {s1, _, _} = Editor.paint_type(base, :arcanus, cells, :grass, stroke: 5)
+      {s2, _, _} = Editor.paint_type(s1, :arcanus, cells, :forest, stroke: 5)
+
+      assert length(s2.history.arcanus) == 1
+      [entry] = s2.history.arcanus
+      # every recorded change starts from the original ocean tile
+      assert Enum.all?(entry.changes, fn {x, y, prev, _new} ->
+               prev == MMap.get_tile_u16_le(base.planes.arcanus.terrain, x, y)
+             end)
+
+      assert Editor.tile_value(s2, :arcanus, :terrain, 30, 20) == 163
+
+      {undone, _} = Editor.undo(s2, :arcanus)
+      assert undone.planes == base.planes
+    end
+
+    test "a stroke that ends where it started leaves no history entry" do
+      base = make_paint_state()
+
+      {s1, _, _} = Editor.paint_type(base, :arcanus, [{30, 20}], :grass, stroke: 9)
+      assert length(s1.history.arcanus) == 1
+
+      {s2, _, _} = Editor.paint_type(s1, :arcanus, [{30, 20}], :water, stroke: 9)
+      assert s2.planes == base.planes
+      assert s2.history.arcanus == []
+    end
+
+    test "an edit from another tab in the middle of a stroke keeps its place; the stroke folds in place" do
+      base = make_paint_state()
+
+      {s1, _, _} =
+        Editor.paint_type(base, :arcanus, TerrainPaint.brush_cells(10, 20, 3), :grass, stroke: 3)
+
+      {s2, {:applied, _, _}} = Editor.apply_single_tile(s1, :arcanus, :terrain_flags, 1, 1, 4)
+
+      {s3, _, _} =
+        Editor.paint_type(s2, :arcanus, TerrainPaint.brush_cells(20, 20, 3), :grass, stroke: 3)
+
+      assert length(s3.history.arcanus) == 2
+      assert Enum.map(s3.history.arcanus, &Map.get(&1, :id)) |> Enum.count(&(&1 == 3)) == 1
+
+      {u1, _} = Editor.undo(s3, :arcanus)
+      {u2, _} = Editor.undo(u1, :arcanus)
+      assert u2.planes == base.planes
+    end
+
     test "painting does not touch the other plane's landmass IDs" do
       base = make_paint_state()
 

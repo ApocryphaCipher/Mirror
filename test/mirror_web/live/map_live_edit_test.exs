@@ -851,6 +851,295 @@ defmodule MirrorWeb.MapLiveEditTest do
     end
   end
 
+  describe "Paint type tool (STORY-017)" do
+    # The shared fixture is a forest world with an inconsistent landmass layer, which
+    # is no place to watch coastlines form. These tests run on an all-ocean world
+    # whose landmass layer is consistent (all zeros).
+    setup %{save: save} do
+      File.write!(save, ocean_world_bytes())
+      :ok
+    end
+
+    defp ocean_world_bytes do
+      synthetic_save_bytes()
+      |> put_bytes(0x002698, :binary.copy(<<0, 0>>, 4800))
+      |> put_bytes(0x004D98, :binary.copy(<<0>>, 4800))
+    end
+
+    # A tile's type through the hover readout is awkward, so these read tile numbers
+    # and check them against Mirror.TerrainType.
+    defp type_at(view, x, y), do: Mirror.TerrainType.terrain_type(tile_at(view, x, y))
+
+    defp paint_form(view, params) do
+      view |> element("#paint-form") |> render_change(%{"paint" => params})
+    end
+
+    defp report(view), do: view |> element("#paint-report") |> render() |> text_of()
+
+    test "the toolbar offers a terrain dropdown, brush sizes and fill", %{conn: conn, save: save} do
+      view = editing(conn, save, "type")
+
+      assert has_element?(view, "#tool-type[aria-pressed=true]")
+      assert has_element?(view, "#paint-form #paint-kind")
+      assert has_element?(view, "#paint-form #paint-size")
+      assert has_element?(view, "#paint-form #paint-fill")
+
+      assert view
+             |> element("#paint-kind")
+             |> render()
+             |> LazyHTML.from_fragment()
+             |> LazyHTML.query("option")
+             |> Enum.count() == 8
+
+      for label <- [
+            "Water (ocean)",
+            "Grassland",
+            "Forest",
+            "Hills",
+            "Mountains",
+            "Desert",
+            "Swamp",
+            "Tundra"
+          ] do
+        assert view |> element("#paint-kind") |> render() =~ label
+      end
+
+      assert view |> element("#paint-size") |> render() =~ "3 × 3"
+      # the raw tile box belongs to the other tool
+      refute has_element?(view, "#brush-form")
+    end
+
+    test "painting grass over the ocean re-tiles the tiles around it", %{conn: conn, save: save} do
+      view = editing(conn, save, "type")
+      assert tile_at(view, 30, 20) == 0
+
+      before_neighbours =
+        for {dx, dy} <- [{-1, -1}, {0, -1}, {1, -1}, {-1, 0}, {1, 0}, {-1, 1}, {0, 1}, {1, 1}],
+            do: tile_at(view, 30 + dx, 20 + dy)
+
+      assert before_neighbours == List.duplicate(0, 8)
+
+      click(view, 30, 20)
+
+      assert tile_at(view, 30, 20) == 162
+      assert type_at(view, 30, 20) == :grass
+
+      # the eight tiles around it became coast, and the sea beyond is untouched
+      for {dx, dy} <- [{-1, -1}, {0, -1}, {1, -1}, {-1, 0}, {1, 0}, {-1, 1}, {0, 1}, {1, 1}] do
+        assert type_at(view, 30 + dx, 20 + dy) == :shore
+        assert tile_at(view, 30 + dx, 20 + dy) != 0
+      end
+
+      assert tile_at(view, 28, 20) == 0
+      assert changed(view) =~ "9 tiles changed"
+      assert report(view) =~ "9 tiles changed"
+    end
+
+    test "the chosen terrain and brush size are used", %{conn: conn, save: save} do
+      view = editing(conn, save, "type")
+      paint_form(view, %{"kind" => "forest", "size" => "3", "fill" => "false"})
+
+      click(view, 30, 20)
+
+      for {dx, dy} <- [{0, 0}, {1, 1}, {-1, -1}],
+          do: assert(type_at(view, 30 + dx, 20 + dy) == :forest)
+
+      assert type_at(view, 32, 20) == :shore
+      assert type_at(view, 34, 20) == :ocean
+      # 9 painted tiles and the ring of 16 around them
+      assert changed(view) =~ "25 tiles changed"
+    end
+
+    test "an option the form does not know is ignored", %{conn: conn, save: save} do
+      view = editing(conn, save, "type")
+      paint_form(view, %{"kind" => "river", "size" => "4", "fill" => "false"})
+      click(view, 30, 20)
+
+      assert type_at(view, 30, 20) == :grass
+      assert changed(view) =~ "9 tiles changed"
+    end
+
+    test "dragging paints as you go and undoes in one step", %{conn: conn, save: save} do
+      view = editing(conn, save, "type")
+
+      pointer(view, "start", 30, 20)
+      assert type_at(view, 30, 20) == :grass
+      pointer(view, "drag", 31, 20)
+      pointer(view, "drag", 32, 20)
+      assert type_at(view, 32, 20) == :grass
+      pointer(view, "end", 32, 20)
+
+      assert changed(view) =~ "tiles changed"
+      refute changed(view) =~ " 0 tiles"
+
+      render_click(view, "undo", %{})
+      assert changed(view) =~ "0 tiles changed"
+      for x <- 29..33, do: assert(tile_at(view, x, 20) == 0)
+
+      render_click(view, "redo", %{})
+      assert type_at(view, 31, 20) == :grass
+    end
+
+    test "fill repaints a whole connected area in one step", %{conn: conn, save: save} do
+      view = editing(conn, save, "type")
+
+      # An island wider than a 5x5 brush: a 5x5 block plus a 3x3 block touching it, so
+      # its east end at x = 35 is out of reach of a brush at (30, 20) (x 28..32).
+      paint_form(view, %{"kind" => "forest", "size" => "5", "fill" => "false"})
+      click(view, 30, 20)
+      paint_form(view, %{"kind" => "forest", "size" => "3", "fill" => "false"})
+      click(view, 34, 20)
+      assert type_at(view, 35, 20) == :forest
+
+      paint_form(view, %{"kind" => "desert", "size" => "5", "fill" => "true"})
+      click(view, 30, 20)
+
+      # the whole island, both blocks, is desert now; the sea around it is not
+      for {x, y} <- [{30, 20}, {28, 18}, {32, 22}, {35, 20}, {35, 21}],
+          do: assert(type_at(view, x, y) == :desert)
+
+      assert type_at(view, 38, 20) == :ocean
+
+      render_click(view, "undo", %{})
+      assert type_at(view, 30, 20) == :forest
+      assert type_at(view, 35, 20) == :forest
+      render_click(view, "undo", %{})
+      render_click(view, "undo", %{})
+      assert changed(view) =~ "0 tiles changed"
+    end
+
+    test "painting keeps the landmass layer in step, and undo removes it", %{
+      conn: conn,
+      save: save
+    } do
+      session_id = "paint-type-landmass-#{System.unique_integer([:positive])}"
+      conn = init_test_session(conn, %{"mirror_session_id" => session_id})
+      view = editing(conn, save, "type")
+
+      click(view, 30, 20)
+
+      state = Mirror.SessionStore.get(session_id)
+
+      ids =
+        for y <- 0..39,
+            x <- 0..59,
+            id = Mirror.Map.get_tile_u8(state.planes.arcanus.landmass, x, y),
+            id != 0,
+            do: id
+
+      assert [_one] = Enum.uniq(ids)
+      assert length(ids) == 1
+
+      render_click(view, "undo", %{})
+      state = Mirror.SessionStore.get(session_id)
+      assert state.planes.arcanus.landmass == :binary.copy(<<0>>, 2400)
+    end
+
+    test "cells that cannot be painted are reported, not changed", %{conn: conn, save: save} do
+      view = editing(conn, save, "type")
+
+      # row 0 is a polar row
+      click(view, 10, 0)
+
+      assert changed(view) =~ "0 tiles changed"
+      assert report(view) =~ "1 left alone"
+      assert tile_at(view, 10, 0) == 0
+    end
+
+    test "right-click picks the terrain under the pointer", %{conn: conn, save: save} do
+      view = editing(conn, save, "type")
+      paint_form(view, %{"kind" => "forest", "size" => "1", "fill" => "false"})
+      click(view, 30, 20)
+      paint_form(view, %{"kind" => "swamp", "size" => "1", "fill" => "false"})
+      assert has_element?(view, "#paint-kind option[selected][value=swamp]")
+
+      click(view, 30, 20, button: 2)
+
+      assert has_element?(view, "#paint-kind option[selected][value=forest]")
+      # picking paints nothing
+      assert changed(view) =~ "9 tiles changed"
+
+      # open water picks as water
+      click(view, 10, 10, button: 2)
+      assert has_element?(view, "#paint-kind option[selected][value=water]")
+    end
+
+    test "view mode ignores painting", %{conn: conn, save: save} do
+      {:ok, view, _} = live(conn, ~p"/arcanus")
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      click(view, 30, 20)
+      assert changed(reopen_in_edit(conn)) =~ "0 tiles changed"
+    end
+
+    test "the raw tile painter has a quick pick of plain tiles and does not re-tile neighbours",
+         %{conn: conn, save: save} do
+      view = editing(conn, save, "paint")
+
+      assert has_element?(view, "#quick-tile-form #quick-tile")
+      html = view |> element("#quick-tile") |> render()
+      assert html =~ "Grassland (162)" and html =~ "Ocean (0)" and html =~ "Tundra (167)"
+
+      view |> element("#quick-tile-form") |> render_change(%{"quick" => %{"tile" => "163"}})
+      click(view, 5, 5)
+
+      assert tile_at(view, 5, 5) == 163
+      # the neighbours are left exactly as they were
+      assert tile_at(view, 6, 5) == 0
+      assert changed(view) =~ "1 tile changed"
+    end
+
+    test "the quick pick ignores anything that is not a tile number", %{conn: conn, save: save} do
+      view = editing(conn, save, "paint")
+      view |> element("#quick-tile-form") |> render_change(%{"quick" => %{"tile" => ""}})
+      click(view, 5, 5)
+      assert tile_at(view, 5, 5) != 163
+    end
+  end
+
+  describe "Paint type tool on a save whose landmass layer is out of step (STORY-017)" do
+    test "the paint repairs the layer, says so, and leaves it consistent", %{
+      conn: conn,
+      save: save
+    } do
+      session_id = "paint-type-repair-#{System.unique_integer([:positive])}"
+      conn = init_test_session(conn, %{"mirror_session_id" => session_id})
+      view = editing(conn, save, "type")
+
+      # The default fixture is forest with landmass all 1, including its ocean pocket
+      # and the polar rows, which the rule says are 0.
+      before = Mirror.SessionStore.get(session_id)
+      terrain = %{arcanus: before.planes.arcanus.terrain, myrror: before.planes.myrror.terrain}
+      landmass = %{arcanus: before.planes.arcanus.landmass, myrror: before.planes.myrror.landmass}
+      assert Mirror.Landmass.violations(terrain, landmass) != []
+
+      click(view, 30, 20)
+
+      assert view |> element("#paint-report") |> render() |> text_of() =~ "1 tile changed"
+
+      assert view |> element("#paint-report") |> render() |> text_of() =~
+               "landmass layer repaired on"
+
+      after_ = Mirror.SessionStore.get(session_id)
+      terrain = %{arcanus: after_.planes.arcanus.terrain, myrror: after_.planes.myrror.terrain}
+      landmass = %{arcanus: after_.planes.arcanus.landmass, myrror: after_.planes.myrror.landmass}
+
+      # Arcanus now follows the rule; Myrror, the plane we did not paint on, is left
+      # exactly as it was (it is out of step too, and that is not ours to touch)
+      arcanus_problems =
+        Enum.filter(Mirror.Landmass.violations(terrain, landmass), fn
+          {:id_shared, _id, _owners} -> false
+          violation -> elem(violation, 1) == :arcanus
+        end)
+
+      assert arcanus_problems == []
+      assert after_.planes.myrror.landmass == before.planes.myrror.landmass
+
+      # one undo puts everything back
+      render_click(view, "undo", %{})
+      assert Mirror.SessionStore.get(session_id).planes == before.planes
+    end
+  end
+
   describe "real-save integration" do
     @tag skip:
            !@has_real_save_and_sprites &&

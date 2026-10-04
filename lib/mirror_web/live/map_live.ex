@@ -13,12 +13,14 @@ defmodule MirrorWeb.MapLive do
     SessionStore,
     Stats,
     Surveyor,
-    TerrainLbx
+    TerrainLbx,
+    TerrainPaint
   }
 
   alias Mirror.TileAtlas
   alias Mirror.SaveFile.{Cities, Roads, Sites, Units, Wizards}
   alias Mirror.Map, as: MirrorMap
+  alias MirrorWeb.PaintTool
 
   @layers [
     :terrain,
@@ -81,6 +83,10 @@ defmodule MirrorWeb.MapLive do
       |> assign(:lab?, lab?)
       |> assign(:edit, nil)
       |> assign(:tool, :cycle)
+      |> assign(:paint_kind, PaintTool.default_kind())
+      |> assign(:paint_size, PaintTool.default_size())
+      |> assign(:paint_fill, false)
+      |> assign(:paint_report, nil)
       |> assign(:discard_armed, false)
       |> assign(:fresh_mount, true)
 
@@ -206,8 +212,26 @@ defmodule MirrorWeb.MapLive do
     end
   end
 
-  def handle_event("set_tool", %{"tool" => tool}, socket) when tool in ["cycle", "paint"] do
+  def handle_event("set_tool", %{"tool" => tool}, socket)
+      when tool in ["cycle", "paint", "type"] do
     {:noreply, assign(socket, :tool, String.to_existing_atom(tool))}
+  end
+
+  # The "Paint type" tool's options: terrain, brush size, fill.
+  def handle_event("set_paint", %{"paint" => params}, socket) do
+    {:noreply,
+     socket
+     |> assign(:paint_kind, PaintTool.parse_kind(params["kind"]) || socket.assigns.paint_kind)
+     |> assign(:paint_size, PaintTool.parse_size(params["size"], socket.assigns.paint_size))
+     |> assign(:paint_fill, PaintTool.parse_flag(params["fill"]))}
+  end
+
+  # Raw painter: pick a plain tile for a terrain from the dropdown.
+  def handle_event("set_quick_tile", %{"quick" => %{"tile" => tile}}, socket) do
+    case Integer.parse(to_string(tile)) do
+      {value, ""} -> handle_event("set_brush", %{"brush" => %{"tile" => value}}, socket)
+      _ -> {:noreply, socket}
+    end
   end
 
   # Discard is a two-step in-page confirmation: native confirm() dialogs are
@@ -1540,8 +1564,17 @@ defmodule MirrorWeb.MapLive do
 
               <div class="flex rounded-lg border border-white/10 p-0.5" role="group" aria-label="Tool">
                 <button
-                  :for={{tool, label} <- [cycle: "🔄 Cycle", paint: "🎨 Paint"]}
+                  :for={
+                    {tool, label, hint} <- [
+                      {:cycle, "🔄 Cycle", "Step a tile to the next picture"},
+                      {:type, "🌍 Paint type",
+                       "Paint water or a land type; neighbouring tiles re-tile automatically"},
+                      {:paint, "🎨 Paint tile",
+                       "Paint one exact tile number; neighbours are not touched"}
+                    ]
+                  }
                   id={"tool-#{tool}"}
+                  title={hint}
                   type="button"
                   phx-click="set_tool"
                   phx-value-tool={tool}
@@ -1555,6 +1588,97 @@ defmodule MirrorWeb.MapLive do
                   {label}
                 </button>
               </div>
+
+              <.form
+                :if={@tool == :type}
+                for={%{}}
+                as={:paint}
+                id="paint-form"
+                phx-change="set_paint"
+                class="flex flex-wrap items-center gap-x-3 gap-y-1"
+              >
+                <label class="flex items-center gap-1.5">
+                  <span class="text-slate-400">Terrain</span>
+                  <select
+                    id="paint-kind"
+                    name="paint[kind]"
+                    class="rounded-lg border border-white/10 bg-slate-950/60 py-0.5 text-sm text-slate-200"
+                  >
+                    <option
+                      :for={{label, value} <- PaintTool.kind_options()}
+                      value={value}
+                      selected={value == Atom.to_string(@paint_kind)}
+                    >
+                      {label}
+                    </option>
+                  </select>
+                </label>
+                <label class="flex items-center gap-1.5">
+                  <span class="text-slate-400">Brush</span>
+                  <select
+                    id="paint-size"
+                    name="paint[size]"
+                    disabled={@paint_fill}
+                    class="rounded-lg border border-white/10 bg-slate-950/60 py-0.5 text-sm text-slate-200 disabled:opacity-40"
+                  >
+                    <option
+                      :for={{label, value} <- PaintTool.size_options()}
+                      value={value}
+                      selected={value == Integer.to_string(@paint_size)}
+                    >
+                      {label}
+                    </option>
+                  </select>
+                </label>
+                <label class="flex items-center gap-1.5">
+                  <input type="hidden" name="paint[fill]" value="false" />
+                  <input
+                    id="paint-fill"
+                    type="checkbox"
+                    name="paint[fill]"
+                    value="true"
+                    checked={@paint_fill}
+                  />
+                  <span class="text-slate-400">Fill</span>
+                </label>
+              </.form>
+
+              <span
+                :if={@tool == :type && @paint_report && @paint_report[:message]}
+                id="paint-report"
+                class={[
+                  "text-xs",
+                  elem(@paint_report.message, 0) == :warn && "text-amber-200",
+                  elem(@paint_report.message, 0) == :ok && "text-emerald-200"
+                ]}
+              >
+                {elem(@paint_report.message, 1)}
+              </span>
+
+              <.form
+                :if={@tool == :paint}
+                for={%{}}
+                as={:quick}
+                id="quick-tile-form"
+                phx-change="set_quick_tile"
+                class="flex items-center gap-1.5"
+              >
+                <span class="text-slate-400">Quick</span>
+                <select
+                  id="quick-tile"
+                  name="quick[tile]"
+                  class="rounded-lg border border-white/10 bg-slate-950/60 py-0.5 text-sm text-slate-200"
+                >
+                  <option value="">Plain tile…</option>
+                  <option
+                    :for={{label, tile} <- PaintTool.quick_tile_options()}
+                    value={tile}
+                    selected={tile == Map.get(@state.selection, :terrain)}
+                  >
+                    {label} ({tile})
+                  </option>
+                </select>
+              </.form>
 
               <.form
                 :if={@tool == :paint}
@@ -1585,11 +1709,16 @@ defmodule MirrorWeb.MapLive do
               </.form>
 
               <span class="text-xs text-slate-400">
-                {if @tool == :cycle,
-                  do:
-                    "Click: next tile · right-click or shift-click: previous · space-drag or middle-drag to pan · Esc to finish",
-                  else:
-                    "Click or drag: paint · right-click: pick tile · space-drag or middle-drag to pan · Esc to finish"}
+                {case @tool do
+                  :cycle ->
+                    "Click: next tile · right-click or shift-click: previous · space-drag or middle-drag to pan · Esc to finish"
+
+                  :type ->
+                    "Click or drag: paint the terrain, neighbours re-tile · right-click: pick the terrain under the pointer · space-drag or middle-drag to pan · Esc to finish"
+
+                  _ ->
+                    "Click or drag: paint this exact tile (neighbours are not re-tiled; use Paint type for that) · right-click: pick tile · space-drag or middle-drag to pan · Esc to finish"
+                end}
               </span>
 
               <div class="ml-auto flex flex-wrap items-center gap-2">
@@ -1929,6 +2058,20 @@ defmodule MirrorWeb.MapLive do
     cycle_tile(socket, x, y, direction)
   end
 
+  defp handle_pointer_start(
+         %{assigns: %{edit: :terrain, tool: :type}} = socket,
+         x,
+         y,
+         button,
+         mods
+       ) do
+    cond do
+      button == 2 or truthy?(mods["ctrl"]) -> pick_paint_kind(socket, x, y)
+      socket.assigns.paint_fill -> paint_fill(socket, x, y)
+      true -> start_type_stroke(socket, x, y)
+    end
+  end
+
   defp handle_pointer_start(socket, x, y, button, mods) do
     {tool, layer} = tool_and_layer(socket, button, mods)
 
@@ -1946,6 +2089,14 @@ defmodule MirrorWeb.MapLive do
 
   defp handle_pointer_drag(socket, x, y) do
     case socket.assigns.active_stroke do
+      %{type_paint: stroke_id} ->
+        paint_cells(
+          socket,
+          TerrainPaint.brush_cells(x, y, socket.assigns.paint_size),
+          stroke_id,
+          false
+        )
+
       %{layer: layer} ->
         apply_stroke_change(socket, layer, x, y)
 
@@ -1988,6 +2139,136 @@ defmodule MirrorWeb.MapLive do
     socket
     |> assign_from_state(state)
     |> assign_forms()
+  end
+
+  # --- Paint type tool (STORY-017) ---
+
+  defp start_type_stroke(socket, x, y) do
+    stroke_id = System.unique_integer([:positive, :monotonic])
+
+    socket
+    |> assign(:active_stroke, %{type_paint: stroke_id, layer: :terrain})
+    |> paint_cells(TerrainPaint.brush_cells(x, y, socket.assigns.paint_size), stroke_id, true)
+  end
+
+  # Fill is one click, one undo step.
+  defp paint_fill(socket, x, y) do
+    cells = TerrainPaint.fill_cells(tile_state(socket), x, y)
+
+    paint_cells(socket, cells, System.unique_integer([:positive, :monotonic]), true)
+  end
+
+  defp tile_state(socket) do
+    get_in(socket.assigns.state, [:planes, socket.assigns.plane, :terrain])
+  end
+
+  # Right-click / ctrl-click: take the terrain under the pointer as the brush.
+  defp pick_paint_kind(socket, x, y) do
+    type =
+      case tile_value(socket.assigns.state, socket.assigns.plane, :terrain, x, y) do
+        nil -> nil
+        tile -> Mirror.TerrainType.terrain_type(tile)
+      end
+
+    case PaintTool.kind_of_type(type) do
+      nil ->
+        assign(socket, :paint_report, %{
+          message: {:warn, "That tile can't be painted (river, lake, node or volcano)"}
+        })
+
+      kind ->
+        assign(socket, :paint_kind, kind)
+    end
+  end
+
+  # Paints `cells` and pushes every changed layer to the page and engine. Calls that
+  # share a stroke id are one undo step; `reset?` starts a fresh report.
+  defp paint_cells(socket, cells, stroke_id, reset?) do
+    plane = socket.assigns.plane
+    kind = socket.assigns.paint_kind
+
+    {:ok, state, {outcome, report}} =
+      SessionStore.update(socket.assigns.session_id, fn current ->
+        {next, outcome, report} =
+          Editor.paint_type(current, plane, cells, kind, stroke: stroke_id)
+
+        {next, {outcome, report}}
+      end)
+
+    socket = assign_state(socket, state)
+
+    case outcome do
+      {:applied, _entry, parts} ->
+        socket
+        |> push_layer_parts(plane, parts)
+        |> note_paint(
+          report,
+          layer_changes(parts, :terrain),
+          layer_changes(parts, :landmass),
+          reset?
+        )
+
+      :none ->
+        note_paint(socket, report, 0, 0, reset?)
+
+      {:error, :out_of_ids} ->
+        assign(socket, :paint_report, %{
+          message: {:warn, "Too many separate landmasses for the save to number; nothing changed"}
+        })
+    end
+  end
+
+  defp layer_changes(parts, layer) do
+    case Enum.find(parts, &(&1.layer == layer)) do
+      nil -> 0
+      %{changes: changes} -> length(changes)
+    end
+  end
+
+  # Keeps a running report over a drag: tiles changed add up, skipped and
+  # unresolved cells accumulate, and a stale neighbour drops out once a later step
+  # re-tiles it.
+  defp note_paint(socket, report, changed, landmass, reset?) do
+    previous =
+      case {reset?, socket.assigns.paint_report} do
+        {false, %{changed: _} = prev} ->
+          prev
+
+        _ ->
+          %{
+            changed: 0,
+            landmass: 0,
+            skipped: MapSet.new(),
+            unresolved: MapSet.new(),
+            stale: MapSet.new()
+          }
+      end
+
+    combined = %{
+      changed: previous.changed + changed,
+      landmass: previous.landmass + landmass,
+      skipped: MapSet.union(previous.skipped, MapSet.new(report.skipped)),
+      unresolved: MapSet.union(previous.unresolved, MapSet.new(report.unresolved)),
+      stale: MapSet.union(previous.stale, MapSet.new(report.stale))
+    }
+
+    assign(
+      socket,
+      :paint_report,
+      Map.put(
+        combined,
+        :message,
+        PaintTool.summary(combined, combined.changed, combined.landmass)
+      )
+    )
+  end
+
+  defp push_layer_parts(socket, plane, parts) do
+    Enum.reduce(parts, socket, fn %{layer: layer, updates: updates, changes: changes}, acc ->
+      acc
+      |> maybe_push_updates(layer, updates, changes)
+      |> emit_engine_delta(plane, layer, changes)
+    end)
   end
 
   # Cycle tool: step the tile's number by ±1 (wrapping 0..761). Each click
@@ -2127,17 +2408,9 @@ defmodule MirrorWeb.MapLive do
   end
 
   defp finish_history_step(socket, state, plane, parts) do
-    parts
-    |> Enum.reduce(assign_state(socket, state), fn %{
-                                                     layer: layer,
-                                                     updates: updates,
-                                                     changes: changes
-                                                   },
-                                                   acc ->
-      acc
-      |> maybe_push_updates(layer, updates, changes)
-      |> emit_engine_delta(plane, layer, changes)
-    end)
+    socket
+    |> assign_state(state)
+    |> push_layer_parts(plane, parts)
     |> refresh_hover()
     |> push_map_layers()
   end

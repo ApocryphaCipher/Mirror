@@ -355,8 +355,12 @@ defmodule Mirror.Editor do
   The landmass IDs are recomputed for this plane only (`Mirror.Landmass.repair/3`
   with `only:`), never touching the other plane's layer. A state without landmass
   data (a fixture, say) just gets the terrain change.
+
+  Pass `stroke: id` while a brush is being dragged: every call with the same id is
+  folded into one undo step (the returned `layers` are still just this call's
+  changes, for the client), so a drag can paint live and undo in one go.
   """
-  def paint_type(state, plane, cells, kind) do
+  def paint_type(state, plane, cells, kind, opts \\ []) do
     terrain = get_in(state, [:planes, plane, :terrain])
     result = TerrainPaint.paint(terrain, cells, kind)
     report = Map.take(result, [:skipped, :unresolved, :stale])
@@ -371,12 +375,98 @@ defmodule Mirror.Editor do
           {next, outcome} =
             apply_compound(state, plane, [{:terrain, terrain_edits}, {:landmass, landmass_edits}])
 
+          {next, outcome} = fold_into_stroke(next, plane, outcome, Keyword.get(opts, :stroke))
           {next, outcome, report}
 
         {:error, reason} ->
           {state, {:error, reason}, report}
       end
     end
+  end
+
+  # The step just recorded becomes part of stroke `id`: the first call takes the
+  # id, later calls are composed into the entry that already has it.
+  defp fold_into_stroke(state, _plane, outcome, nil), do: {state, outcome}
+  defp fold_into_stroke(state, _plane, :none, _id), do: {state, :none}
+
+  defp fold_into_stroke(state, plane, {:applied, entry, layers}, id) do
+    [%{id: new_id} = new | rest] = Map.get(state.history, plane, [])
+    true = new_id == entry.id
+
+    # The stroke's earlier entry can be anywhere (another tab may have edited in
+    # between), so it is updated in place by id, as record_stroke/4 does.
+    case Enum.find_index(rest, &(Map.get(&1, :id) == id)) do
+      nil ->
+        renamed = %{new | id: id}
+        {put_history(state, plane, [renamed | rest]), {:applied, renamed, layers}}
+
+      index ->
+        {before, [earlier | after_]} = Enum.split(rest, index)
+
+        history =
+          case compose_entries(earlier, new, id) do
+            nil -> before ++ after_
+            composed -> before ++ [composed | after_]
+          end
+
+        {put_history(state, plane, history), {:applied, entry, layers}}
+    end
+  end
+
+  defp put_history(state, plane, history),
+    do: %{state | history: Map.put(state.history, plane, history)}
+
+  # Two entries for one stroke become one: per layer and tile, the earliest
+  # previous value and the latest new value; tiles that end where they began drop
+  # out. `nil` when nothing is left.
+  defp compose_entries(earlier, later, id) do
+    parts = fn entry ->
+      [{entry.layer, entry.changes} | Enum.map(entry.also, &{&1.layer, &1.changes})]
+    end
+
+    order = Enum.uniq(Enum.map(parts.(earlier) ++ parts.(later), &elem(&1, 0)))
+
+    composed =
+      for layer <- order,
+          changes =
+            compose_changes(
+              layer_changes(parts.(earlier), layer),
+              layer_changes(parts.(later), layer)
+            ),
+          changes != [],
+          do: {layer, changes}
+
+    case composed do
+      [] ->
+        nil
+
+      [{layer, changes} | rest] ->
+        %{
+          id: id,
+          layer: layer,
+          changes: changes,
+          also: Enum.map(rest, fn {l, c} -> %{layer: l, changes: c} end)
+        }
+    end
+  end
+
+  defp layer_changes(parts, layer) do
+    Enum.flat_map(parts, fn {l, changes} -> if l == layer, do: changes, else: [] end)
+  end
+
+  defp compose_changes(first, second) do
+    {order, by_tile} =
+      Enum.reduce(first ++ second, {[], %{}}, fn {x, y, prev, new}, {order, by_tile} ->
+        case by_tile do
+          %{{^x, ^y} => {first_prev, _}} -> {order, Map.put(by_tile, {x, y}, {first_prev, new})}
+          _ -> {[{x, y} | order], Map.put(by_tile, {x, y}, {prev, new})}
+        end
+      end)
+
+    for {x, y} = key <- Enum.reverse(order),
+        {prev, new} = Map.fetch!(by_tile, key),
+        prev != new,
+        do: {x, y, prev, new}
   end
 
   # The landmass IDs that change for `plane` once the terrain changes are applied.
