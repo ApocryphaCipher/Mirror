@@ -1,3 +1,5 @@
+import {layerTypeAfterDelta} from "./layer_type.mjs"
+
 const LAYER_STACK = [
   "terrain",
   "terrain_flags",
@@ -137,7 +139,12 @@ const MapCanvas = {
     this.handleEvent("engine_delta", payload => {
       if (!payload || !Array.isArray(payload.changes)) return
       if (payload.delta_type && payload.delta_type !== "tile_set") return
-      if (payload.layer_type) this.layerType = payload.layer_type
+      this.layerType = layerTypeAfterDelta(
+        this.layerType,
+        this.activeLayer,
+        payload.layer,
+        payload.layer_type
+      )
       const layer = payload.layer || this.activeLayer
 
       payload.changes.forEach(change => {
@@ -149,7 +156,12 @@ const MapCanvas = {
 
     this.handleEvent("tile_updates", payload => {
       if (!payload || !Array.isArray(payload.updates)) return
-      this.layerType = payload.layer_type || this.layerType
+      this.layerType = layerTypeAfterDelta(
+        this.layerType,
+        this.activeLayer,
+        payload.layer,
+        payload.layer_type
+      )
       payload.updates.forEach(update => {
         this.applyTileValue(payload.layer, update.x, update.y, update.value)
       })
