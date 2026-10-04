@@ -344,6 +344,36 @@ defmodule Mirror.EditorTest do
       assert undone.planes == base.planes
     end
 
+    test "a layer listed twice is merged into one part, so undo restores the original" do
+      base = make_paint_state()
+
+      {state, {:applied, entry, layers}} =
+        Editor.apply_compound(base, :arcanus, [
+          {:terrain, [{5, 5, 1}]},
+          {:landmass, [{7, 7, 9}]},
+          {:terrain, [{5, 5, 2}, {6, 6, 3}]}
+        ])
+
+      assert Enum.map(layers, & &1.layer) == [:terrain, :landmass]
+      assert entry.layer == :terrain
+      assert entry.changes == [{5, 5, 0, 2}, {6, 6, 0, 3}]
+      assert [%{layer: :landmass, changes: [{7, 7, 0, 9}]}] = entry.also
+      assert Editor.tile_value(state, :arcanus, :terrain, 5, 5) == 2
+
+      {undone, _} = Editor.undo(state, :arcanus)
+      assert undone.planes == base.planes
+    end
+
+    test "two entries for one layer, the second undoing the first, record nothing" do
+      base = make_paint_state()
+
+      assert {^base, :none} =
+               Editor.apply_compound(base, :arcanus, [
+                 {:terrain, [{5, 5, 1}]},
+                 {:terrain, [{5, 5, 0}]}
+               ])
+    end
+
     test "edits that net out to no change record nothing" do
       base = make_paint_state()
 

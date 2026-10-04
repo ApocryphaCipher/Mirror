@@ -255,9 +255,11 @@ defmodule Mirror.Editor do
   **single undo step** (so undo and redo restore every layer together).
 
   `edits` is a list of `{layer, [{x, y, value}]}`, for example terrain tiles plus
-  the landmass IDs that go with them. If a layer lists the same tile more than
-  once, the last value wins. The first layer that actually changes is the entry's
-  main layer; the others ride along in its `:also` list.
+  the landmass IDs that go with them. A layer listed more than once is merged
+  (its edits in order), and if it lists the same tile more than once the last
+  value wins, so a step has one part per layer and undo restores the original.
+  The first layer that actually changes is the entry's main layer; the others
+  ride along in its `:also` list.
 
   Returns `{state, :none}` when nothing changed, otherwise
   `{updated_state, {:applied, entry, layers}}` where `layers` is a list of
@@ -266,7 +268,8 @@ defmodule Mirror.Editor do
   """
   def apply_compound(state, plane, edits) when is_list(edits) do
     {next_state, layers} =
-      Enum.reduce(edits, {state, []}, fn {layer, tile_edits}, {acc_state, acc_layers} ->
+      Enum.reduce(group_by_layer(edits), {state, []}, fn {layer, tile_edits},
+                                                         {acc_state, acc_layers} ->
         tile_edits = last_value_per_tile(tile_edits)
 
         {st, changes, updates} =
@@ -309,6 +312,18 @@ defmodule Mirror.Editor do
 
         {updated_state, {:applied, entry, layers}}
     end
+  end
+
+  # A layer listed more than once is merged into its first entry (edits in order),
+  # so a step has at most one part per layer and undo can restore it exactly.
+  defp group_by_layer(edits) do
+    {order, by_layer} =
+      Enum.reduce(edits, {[], %{}}, fn {layer, tile_edits}, {order, by_layer} ->
+        order = if Map.has_key?(by_layer, layer), do: order, else: [layer | order]
+        {order, Map.update(by_layer, layer, tile_edits, &(&1 ++ tile_edits))}
+      end)
+
+    for layer <- Enum.reverse(order), do: {layer, Map.fetch!(by_layer, layer)}
   end
 
   # Several edits to one tile in a single step collapse to the last value, so the
