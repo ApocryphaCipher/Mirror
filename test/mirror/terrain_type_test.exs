@@ -8,10 +8,10 @@ defmodule Mirror.TerrainTypeTest do
   @myrror_start 0x2FA
   # Ocean, tolerant of Ocean-or-Shore on every side.
   @tile_ocean_loose 0
-  # The animated "sparkle" ocean (4 frames). The ported table only accepts
-  # Ocean neighbours for it, but the real game places it at random (~20% of
-  # ocean tiles, even beside shore); see classic-terrain-format.md.
-  @tile_ocean_strict 601
+  # The animated "sparkle" ocean (4 frames). The game places it at random over
+  # any ocean tile (~20%, even beside shore), so it is matched like tile 0; see
+  # classic-terrain-format.md.
+  @tile_ocean_sparkle 601
   # Shore, requiring non-Ocean/Shore specifically to its SouthEast.
   @tile_shore 2
   # Grass with only a :center rule — every other direction is unconstrained.
@@ -20,7 +20,7 @@ defmodule Mirror.TerrainTypeTest do
   describe "terrain_type/1" do
     test "looks up Arcanus tiles directly" do
       assert TerrainType.terrain_type(@tile_ocean_loose) == :ocean
-      assert TerrainType.terrain_type(@tile_ocean_strict) == :ocean
+      assert TerrainType.terrain_type(@tile_ocean_sparkle) == :ocean
       assert TerrainType.terrain_type(@tile_shore) == :shore
     end
 
@@ -41,9 +41,34 @@ defmodule Mirror.TerrainTypeTest do
       refute TerrainType.matches?(@tile_ocean_loose, %{0 => :grass, center: :ocean})
     end
 
-    test "the ported table's sparkle-ocean tile rejects a Shore neighbour the loose one accepts" do
-      assert TerrainType.matches?(@tile_ocean_loose, %{0 => :shore, center: :ocean})
-      refute TerrainType.matches?(@tile_ocean_strict, %{0 => :shore, center: :ocean})
+    test "the sparkle-ocean tile (601) is valid wherever plain ocean (0) is" do
+      for region <- [
+            %{0 => :shore, center: :ocean},
+            %{0 => :grass, center: :ocean},
+            %{0 => :ocean, 3 => :forest, 5 => :shore, center: :ocean}
+          ] do
+        assert TerrainType.matches?(@tile_ocean_sparkle, region) ==
+                 TerrainType.matches?(@tile_ocean_loose, region)
+      end
+
+      # ...including beside shore, which kazzmir's strict rule for 601 rejected.
+      assert TerrainType.matches?(@tile_ocean_sparkle, %{0 => :shore, center: :ocean})
+    end
+
+    test "the sparkle-ocean tile is still ocean-only: a land centre does not match it" do
+      refute TerrainType.matches?(@tile_ocean_sparkle, %{center: :grass})
+    end
+
+    test "the Myrror copy of 601 behaves the same" do
+      region = %{0 => :shore, center: :ocean}
+
+      assert TerrainType.matches?(@tile_ocean_sparkle + @myrror_start, region) ==
+               TerrainType.matches?(@tile_ocean_sparkle, region)
+    end
+
+    test "resolve_tile never returns the sparkle tile; ocean resolves to plain tile 0" do
+      assert TerrainType.resolve_tile(%{0 => :shore, center: :ocean}, :arcanus) ==
+               @tile_ocean_loose
     end
 
     test "none_of: a direction's neighbour must not be one of the forbidden types" do
@@ -202,7 +227,11 @@ defmodule Mirror.TerrainTypeTest do
       end)
     end
 
-    assert (match_count + variant_count) / total >= 0.92
+    # 195 interior sparkle-ocean (601) tiles used to be unexplained here; matching
+    # 601 like tile 0 explains them, leaving 5 unrelated tiles (polar tundra,
+    # two coast pieces, one Myrror river-side tile).
+    assert unexplained_count <= 10
+    assert (match_count + variant_count) / total >= 0.99
   end
 
   defp build_region(terrain_bin, x, y) do
