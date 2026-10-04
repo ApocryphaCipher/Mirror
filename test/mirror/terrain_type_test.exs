@@ -8,7 +8,9 @@ defmodule Mirror.TerrainTypeTest do
   @myrror_start 0x2FA
   # Ocean, tolerant of Ocean-or-Shore on every side.
   @tile_ocean_loose 0
-  # Ocean, but strictly Ocean-only on every side (a "deep ocean" variant).
+  # The animated "sparkle" ocean (4 frames). The ported table only accepts
+  # Ocean neighbours for it, but the real game places it at random (~20% of
+  # ocean tiles, even beside shore); see classic-terrain-format.md.
   @tile_ocean_strict 601
   # Shore, requiring non-Ocean/Shore specifically to its SouthEast.
   @tile_shore 2
@@ -39,7 +41,7 @@ defmodule Mirror.TerrainTypeTest do
       refute TerrainType.matches?(@tile_ocean_loose, %{0 => :grass, center: :ocean})
     end
 
-    test "the strict-ocean variant rejects a Shore neighbour the loose one accepts" do
+    test "the ported table's sparkle-ocean tile rejects a Shore neighbour the loose one accepts" do
       assert TerrainType.matches?(@tile_ocean_loose, %{0 => :shore, center: :ocean})
       refute TerrainType.matches?(@tile_ocean_strict, %{0 => :shore, center: :ocean})
     end
