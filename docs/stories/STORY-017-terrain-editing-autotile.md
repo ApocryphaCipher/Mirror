@@ -45,7 +45,12 @@ neighbour-mask → tile table (with rotation flags). We have bypassed binary dec
    three fresh worlds on 2026-10-04; see `docs/reference/classic-terrain-format.md`'s
    `TERRTYPE.LBX` section. Item 2 is closed. For painting, ocean is tile 0,
    or 601 about 20% of the time.
-3. **Tools**:
+3. **Tools** (engine done, editor integration open: `Mirror.TerrainPaint`
+   resolves a painted type to tiles with brush and fill helpers, tested on
+   real maps; still to do: one undo step that covers terrain and landmass
+   together, the tool in the LiveView and palette, warnings for the
+   `skipped` / `unresolved` / `stale` cells it reports, and smoothing of
+   impossible coastlines):
    - *Paint type* (brush / fill): set types, then re-resolve the painted
      tiles and their 8 neighbours. **Keep a neighbour's existing tile if it
      still matches** (the game does; checked on a live Raise Volcano, 6 of 6,

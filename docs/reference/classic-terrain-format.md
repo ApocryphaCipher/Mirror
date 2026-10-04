@@ -103,6 +103,20 @@ The ported table's `:shore` label covers coast corners, channel pieces and spark
 
 **What animates (frame diff of the 4 frames, 2026-10-04).** On the coast pieces (`34`-`49`, `146`-`161`) only about 36 of 360 pixels change, and they trace the shoreline, the band where water meets land, plus a few points just offshore: a wash of waves along the edge (Kevin's reading, matched by the pixel map). On open ocean (`601`) about 22 scattered pixels change across the whole tile, the sparkle. `31` changes 4 corner pixels; `54` and `18` change 1-4 pixels. The nodes and volcano change 35-80 pixels inside the tile. So the animated cells are three kinds: shore waves, ocean sparkle, and node / volcano effects.
 
+## Water, shore and painting a type (STORY-017)
+
+How a painted terrain *type* turns into tiles, implemented in `Mirror.TerrainPaint`:
+
+- **Shore is the water cell next to land.** A water cell (`:ocean`, `:shore`, `:lake`) is `:shore` exactly when at least one of its 8 neighbours is land, otherwise `:ocean`. Checked 2026-10-04 on the three fresh worlds: 5,925 ocean cells with all-water neighbours and 3,652 shore cells with a land neighbour, zero exceptions. A land cell never touches `:ocean` directly. So painting land or water changes the ocean/shore status of neighbouring water cells, and only the painted cells and their 8 neighbours can change type.
+- **Neighbour re-picking** follows the rule from the live casts: a neighbour keeps its tile if it still matches, else it takes the resolver's pick.
+- **Land types have neighbour rules too:** desert (164 tiles), tundra (163), hill (18) and mountain (17) pick edge variants by their own type among the neighbours; grass, forest and swamp have 3-5 tiles with no neighbour rules; rivers and lakes need river or water neighbours.
+- **Plain grass is tile 162**, the game's own choice (Change Terrain, and 162 / 172 / 173 / 180 are the grass tiles in real maps). The resolver would pick tile 1, which no real map uses (it looks like ordinary grass).
+- **Saves store tile numbers 0..761 on both planes**, so resolve with `:arcanus` for Myrror too: `resolve_tile(region, :myrror)` adds kazzmir's combined-index offset (0x2FA), which a save does not use. (The whole-save test resolves Myrror with `:myrror`, so its Myrror tiles are always counted as "valid variants", never as exact matches.)
+- **Impossible coastlines.** Some land/water shapes have no shore tile: the game's table only covers the patterns its generator makes (on real maps, 69 of 1,047 random paints that changed anything, 6.6%, left at least one shore cell with no matching tile: 2% at brush size 1, 12% at size 5). `TerrainPaint` leaves such cells as they were and reports them as `stale`; a painted cell with no fitting tile is left unpainted and reported as `unresolved`. Smoothing the shape automatically is not done.
+- **Not painted:** rivers, lakes, nodes, volcanoes and the polar rows (reported as `skipped`).
+
+Checked on 1,200 random brushes (every kind, sizes 1, 3, 5) over the three worlds and `SAVE1.GAM`: painted cells always got the requested kind, the ocean/shore rule was never broken, repeating a paint never changed anything, and every newly invalid tile was one reported as `stale`.
+
 ## Landmass layer (save `0x4D98`, RAM `0x74DC0`)
 
 Two planes of 2,400 bytes. Decoded 2026-10-04 from the fresh worlds, the older vault dumps and the saves: 12 distinct valid maps, 24 plane-maps. `Mirror.Landmass` implements it.
