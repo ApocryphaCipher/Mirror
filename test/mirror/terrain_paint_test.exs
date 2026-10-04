@@ -56,6 +56,13 @@ defmodule Mirror.TerrainPaintTest do
         do: {x, y}
   end
 
+  # A 9x9 grass island has its west coast at x = 26: cutting a bay into it at
+  # x = 26 is a paint that resolves, with column 27 just inside the coast.
+  defp island_with({x, y}, tile) do
+    {grass, _} = paint(ocean_plane(), TerrainPaint.brush_cells(30, 20, 9), :grass)
+    elem(MMap.put_tile_u16_le(grass, x, y, tile), 0)
+  end
+
   describe "brush_cells/3" do
     test "odd square brushes centred on the cell" do
       assert TerrainPaint.brush_cells(10, 10, 1) == [{10, 10}]
@@ -172,6 +179,53 @@ defmodule Mirror.TerrainPaintTest do
       cells = [{10, 0}, {10, 1}, {10, 38}, {10, 39}]
       assert %{changes: [], skipped: skipped} = TerrainPaint.paint(ocean_plane(), cells, :grass)
       assert Enum.sort(skipped) == cells
+    end
+
+    test "a skipped cell in the brush is never changed, even beside a painted cell" do
+      for {tile, name} <- [{@river, "river"}, {@lake, "lake"}, {@node, "node"}, {179, "volcano"}] do
+        base = island_with({27, 20}, tile)
+        {after_, result} = paint(base, [{26, 20}, {27, 20}], :water)
+
+        assert {27, 20} in result.skipped, name
+        assert MMap.get_tile_u16_le(after_, 27, 20) == tile, name
+        refute Enum.any?(result.changes, fn {x, y, _, _} -> {x, y} == {27, 20} end), name
+        assert type(after_, 26, 20) == :shore, name
+      end
+    end
+
+    test "a skipped cell that stops matching is reported as stale, not fixed" do
+      base = island_with({27, 20}, @river)
+      {after_, result} = paint(base, [{26, 20}, {27, 20}], :water)
+
+      newly_invalid =
+        TerrainType.matches?(@river, region(base, 27, 20)) and
+          not TerrainType.matches?(@river, region(after_, 27, 20))
+
+      assert {27, 20} in result.stale == newly_invalid
+    end
+
+    test "polar-row cells in the brush are never changed" do
+      # (30, 1) is a polar row, (30, 2) is paintable; land at (30, 2) means the
+      # ocean tile above it no longer matches, yet it must not change.
+      {after_, result} = paint(ocean_plane(), [{30, 1}, {30, 2}], :grass)
+
+      assert {30, 1} in result.skipped
+      assert MMap.get_tile_u16_le(after_, 30, 1) == @ocean
+      assert {30, 1} in result.stale
+      assert type(after_, 30, 2) == :grass
+    end
+
+    test "a protected cell that is only a neighbour of the brush may be re-tiled; if it still does not match it is reported" do
+      base = island_with({27, 20}, @river)
+      {after_, result} = paint(base, [{26, 20}], :water)
+
+      refute {27, 20} in result.skipped
+      new_tile = MMap.get_tile_u16_le(after_, 27, 20)
+      matched_before = TerrainType.matches?(@river, region(base, 27, 20))
+
+      # what changed is valid; what could not be fixed and used to match is reported
+      assert TerrainType.matches?(new_tile, region(after_, 27, 20)) or
+               not matched_before or {27, 20} in result.stale
     end
 
     test "a cell that already has the requested kind is a no-op, not skipped" do

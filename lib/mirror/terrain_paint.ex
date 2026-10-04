@@ -11,10 +11,13 @@ defmodule Mirror.TerrainPaint do
 
     * A cell is **water** (`:ocean`, `:shore`, `:lake`) or **land** (every other
       type). Painting chooses water or one land type for a cell.
-    * Water splits into `:ocean` and `:shore` mechanically: a water cell is
-      `:shore` if any of its 8 neighbours is land, otherwise `:ocean` (held for
-      every one of 9,577 water cells on three fresh worlds). So painting land or
-      water can turn neighbouring water cells between ocean and shore.
+    * Open water is `:ocean` or `:shore`, decided mechanically: it is `:shore` if
+      any of its 8 neighbours is land, otherwise `:ocean` (held for every one of
+      9,577 ocean and shore cells on three fresh worlds). So painting land or
+      water can turn neighbouring open water between ocean and shore. A lake
+      next to open water counts as water for this test (lakes were too rare in
+      the data to test that), and a lake itself keeps its type: it is protected
+      and never becomes ocean or shore.
     * Only the painted cells and their 8 neighbours can change type. Beyond
       that, a cell's tile is re-picked **only if it no longer matches** its
       neighbourhood, and then to the first valid tile (`TerrainType.resolve_tile/2`).
@@ -26,8 +29,12 @@ defmodule Mirror.TerrainPaint do
   ## Not painted (reported as `skipped`)
 
   Rivers, lakes, the three node types and volcanoes, and the polar rows
-  (0, 1, 38, 39). Their tiles have rules tied to each other (a river needs river
-  or water neighbours) that this first version does not try to keep.
+  (0, 1, 38, 39). A cell in your brush that is one of these is **never changed**,
+  not even by a painted cell next to it; if it stops matching it is left as it was
+  and reported in `stale`. Such a cell that is only a *neighbour* of the brush
+  (not in it) is re-tiled like any other neighbour when its tile stops matching:
+  freezing those too raised the share of paints with a stale or unresolved cell
+  on real maps from 17.5% to 22.6%.
 
   Both planes store tile numbers 0..761, so resolution always uses `:arcanus`
   (`resolve_tile/2`'s `:myrror` adds kazzmir's combined-index offset, which a
@@ -113,10 +120,12 @@ defmodule Mirror.TerrainPaint do
   (`{x, y, previous, new}`, ready for the editor's undo history) and what was
   not done:
 
-    * `skipped`: painted cells left alone (protected type or polar row);
+    * `skipped`: cells you asked to paint but that are protected (see the
+      module doc); they are never changed;
     * `unresolved`: painted cells no tile fits, so they were left unpainted;
-    * `stale`: neighbours whose tile no longer matches but for which no tile fits
-      either, left as they were.
+    * `stale`: neighbours that matched before the paint, no longer do, and were
+      left as they were: no tile fits, or the cell is protected / in a polar row.
+      (Tiles that already did not match are not reported.)
   """
   @spec paint(binary(), [cell()], atom()) :: result()
   def paint(terrain, cells, kind) when kind in @kinds do
@@ -127,8 +136,9 @@ defmodule Mirror.TerrainPaint do
   # Cells no tile fits are dropped and the paint is re-run without them, so the
   # result is always consistent for the cells that were painted.
   defp run(terrain, targets, kind, skipped, unresolved) do
-    types = new_types(terrain, targets, kind)
-    {changes, stale, bad} = tiles(terrain, types, targets)
+    frozen = MapSet.new(skipped)
+    types = new_types(terrain, targets, kind, frozen)
+    {changes, stale, bad} = tiles(terrain, types, targets, frozen)
 
     if bad == [] do
       %{
@@ -143,11 +153,11 @@ defmodule Mirror.TerrainPaint do
   end
 
   defp split_targets(terrain, cells, kind) do
-    Enum.reduce(cells, {[], []}, fn {_x, y} = cell, {ok, skipped} ->
+    Enum.reduce(cells, {[], []}, fn cell, {ok, skipped} ->
       type = type_at(terrain, %{}, cell)
 
       cond do
-        y in @polar_rows or type in @protected or type == nil -> {ok, [cell | skipped]}
+        locked?(terrain, cell) -> {ok, [cell | skipped]}
         kind_of(type) == kind -> {ok, skipped}
         true -> {[cell | ok], skipped}
       end
@@ -157,9 +167,9 @@ defmodule Mirror.TerrainPaint do
 
   # The type of every cell whose type can change: the painted cells and their
   # 8 neighbours. Painted water starts as ocean and is settled below.
-  defp new_types(terrain, targets, kind) do
+  defp new_types(terrain, targets, kind, frozen) do
     painted = Map.new(targets, &{&1, if(kind == :water, do: :ocean, else: kind)})
-    ring = for cell <- targets, n <- neighbours(cell), do: n
+    ring = for cell <- targets, n <- neighbours(cell), not MapSet.member?(frozen, n), do: n
 
     Enum.reduce(ring, painted, fn cell, acc ->
       Map.put_new_lazy(acc, cell, fn -> type_at(terrain, %{}, cell) end)
@@ -190,7 +200,7 @@ defmodule Mirror.TerrainPaint do
   end
 
   # Re-picks tiles over the painted cells and everything within 2 of them.
-  defp tiles(terrain, types, targets) do
+  defp tiles(terrain, types, targets, frozen) do
     check =
       for cell <- targets,
           dy <- -2..2,
@@ -213,18 +223,48 @@ defmodule Mirror.TerrainPaint do
       region = Map.put(region, :center, type)
 
       cond do
+        MapSet.member?(frozen, cell) ->
+          if TerrainType.matches?(old, region) or not matched_before?(terrain, cell, old),
+            do: {changes, stale, bad},
+            else: {changes, [cell | stale], bad}
+
         not is_painted and not type_changed and TerrainType.matches?(old, region) ->
           {changes, stale, bad}
 
         true ->
           case pick(region, type) do
-            nil when is_painted -> {changes, stale, [cell | bad]}
-            nil -> {changes, [cell | stale], bad}
-            ^old -> {changes, stale, bad}
-            new -> {[{x, y, old, new} | changes], stale, bad}
+            nil when is_painted ->
+              {changes, stale, [cell | bad]}
+
+            nil when not is_painted ->
+              {changes, stale_if_newly_invalid(stale, terrain, cell, old), bad}
+
+            ^old ->
+              {changes, stale, bad}
+
+            new ->
+              {[{x, y, old, new} | changes], stale, bad}
           end
       end
     end)
+  end
+
+  # A tile that already did not match before the paint is not our doing: it is
+  # not reported.
+  defp matched_before?(terrain, cell, old) do
+    region = Map.put(region(terrain, %{}, cell), :center, type_at(terrain, %{}, cell))
+    TerrainType.matches?(old, region)
+  end
+
+  defp stale_if_newly_invalid(stale, terrain, cell, old) do
+    if matched_before?(terrain, cell, old), do: [cell | stale], else: stale
+  end
+
+  # Cells that cannot be painted: protected types, the polar rows, and unknown
+  # tile numbers.
+  defp locked?(terrain, {_x, y} = cell) do
+    type = type_at(terrain, %{}, cell)
+    y in @polar_rows or type == nil or type in @protected
   end
 
   defp pick(region, type) do
