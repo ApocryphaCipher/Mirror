@@ -41,6 +41,7 @@ defmodule Mirror.TerrainPaint do
   save does not use).
   """
 
+  alias Mirror.Editor
   alias Mirror.Engine.Topology
   alias Mirror.Map, as: MMap
   alias Mirror.TerrainType
@@ -86,14 +87,21 @@ defmodule Mirror.TerrainPaint do
 
   @doc """
   The connected cells (4-way, x wraps) that have the same kind as `{x, y}`:
-  water (ocean and shore together) or one land type. Protected cells give `[]`.
+  water (ocean and shore together) or one land type. Protected cells (see the
+  module doc) are never in the result and a flood does not pass through them; a
+  protected seed gives `[]`.
   """
   @spec fill_cells(binary(), integer(), integer()) :: [cell()]
   def fill_cells(terrain, x, y) do
-    kind = kind_of(type_at(terrain, %{}, {x, y}))
+    if Editor.valid_coord?(x, y) do
+      seed = {x, y}
+      kind = kind_of(type_at(terrain, %{}, seed))
 
-    if kind in @kinds do
-      flood(terrain, kind, [{x, y}], MapSet.new([{x, y}]))
+      if kind in @kinds and not locked?(terrain, seed) do
+        flood(terrain, kind, [seed], MapSet.new([seed]))
+      else
+        []
+      end
     else
       []
     end
@@ -109,6 +117,7 @@ defmodule Mirror.TerrainPaint do
           ny in 0..(@height - 1),
           cell = {MMap.wrap_x(x + dx), ny},
           not MapSet.member?(seen, cell),
+          not locked?(terrain, cell),
           kind_of(type_at(terrain, %{}, cell)) == kind,
           do: cell
 

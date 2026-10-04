@@ -234,14 +234,26 @@ defmodule Mirror.TerrainPaintTest do
   end
 
   describe "fill_cells/3" do
-    test "fills the connected cells of the same kind" do
+    test "fills the connected cells of the same kind, leaving out protected cells" do
       {map, _} = paint(ocean_plane(), TerrainPaint.brush_cells(30, 20, 5), :grass)
 
       island = TerrainPaint.fill_cells(map, 30, 20)
       assert length(island) == 25
-      # water (ocean and shore together) is everything else
+      # the sea is everything else except the 4 polar rows (4 * 60 cells)
       sea = TerrainPaint.fill_cells(map, 10, 10)
-      assert length(sea) == 2400 - 25
+      assert length(sea) == 2400 - 25 - 4 * 60
+      refute Enum.any?(sea, fn {_x, y} -> y in [0, 1, 38, 39] end)
+    end
+
+    test "a seed in a polar row fills nothing, even on an all-ocean plane" do
+      for seed <- [{0, 0}, {10, 1}, {59, 38}, {30, 39}] do
+        assert TerrainPaint.fill_cells(ocean_plane(), elem(seed, 0), elem(seed, 1)) == []
+      end
+    end
+
+    test "a seed off the map fills nothing" do
+      assert TerrainPaint.fill_cells(ocean_plane(), 60, 10) == []
+      assert TerrainPaint.fill_cells(ocean_plane(), 10, -1) == []
     end
 
     test "a protected cell fills nothing" do
