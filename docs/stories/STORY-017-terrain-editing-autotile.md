@@ -52,12 +52,11 @@ neighbour-mask → tile table (with rotation flags). We have bypassed binary dec
      and a Change Terrain, 4 of 4, changed neighbours identical to the
      resolver's pick, see
      `docs/reference/classic-terrain-format.md`).
-     **Prerequisite:** `TerrainType.matches?` still rejects sparkle-ocean
-     tile 601 beside shore, but the game stores it there (513 of 1,213 live
-     601 tiles have a non-ocean neighbour). Applied as written, this rule
-     would replace valid 601 neighbours with tile 0. Before relying on
-     `matches?` as the validity check, treat 0 and 601 as interchangeable
-     ocean (or special-case ocean-type neighbours) and cover it with a test.
+     **Done:** `TerrainType.matches?` now treats sparkle-ocean 601 like tile 0
+     (the game places 601 over any ocean, even beside shore: 513 of 1,213
+     live 601 tiles have a non-ocean neighbour), so the keep-if-valid rule
+     no longer swaps valid 601 neighbours for tile 0. `resolve_tile/2` still
+     returns 0 for ocean; using 601 for ~20% of painted ocean is cosmetic.
    - *Cycle picture* (MMS "L/R"): step through variants of the same type
      without changing the type.
    - *Stamp exact tile*: pick from a tile palette, or eyedrop any tile on

@@ -79,8 +79,21 @@ defmodule Mirror.TerrainType do
   defp do_terrain_type(_), do: nil
   defp tile_rules(_), do: nil
 
+  # Tile 601 is the animated "sparkle" ocean. The game scatters it at random over
+  # ordinary ocean (~20% of ocean tiles, including tiles beside shore), so it has
+  # no rules of its own: checked live 2026-10-04, tile 0's rules accept all 1,213
+  # real 601 tiles (3 worlds, both planes), while kazzmir's strict rule for 601
+  # accepts only 700 of them. See docs/reference/classic-terrain-format.md.
+  @sparkle_ocean 601
+  @plain_ocean 0
+
   @doc """
   Checks if `tile_number` is compatible with the given `region`.
+
+  The sparkle-ocean tile (601) is checked with plain ocean's rules (tile 0),
+  because the game places it over any ocean tile regardless of neighbours. So
+  `matches?(601, region) == matches?(0, region)`. `resolve_tile/2` still returns
+  tile 0 for ocean; swapping some of those for 601 is a separate, cosmetic choice.
 
   `region` is a map of direction -> terrain type atom. Directions can be `0..7`
   (for N, NE, E, etc. per `Mirror.Engine.Topology`) or `:center`.
@@ -94,11 +107,14 @@ defmodule Mirror.TerrainType do
     # Normalize tile number to Arcanus base
     base_tile = if tile_number >= 0x2FA, do: tile_number - 0x2FA, else: tile_number
 
-    case tile_rules(base_tile) do
+    case tile_rules(canonical_tile(base_tile)) do
       nil -> false
       rules -> matches_rules?(rules, region)
     end
   end
+
+  defp canonical_tile(@sparkle_ocean), do: @plain_ocean
+  defp canonical_tile(tile), do: tile
 
   defp matches_rules?(rules, region) do
     Enum.all?(region, fn {dir, actual_type} ->
