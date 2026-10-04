@@ -2,11 +2,14 @@
 
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
 **Status:** open. Phase 1 (core lookup and resolve engine, item 1 below)
-is done; item 2's polar-edge gap is resolved (see item 2) and the
-correctness test's remaining unexplained mismatches are explained: they
-are the randomly placed animated "sparkle" ocean, tile 601 (live check
-2026-10-04). Phase 2 (editor tools
-and UI, items 3–4) remains untouched.
+is done, and item 2 is closed: the polar-edge gap and the sparkle-ocean
+mismatches are explained (live checks, 2026-09-28 and 2026-10-04). Phase 2
+has started: the paint engine (`Mirror.TerrainPaint`, item 3's brush and fill)
+and the landmass rule (`Mirror.Landmass`) are done. Still open: the editor
+integration (one undo step covering terrain and landmass), the tools and
+palette in the UI, the cycle and stamp tools, and smoothing of impossible
+coastlines. Item 4 is handled for now by exclusion: rivers, lakes, nodes and
+volcanoes are not painted (see item 4).
 **Size:** large
 
 ## Why this is the interesting one
@@ -45,7 +48,12 @@ neighbour-mask → tile table (with rotation flags). We have bypassed binary dec
    three fresh worlds on 2026-10-04; see `docs/reference/classic-terrain-format.md`'s
    `TERRTYPE.LBX` section. Item 2 is closed. For painting, ocean is tile 0,
    or 601 about 20% of the time.
-3. **Tools**:
+3. **Tools** (engine done, editor integration open: `Mirror.TerrainPaint`
+   resolves a painted type to tiles with brush and fill helpers, tested on
+   real maps; still to do: one undo step that covers terrain and landmass
+   together, the tool in the LiveView and palette, warnings for the
+   `skipped` / `unresolved` / `stale` cells it reports, and smoothing of
+   impossible coastlines):
    - *Paint type* (brush / fill): set types, then re-resolve the painted
      tiles and their 8 neighbours. **Keep a neighbour's existing tile if it
      still matches** (the game does; checked on a live Raise Volcano, 6 of 6,
@@ -61,8 +69,11 @@ neighbour-mask → tile table (with rotation flags). We have bypassed binary dec
      without changing the type.
    - *Stamp exact tile*: pick from a tile palette, or eyedrop any tile on
      either plane (MMS "Alt-F3/F4") and stamp it verbatim.
-4. Rivers and node/volcano tiles: check how the game encodes them in
-   `TERRTYPE`, and handle them or explicitly exclude them.
+4. Rivers and node/volcano tiles: **excluded for now.** `TerrainPaint`
+   never paints or changes rivers, lakes, nodes or volcanoes in the brush
+   (reported as `skipped`), because their tiles have rules tied to each other.
+   Painting beside them often leaves a tile that cannot be fixed (52% of
+   paints that touch one), so supporting them properly is future work.
 
 ## Continents (landmass layer)
 
