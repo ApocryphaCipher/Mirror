@@ -255,8 +255,9 @@ defmodule Mirror.Editor do
   **single undo step** (so undo and redo restore every layer together).
 
   `edits` is a list of `{layer, [{x, y, value}]}`, for example terrain tiles plus
-  the landmass IDs that go with them. The first layer that actually changes is the
-  entry's main layer; the others ride along in its `:also` list.
+  the landmass IDs that go with them. If a layer lists the same tile more than
+  once, the last value wins. The first layer that actually changes is the entry's
+  main layer; the others ride along in its `:also` list.
 
   Returns `{state, :none}` when nothing changed, otherwise
   `{updated_state, {:applied, entry, layers}}` where `layers` is a list of
@@ -266,6 +267,8 @@ defmodule Mirror.Editor do
   def apply_compound(state, plane, edits) when is_list(edits) do
     {next_state, layers} =
       Enum.reduce(edits, {state, []}, fn {layer, tile_edits}, {acc_state, acc_layers} ->
+        tile_edits = last_value_per_tile(tile_edits)
+
         {st, changes, updates} =
           Enum.reduce(tile_edits, {acc_state, [], []}, fn {x, y, value}, {s, cs, us} ->
             case apply_tile(s, plane, layer, x, y, value) do
@@ -306,6 +309,18 @@ defmodule Mirror.Editor do
 
         {updated_state, {:applied, entry, layers}}
     end
+  end
+
+  # Several edits to one tile in a single step collapse to the last value, so the
+  # recorded change is original -> final and undo restores the original.
+  defp last_value_per_tile(tile_edits) do
+    {order, values} =
+      Enum.reduce(tile_edits, {[], %{}}, fn {x, y, value}, {order, values} ->
+        order = if Map.has_key?(values, {x, y}), do: order, else: [{x, y} | order]
+        {order, Map.put(values, {x, y}, value)}
+      end)
+
+    for {x, y} = key <- Enum.reverse(order), do: {x, y, Map.fetch!(values, key)}
   end
 
   @doc """

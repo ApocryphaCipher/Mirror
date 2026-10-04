@@ -325,6 +325,32 @@ defmodule Mirror.EditorTest do
       assert Editor.tile_value(state, :arcanus, :landmass, 6, 5) == 3
     end
 
+    test "a tile listed twice in one layer collapses to its last value, so undo restores the original" do
+      base = make_paint_state()
+
+      {state, {:applied, entry, [terrain | _]}} =
+        Editor.apply_compound(base, :arcanus, [
+          {:terrain, [{5, 5, 100}, {6, 5, 7}, {5, 5, 200}]},
+          {:landmass, [{5, 5, 3}, {5, 5, 4}]}
+        ])
+
+      assert Editor.tile_value(state, :arcanus, :terrain, 5, 5) == 200
+      assert Editor.tile_value(state, :arcanus, :landmass, 5, 5) == 4
+      assert entry.changes == [{5, 5, 0, 200}, {6, 5, 0, 7}]
+      assert terrain.changes == entry.changes
+      assert [%{layer: :landmass, changes: [{5, 5, 0, 4}]}] = entry.also
+
+      {undone, _} = Editor.undo(state, :arcanus)
+      assert undone.planes == base.planes
+    end
+
+    test "edits that net out to no change record nothing" do
+      base = make_paint_state()
+
+      assert {^base, :none} =
+               Editor.apply_compound(base, :arcanus, [{:terrain, [{5, 5, 0}, {5, 5, 0}]}])
+    end
+
     test "apply_compound with nothing to change is :none and leaves history alone" do
       state = make_paint_state()
 
