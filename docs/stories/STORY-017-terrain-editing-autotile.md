@@ -11,8 +11,9 @@ neighbouring tiles re-tile as you paint, the landmass layer is kept in step, and
 drag is one undo step (`Mirror.TerrainPaint`, `Mirror.Landmass`,
 `Editor.paint_type/5`, `MirrorWeb.PaintTool`). Still open: the stamp / eyedrop-tile
 tool, smoothing of impossible coastlines, and painting rivers, lakes, nodes and
-volcanoes (item 4 is handled by exclusion: they are not painted). Not checked yet:
-that the real game accepts a save with a repainted landmass layer.
+volcanoes (item 4 is handled by exclusion: they are not painted). Checked in the
+real game (2026-10-04): a save painted with the tool loads with its memory identical to
+the file and the new island draws correctly; a turn change has not been observed yet.
 **Size:** large
 
 ## Why this is the interesting one

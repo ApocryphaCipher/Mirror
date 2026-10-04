@@ -181,8 +181,10 @@ These all bit a previous session:
   decoded (`Mirror.Landmass`, docs/reference/classic-terrain-format.md) and
   `Editor.paint_type/4` keeps the IDs right for a painted type, as one undo
   step with the terrain. Wiring the raw tools to the same repair remains open
-  in STORY-017 and STORY-029 (see also STORY-021 for round-trip safety). That
-  a repaired layer is accepted by the real game has not been checked yet.
+  in STORY-017 and STORY-029 (see also STORY-021 for round-trip safety). A save
+  with a repainted landmass layer loads in the real game with its memory identical
+  to the file (checked 2026-10-04); what a turn change does to it has not been
+  observed yet.
 - Don't leave test edits in a save someone else is using.
 
 ## 10. Testing
