@@ -90,9 +90,9 @@ Entry 1 marks 42 tiles on plane 0 as animated (4 frames each) and 37 on plane 1:
 | --- | --- | --- |
 | `601` | Sparkle ocean, placed at random (~20% of ocean) | See above |
 | `31`, `32`, `33` | Ocean with a bright sparkle dot at a tile corner. `32` and `33` are the centre of a small enclosed pond | Sprites. `31`: ocean E, S and SE in ~83% of 202 tiles. `33` (live 2026-10-04, Arcanus x=48 y=29): N `84`, W `83`, E `85`, S `82`, all four diagonals land, so a plus-shaped pond with `82`-`85` as its four arms. `32` (two maps): N `84` and W `83` again, other sides other coast pieces, no plain ocean next to it |
-| `34`-`49` | Coast, convex corner, 4 groups of 4 variants (SE: 34-37, NW: 38-41, SW: 42-45, NE: 46-49) | Sprites; only the named diagonal neighbour is ocean (50-90% of tiles) |
+| `34`-`49` | Shoreline-wave coast, convex corner, 4 groups of 4 variants (SE: 34-37, NW: 38-41, SW: 42-45, NE: 46-49) | Sprites; only the named diagonal neighbour is ocean (50-90% of tiles) |
 | `54` | Narrow water channel running east-west, with land on both sides | Sprite; four tiles in three fresh maps, each with a coast-family tile to the west and east (e.g. `50` / `110`, `95` / `111`, `95` / `110`), so a run of east-west channel pieces |
-| `146`-`161` | Coast pieces (rendered as curved coasts, a few with a corner dot); rare in fresh maps | Sprites. Placement rule not worked out (*guess:* coast variants that carry a sparkle corner) |
+| `146`-`161` | Shoreline-wave coast pieces, like `34`-`49` (curved coasts); rare in fresh maps | Frame diff (below). Which coastline shapes get these over the static coast pieces is not worked out |
 | `168` | Sorcery node (blue pond) | Sprite and ~20 per plane across 3 worlds |
 | `169` | Nature node (sparkling green) | Same |
 | `170` | Chaos node (red crater) | Same |
@@ -100,6 +100,8 @@ Entry 1 marks 42 tiles on plane 0 as animated (4 frames each) and 37 on plane 1:
 | `18` | Lake (a pond with a green rim) | Sprite only; never seen in 140 maps |
 
 The ported table's `:shore` label covers coast corners, channel pieces and sparkle pieces alike, so it is too coarse to pick animation by.
+
+**What animates (frame diff of the 4 frames, 2026-10-04).** On the coast pieces (`34`-`49`, `146`-`161`) only about 36 of 360 pixels change, and they trace the shoreline, the band where water meets land, plus a few points just offshore: a wash of waves along the edge (Kevin's reading, matched by the pixel map). On open ocean (`601`) about 22 scattered pixels change across the whole tile, the sparkle. `31` changes 4 corner pixels; `54` and `18` change 1-4 pixels. The nodes and volcano change 35-80 pixels inside the tile. So the animated cells are three kinds: shore waves, ocean sparkle, and node / volcano effects.
 
 ## Where the files come from
 

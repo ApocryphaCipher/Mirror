@@ -12,7 +12,7 @@
   generation, so the animated cell list can be computed once per load.
   Evidence and numbers: `docs/reference/classic-terrain-format.md`.
 - 42 plane-0 tiles are animated in all (37 on plane 1), and most are not
-  ocean: coast corners (34-49, 146-161), a channel piece (54), the
+  ocean: shoreline-wave coast pieces (34-49, 146-161), a channel piece (54), the
   node tiles (168-170), the volcano (179) and the lake (18), plus three
   ocean sparkle pieces (31-33) beside 601. Table with the evidence in
   `docs/reference/classic-terrain-format.md`.
@@ -31,9 +31,10 @@
 - Pause the clock when the tab is hidden, and add a UI toggle
   ("Animate terrain").
 - ~~List the animated tile numbers in [../reference/classic-terrain-format.md](../reference/classic-terrain-format.md)~~
-  (listed and identified). Still open: confirm tile 18 (lake) in a real map
-  (never seen outside the sprite sheet; 179 is now confirmed as the volcano), and the placement rule for
-  146-161.
+  (listed and identified). Still open, both low priority because they already
+  look right in the map viewer: confirm tile 18 (lake) in a real map (only
+  seen as a sprite; 179 is confirmed as the volcano), and which coastline
+  shapes get the wave pieces (146-161) rather than static coast.
 
 ## Definition of done
 
