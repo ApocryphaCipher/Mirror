@@ -215,6 +215,23 @@ defmodule Mirror.LandmassTest do
       assert MMap.get_tile_u8(full.arcanus, 30, 30) == 1
     end
 
+    test "only: ignores repeated planes and rejects unknown ones" do
+      # 255 landmasses on Arcanus is the most the layer can number; a repeated plane
+      # must not double that and fail.
+      islands = for x <- 0..58//2, y <- 2..36//2, do: {x, y}
+      many = Map.new(Enum.take(islands, 255), &{&1, @grass})
+      t = planes(terrain(many), terrain(%{}))
+      l = planes(lm(%{}), lm(%{}))
+
+      assert {:ok, once} = Landmass.repair(t, l, only: :arcanus)
+      assert {:ok, ^once} = Landmass.repair(t, l, only: [:arcanus, :arcanus])
+      assert Landmass.violations(t, once |> Map.put(:myrror, lm(%{}))) == []
+
+      assert_raise ArgumentError, ~r/unknown plane/, fn ->
+        Landmass.repair(t, l, only: [:arcanus, :nowhere])
+      end
+    end
+
     test "runs out of IDs only past 255 landmasses" do
       many = for x <- 0..58//2, y <- 2..37//2, into: %{}, do: {{x, y}, @grass}
       assert map_size(many) > 255

@@ -173,16 +173,22 @@ defmodule Mirror.Landmass do
   the rule comes back unchanged.
 
   With `only: :arcanus` (or `:myrror`, or a list) just those planes are
-  recomputed: the other plane's layer is returned exactly as given and its IDs are
-  treated as taken, so an edit on one plane can never reuse or reassign an ID
-  that the other plane carries, even if that plane is itself inconsistent.
+  recomputed (repeats are ignored; an unknown plane raises `ArgumentError`): the
+  other plane's layer is returned exactly as given and its IDs are treated as
+  taken, so an edit on one plane can never reuse or reassign an ID that the other
+  plane carries, even if that plane is itself inconsistent.
 
   Returns `{:error, :out_of_ids}` if more than 255 landmasses would be needed.
   """
   @spec repair(plane_bins(), plane_bins(), keyword()) ::
           {:ok, plane_bins()} | {:error, :out_of_ids}
   def repair(terrain, landmass, opts \\ []) do
-    fix = opts |> Keyword.get(:only, @planes) |> List.wrap()
+    fix = opts |> Keyword.get(:only, @planes) |> List.wrap() |> Enum.uniq()
+
+    case fix -- @planes do
+      [] -> :ok
+      unknown -> raise ArgumentError, "unknown plane(s) in only: #{inspect(unknown)}"
+    end
 
     reserved =
       for plane <- @planes -- fix,
