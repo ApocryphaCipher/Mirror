@@ -103,6 +103,19 @@ The ported table's `:shore` label covers coast corners, channel pieces and spark
 
 **What animates (frame diff of the 4 frames, 2026-10-04).** On the coast pieces (`34`-`49`, `146`-`161`) only about 36 of 360 pixels change, and they trace the shoreline, the band where water meets land, plus a few points just offshore: a wash of waves along the edge (Kevin's reading, matched by the pixel map). On open ocean (`601`) about 22 scattered pixels change across the whole tile, the sparkle. `31` changes 4 corner pixels; `54` and `18` change 1-4 pixels. The nodes and volcano change 35-80 pixels inside the tile. So the animated cells are three kinds: shore waves, ocean sparkle, and node / volcano effects.
 
+## Landmass layer (save `0x4D98`, RAM `0x74DC0`)
+
+Two planes of 2,400 bytes. Decoded 2026-10-04 from the fresh worlds, the older vault dumps and the saves: 12 distinct valid maps, 24 plane-maps. `Mirror.Landmass` implements it.
+
+- **Land** is any tile whose type is not `:ocean`, `:shore` or `:lake`, outside the polar rows (0, 1, 38, 39). Rivers, nodes and volcanoes are land. **Everything else is ID 0** (ocean, coast, lakes and the polar tundra rows; this is most likely where the "340 land tiles with ID 0" in STORY-029's first look came from; not re-counted on SAVE1).
+- **One non-zero ID per landmass.** Land tiles are in the same landmass when they touch in any of the **8** directions, x wrapping around the map and y not. With 8-way connectivity no landmass ever carried two IDs; with 4-way connectivity IDs span several regions, so diagonals count.
+- **IDs are unique across both planes** (no ID appears on both Arcanus and Myrror). A single-tile island, such as a lone node, has its own ID.
+- **The numbering is arbitrary** (gaps such as 1, 13, 28, 33, 34; up to about 44 on a fresh map).
+- **The game does not change the layer in play.** Zero bytes changed across five turns (3 worlds), the Raise Volcano cast and the Change Terrain cast.
+- The two combat checkpoints (cp29, cp30) look like violations but are not: the game reuses that memory in battle (terrain reads as garbage there), so they were excluded.
+
+Not established (*guess*): that the polar boundary is by row rather than by tile type (every polar tile on the checked maps is tundra or coast, so both agree); what the game reads the layer for; and how the game itself would number a landmass after a land/water edit, because none of the events we caused turns land into water. For edits Mirror therefore keeps the invariant above and reuses IDs where it can (`Mirror.Landmass.repair/2`). We have not loaded a repaired save in the game to see that it is accepted.
+
 ## Where the files come from
 
 The `MAGIC.zip` install at `~/.mirror_assets/MAGIC` is **not** a complete

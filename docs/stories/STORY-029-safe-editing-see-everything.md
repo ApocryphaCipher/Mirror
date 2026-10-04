@@ -43,7 +43,17 @@ First look at `SAVE1.GAM` (quick script, not yet rigorous):
   small islands get `0`, and/or the IDs come from map generation and are
   never recomputed.
 
-**Research first:** work out the real rule (MoM modding docs; momedit; and
+**Rule decoded (2026-10-04):** land = not ocean/shore/lake and not in a
+polar row (0, 1, 38, 39); 8-way connectivity with x wrap; one non-zero ID per
+landmass, unique across both planes; everything else 0. It held on every
+valid map checked. The "first look" bullets above were a rough guess; the
+~340 land tiles with ID 0 are most likely the polar tundra rows (not re-counted on SAVE1), and a flood fill that
+includes diagonals gives exactly one ID per region. Implemented in
+`Mirror.Landmass` (`violations/2` is the edit checker's landmass check).
+Details and evidence: `docs/reference/classic-terrain-format.md`. Still open:
+what the game uses the layer for (see below).
+
+*Original research notes:* work out the real rule (MoM modding docs; momedit; and
 compare several saves, including one straight after map creation). Also
 find out **what the game uses it for** (AI expansion, pathing, settler
 targeting?), because that decides how much a wrong ID matters.

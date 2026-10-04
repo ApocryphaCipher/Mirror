@@ -67,9 +67,13 @@ neighbour-mask → tile table (with rotation flags). We have bypassed binary dec
 ## Continents (landmass layer)
 
 Type painting changes land ↔ water constantly, so it must also maintain
-the save's **landmass** IDs (`0x004d98`) using the game's rule, which
-isn't decoded yet (see STORY-029). Don't ship type painting that writes
-terrain without updating landmass.
+the save's **landmass** IDs (`0x004d98`). **The rule is decoded** (2026-10-04,
+see `docs/reference/classic-terrain-format.md`, "Landmass layer"):
+`Mirror.Landmass` implements it, with `violations/2` (for the STORY-029 edit
+checker) and `repair/2` (keeps IDs stable, only renumbers what an edit
+changed). **Still to do:** call `Landmass.repair/2` from the paint tool (and
+from cycle) whenever an edit can change land/water or join/split a landmass.
+Don't ship type painting that writes terrain without it.
 
 ## Definition of done
 
