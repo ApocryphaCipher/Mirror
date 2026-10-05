@@ -2,7 +2,10 @@
 """Compare the running game's memory (through the DOSBox fork's API) with a save
 file, to check what the real game made of it after you loaded it.
 
-  python3 scripts/verify_loaded_save.py ~/DOS/MAGIC/SAVE9.GAM
+  python3 scripts/verify_loaded_save.py ~/DOS/MAGIC/SAVE2.GAM
+
+(Use the slot you loaded from Load Game: slots 1-8. Slot 9 is the game's autosave
+and cannot be picked there.)
 
 Checks the wizard records, terrain, landmass, minerals, explored map and terrain
 flags. Addresses are from docs/reference/live-ram-map.md (re-check them after a

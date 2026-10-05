@@ -38,7 +38,8 @@ def main():
     ap.add_argument("--max-list", type=int, default=60)
     args = ap.parse_args()
     prev = {}
-    print("watching terrain, minerals, explored, terrain_flags; Ctrl-C to stop", flush=True)
+    names = ", ".join(name for name, _, _ in BLOCKS)
+    print(f"watching {names}; Ctrl-C to stop", flush=True)
     while True:
         try:
             cur = {name: tiles(read(addr, 2 * 2 * PLANE if width == 2 else 2 * PLANE), width)

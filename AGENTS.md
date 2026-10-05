@@ -173,7 +173,9 @@ These all bit a previous session:
   enforces this (by canonical path and device/inode) for all callers.
   **Save as** suggests the next free `SAVE1.GAM`–`SAVE9.GAM` slot (or leaves
   it empty if all 9 are taken). Arbitrary names can be written but the
-  UI warns that Master of Magic only loads `SAVE1`–`SAVE9`.
+  UI warns that Master of Magic only loads `SAVE1`–`SAVE9`. (In the game's Load
+  Game screen slot 9 is the autosave and cannot be picked, so for a save you want to
+  load, use slots 1–8; Kevin, 2026-10-04.)
 - An edit must leave the save consistent. The raw editors (Cycle, raw Paint)
   update terrain bytes and the derived adjacency mask only. They do **not**
   keep landmass/continent IDs consistent across land/water transitions;
