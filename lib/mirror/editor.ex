@@ -345,7 +345,8 @@ defmodule Mirror.Editor do
 
   Returns `{state, outcome, report}`. `report` is `%{skipped, unresolved, stale}`
   from `Mirror.TerrainPaint.paint/3` (cells not painted or left unfixed), so the
-  caller can warn. `outcome` is:
+  caller can warn, plus `landmass_out_of_step`: whether the plane's landmass layer
+  was already inconsistent before this paint (so the repair is not just this edit). `outcome` is:
 
     * `:none`: nothing changed;
     * `{:applied, entry, layers}`: as for `apply_compound/3`;
@@ -355,15 +356,23 @@ defmodule Mirror.Editor do
   The landmass IDs are recomputed for this plane only (`Mirror.Landmass.repair/3`
   with `only:`), never touching the other plane's layer. A state without landmass
   data (a fixture, say) just gets the terrain change.
+
+  Pass `stroke: id` while a brush is being dragged: every call with the same id is
+  folded into one undo step (the returned `layers` are still just this call's
+  changes, for the client), so a drag can paint live and undo in one go.
   """
-  def paint_type(state, plane, cells, kind) do
+  def paint_type(state, plane, cells, kind, opts \\ []) do
     terrain = get_in(state, [:planes, plane, :terrain])
     result = TerrainPaint.paint(terrain, cells, kind)
-    report = Map.take(result, [:skipped, :unresolved, :stale])
+
+    report =
+      result |> Map.take([:skipped, :unresolved, :stale]) |> Map.put(:landmass_out_of_step, false)
 
     if result.changes == [] do
       {state, :none, report}
     else
+      report = %{report | landmass_out_of_step: landmass_out_of_step?(state, plane)}
+
       terrain_edits = Enum.map(result.changes, fn {x, y, _prev, new} -> {x, y, new} end)
 
       case landmass_edits(state, plane, result.changes) do
@@ -371,6 +380,7 @@ defmodule Mirror.Editor do
           {next, outcome} =
             apply_compound(state, plane, [{:terrain, terrain_edits}, {:landmass, landmass_edits}])
 
+          {next, outcome} = fold_into_stroke(next, plane, outcome, Keyword.get(opts, :stroke))
           {next, outcome, report}
 
         {:error, reason} ->
@@ -379,14 +389,143 @@ defmodule Mirror.Editor do
     end
   end
 
+  # The step just recorded becomes part of stroke `id`: the first call takes the
+  # id, later calls are composed into the entry that already has it.
+  defp fold_into_stroke(state, _plane, outcome, nil), do: {state, outcome}
+  defp fold_into_stroke(state, _plane, :none, _id), do: {state, :none}
+
+  defp fold_into_stroke(state, plane, {:applied, entry, layers}, id) do
+    [%{id: new_id} = new | rest] = Map.get(state.history, plane, [])
+    true = new_id == entry.id
+
+    # The stroke's earlier entry can be anywhere (another tab may have edited in
+    # between), so it is updated in place by id, as record_stroke/4 does. But the
+    # folded changes move below any entry that came in between, so that is only
+    # sound when none of those touched the same tile: otherwise undo and redo
+    # would no longer round-trip. Then this segment stays its own entry (it takes
+    # the stroke id, so the next segment folds into it, not into the older one).
+    case Enum.find_index(rest, &(Map.get(&1, :id) == id)) do
+      nil ->
+        keep_as_stroke_entry(state, plane, new, rest, id, layers)
+
+      index ->
+        {before, [earlier | after_]} = Enum.split(rest, index)
+
+        if Enum.any?(before, &overlaps?(&1, new)) do
+          keep_as_stroke_entry(state, plane, new, rest, id, layers)
+        else
+          history =
+            case compose_entries(earlier, new, id) do
+              nil -> before ++ after_
+              composed -> before ++ [composed | after_]
+            end
+
+          {put_history(state, plane, history), {:applied, entry, layers}}
+        end
+    end
+  end
+
+  defp keep_as_stroke_entry(state, plane, new, rest, id, layers) do
+    renamed = %{new | id: id}
+    {put_history(state, plane, [renamed | rest]), {:applied, renamed, layers}}
+  end
+
+  # Do two history entries touch a common tile of a common layer?
+  defp overlaps?(a, b), do: not MapSet.disjoint?(entry_tiles(a), entry_tiles(b))
+
+  defp entry_tiles(entry) do
+    parts = [
+      {entry.layer, entry.changes} | Enum.map(Map.get(entry, :also, []), &{&1.layer, &1.changes})
+    ]
+
+    for {layer, changes} <- parts, {x, y, _prev, _new} <- changes, into: MapSet.new() do
+      {layer, x, y}
+    end
+  end
+
+  defp put_history(state, plane, history),
+    do: %{state | history: Map.put(state.history, plane, history)}
+
+  # Two entries for one stroke become one: per layer and tile, the earliest
+  # previous value and the latest new value; tiles that end where they began drop
+  # out. `nil` when nothing is left.
+  defp compose_entries(earlier, later, id) do
+    parts = fn entry ->
+      [{entry.layer, entry.changes} | Enum.map(entry.also, &{&1.layer, &1.changes})]
+    end
+
+    order = Enum.uniq(Enum.map(parts.(earlier) ++ parts.(later), &elem(&1, 0)))
+
+    composed =
+      for layer <- order,
+          changes =
+            compose_changes(
+              layer_changes(parts.(earlier), layer),
+              layer_changes(parts.(later), layer)
+            ),
+          changes != [],
+          do: {layer, changes}
+
+    case composed do
+      [] ->
+        nil
+
+      [{layer, changes} | rest] ->
+        %{
+          id: id,
+          layer: layer,
+          changes: changes,
+          also: Enum.map(rest, fn {l, c} -> %{layer: l, changes: c} end)
+        }
+    end
+  end
+
+  defp layer_changes(parts, layer) do
+    Enum.flat_map(parts, fn {l, changes} -> if l == layer, do: changes, else: [] end)
+  end
+
+  defp compose_changes(first, second) do
+    {order, by_tile} =
+      Enum.reduce(first ++ second, {[], %{}}, fn {x, y, prev, new}, {order, by_tile} ->
+        case by_tile do
+          %{{^x, ^y} => {first_prev, _}} -> {order, Map.put(by_tile, {x, y}, {first_prev, new})}
+          _ -> {[{x, y} | order], Map.put(by_tile, {x, y}, {prev, new})}
+        end
+      end)
+
+    for {x, y} = key <- Enum.reverse(order),
+        {prev, new} = Map.fetch!(by_tile, key),
+        prev != new,
+        do: {x, y, prev, new}
+  end
+
+  # Was this plane's landmass layer already out of step with its terrain (or sharing
+  # an ID with the other plane) before the paint? False when the state has no
+  # landmass data to check.
+  defp landmass_out_of_step?(state, plane) do
+    planes = state.planes
+
+    if landmass_data?(planes) do
+      terrain = Map.new(Landmass.plane_keys(), &{&1, get_in(planes, [&1, :terrain])})
+      landmass = Map.new(Landmass.plane_keys(), &{&1, get_in(planes, [&1, :landmass])})
+      Landmass.violations(terrain, landmass, only: plane) != []
+    else
+      false
+    end
+  end
+
+  defp landmass_data?(planes) do
+    Enum.all?(Landmass.plane_keys(), fn p ->
+      is_binary(get_in(planes, [p, :terrain])) and is_binary(get_in(planes, [p, :landmass]))
+    end)
+  end
+
   # The landmass IDs that change for `plane` once the terrain changes are applied.
   defp landmass_edits(state, plane, terrain_changes) do
     planes = state.planes
     layers = Map.get(planes, plane, %{})
 
-    if Enum.all?(Landmass.plane_keys(), fn p ->
-         is_binary(get_in(planes, [p, :terrain])) and is_binary(get_in(planes, [p, :landmass]))
-       end) do
+    if landmass_data?(planes) do
       new_terrain =
         Enum.reduce(terrain_changes, layers.terrain, fn {x, y, _prev, new}, acc ->
           elem(MirrorMap.put_tile_u16_le(acc, x, y, new), 0)

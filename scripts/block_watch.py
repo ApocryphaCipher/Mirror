@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Watch the running game's map blocks and print what changes, as it happens:
-terrain (u16), minerals, explored and terrain flags (u8), through the DOSBox
+terrain (u16), landmass, minerals, explored and terrain flags (u8), through the DOSBox
 fork's API. For seeing what a spell or action does to the map (docs/reference/
 live-ram-map.md has the addresses; re-check them after a fresh DOSBox launch).
 
@@ -15,6 +15,7 @@ API = "http://127.0.0.1:8086/api/v1/memory/0x{:x}/{}"
 # name, RAM address, bytes per tile
 BLOCKS = [
     ("terrain", 0x72630, 2),
+    ("landmass", 0x74DC0, 1),
     ("minerals", 0x760B0, 1),
     ("explored", 0x78690, 1),
     ("terrain_flags", 0x773A0, 1),
@@ -37,7 +38,8 @@ def main():
     ap.add_argument("--max-list", type=int, default=60)
     args = ap.parse_args()
     prev = {}
-    print("watching terrain, minerals, explored, terrain_flags; Ctrl-C to stop", flush=True)
+    names = ", ".join(name for name, _, _ in BLOCKS)
+    print(f"watching {names}; Ctrl-C to stop", flush=True)
     while True:
         try:
             cur = {name: tiles(read(addr, 2 * 2 * PLANE if width == 2 else 2 * PLANE), width)

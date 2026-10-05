@@ -483,6 +483,165 @@ defmodule Mirror.EditorTest do
       assert split.planes == state.planes
     end
 
+    test "calls sharing a stroke id fold into one undo step; each call still returns only its own changes" do
+      base = make_paint_state()
+      stroke = 777
+
+      {s1, {:applied, e1, l1}, _} =
+        Editor.paint_type(base, :arcanus, TerrainPaint.brush_cells(10, 20, 3), :grass,
+          stroke: stroke
+        )
+
+      {s2, {:applied, _e2, l2}, _} =
+        Editor.paint_type(s1, :arcanus, TerrainPaint.brush_cells(20, 20, 3), :grass,
+          stroke: stroke
+        )
+
+      assert e1.id == stroke
+      assert length(s2.history.arcanus) == 1
+      assert hd(s2.history.arcanus).id == stroke
+
+      # the second call's layers are just its own changes, not the whole stroke
+      second_tiles =
+        l2
+        |> Enum.find(&(&1.layer == :terrain))
+        |> Map.fetch!(:changes)
+        |> Enum.map(&{elem(&1, 0), elem(&1, 1)})
+
+      assert Enum.all?(second_tiles, fn {x, _} -> x >= 18 end)
+      assert length(l1) == 2
+
+      {undone, {:applied, _, :terrain, _, [_]}} = Editor.undo(s2, :arcanus)
+      assert undone.planes == base.planes
+      assert undone.history.arcanus == []
+
+      {redone, _} = Editor.redo(undone, :arcanus)
+      assert redone.planes == s2.planes
+    end
+
+    test "without a stroke id every paint is its own undo step" do
+      base = make_paint_state()
+      {s1, _, _} = Editor.paint_type(base, :arcanus, TerrainPaint.brush_cells(10, 20, 3), :grass)
+      {s2, _, _} = Editor.paint_type(s1, :arcanus, TerrainPaint.brush_cells(20, 20, 3), :grass)
+      assert length(s2.history.arcanus) == 2
+    end
+
+    test "a stroke that paints the same cells twice keeps the first previous value and the last new one" do
+      base = make_paint_state()
+      cells = TerrainPaint.brush_cells(30, 20, 3)
+
+      {s1, _, _} = Editor.paint_type(base, :arcanus, cells, :grass, stroke: 5)
+      {s2, _, _} = Editor.paint_type(s1, :arcanus, cells, :forest, stroke: 5)
+
+      assert length(s2.history.arcanus) == 1
+      [entry] = s2.history.arcanus
+      # every recorded change starts from the original ocean tile
+      assert Enum.all?(entry.changes, fn {x, y, prev, _new} ->
+               prev == MMap.get_tile_u16_le(base.planes.arcanus.terrain, x, y)
+             end)
+
+      assert Editor.tile_value(s2, :arcanus, :terrain, 30, 20) == 163
+
+      {undone, _} = Editor.undo(s2, :arcanus)
+      assert undone.planes == base.planes
+    end
+
+    test "a stroke that ends where it started leaves no history entry" do
+      base = make_paint_state()
+
+      {s1, _, _} = Editor.paint_type(base, :arcanus, [{30, 20}], :grass, stroke: 9)
+      assert length(s1.history.arcanus) == 1
+
+      {s2, _, _} = Editor.paint_type(s1, :arcanus, [{30, 20}], :water, stroke: 9)
+      assert s2.planes == base.planes
+      assert s2.history.arcanus == []
+    end
+
+    test "an edit from another tab in the middle of a stroke keeps its place; the stroke folds in place" do
+      base = make_paint_state()
+
+      {s1, _, _} =
+        Editor.paint_type(base, :arcanus, TerrainPaint.brush_cells(10, 20, 3), :grass, stroke: 3)
+
+      {s2, {:applied, _, _}} = Editor.apply_single_tile(s1, :arcanus, :terrain_flags, 1, 1, 4)
+
+      {s3, _, _} =
+        Editor.paint_type(s2, :arcanus, TerrainPaint.brush_cells(20, 20, 3), :grass, stroke: 3)
+
+      assert length(s3.history.arcanus) == 2
+      assert Enum.map(s3.history.arcanus, &Map.get(&1, :id)) |> Enum.count(&(&1 == 3)) == 1
+
+      {u1, _} = Editor.undo(s3, :arcanus)
+      {u2, _} = Editor.undo(u1, :arcanus)
+      assert u2.planes == base.planes
+    end
+
+    test "a stroke does not fold below another tab's edit to the same tile, and undo/redo still round-trip" do
+      base = make_paint_state()
+
+      {s1, _, _} =
+        Editor.paint_type(base, :arcanus, TerrainPaint.brush_cells(10, 20, 3), :grass, stroke: 3)
+
+      # another tab edits (30, 20), which the stroke's next segment then paints over
+      {s2, {:applied, _, _}} = Editor.apply_single_tile(s1, :arcanus, :terrain, 30, 20, 7)
+
+      {s3, _, _} =
+        Editor.paint_type(s2, :arcanus, TerrainPaint.brush_cells(30, 20, 3), :forest, stroke: 3)
+
+      # not folded: the segment is its own entry, above the other tab's edit
+      assert length(s3.history.arcanus) == 3
+      assert Editor.tile_value(s3, :arcanus, :terrain, 30, 20) == 163
+
+      # a later segment of the same stroke folds into the newest entry, not the old one
+      {s4, _, _} =
+        Editor.paint_type(s3, :arcanus, TerrainPaint.brush_cells(33, 20, 3), :forest, stroke: 3)
+
+      assert length(s4.history.arcanus) == 3
+
+      undo_all = fn st ->
+        Enum.reduce(1..3, st, fn _, acc -> elem(Editor.undo(acc, :arcanus), 0) end)
+      end
+
+      redo_all = fn st ->
+        Enum.reduce(1..3, st, fn _, acc -> elem(Editor.redo(acc, :arcanus), 0) end)
+      end
+
+      undone = undo_all.(s4)
+      assert undone.planes == base.planes
+      assert redo_all.(undone).planes == s4.planes
+    end
+
+    test "the report says whether the landmass layer was already out of step, not merely that a lot of IDs changed" do
+      base = make_paint_state()
+
+      # a valid merge reassigns many IDs but the layer was fine: not "out of step"
+      {s1, _, _} = Editor.paint_type(base, :arcanus, TerrainPaint.brush_cells(10, 20, 5), :grass)
+      {s2, _, _} = Editor.paint_type(s1, :arcanus, TerrainPaint.brush_cells(18, 20, 5), :grass)
+
+      {joined, {:applied, _, parts}, report} =
+        Editor.paint_type(s2, :arcanus, for(x <- 12..16, do: {x, 20}), :grass)
+
+      assert report.landmass_out_of_step == false
+      assert joined.planes.arcanus.landmass != s2.planes.arcanus.landmass
+      assert Enum.find(parts, &(&1.layer == :landmass)).changes != []
+
+      # land the layer does not know about is genuinely out of step
+      terrain = elem(MMap.put_tile_u16_le(layer(base, :arcanus, :terrain), 5, 5, 162), 0)
+      broken = put_in(base, [:planes, :arcanus, :terrain], terrain)
+      {_, {:applied, _, _}, report} = Editor.paint_type(broken, :arcanus, [{30, 20}], :grass)
+      assert report.landmass_out_of_step == true
+
+      # a sharing of an ID with the other plane is out of step too
+      shared = put_in(s1, [:planes, :myrror, :landmass], layer(s1, :arcanus, :landmass))
+      {_, _, report} = Editor.paint_type(shared, :arcanus, [{40, 30}], :grass)
+      assert report.landmass_out_of_step == true
+    end
+
+    test "a state without landmass data is never reported as out of step" do
+      {_, _, report} = Editor.paint_type(make_test_state(), :arcanus, [{30, 20}], :grass)
+      assert report.landmass_out_of_step == false
+    end
+
     test "painting does not touch the other plane's landmass IDs" do
       base = make_paint_state()
 

@@ -104,11 +104,17 @@ defmodule Mirror.Landmass do
   @doc """
   What is inconsistent between `terrain` and `landmass` (each `%{arcanus:, myrror:}`),
   as a list of violations; `[]` means the layer follows the rule.
+
+  With `only: :arcanus` (or `:myrror`, or a list) just those planes are checked,
+  but an ID they share with a plane left out still counts as a violation, because
+  `repair/3` with the same `only:` would have to renumber it.
   """
-  @spec violations(plane_bins(), plane_bins()) :: [violation()]
-  def violations(terrain, landmass) do
+  @spec violations(plane_bins(), plane_bins(), keyword()) :: [violation()]
+  def violations(terrain, landmass, opts \\ []) do
+    planes = selected_planes!(opts)
+
     per_plane =
-      for plane <- @planes do
+      for plane <- planes do
         comps = components(Map.fetch!(terrain, plane))
         {plane, comps, Map.fetch!(landmass, plane)}
       end
@@ -142,6 +148,14 @@ defmodule Mirror.Landmass do
           id != 0,
           do: {id, {plane, hd(comp)}}
 
+    # IDs on a plane that is not being checked count as taken
+    claims =
+      claims ++
+        for plane <- @planes -- planes,
+            id <- landmass |> Map.fetch!(plane) |> :binary.bin_to_list() |> Enum.uniq(),
+            id != 0,
+            do: {id, {plane, :unchecked}}
+
     shared =
       claims
       |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
@@ -150,6 +164,16 @@ defmodule Mirror.Landmass do
       |> Enum.map(fn {id, owners} -> {:id_shared, id, owners} end)
 
     water_and_polar ++ per_component ++ shared
+  end
+
+  # The planes named by `only:` (default both), without repeats; unknown names raise.
+  defp selected_planes!(opts) do
+    planes = opts |> Keyword.get(:only, @planes) |> List.wrap() |> Enum.uniq()
+
+    case planes -- @planes do
+      [] -> planes
+      unknown -> raise ArgumentError, "unknown plane(s) in only: #{inspect(unknown)}"
+    end
   end
 
   defp component_problems(plane, first, comp, lm, ids) do
@@ -183,12 +207,7 @@ defmodule Mirror.Landmass do
   @spec repair(plane_bins(), plane_bins(), keyword()) ::
           {:ok, plane_bins()} | {:error, :out_of_ids}
   def repair(terrain, landmass, opts \\ []) do
-    fix = opts |> Keyword.get(:only, @planes) |> List.wrap() |> Enum.uniq()
-
-    case fix -- @planes do
-      [] -> :ok
-      unknown -> raise ArgumentError, "unknown plane(s) in only: #{inspect(unknown)}"
-    end
+    fix = selected_planes!(opts)
 
     reserved =
       for plane <- @planes -- fix,

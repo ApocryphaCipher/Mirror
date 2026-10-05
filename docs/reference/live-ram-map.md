@@ -139,6 +139,12 @@ All in `scripts/`; they only read through the API (writes stay off).
   (`0x78690`) and terrain flags (`0x773A0`) and prints every changed tile as it
   happens. Use it to see what a spell does to the map.
 
+- `verify_loaded_save.py FILE`: after loading a save in the game, compares the wizard records, terrain, landmass, minerals, explored map and terrain flags in RAM with the file and says whether they are identical (read only).
+
+**Testing a save in the real game.** Put the file in `~/DOS/MAGIC` under a slot name the game offers and load it with **Load Game**. Slot 9 is the game's autosave and cannot be picked, so use 1-8 (back up what is there first). **Load Game and Save Game look alike**: a mix-up overwrote a slot once. The DOS file-call log (`files-*.jsonl`) tells them apart: `open` with mode 0 is a load, `create` is a save, and a guard such as `tail -F` on that log filtered for `SAVE` shows it live. Then run `verify_loaded_save.py` on the file.
+
+**The view-origin pair at `0x2F9EE` did not follow the view once** (2026-10-04, read as (37, 24) while the screen showed a different part of the map, identified instead by matching a one-tile island). *Guess:* it is not updated by every way of moving the view; don't rely on it to name the tile under the pointer without checking it against the screen.
+
 **Giving a wizard a spell: edit a copy of the save, don't write RAM.** With
 writes off, the way is to edit the `.GAM` and load it (use **Load**, not
 Save: saving from the running game overwrites the edit). Offsets in the

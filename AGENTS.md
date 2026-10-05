@@ -173,7 +173,9 @@ These all bit a previous session:
   enforces this (by canonical path and device/inode) for all callers.
   **Save as** suggests the next free `SAVE1.GAM`–`SAVE9.GAM` slot (or leaves
   it empty if all 9 are taken). Arbitrary names can be written but the
-  UI warns that Master of Magic only loads `SAVE1`–`SAVE9`.
+  UI warns that Master of Magic only loads `SAVE1`–`SAVE9`. (In the game's Load
+  Game screen slot 9 is the autosave and cannot be picked, so for a save you want to
+  load, use slots 1–8; Kevin, 2026-10-04.)
 - An edit must leave the save consistent. The raw editors (Cycle, raw Paint)
   update terrain bytes and the derived adjacency mask only. They do **not**
   keep landmass/continent IDs consistent across land/water transitions;
@@ -181,8 +183,10 @@ These all bit a previous session:
   decoded (`Mirror.Landmass`, docs/reference/classic-terrain-format.md) and
   `Editor.paint_type/4` keeps the IDs right for a painted type, as one undo
   step with the terrain. Wiring the raw tools to the same repair remains open
-  in STORY-017 and STORY-029 (see also STORY-021 for round-trip safety). That
-  a repaired layer is accepted by the real game has not been checked yet.
+  in STORY-017 and STORY-029 (see also STORY-021 for round-trip safety). A save
+  with a repainted landmass layer loads in the real game with its memory identical
+  to the file (checked 2026-10-04); what a turn change does to it has not been
+  observed yet.
 - Don't leave test edits in a save someone else is using.
 
 ## 10. Testing

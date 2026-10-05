@@ -34,6 +34,14 @@ Space+drag: pan · Esc: done".
   tiles).
 - The existing tile number box and preview, for any specific tile.
 
+## Progress (2026-10-05)
+
+The tools now exist in the toolbar as text buttons: **🔄 Cycle**, **🌍 Paint type**
+(terrain dropdown, brush size and fill, STORY-017) and **🎨 Paint tile** (the raw
+tile number box, now with a quick pick of plain tiles per terrain). Still open here:
+moving them into a floating emoji column over the map, and the Cycle instructions
+strip.
+
 ## Prerequisites and open questions
 
 - **Default tiles need labels.** Someone has to pick, per terrain, the tile
