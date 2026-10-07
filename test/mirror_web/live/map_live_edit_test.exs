@@ -773,6 +773,90 @@ defmodule MirrorWeb.MapLiveEditTest do
     end
   end
 
+  describe "overlays follow the save across tabs (STORY-044)" do
+    # The newest items pushed for a layer so far (events queue up, so read them all).
+    defp latest_overlay(view, layer, last \\ nil) do
+      next =
+        try do
+          assert_push_event(view, "overlay_data", %{layer: ^layer, items: items}, 50)
+          items
+        rescue
+          ExUnit.AssertionError -> :none
+        end
+
+      case {next, last} do
+        {:none, nil} -> flunk("no #{layer} overlay was pushed")
+        {:none, last} -> last
+        {items, _} -> latest_overlay(view, layer, items)
+      end
+    end
+
+    defp two_tabs(conn) do
+      session_id = "overlay-tabs-#{System.unique_integer([:positive])}"
+      conn1 = init_test_session(conn, %{"mirror_session_id" => session_id})
+      conn2 = init_test_session(conn, %{"mirror_session_id" => session_id})
+      {:ok, tab1, _} = live(conn1, ~p"/arcanus")
+      {:ok, tab2, _} = live(conn2, ~p"/arcanus")
+      {tab1, tab2}
+    end
+
+    defp load(view, path),
+      do: view |> element("#load-form") |> render_submit(%{"load" => %{"path" => path}})
+
+    test "a save loaded in one tab shows its cities, units and sites in the other", %{
+      conn: conn,
+      save: save
+    } do
+      {tab1, tab2} = two_tabs(conn)
+      load(tab1, save)
+
+      assert Enum.any?(latest_overlay(tab2, "cities"), &match?(%{name: "Deventor"}, &1))
+      assert latest_overlay(tab2, "units") == []
+      assert Enum.any?(latest_overlay(tab2, "sites"), &match?(%{x: 48, y: 28}, &1))
+    end
+
+    test "loading a different save replaces the other tab's overlays", %{
+      conn: conn,
+      dir: dir,
+      save: save
+    } do
+      other = Path.join(dir, "SAVE2.GAM")
+      File.write!(other, String.replace(File.read!(save), "Deventor", "Deventer"))
+
+      {tab1, tab2} = two_tabs(conn)
+      load(tab1, save)
+      assert Enum.any?(latest_overlay(tab2, "cities"), &match?(%{name: "Deventor"}, &1))
+
+      load(tab1, other)
+      cities = latest_overlay(tab2, "cities")
+      assert Enum.any?(cities, &match?(%{name: "Deventer"}, &1))
+      refute Enum.any?(cities, &match?(%{name: "Deventor"}, &1))
+    end
+
+    test "a tile edit in one tab does not re-push the other tab's sprites or items", %{
+      conn: conn,
+      save: save
+    } do
+      {tab1, tab2} = two_tabs(conn)
+      load(tab1, save)
+      latest_overlay(tab2, "cities")
+      latest_overlay(tab2, "units")
+      latest_overlay(tab2, "sites")
+
+      render_click(tab1, "toggle_edit", %{})
+      render_click(tab1, "set_tool", %{"tool" => "cycle"})
+      click(tab1, 1, 1)
+
+      # The map layers still follow the edit...
+      assert_push_event(tab2, "overlay_data", %{layer: "roads"})
+      # ...but the sprites (an LBX decode) and the save's items do not move.
+      refute_push_event(tab2, "overlay_sprites", _, 100)
+      refute_push_event(tab2, "overlay_data", %{layer: "cities"}, 100)
+      refute_push_event(tab2, "overlay_data", %{layer: "units"}, 100)
+      refute_push_event(tab2, "overlay_data", %{layer: "sites"}, 100)
+    end
+  end
+
   describe "Roads, corruption and specials tools (STORY-018)" do
     defp road_at(items, x, y), do: Enum.find(items, &match?(%{kind: :road, x: ^x, y: ^y}, &1))
 

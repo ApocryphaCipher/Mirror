@@ -1,9 +1,7 @@
 # STORY-044 (bug): Cities/units/sites overlays go stale on cross-tab save updates
 
 **Parent:** [EPIC-004](../epics/EPIC-004-overland-map-features.md)
-**Status:** open, confirmed. Not fixed here — filed out of STORY-011 to
-avoid scope creep and because the real fix has a performance wrinkle (see
-below), not just a one-line call swap.
+**Status:** fixed 2026-10-06.
 **Size:** small–medium
 **Reported by:** Copilot's PR review on
 [#74](https://github.com/ApocryphaCipher/Mirror/pull/74) (STORY-011),
@@ -79,3 +77,18 @@ editing, not just a correctness fix.
   and sites immediately, without a reload.
 - No `OverlaySprites.load/1` call added to a path that fires on every
   tile edit.
+
+## Fix
+
+`push_overlays/1` is split: it still decodes the sprites once (the load path)
+and calls the new `push_overlay_items/1`, which pushes `sites`, `cities` and
+`units` from the save's raw bytes. The cross-tab `handle_info/2` and the
+`discard_edits` branch now call `push_overlay_items_if_save_changed/2`: the items
+depend only on `save.raw` and the plane, so they are pushed again only when the raw
+save differs from the one the tab had. A tile edit in another tab leaves it alone,
+so no sprite decode and no items re-push on the per-edit path.
+
+Tests (`map_live_edit_test.exs`, "overlays follow the save across tabs"): a save
+loaded in one tab reaches the other's cities, units and sites; a different save
+replaces them; and a tile edit pushes neither `overlay_sprites` nor the items. All
+three fail without the fix.
