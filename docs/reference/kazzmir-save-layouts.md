@@ -235,7 +235,7 @@ One byte per tile, row-major.
 | Bit | Meaning | Status |
 | --- | --- | --- |
 | `0x08` | road | **checked** (details below) |
-| `0x10` | enchanted road | **checked:** in SAVE1 only Myrror tiles have it (13), because Myrror's roads start enchanted. On Arcanus the **Enchant Road** spell sets it, so it can appear on either plane. *To check:* cast Enchant Road on Arcanus (STORY-032 checkpoint 7) and diff the flags |
+| `0x10` | enchanted road | **checked in the running game** (2026-10-06, checkpoint 70, collection `mom-live-2026-10-06`): casting **Enchant Road** changed five connected Arcanus road tiles from `0x08` to **`0x18`**, so an enchanted road keeps the road bit (`0x08`) and adds `0x10`. The same file has 13 Myrror tiles, all `0x18` (Myrror's roads start enchanted), so a bare `0x10` is not seen. |
 | `0x20` | corruption | kazzmir; none in SAVE1–9 |
 
 How the road bit was checked:

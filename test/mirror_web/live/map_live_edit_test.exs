@@ -773,6 +773,182 @@ defmodule MirrorWeb.MapLiveEditTest do
     end
   end
 
+  describe "Roads, corruption and specials tools (STORY-018)" do
+    defp road_at(items, x, y), do: Enum.find(items, &match?(%{kind: :road, x: ^x, y: ^y}, &1))
+
+    # The newest roads overlay pushed so far. Events queue up (the load pushes one
+    # too), so read them all and keep the last.
+    defp latest_roads(view, last \\ nil) do
+      next =
+        try do
+          assert_push_event(view, "overlay_data", %{layer: "roads", items: items}, 50)
+          items
+        rescue
+          ExUnit.AssertionError -> :none
+        end
+
+      case {next, last} do
+        {:none, nil} -> flunk("no roads overlay was pushed")
+        {:none, last} -> last
+        {items, _} -> latest_roads(view, items)
+      end
+    end
+
+    defp flags_byte(path, x, y) do
+      {:ok, io} = File.open(path, [:read, :binary])
+      {:ok, <<byte>>} = :file.pread(io, 0x01CBB8 + y * 60 + x, 1)
+      File.close(io)
+      byte
+    end
+
+    test "the Road tool steps none, road, enchanted road, none, and shift-click steps back",
+         %{conn: conn, save: save} do
+      view = editing(conn, save, "road")
+
+      click(view, 12, 12)
+      assert %{enchanted: false} = road_at(latest_roads(view), 12, 12)
+      assert view |> element("#road-report") |> render() |> text_of() == "Road"
+
+      click(view, 12, 12)
+      assert %{enchanted: true} = road_at(latest_roads(view), 12, 12)
+      assert view |> element("#road-report") |> render() |> text_of() == "Enchanted road"
+
+      click(view, 12, 12)
+      assert road_at(latest_roads(view), 12, 12) == nil
+
+      click(view, 12, 12, shift: true)
+      assert %{enchanted: true} = road_at(latest_roads(view), 12, 12)
+    end
+
+    test "neighbouring roads redraw as one connected road, ocean included", %{
+      conn: conn,
+      save: save
+    } do
+      view = editing(conn, save, "road")
+      click(view, 12, 12)
+      click(view, 13, 12)
+
+      items = latest_roads(view)
+      assert :e in road_at(items, 12, 12).pieces
+      assert :w in road_at(items, 13, 12).pieces
+
+      render_click(view, "undo", %{})
+      items = latest_roads(view)
+      assert road_at(items, 13, 12) == nil
+      assert road_at(items, 12, 12).pieces == [:c]
+    end
+
+    test "the Corruption tool toggles a tile and leaves its road alone", %{
+      conn: conn,
+      save: save
+    } do
+      view = editing(conn, save, "road")
+      click(view, 20, 20)
+      render_click(view, "set_tool", %{"tool" => "corruption"})
+
+      click(view, 20, 20)
+      items = latest_roads(view)
+      assert Enum.any?(items, &match?(%{kind: :corruption, x: 20, y: 20}, &1))
+      assert road_at(items, 20, 20)
+
+      click(view, 20, 20)
+      items = latest_roads(view)
+      refute Enum.any?(items, &match?(%{kind: :corruption}, &1))
+      assert road_at(items, 20, 20)
+    end
+
+    test "the Special tool places the chosen special, and right-click removes it", %{
+      conn: conn,
+      save: save
+    } do
+      view = editing(conn, save, "special")
+      view |> element("#special-form") |> render_change(%{"special" => %{"value" => "6"}})
+
+      click(view, 14, 14)
+      items = latest_roads(view)
+      assert Enum.any?(items, &match?(%{kind: :special, x: 14, y: 14, special: :mithril}, &1))
+      assert view |> element("#road-report") |> render() |> text_of() == "Mithril ore"
+
+      click(view, 14, 14, button: 2)
+      items = latest_roads(view)
+      refute Enum.any?(items, &match?(%{kind: :special, x: 14, y: 14}, &1))
+
+      render_click(view, "undo", %{})
+      items = latest_roads(view)
+      assert Enum.any?(items, &match?(%{kind: :special, x: 14, y: 14, special: :mithril}, &1))
+    end
+
+    test "a special the form does not know is ignored", %{conn: conn, save: save} do
+      view = editing(conn, save, "special")
+      view |> element("#special-form") |> render_change(%{"special" => %{"value" => "6"}})
+      view |> element("#special-form") |> render_change(%{"special" => %{"value" => "99"}})
+
+      click(view, 15, 15)
+      assert Enum.any?(latest_roads(view), &match?(%{kind: :special, special: :mithril}, &1))
+    end
+
+    test "clicking where nothing would change adds no undo step", %{conn: conn, save: save} do
+      view = editing(conn, save, "special")
+      click(view, 16, 16, button: 2)
+      assert changed(view) =~ "0 tiles changed"
+    end
+
+    test "edits are counted, survive Save as, and discard restores", %{
+      conn: conn,
+      dir: dir,
+      save: save
+    } do
+      view = editing(conn, save, "road")
+      click(view, 30, 5)
+      assert changed(view) =~ "1 tile changed"
+
+      target = Path.join(dir, "SAVE3.GAM")
+      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+      assert flags_byte(target, 30, 5) == 0x08
+      assert flags_byte(save, 30, 5) == 0x00
+
+      click(view, 30, 5)
+      assert changed(view) =~ "1 tile changed"
+      render_click(view, "arm_discard", %{})
+      render_click(view, "discard_edits", %{})
+      assert %{enchanted: false} = road_at(latest_roads(view), 30, 5)
+    end
+
+    test "a click edits the stored byte, so another tab's bit is not erased (STORY-039)", %{
+      conn: conn,
+      save: save
+    } do
+      session_id = "stale-flags-test-#{System.unique_integer([:positive])}"
+      conn1 = init_test_session(conn, %{"mirror_session_id" => session_id})
+
+      {:ok, tab1, _} = live(conn1, ~p"/arcanus")
+      tab1 |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      render_click(tab1, "toggle_edit", %{})
+      render_click(tab1, "set_tool", %{"tool" => "road"})
+
+      # Another tab corrupts (3, 3) in the session store; this tab has not seen it.
+      store = Mirror.SessionStore.get(session_id)
+      {flags, 0} = Mirror.Map.put_tile_u8(store.planes.arcanus.terrain_flags, 3, 3, 0x20)
+
+      :ets.insert(
+        :mirror_sessions,
+        {session_id, put_in(store.planes.arcanus.terrain_flags, flags)}
+      )
+
+      click(tab1, 3, 3)
+
+      after_click = Mirror.SessionStore.get(session_id)
+      assert Mirror.Map.get_tile_u8(after_click.planes.arcanus.terrain_flags, 3, 3) == 0x28
+    end
+
+    test "view mode ignores the tools", %{conn: conn, save: save} do
+      view = editing(conn, save, "road")
+      render_click(view, "toggle_edit", %{})
+      click(view, 12, 12)
+      refute has_element?(view, "#unsaved-notice")
+    end
+  end
+
   describe "sites layer (STORY-011)" do
     # x, y, plane (0 Arcanus, 1 Myrror), intact (1/0), kind -> 24-byte encounter record.
     defp encounter_bytes(x, y, plane, intact, kind) do

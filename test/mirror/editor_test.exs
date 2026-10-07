@@ -557,19 +557,29 @@ defmodule Mirror.EditorTest do
       assert s2.history.arcanus == []
     end
 
+    # Negative, so it can never equal an id `apply_single_tile` draws from the
+    # positive unique-integer counter (a collision made these tests depend on the seed).
+    @stroke_id -3
+
     test "an edit from another tab in the middle of a stroke keeps its place; the stroke folds in place" do
       base = make_paint_state()
 
       {s1, _, _} =
-        Editor.paint_type(base, :arcanus, TerrainPaint.brush_cells(10, 20, 3), :grass, stroke: 3)
+        Editor.paint_type(base, :arcanus, TerrainPaint.brush_cells(10, 20, 3), :grass,
+          stroke: @stroke_id
+        )
 
       {s2, {:applied, _, _}} = Editor.apply_single_tile(s1, :arcanus, :terrain_flags, 1, 1, 4)
 
       {s3, _, _} =
-        Editor.paint_type(s2, :arcanus, TerrainPaint.brush_cells(20, 20, 3), :grass, stroke: 3)
+        Editor.paint_type(s2, :arcanus, TerrainPaint.brush_cells(20, 20, 3), :grass,
+          stroke: @stroke_id
+        )
 
       assert length(s3.history.arcanus) == 2
-      assert Enum.map(s3.history.arcanus, &Map.get(&1, :id)) |> Enum.count(&(&1 == 3)) == 1
+
+      assert Enum.map(s3.history.arcanus, &Map.get(&1, :id)) |> Enum.count(&(&1 == @stroke_id)) ==
+               1
 
       {u1, _} = Editor.undo(s3, :arcanus)
       {u2, _} = Editor.undo(u1, :arcanus)
@@ -580,13 +590,17 @@ defmodule Mirror.EditorTest do
       base = make_paint_state()
 
       {s1, _, _} =
-        Editor.paint_type(base, :arcanus, TerrainPaint.brush_cells(10, 20, 3), :grass, stroke: 3)
+        Editor.paint_type(base, :arcanus, TerrainPaint.brush_cells(10, 20, 3), :grass,
+          stroke: @stroke_id
+        )
 
       # another tab edits (30, 20), which the stroke's next segment then paints over
       {s2, {:applied, _, _}} = Editor.apply_single_tile(s1, :arcanus, :terrain, 30, 20, 7)
 
       {s3, _, _} =
-        Editor.paint_type(s2, :arcanus, TerrainPaint.brush_cells(30, 20, 3), :forest, stroke: 3)
+        Editor.paint_type(s2, :arcanus, TerrainPaint.brush_cells(30, 20, 3), :forest,
+          stroke: @stroke_id
+        )
 
       # not folded: the segment is its own entry, above the other tab's edit
       assert length(s3.history.arcanus) == 3
@@ -594,7 +608,9 @@ defmodule Mirror.EditorTest do
 
       # a later segment of the same stroke folds into the newest entry, not the old one
       {s4, _, _} =
-        Editor.paint_type(s3, :arcanus, TerrainPaint.brush_cells(33, 20, 3), :forest, stroke: 3)
+        Editor.paint_type(s3, :arcanus, TerrainPaint.brush_cells(33, 20, 3), :forest,
+          stroke: @stroke_id
+        )
 
       assert length(s4.history.arcanus) == 3
 

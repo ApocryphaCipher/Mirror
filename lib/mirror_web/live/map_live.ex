@@ -20,7 +20,7 @@ defmodule MirrorWeb.MapLive do
   alias Mirror.TileAtlas
   alias Mirror.SaveFile.{Cities, Roads, Sites, Units, Wizards}
   alias Mirror.Map, as: MirrorMap
-  alias MirrorWeb.PaintTool
+  alias MirrorWeb.{PaintTool, RoadTool}
 
   @layers [
     :terrain,
@@ -87,6 +87,8 @@ defmodule MirrorWeb.MapLive do
       |> assign(:paint_size, PaintTool.default_size())
       |> assign(:paint_fill, false)
       |> assign(:paint_report, nil)
+      |> assign(:special, RoadTool.default_special())
+      |> assign(:road_report, nil)
       |> assign(:discard_armed, false)
       |> assign(:fresh_mount, true)
 
@@ -213,8 +215,14 @@ defmodule MirrorWeb.MapLive do
   end
 
   def handle_event("set_tool", %{"tool" => tool}, socket)
-      when tool in ["cycle", "paint", "type"] do
-    {:noreply, assign(socket, :tool, String.to_existing_atom(tool))}
+      when tool in ["cycle", "paint", "type", "road", "corruption", "special"] do
+    {:noreply,
+     socket |> assign(:tool, String.to_existing_atom(tool)) |> assign(:road_report, nil)}
+  end
+
+  # The "Special" tool's option: which special a click places.
+  def handle_event("set_special", %{"special" => %{"value" => value}}, socket) do
+    {:noreply, assign(socket, :special, RoadTool.parse_special(value) || socket.assigns.special)}
   end
 
   # The "Paint type" tool's options: terrain, brush size, fill.
@@ -1554,7 +1562,7 @@ defmodule MirrorWeb.MapLive do
                   Terrain
                 </span>
                 <span
-                  :for={label <- ["Roads", "Structures", "Units"]}
+                  :for={label <- ["Structures", "Units"]}
                   class="px-2.5 py-0.5 text-slate-500"
                   title="Coming once this data is decoded (EPIC-004)"
                 >
@@ -1570,7 +1578,10 @@ defmodule MirrorWeb.MapLive do
                       {:type, "🌍 Paint type",
                        "Paint water or a land type; neighbouring tiles re-tile automatically"},
                       {:paint, "🎨 Paint tile",
-                       "Paint one exact tile number; neighbours are not touched"}
+                       "Paint one exact tile number; neighbours are not touched"},
+                      {:road, "🛣️ Road", "Click to step a tile: no road, road, enchanted road"},
+                      {:corruption, "☠️ Corruption", "Click to corrupt a tile or clean it"},
+                      {:special, "💎 Special", "Place an ore, gems, crystals, wild game or nightshade"}
                     ]
                   }
                   id={"tool-#{tool}"}
@@ -1662,6 +1673,40 @@ defmodule MirrorWeb.MapLive do
               </span>
 
               <.form
+                :if={@tool == :special}
+                for={%{}}
+                as={:special}
+                id="special-form"
+                phx-change="set_special"
+                class="flex items-center gap-1.5"
+              >
+                <label for="special-value" class="text-slate-400">Special</label>
+                <select
+                  id="special-value"
+                  name="special[value]"
+                  class="rounded-lg border border-white/10 bg-slate-950/60 py-0.5 text-sm text-slate-200"
+                >
+                  <option
+                    :for={{label, value} <- RoadTool.special_options()}
+                    value={value}
+                    selected={value == Integer.to_string(@special)}
+                  >
+                    {label}
+                  </option>
+                </select>
+              </.form>
+
+              <span
+                :if={@tool in [:road, :corruption, :special]}
+                id="road-report"
+                role="status"
+                aria-live="polite"
+                class="text-xs text-emerald-200"
+              >
+                {@road_report}
+              </span>
+
+              <.form
                 :if={@tool == :paint}
                 for={%{}}
                 as={:quick}
@@ -1718,6 +1763,15 @@ defmodule MirrorWeb.MapLive do
                 {case @tool do
                   :cycle ->
                     "Click: next tile · right-click or shift-click: previous · space-drag or middle-drag to pan · Esc to finish"
+
+                  :road ->
+                    "Click: no road → road → enchanted road → none · right-click or shift-click: step back · roads may cross water (bridges) · space-drag or middle-drag to pan · Esc to finish"
+
+                  :corruption ->
+                    "Click: corrupt a tile, or clean it · space-drag or middle-drag to pan · Esc to finish"
+
+                  :special ->
+                    "Click: place the chosen special · right-click or shift-click: remove it · space-drag or middle-drag to pan · Esc to finish"
 
                   :type ->
                     "Click or drag: paint the terrain, neighbours re-tile · right-click: pick the terrain under the pointer · space-drag or middle-drag to pan · Esc to finish"
@@ -2065,6 +2119,38 @@ defmodule MirrorWeb.MapLive do
   end
 
   defp handle_pointer_start(
+         %{assigns: %{edit: :terrain, tool: :road}} = socket,
+         x,
+         y,
+         button,
+         mods
+       ) do
+    back? = button == 2 or truthy?(mods["shift"])
+    flag_click(socket, :terrain_flags, :road, x, y, &RoadTool.cycle_road(&1, back?))
+  end
+
+  defp handle_pointer_start(
+         %{assigns: %{edit: :terrain, tool: :corruption}} = socket,
+         x,
+         y,
+         _button,
+         _mods
+       ) do
+    flag_click(socket, :terrain_flags, :corruption, x, y, &RoadTool.toggle_corruption/1)
+  end
+
+  defp handle_pointer_start(
+         %{assigns: %{edit: :terrain, tool: :special}} = socket,
+         x,
+         y,
+         button,
+         mods
+       ) do
+    value = if button == 2 or truthy?(mods["shift"]), do: 0, else: socket.assigns.special
+    flag_click(socket, :minerals, :special, x, y, fn _ -> value end)
+  end
+
+  defp handle_pointer_start(
          %{assigns: %{edit: :terrain, tool: :type}} = socket,
          x,
          y,
@@ -2262,6 +2348,31 @@ defmodule MirrorWeb.MapLive do
     end)
   end
 
+  # Roads, corruption and specials (STORY-018): one click changes one byte of
+  # the flags or minerals layer, as its own one-tile stroke (one undo step).
+  # `change` maps the tile's current byte to the new one. It runs inside the
+  # session update, on the stored byte rather than this tab's snapshot, so two
+  # tabs editing different bits of one tile cannot erase each other (STORY-039).
+  defp flag_click(socket, layer, what, x, y, change) do
+    if valid_coord?(x, y) do
+      {socket, applied} = start_stroke_with(socket, layer, x, y, change)
+
+      socket = finalize_stroke(socket, socket.assigns.active_stroke)
+
+      case applied do
+        {prev, new} ->
+          socket
+          |> assign(:road_report, RoadTool.describe(what, prev, new))
+          |> assign_hover(x, y)
+
+        nil ->
+          socket
+      end
+    else
+      socket
+    end
+  end
+
   # Cycle tool: step the tile's number by ±1 (wrapping 0..761). Each click
   # is its own one-tile stroke, so each click is one undo step.
   defp cycle_tile(socket, x, y, direction) do
@@ -2282,11 +2393,24 @@ defmodule MirrorWeb.MapLive do
   end
 
   defp start_stroke(socket, layer, x, y, value \\ nil) do
+    {socket, _change} = start_stroke_with(socket, layer, x, y, value)
+    socket
+  end
+
+  # `value` is a tile value, `nil` for the layer's brush, or a function from the
+  # stored tile value to the new one. Returns the socket and `{prev, new}`, or
+  # `nil` when nothing changed.
+  defp start_stroke_with(socket, layer, x, y, value) do
     plane = socket.assigns.plane
 
     {:ok, state, {stroke, change, updates}} =
       SessionStore.update(socket.assigns.session_id, fn current ->
-        val = value || Map.get(current.selection, layer, 0)
+        val =
+          cond do
+            is_function(value, 1) -> value.(Editor.tile_value(current, plane, layer, x, y) || 0)
+            value -> value
+            true -> Map.get(current.selection, layer, 0)
+          end
 
         {next_state, stroke, change, updates} =
           Editor.start_stroke(current, plane, layer, x, y, val)
@@ -2302,11 +2426,8 @@ defmodule MirrorWeb.MapLive do
       |> assign_state(state)
       |> maybe_push_updates(layer, updates, changes)
 
-    if changes do
-      emit_engine_delta(socket, plane, layer, changes)
-    else
-      socket
-    end
+    socket = if changes, do: emit_engine_delta(socket, plane, layer, changes), else: socket
+    {socket, change}
   end
 
   defp apply_stroke_change(socket, layer, x, y) do
