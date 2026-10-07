@@ -16,8 +16,8 @@ defmodule MirrorWeb.RoadTool do
   @enchanted 0x10
   @corruption 0x20
 
-  # An enchanted road keeps the plain road bit too, as the game's Enchant Road
-  # spell does on top of an existing road. `Mirror.SaveFile.Roads` reads either.
+  # An enchanted road keeps the plain road bit too: the game's Enchant Road
+  # spell turned 0x08 into 0x18 (checked live, 2026-10-06; STORY-018).
   @road_bits @road ||| @enchanted
 
   @specials [

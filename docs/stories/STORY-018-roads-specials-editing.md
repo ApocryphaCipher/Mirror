@@ -1,7 +1,8 @@
 # STORY-018: Roads, corruption and resource editing
 
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
-**Status:** implemented, **real-game check still to do**. The Road, Corruption
+**Status:** implemented; the byte values are checked in the running game
+(2026-10-06), and what the player sees is still to confirm. The Road, Corruption
 and Special tools are in the edit toolbar (`MirrorWeb.RoadTool`,
 `MirrorWeb.MapLive`); the meanings they use are in
 [kazzmir-save-layouts.md](../reference/kazzmir-save-layouts.md). It builds on
@@ -36,11 +37,24 @@ STORY-013's drawing.
   their neighbours because the overlay is rebuilt from the flags after every
   edit. Edits are saved by Save as like any other.
 
+## Checked in the real game (2026-10-06)
+
+A save was built from SAVE3 with a road at (32,21), an enchanted road at
+(33,21), corruption at (35,18) and mithril at (36,18), all written with the
+tools' own values, plus Freya given one Sorcery book and Enchant Road known.
+Loaded in the DOSBox fork, then Enchant Road cast (checkpoint 70, collection
+`mom-live-2026-10-06`):
+
+- **The game accepts the save and keeps every byte:** `0x08`, `0x18`, `0x20`
+  and minerals `6` were in RAM exactly as written.
+- **Enchant Road writes `0x18`** (road bit kept, `0x10` added): five connected
+  road tiles went `0x08` → `0x18`, including the tool-made road at (32,21),
+  which the game treated as part of the network. That is the value the tool
+  writes. SAVE3's 13 Myrror road tiles are `0x18` too (an earlier note here said
+  `0x10`; it was wrong).
+
 ## Still to check in the real game
 
-- **An enchanted road is written as `0x18`** (both bits), as we believe the
-  game's Enchant Road spell leaves it on top of the plain road bit. SAVE1's
-  Myrror roads have only `0x10`, which the tool reads as enchanted and clears
-  with a click. Save a tile with the tool, load it in DOSBox and compare with a
-  tile the game enchanted itself.
-- That a road, corruption and a special placed with the tools show up in the real game.
+- What the screen shows: the enchanted road at (33,21) animating like the
+  game's own, the corruption at (35,18) and the mithril at (36,18) drawn.
+- Roads on ocean tiles (bridges) were not tried.
