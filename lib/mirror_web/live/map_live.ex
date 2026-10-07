@@ -101,6 +101,7 @@ defmodule MirrorWeb.MapLive do
       |> assign(:hover, nil)
       |> assign(:tile_assets, nil)
       |> assign(:overlays_primed, false)
+      |> assign(:overlay_sprites_sent, false)
       |> assign(:load_path, SaveManager.default_load_path())
       |> assign(:save_path_input, state.save_path || "")
       |> assign_forms()
@@ -3078,16 +3079,26 @@ defmodule MirrorWeb.MapLive do
   defp push_overlays(%{assigns: %{lab?: true}} = socket), do: socket
 
   defp push_overlays(socket) do
-    socket =
-      case OverlaySprites.load(Paths.mom_path()) do
-        {:ok, sprites} -> push_event(socket, "overlay_sprites", sprites)
-        {:error, _} -> socket
-      end
-
     socket
+    |> push_overlay_sprites()
     |> assign(:overlays_primed, true)
     |> push_overlay_items()
     |> push_map_layers()
+  end
+
+  # The sprite bank, once per socket: the game files do not change under a
+  # running page, so a later load, layer change or tile reload does not decode
+  # them again. A failed decode (no game files yet) is tried again on the next call.
+  defp push_overlay_sprites(%{assigns: %{overlay_sprites_sent: true}} = socket), do: socket
+
+  defp push_overlay_sprites(socket) do
+    case OverlaySprites.load(Paths.mom_path()) do
+      {:ok, sprites} ->
+        socket |> push_event("overlay_sprites", sprites) |> assign(:overlay_sprites_sent, true)
+
+      {:error, _} ->
+        socket
+    end
   end
 
   # What a cross-tab update or a discard needs for the overlays (STORY-044). A tab

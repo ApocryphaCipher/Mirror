@@ -1520,6 +1520,24 @@ defmodule MirrorWeb.MapLiveEditTest do
       assert length(items) == 16
     end
 
+    @tag skip:
+           !@has_real_save_and_sprites &&
+             "needs MIRROR_MOM_PATH/(SAVE1.GAM, MAPBACK.LBX, UNITS1.LBX, UNITS2.LBX)"
+    test "the sprites are pushed once per socket, not again by later loads (STORY-044)",
+         %{conn: conn, dir: dir} do
+      real_save = Path.join(dir, "REAL_SAVE1.GAM")
+      File.cp!(@real_save_source, real_save)
+
+      {:ok, view, _} = live(conn, ~p"/arcanus")
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => real_save}})
+      assert_push_event(view, "overlay_sprites", %{cities: %{city: %{width: 32}}})
+
+      # Loading again re-sends the items, but not the sprite bank.
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => real_save}})
+      assert_push_event(view, "overlay_data", %{layer: "cities", items: [_ | _]})
+      refute_push_event(view, "overlay_sprites", _, 100)
+    end
+
     @tag skip: !@has_real_save && "needs MIRROR_MOM_PATH/SAVE1.GAM"
     test "real SAVE1.GAM overwrite protection and Save as", %{conn: conn, dir: dir} do
       real_save = Path.join(dir, "REAL_SAVE1.GAM")
