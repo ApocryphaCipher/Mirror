@@ -314,6 +314,30 @@ defmodule Mirror.Editor do
     end
   end
 
+  @fully_explored 15
+
+  @doc """
+  Marks every tile of `plane` as fully explored (15) in the exploration layer, as one
+  undo step (STORY-037). Tiles already at 15 are left out, so the step records only
+  what changed and a plane that is all explored gives `{state, :none}`.
+
+  Returns what `apply_compound/3` does.
+  """
+  def reveal_all(state, plane) do
+    case get_in(state.planes, [plane, :exploration]) do
+      explored when is_binary(explored) ->
+        edits =
+          for {byte, index} <- Enum.with_index(:binary.bin_to_list(explored)),
+              byte != @fully_explored,
+              do: {rem(index, MirrorMap.width()), div(index, MirrorMap.width()), @fully_explored}
+
+        apply_compound(state, plane, [{:exploration, edits}])
+
+      _ ->
+        {state, :none}
+    end
+  end
+
   # A layer listed more than once is merged into its first entry (edits in order),
   # so a step has at most one part per layer and undo can restore it exactly.
   defp group_by_layer(edits) do

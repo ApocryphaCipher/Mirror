@@ -773,6 +773,135 @@ defmodule MirrorWeb.MapLiveEditTest do
     end
   end
 
+  describe "Reveal all (STORY-037)" do
+    @explored_at 0x014814
+
+    defp explored(path, plane) do
+      offset = @explored_at + if(plane == :myrror, do: 2400, else: 0)
+      path |> File.read!() |> binary_part(offset, 2400)
+    end
+
+    defp fog_tiles(view) do
+      assert_push_event(view, "overlay_data", %{layer: "fog", items: items})
+      length(items)
+    end
+
+    defp session_planes(session_id), do: Mirror.SessionStore.get(session_id).planes
+
+    defp revealing(conn, save) do
+      session_id = "reveal-test-#{System.unique_integer([:positive])}"
+      conn = init_test_session(conn, %{"mirror_session_id" => session_id})
+      {:ok, view, _} = live(conn, ~p"/arcanus")
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      render_click(view, "toggle_edit", %{})
+      {view, session_id}
+    end
+
+    test "this plane: the fog clears and the message says how many tiles", %{
+      conn: conn,
+      save: save
+    } do
+      {view, session_id} = revealing(conn, save)
+      assert explored(save, :arcanus) != :binary.copy(<<15>>, 2400)
+
+      view |> element("#reveal-plane") |> render_click()
+
+      assert session_planes(session_id).arcanus.exploration == :binary.copy(<<15>>, 2400)
+
+      assert view |> element("#reveal-report") |> render() |> text_of() =~
+               ~r/^Revealed \d+ tiles on Arcanus$/
+
+      assert changed(view) =~ ~r/^[1-9]\d* tiles? changed/
+      # The fog layer is rebuilt: nothing is left unexplored on this plane.
+      assert latest_overlay(view, "fog") == []
+    end
+
+    test "this plane leaves Myrror alone; both planes reveal both", %{conn: conn, save: save} do
+      {view, session_id} = revealing(conn, save)
+      myrror_before = session_planes(session_id).myrror.exploration
+
+      view |> element("#reveal-plane") |> render_click()
+      assert session_planes(session_id).myrror.exploration == myrror_before
+
+      view |> element("#reveal-both") |> render_click()
+      planes = session_planes(session_id)
+      assert planes.myrror.exploration == :binary.copy(<<15>>, 2400)
+      assert planes.arcanus.exploration == :binary.copy(<<15>>, 2400)
+    end
+
+    test "undo brings the fog back, one step per plane", %{conn: conn, save: save} do
+      {view, session_id} = revealing(conn, save)
+      original = session_planes(session_id)
+      view |> element("#reveal-both") |> render_click()
+      assert changed(view) =~ ~r/^[1-9]\d* tiles? changed/
+
+      render_click(view, "undo", %{})
+      assert session_planes(session_id).arcanus.exploration == original.arcanus.exploration
+      assert session_planes(session_id).myrror.exploration == :binary.copy(<<15>>, 2400)
+      assert latest_overlay(view, "fog") != []
+
+      render_click(view, "redo", %{})
+      assert session_planes(session_id).arcanus.exploration == :binary.copy(<<15>>, 2400)
+    end
+
+    test "Save as writes every tile explored and changes nothing else", %{
+      conn: conn,
+      dir: dir,
+      save: save
+    } do
+      {view, _session_id} = revealing(conn, save)
+      view |> element("#reveal-both") |> render_click()
+
+      target = Path.join(dir, "REVEALED.GAM")
+      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+
+      assert explored(target, :arcanus) == :binary.copy(<<15>>, 2400)
+      assert explored(target, :myrror) == :binary.copy(<<15>>, 2400)
+
+      # Every other byte (sites' looked-at flags, cities, wizards...) is as it was.
+      before = File.read!(save)
+      after_save = File.read!(target)
+      assert byte_size(before) == byte_size(after_save)
+
+      outside = fn bin ->
+        {head, rest} = :erlang.split_binary(bin, @explored_at)
+        {_, tail} = :erlang.split_binary(rest, 4800)
+        {head, tail}
+      end
+
+      assert outside.(before) == outside.(after_save)
+      assert File.read!(save) == before
+    end
+
+    test "a second reveal says there is nothing left to do", %{conn: conn, save: save} do
+      {view, _} = revealing(conn, save)
+      view |> element("#reveal-plane") |> render_click()
+      view |> element("#reveal-plane") |> render_click()
+
+      assert view |> element("#reveal-report") |> render() |> text_of() ==
+               "Already fully explored"
+    end
+
+    test "view mode has no Reveal buttons and ignores the event", %{conn: conn, save: save} do
+      session_id = "reveal-view-#{System.unique_integer([:positive])}"
+      conn = init_test_session(conn, %{"mirror_session_id" => session_id})
+      {:ok, view, _} = live(conn, ~p"/arcanus")
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      before = session_planes(session_id)
+
+      refute has_element?(view, "#reveal-plane")
+      render_click(view, "reveal_all", %{"scope" => "both"})
+      assert session_planes(session_id) == before
+    end
+
+    test "an unknown scope is ignored", %{conn: conn, save: save} do
+      {view, session_id} = revealing(conn, save)
+      before = session_planes(session_id)
+      render_click(view, "reveal_all", %{"scope" => "everything"})
+      assert session_planes(session_id) == before
+    end
+  end
+
   describe "overlays follow the save across tabs (STORY-044)" do
     # The newest items pushed for a layer so far (events queue up, so read them all).
     defp latest_overlay(view, layer, last \\ nil) do

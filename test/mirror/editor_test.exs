@@ -714,4 +714,85 @@ defmodule Mirror.EditorTest do
       assert Editor.tile_value(state, :arcanus, :terrain, 30, 20) == 162
     end
   end
+
+  describe "reveal_all/2 (STORY-037)" do
+    defp reveal_state do
+      zeros = :binary.copy(<<0>>, 2400)
+      # Arcanus: three tiles at 15, two partly explored (3, 12), the rest unexplored.
+      {arcanus, _} =
+        Enum.reduce(
+          [{0, 0, 15}, {1, 0, 15}, {59, 39, 15}, {2, 0, 3}, {3, 0, 12}],
+          {zeros, nil},
+          fn {x, y, v}, {bin, _} ->
+            Mirror.Map.put_tile_u8(bin, x, y, v)
+          end
+        )
+
+      all_explored = :binary.copy(<<15>>, 2400)
+
+      layer = fn exploration ->
+        %{terrain: :binary.copy(<<0::little-16>>, 2400), exploration: exploration}
+      end
+
+      raw_planes = %{arcanus: layer.(arcanus), myrror: layer.(all_explored)}
+
+      %{
+        save: %SaveFile{path: "/fake/SAVE1.GAM", planes: raw_planes, raw: <<>>},
+        planes: raw_planes,
+        original_planes: raw_planes,
+        active_layer: :terrain,
+        selection: %{terrain: 0},
+        history: %{arcanus: [], myrror: []},
+        redo: %{arcanus: [], myrror: []},
+        dataset_id: nil
+      }
+    end
+
+    test "sets every tile of the plane to 15, as one undo step" do
+      base = reveal_state()
+      {state, {:applied, entry, [part]}} = Editor.reveal_all(base, :arcanus)
+
+      assert state.planes.arcanus.exploration == :binary.copy(<<15>>, 2400)
+      assert entry.layer == :exploration
+      # Only what changed is recorded: 2397 of the 2400 tiles were not yet 15.
+      assert length(part.changes) == 2397
+      assert length(state.history.arcanus) == 1
+      assert state.history.myrror == []
+      assert state.redo.arcanus == []
+    end
+
+    test "partly explored tiles become fully explored, and keep their old value for undo" do
+      base = reveal_state()
+      {state, {:applied, _, [part]}} = Editor.reveal_all(base, :arcanus)
+
+      assert {2, 0, 3, 15} in part.changes
+      assert {3, 0, 12, 15} in part.changes
+      refute Enum.any?(part.changes, &match?({0, 0, _, _}, &1))
+      assert Mirror.Map.get_tile_u8(state.planes.arcanus.exploration, 2, 0) == 15
+    end
+
+    test "undo restores the original bytes and redo reveals again" do
+      base = reveal_state()
+      {revealed, _} = Editor.reveal_all(base, :arcanus)
+
+      {undone, _} = Editor.undo(revealed, :arcanus)
+      assert undone.planes == base.planes
+
+      {redone, _} = Editor.redo(undone, :arcanus)
+      assert redone.planes == revealed.planes
+    end
+
+    test "a plane that is already fully explored changes nothing and records nothing" do
+      base = reveal_state()
+      assert {^base, :none} = Editor.reveal_all(base, :myrror)
+    end
+
+    test "other layers and the other plane are untouched" do
+      base = reveal_state()
+      {state, _} = Editor.reveal_all(base, :arcanus)
+
+      assert state.planes.arcanus.terrain == base.planes.arcanus.terrain
+      assert state.planes.myrror == base.planes.myrror
+    end
+  end
 end
