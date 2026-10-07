@@ -15,7 +15,7 @@
 - [STORY-015](STORY-015-view-mode-layout.md): view mode, full-window map with pan/zoom (EPIC-006) **Done**
 - [STORY-016](STORY-016-edit-mode-shell.md): edit mode shell (EPIC-006) **Done**
 - [STORY-017](STORY-017-terrain-editing-autotile.md): terrain editing with auto-tiling via `TERRTYPE.LBX` (EPIC-006)
-- [STORY-018](STORY-018-roads-specials-editing.md): roads, corruption, resource editing (EPIC-006)
+- [STORY-018](STORY-018-roads-specials-editing.md): roads, corruption, resource editing (EPIC-006) **Implemented**, real-game check to do
 - [STORY-019](STORY-019-move-structures.md): select and move structures and unit stacks (EPIC-006)
 - [STORY-020](STORY-020-structure-editors.md): structure detail editors (EPIC-006)
 - [STORY-021](STORY-021-save-round-trip-safety.md): save round-trip safety (EPIC-006) **Done**
