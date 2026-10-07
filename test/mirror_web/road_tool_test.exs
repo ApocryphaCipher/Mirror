@@ -16,7 +16,7 @@ defmodule MirrorWeb.RoadToolTest do
       assert RoadTool.cycle_road(0x08, true) == 0x00
     end
 
-    test "an enchanted-only byte, as Myrror saves have it, counts as enchanted" do
+    test "a byte with only the enchanted bit set is still read as enchanted" do
       assert RoadTool.road_state(0x10) == :enchanted
       assert RoadTool.cycle_road(0x10) == 0x00
     end
