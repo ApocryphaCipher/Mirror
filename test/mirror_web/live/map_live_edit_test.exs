@@ -914,6 +914,33 @@ defmodule MirrorWeb.MapLiveEditTest do
       assert %{enchanted: false} = road_at(latest_roads(view), 30, 5)
     end
 
+    test "a click edits the stored byte, so another tab's bit is not erased (STORY-039)", %{
+      conn: conn,
+      save: save
+    } do
+      session_id = "stale-flags-test-#{System.unique_integer([:positive])}"
+      conn1 = init_test_session(conn, %{"mirror_session_id" => session_id})
+
+      {:ok, tab1, _} = live(conn1, ~p"/arcanus")
+      tab1 |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      render_click(tab1, "toggle_edit", %{})
+      render_click(tab1, "set_tool", %{"tool" => "road"})
+
+      # Another tab corrupts (3, 3) in the session store; this tab has not seen it.
+      store = Mirror.SessionStore.get(session_id)
+      {flags, 0} = Mirror.Map.put_tile_u8(store.planes.arcanus.terrain_flags, 3, 3, 0x20)
+
+      :ets.insert(
+        :mirror_sessions,
+        {session_id, put_in(store.planes.arcanus.terrain_flags, flags)}
+      )
+
+      click(tab1, 3, 3)
+
+      after_click = Mirror.SessionStore.get(session_id)
+      assert Mirror.Map.get_tile_u8(after_click.planes.arcanus.terrain_flags, 3, 3) == 0x28
+    end
+
     test "view mode ignores the tools", %{conn: conn, save: save} do
       view = editing(conn, save, "road")
       render_click(view, "toggle_edit", %{})

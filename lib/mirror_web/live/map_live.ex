@@ -2350,24 +2350,26 @@ defmodule MirrorWeb.MapLive do
 
   # Roads, corruption and specials (STORY-018): one click changes one byte of
   # the flags or minerals layer, as its own one-tile stroke (one undo step).
-  # `change` maps the tile's current byte to the new one.
+  # `change` maps the tile's current byte to the new one. It runs inside the
+  # session update, on the stored byte rather than this tab's snapshot, so two
+  # tabs editing different bits of one tile cannot erase each other (STORY-039).
   defp flag_click(socket, layer, what, x, y, change) do
-    case tile_value(socket.assigns.state, socket.assigns.plane, layer, x, y) do
-      nil ->
-        socket
+    if valid_coord?(x, y) do
+      {socket, applied} = start_stroke_with(socket, layer, x, y, change)
 
-      current ->
-        new = change.(current)
+      socket = finalize_stroke(socket, socket.assigns.active_stroke)
 
-        if new == current do
+      case applied do
+        {prev, new} ->
           socket
-        else
-          socket
-          |> start_stroke(layer, x, y, new)
-          |> then(&finalize_stroke(&1, &1.assigns.active_stroke))
-          |> assign(:road_report, RoadTool.describe(what, current, new))
+          |> assign(:road_report, RoadTool.describe(what, prev, new))
           |> assign_hover(x, y)
-        end
+
+        nil ->
+          socket
+      end
+    else
+      socket
     end
   end
 
@@ -2391,11 +2393,24 @@ defmodule MirrorWeb.MapLive do
   end
 
   defp start_stroke(socket, layer, x, y, value \\ nil) do
+    {socket, _change} = start_stroke_with(socket, layer, x, y, value)
+    socket
+  end
+
+  # `value` is a tile value, `nil` for the layer's brush, or a function from the
+  # stored tile value to the new one. Returns the socket and `{prev, new}`, or
+  # `nil` when nothing changed.
+  defp start_stroke_with(socket, layer, x, y, value) do
     plane = socket.assigns.plane
 
     {:ok, state, {stroke, change, updates}} =
       SessionStore.update(socket.assigns.session_id, fn current ->
-        val = value || Map.get(current.selection, layer, 0)
+        val =
+          cond do
+            is_function(value, 1) -> value.(Editor.tile_value(current, plane, layer, x, y) || 0)
+            value -> value
+            true -> Map.get(current.selection, layer, 0)
+          end
 
         {next_state, stroke, change, updates} =
           Editor.start_stroke(current, plane, layer, x, y, val)
@@ -2411,11 +2426,8 @@ defmodule MirrorWeb.MapLive do
       |> assign_state(state)
       |> maybe_push_updates(layer, updates, changes)
 
-    if changes do
-      emit_engine_delta(socket, plane, layer, changes)
-    else
-      socket
-    end
+    socket = if changes, do: emit_engine_delta(socket, plane, layer, changes), else: socket
+    {socket, change}
   end
 
   defp apply_stroke_change(socket, layer, x, y) do
