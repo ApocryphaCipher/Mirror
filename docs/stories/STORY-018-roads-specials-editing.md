@@ -1,8 +1,8 @@
 # STORY-018: Roads, corruption and resource editing
 
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
-**Status:** implemented; the byte values are checked in the running game
-(2026-10-06), and what the player sees is still to confirm. The Road, Corruption
+**Status:** implemented and checked in the running game (2026-10-06): the bytes
+and what the player sees. The Road, Corruption
 and Special tools are in the edit toolbar (`MirrorWeb.RoadTool`,
 `MirrorWeb.MapLive`); the meanings they use are in
 [kazzmir-save-layouts.md](../reference/kazzmir-save-layouts.md). It builds on
@@ -53,8 +53,14 @@ Loaded in the DOSBox fork, then Enchant Road cast (checkpoint 70, collection
   writes. SAVE3's 13 Myrror road tiles are `0x18` too (an earlier note here said
   `0x10`; it was wrong).
 
+- **On screen** (12 raw screenshots, 0.25 s apart, tile pixels compared):
+  - the tool-written enchanted road at (33,21) and the tool road the spell
+    enchanted at (32,21) flicker in the same on/off pattern as the game's own
+    enchanted roads at (31,22) and (31,23);
+  - the plain road at (31,20) and a grass control tile never change;
+  - the corruption at (35,18) is drawn as the game's dark corrupted tile, and
+    the mithril at (36,18) as a sparkling ore sprite.
+
 ## Still to check in the real game
 
-- What the screen shows: the enchanted road at (33,21) animating like the
-  game's own, the corruption at (35,18) and the mithril at (36,18) drawn.
 - Roads on ocean tiles (bridges) were not tried.
