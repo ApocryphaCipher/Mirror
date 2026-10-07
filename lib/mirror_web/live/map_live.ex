@@ -100,6 +100,8 @@ defmodule MirrorWeb.MapLive do
       |> assign(:active_stroke, nil)
       |> assign(:hover, nil)
       |> assign(:tile_assets, nil)
+      |> assign(:overlays_primed, false)
+      |> assign(:overlay_sprites_sent, false)
       |> assign(:load_path, SaveManager.default_load_path())
       |> assign(:save_path_input, state.save_path || "")
       |> assign_forms()
@@ -173,6 +175,7 @@ defmodule MirrorWeb.MapLive do
   def handle_info({:session_state_updated, session_id, new_state, sender}, socket) do
     if session_id == socket.assigns.session_id and sender != self() do
       current_state = SessionStore.get(session_id) || new_state
+      previous_state = socket.assigns.state
 
       socket =
         socket
@@ -186,6 +189,7 @@ defmodule MirrorWeb.MapLive do
           |> push_map_state()
           |> push_map_reload()
           |> push_map_layers()
+          |> push_overlays_after_update(previous_state)
         else
           socket
         end
@@ -278,6 +282,8 @@ defmodule MirrorWeb.MapLive do
            end
          end) do
       {:ok, %{save: %SaveFile{}} = state} ->
+        previous_state = socket.assigns.state
+
         socket =
           socket
           |> assign_from_state(state)
@@ -287,7 +293,12 @@ defmodule MirrorWeb.MapLive do
 
         socket =
           if connected?(socket),
-            do: socket |> push_map_state() |> push_map_reload() |> push_map_layers(),
+            do:
+              socket
+              |> push_map_state()
+              |> push_map_reload()
+              |> push_map_layers()
+              |> push_overlays_after_update(previous_state),
             else: socket
 
         {:noreply, socket}
@@ -3062,31 +3073,74 @@ defmodule MirrorWeb.MapLive do
   end
 
   # Overlay layers on the map pages (STORY-009): the sprites once, then each
-  # layer's items for this plane. The Lab has no overlays.
+  # layer's items for this plane. The Lab has no overlays. Decoding the sprites
+  # reads the game's LBX files, so it stays off the paths that run on every edit
+  # or cross-tab update (STORY-044); those use `push_overlay_items/1`.
   defp push_overlays(%{assigns: %{lab?: true}} = socket), do: socket
 
   defp push_overlays(socket) do
-    socket =
-      case OverlaySprites.load(Paths.mom_path()) do
-        {:ok, sprites} -> push_event(socket, "overlay_sprites", sprites)
-        {:error, _} -> socket
-      end
-
     socket
-    |> push_event("overlay_data", %{
-      layer: "sites",
-      items: site_items(socket.assigns.state, socket.assigns.plane)
-    })
-    |> push_event("overlay_data", %{
-      layer: "cities",
-      items: city_items(socket.assigns.state, socket.assigns.plane)
-    })
-    |> push_event("overlay_data", %{
-      layer: "units",
-      items: unit_items(socket.assigns.state, socket.assigns.plane)
-    })
+    |> push_overlay_sprites()
+    |> assign(:overlays_primed, true)
+    |> push_overlay_items()
     |> push_map_layers()
   end
+
+  # The sprite bank, once per socket: the game files do not change under a
+  # running page, so a later load, layer change or tile reload does not decode
+  # them again. A failed decode (no game files yet) is tried again on the next call.
+  defp push_overlay_sprites(%{assigns: %{overlay_sprites_sent: true}} = socket), do: socket
+
+  defp push_overlay_sprites(socket) do
+    case OverlaySprites.load(Paths.mom_path()) do
+      {:ok, sprites} ->
+        socket |> push_event("overlay_sprites", sprites) |> assign(:overlay_sprites_sent, true)
+
+      {:error, _} ->
+        socket
+    end
+  end
+
+  # What a cross-tab update or a discard needs for the overlays (STORY-044). A tab
+  # opened before any save has never been given the tile assets or the sprites (the
+  # mount only does that when a save is loaded), so its first update sets it up like
+  # a load; after that only the items move, and only when the save changed.
+  defp push_overlays_after_update(%{assigns: %{lab?: true}} = socket, _previous_state), do: socket
+
+  defp push_overlays_after_update(socket, previous_state) do
+    if socket.assigns.overlays_primed do
+      push_overlay_items_if_save_changed(socket, previous_state)
+    else
+      maybe_push_tile_assets(socket)
+    end
+  end
+
+  # The cities, units and sites for this plane. They come from the save's raw
+  # bytes alone, so they only change when the save itself does.
+  defp push_overlay_items(%{assigns: %{lab?: true}} = socket), do: socket
+
+  defp push_overlay_items(socket) do
+    %{state: state, plane: plane} = socket.assigns
+
+    socket
+    |> push_event("overlay_data", %{layer: "sites", items: site_items(state, plane)})
+    |> push_event("overlay_data", %{layer: "cities", items: city_items(state, plane)})
+    |> push_event("overlay_data", %{layer: "units", items: unit_items(state, plane)})
+  end
+
+  # For updates that arrive from another tab or a discard: tile edits leave the
+  # raw save alone, so only a different save (a load, a discard that restores one)
+  # needs the items again (STORY-044).
+  defp push_overlay_items_if_save_changed(socket, previous_state) do
+    if save_raw(previous_state) == save_raw(socket.assigns.state) do
+      socket
+    else
+      push_overlay_items(socket)
+    end
+  end
+
+  defp save_raw(%{save: %{raw: raw}}), do: raw
+  defp save_raw(_state), do: nil
 
   # The overlays computed from the map itself, pushed again after every
   # edit: where a city could go (STORY-035), roads, specials and corruption

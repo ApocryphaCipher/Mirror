@@ -773,6 +773,122 @@ defmodule MirrorWeb.MapLiveEditTest do
     end
   end
 
+  describe "overlays follow the save across tabs (STORY-044)" do
+    # The newest items pushed for a layer so far (events queue up, so read them all).
+    defp latest_overlay(view, layer, last \\ nil) do
+      next =
+        try do
+          assert_push_event(view, "overlay_data", %{layer: ^layer, items: items}, 50)
+          items
+        rescue
+          ExUnit.AssertionError -> :none
+        end
+
+      case {next, last} do
+        {:none, nil} -> flunk("no #{layer} overlay was pushed")
+        {:none, last} -> last
+        {items, _} -> latest_overlay(view, layer, items)
+      end
+    end
+
+    # Reads and drops every queued push of an event.
+    defp drain(view, event) do
+      assert_push_event(view, event, _, 50)
+      drain(view, event)
+    rescue
+      ExUnit.AssertionError -> :ok
+    end
+
+    defp two_tabs(conn) do
+      session_id = "overlay-tabs-#{System.unique_integer([:positive])}"
+      conn1 = init_test_session(conn, %{"mirror_session_id" => session_id})
+      conn2 = init_test_session(conn, %{"mirror_session_id" => session_id})
+      {:ok, tab1, _} = live(conn1, ~p"/arcanus")
+      {:ok, tab2, _} = live(conn2, ~p"/arcanus")
+      {tab1, tab2}
+    end
+
+    defp load(view, path),
+      do: view |> element("#load-form") |> render_submit(%{"load" => %{"path" => path}})
+
+    test "a save loaded in one tab shows its cities, units and sites in the other", %{
+      conn: conn,
+      save: save
+    } do
+      {tab1, tab2} = two_tabs(conn)
+      load(tab1, save)
+
+      assert Enum.any?(latest_overlay(tab2, "cities"), &match?(%{name: "Deventor"}, &1))
+      assert latest_overlay(tab2, "units") == []
+      assert Enum.any?(latest_overlay(tab2, "sites"), &match?(%{x: 48, y: 28}, &1))
+    end
+
+    test "loading a different save replaces the other tab's overlays", %{
+      conn: conn,
+      dir: dir,
+      save: save
+    } do
+      other = Path.join(dir, "SAVE2.GAM")
+      File.write!(other, String.replace(File.read!(save), "Deventor", "Deventer"))
+
+      {tab1, tab2} = two_tabs(conn)
+      load(tab1, save)
+      assert Enum.any?(latest_overlay(tab2, "cities"), &match?(%{name: "Deventor"}, &1))
+
+      load(tab1, other)
+      cities = latest_overlay(tab2, "cities")
+      assert Enum.any?(cities, &match?(%{name: "Deventer"}, &1))
+      refute Enum.any?(cities, &match?(%{name: "Deventor"}, &1))
+    end
+
+    # Whether the tab has been given the overlay sprites and tile assets yet.
+    defp primed?(view), do: :sys.get_state(view.pid).socket.assigns.overlays_primed
+
+    test "a tab opened before any save is set up like a load by the first cross-tab load",
+         %{conn: conn, save: save} do
+      session_id = "overlay-prime-#{System.unique_integer([:positive])}"
+      conn = init_test_session(conn, %{"mirror_session_id" => session_id})
+      {:ok, tab1, _} = live(conn, ~p"/arcanus")
+      {:ok, tab2, _} = live(conn, ~p"/arcanus")
+      refute primed?(tab2)
+
+      load(tab1, save)
+      # Its first update gets the sprites and tile assets (a mount with no save never
+      # did) and the items.
+      assert primed?(tab2)
+      assert Enum.any?(latest_overlay(tab2, "cities"), &match?(%{name: "Deventor"}, &1))
+
+      # A tab opened once a save is loaded is set up at mount.
+      {:ok, tab3, _} = live(conn, ~p"/arcanus")
+      assert primed?(tab3)
+    end
+
+    test "a tile edit in one tab does not re-push the other tab's sprites or items", %{
+      conn: conn,
+      save: save
+    } do
+      {tab1, tab2} = two_tabs(conn)
+      load(tab1, save)
+      latest_overlay(tab2, "cities")
+      latest_overlay(tab2, "units")
+      latest_overlay(tab2, "sites")
+      # With the game files present, the first load also sent the sprites.
+      drain(tab2, "overlay_sprites")
+
+      render_click(tab1, "toggle_edit", %{})
+      render_click(tab1, "set_tool", %{"tool" => "cycle"})
+      click(tab1, 1, 1)
+
+      # The map layers still follow the edit...
+      assert_push_event(tab2, "overlay_data", %{layer: "roads"})
+      # ...but the sprites (an LBX decode) and the save's items do not move.
+      refute_push_event(tab2, "overlay_sprites", _, 100)
+      refute_push_event(tab2, "overlay_data", %{layer: "cities"}, 100)
+      refute_push_event(tab2, "overlay_data", %{layer: "units"}, 100)
+      refute_push_event(tab2, "overlay_data", %{layer: "sites"}, 100)
+    end
+  end
+
   describe "Roads, corruption and specials tools (STORY-018)" do
     defp road_at(items, x, y), do: Enum.find(items, &match?(%{kind: :road, x: ^x, y: ^y}, &1))
 
@@ -1382,6 +1498,44 @@ defmodule MirrorWeb.MapLiveEditTest do
         plaques: %{blue: %{width: 20, height: 18}},
         units: %{0 => %{width: 18, height: 16}}
       })
+    end
+
+    @tag skip:
+           !@has_real_save_and_sprites &&
+             "needs MIRROR_MOM_PATH/(SAVE1.GAM, MAPBACK.LBX, UNITS1.LBX, UNITS2.LBX)"
+    test "a tab opened before any save gets the sprites on the first cross-tab load (STORY-044)",
+         %{conn: conn, dir: dir} do
+      real_save = Path.join(dir, "REAL_SAVE1.GAM")
+      File.cp!(@real_save_source, real_save)
+
+      session_id = "overlay-sprites-#{System.unique_integer([:positive])}"
+      conn = init_test_session(conn, %{"mirror_session_id" => session_id})
+      {:ok, tab1, _} = live(conn, ~p"/arcanus")
+      {:ok, tab2, _} = live(conn, ~p"/arcanus")
+
+      tab1 |> element("#load-form") |> render_submit(%{"load" => %{"path" => real_save}})
+
+      assert_push_event(tab2, "overlay_sprites", %{cities: %{city: %{width: 32}}})
+      assert_push_event(tab2, "overlay_data", %{layer: "cities", items: items})
+      assert length(items) == 16
+    end
+
+    @tag skip:
+           !@has_real_save_and_sprites &&
+             "needs MIRROR_MOM_PATH/(SAVE1.GAM, MAPBACK.LBX, UNITS1.LBX, UNITS2.LBX)"
+    test "the sprites are pushed once per socket, not again by later loads (STORY-044)",
+         %{conn: conn, dir: dir} do
+      real_save = Path.join(dir, "REAL_SAVE1.GAM")
+      File.cp!(@real_save_source, real_save)
+
+      {:ok, view, _} = live(conn, ~p"/arcanus")
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => real_save}})
+      assert_push_event(view, "overlay_sprites", %{cities: %{city: %{width: 32}}})
+
+      # Loading again re-sends the items, but not the sprite bank.
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => real_save}})
+      assert_push_event(view, "overlay_data", %{layer: "cities", items: [_ | _]})
+      refute_push_event(view, "overlay_sprites", _, 100)
     end
 
     @tag skip: !@has_real_save && "needs MIRROR_MOM_PATH/SAVE1.GAM"
