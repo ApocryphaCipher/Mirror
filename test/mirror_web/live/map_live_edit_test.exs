@@ -791,6 +791,14 @@ defmodule MirrorWeb.MapLiveEditTest do
       end
     end
 
+    # Reads and drops every queued push of an event.
+    defp drain(view, event) do
+      assert_push_event(view, event, _, 50)
+      drain(view, event)
+    rescue
+      ExUnit.AssertionError -> :ok
+    end
+
     defp two_tabs(conn) do
       session_id = "overlay-tabs-#{System.unique_integer([:positive])}"
       conn1 = init_test_session(conn, %{"mirror_session_id" => session_id})
@@ -833,6 +841,28 @@ defmodule MirrorWeb.MapLiveEditTest do
       refute Enum.any?(cities, &match?(%{name: "Deventor"}, &1))
     end
 
+    # Whether the tab has been given the overlay sprites and tile assets yet.
+    defp primed?(view), do: :sys.get_state(view.pid).socket.assigns.overlays_primed
+
+    test "a tab opened before any save is set up like a load by the first cross-tab load",
+         %{conn: conn, save: save} do
+      session_id = "overlay-prime-#{System.unique_integer([:positive])}"
+      conn = init_test_session(conn, %{"mirror_session_id" => session_id})
+      {:ok, tab1, _} = live(conn, ~p"/arcanus")
+      {:ok, tab2, _} = live(conn, ~p"/arcanus")
+      refute primed?(tab2)
+
+      load(tab1, save)
+      # Its first update gets the sprites and tile assets (a mount with no save never
+      # did) and the items.
+      assert primed?(tab2)
+      assert Enum.any?(latest_overlay(tab2, "cities"), &match?(%{name: "Deventor"}, &1))
+
+      # A tab opened once a save is loaded is set up at mount.
+      {:ok, tab3, _} = live(conn, ~p"/arcanus")
+      assert primed?(tab3)
+    end
+
     test "a tile edit in one tab does not re-push the other tab's sprites or items", %{
       conn: conn,
       save: save
@@ -842,6 +872,8 @@ defmodule MirrorWeb.MapLiveEditTest do
       latest_overlay(tab2, "cities")
       latest_overlay(tab2, "units")
       latest_overlay(tab2, "sites")
+      # With the game files present, the first load also sent the sprites.
+      drain(tab2, "overlay_sprites")
 
       render_click(tab1, "toggle_edit", %{})
       render_click(tab1, "set_tool", %{"tool" => "cycle"})
@@ -1466,6 +1498,26 @@ defmodule MirrorWeb.MapLiveEditTest do
         plaques: %{blue: %{width: 20, height: 18}},
         units: %{0 => %{width: 18, height: 16}}
       })
+    end
+
+    @tag skip:
+           !@has_real_save_and_sprites &&
+             "needs MIRROR_MOM_PATH/(SAVE1.GAM, MAPBACK.LBX, UNITS1.LBX, UNITS2.LBX)"
+    test "a tab opened before any save gets the sprites on the first cross-tab load (STORY-044)",
+         %{conn: conn, dir: dir} do
+      real_save = Path.join(dir, "REAL_SAVE1.GAM")
+      File.cp!(@real_save_source, real_save)
+
+      session_id = "overlay-sprites-#{System.unique_integer([:positive])}"
+      conn = init_test_session(conn, %{"mirror_session_id" => session_id})
+      {:ok, tab1, _} = live(conn, ~p"/arcanus")
+      {:ok, tab2, _} = live(conn, ~p"/arcanus")
+
+      tab1 |> element("#load-form") |> render_submit(%{"load" => %{"path" => real_save}})
+
+      assert_push_event(tab2, "overlay_sprites", %{cities: %{city: %{width: 32}}})
+      assert_push_event(tab2, "overlay_data", %{layer: "cities", items: items})
+      assert length(items) == 16
     end
 
     @tag skip: !@has_real_save && "needs MIRROR_MOM_PATH/SAVE1.GAM"

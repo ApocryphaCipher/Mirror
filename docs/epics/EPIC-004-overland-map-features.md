@@ -72,6 +72,7 @@ STORY-011 → STORY-013.
 - [STORY-011](../stories/STORY-011-sites-towers-lairs.md) (**Done**): towers, fortresses, lairs, ruins and other sites
 - [STORY-012](../stories/STORY-012-units-with-banner-plaques.md) (**Done**): units with banner-colour plaques
 - [STORY-013](../stories/STORY-013-roads-minerals-corruption.md) (**Done**): specials and bonuses (ores, gems, nightshade, wild game…), roads, corruption
+- [STORY-044](../stories/STORY-044-bug-stale-overlays-across-tabs.md) (**Fixed**): **bug**: cities, units and sites overlays go stale on cross-tab save updates
 
 Superseded from the original scoping above: the plan to use MOMIME
 `overland/cities` / `overland/mapFeatures` PNGs. Classic LBX art is the

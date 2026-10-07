@@ -100,6 +100,7 @@ defmodule MirrorWeb.MapLive do
       |> assign(:active_stroke, nil)
       |> assign(:hover, nil)
       |> assign(:tile_assets, nil)
+      |> assign(:overlays_primed, false)
       |> assign(:load_path, SaveManager.default_load_path())
       |> assign(:save_path_input, state.save_path || "")
       |> assign_forms()
@@ -187,7 +188,7 @@ defmodule MirrorWeb.MapLive do
           |> push_map_state()
           |> push_map_reload()
           |> push_map_layers()
-          |> push_overlay_items_if_save_changed(previous_state)
+          |> push_overlays_after_update(previous_state)
         else
           socket
         end
@@ -296,7 +297,7 @@ defmodule MirrorWeb.MapLive do
               |> push_map_state()
               |> push_map_reload()
               |> push_map_layers()
-              |> push_overlay_items_if_save_changed(previous_state),
+              |> push_overlays_after_update(previous_state),
             else: socket
 
         {:noreply, socket}
@@ -3084,8 +3085,23 @@ defmodule MirrorWeb.MapLive do
       end
 
     socket
+    |> assign(:overlays_primed, true)
     |> push_overlay_items()
     |> push_map_layers()
+  end
+
+  # What a cross-tab update or a discard needs for the overlays (STORY-044). A tab
+  # opened before any save has never been given the tile assets or the sprites (the
+  # mount only does that when a save is loaded), so its first update sets it up like
+  # a load; after that only the items move, and only when the save changed.
+  defp push_overlays_after_update(%{assigns: %{lab?: true}} = socket, _previous_state), do: socket
+
+  defp push_overlays_after_update(socket, previous_state) do
+    if socket.assigns.overlays_primed do
+      push_overlay_items_if_save_changed(socket, previous_state)
+    else
+      maybe_push_tile_assets(socket)
+    end
   end
 
   # The cities, units and sites for this plane. They come from the save's raw
