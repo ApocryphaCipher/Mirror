@@ -1,8 +1,7 @@
 # STORY-037: Reveal all: make every tile explored for the player
 
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
-**Status:** implemented 2026-10-07; the real-game check (the last item under
-"Done when") is still to do. Nice-to-have.
+**Status:** implemented and checked in the real game (2026-10-07).
 **Size:** small
 **Requested by:** [Kevin](https://github.com/KevinAsbury), 2026-09-24
 
@@ -82,7 +81,20 @@ itself is checked.
   other plane and layers are untouched, Save as writes the 4,800 bytes and no other
   byte differs, view mode and an unknown scope are ignored.
 
-## Still to check in the real game
+## Checked in the real game (2026-10-07)
 
-Save as, load in DOSBox, and look: the whole map visible on both planes, a lair
-that was never looked at still "Unexplored" in the Surveyor, and the mini-map.
+A save was made from SAVE8 (Freya, 279 explored tiles on Arcanus, none on Myrror,
+including 84 partly explored 1–14 tiles) with `Editor.reveal_all/2` on both planes
+and written with `SaveFile.write`, into slot 6. Only the 4,800 explored bytes
+differ from SAVE8 (4,605 of them changed). Loaded in the DOSBox fork
+(checkpoint 71, collection `mom-live-2026-10-07`):
+
+- **The game loads it without complaint and keeps every byte:** the explored block
+  in RAM is identical to the file's, all 4,800 tiles at 15.
+- **No fog on either plane, and the mini-map shows the whole world.** The main
+  view has no black pixels, and the mini-map's only black pixels are its own frame.
+- **A site that was never looked at still says "Unexplored"** in the Surveyor, so
+  Reveal all leaves the sites' looked-at flag alone.
+
+SAVE3 is not a usable source for this check: it is the "God mode" save and is
+already fully explored on both planes, so revealing it changes nothing.
