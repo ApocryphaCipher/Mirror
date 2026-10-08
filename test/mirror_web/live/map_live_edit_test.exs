@@ -918,6 +918,67 @@ defmodule MirrorWeb.MapLiveEditTest do
     end
   end
 
+  describe "node auras (STORY-008)" do
+    @aura_tiles [{42, 10}, {43, 10}, {41, 9}, {42, 11}, {41, 10}]
+
+    defp aura_tiles(items), do: items |> Enum.map(&{&1.x, &1.y}) |> Enum.sort()
+
+    test "an owned node pushes its aura tiles in its owner's banner colour", %{
+      conn: conn,
+      save: save
+    } do
+      {:ok, view, _} = live(conn, ~p"/arcanus")
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+
+      assert_push_event(view, "overlay_data", %{layer: "auras", items: items})
+      assert aura_tiles(items) == Enum.sort(@aura_tiles)
+      # Wizard 0's banner is yellow (Freya)
+      assert Enum.all?(items, &(&1.banner == :yellow))
+      # Each tile carries its place in the node's list: the game's sparkle frame is
+      # (step + that place) mod 6.
+      assert items |> Enum.sort_by(& &1.i) |> Enum.map(&{&1.i, &1.x, &1.y}) ==
+               Enum.with_index(@aura_tiles, fn {x, y}, i -> {i, x, y} end)
+    end
+
+    test "an unowned node shows nothing", %{conn: conn, dir: dir, save: save} do
+      unowned = Path.join(dir, "SAVE2.GAM")
+      # the owner byte of node record 0 is at 0x6058 + 3
+      <<head::binary-size(0x6058 + 3), _owner, tail::binary>> = File.read!(save)
+      File.write!(unowned, <<head::binary, 0xFF, tail::binary>>)
+
+      {:ok, view, _} = live(conn, ~p"/arcanus")
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => unowned}})
+
+      assert_push_event(view, "overlay_data", %{layer: "auras", items: []})
+    end
+
+    test "only the viewed plane's nodes are pushed", %{conn: conn, save: save} do
+      {:ok, view, _} = live(conn, ~p"/myrror")
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+
+      assert_push_event(view, "overlay_data", %{layer: "auras", items: []})
+    end
+
+    test "a save loaded in one tab shows its auras in the other, and a tile edit does not re-push",
+         %{conn: conn, save: save} do
+      session_id = "aura-tabs-#{System.unique_integer([:positive])}"
+      conn = init_test_session(conn, %{"mirror_session_id" => session_id})
+      {:ok, tab1, _} = live(conn, ~p"/arcanus")
+      {:ok, tab2, _} = live(conn, ~p"/arcanus")
+
+      tab1 |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      assert aura_tiles(latest_overlay(tab2, "auras")) == Enum.sort(@aura_tiles)
+
+      render_click(tab1, "toggle_edit", %{})
+      render_click(tab1, "set_tool", %{"tool" => "cycle"})
+      pointer(tab1, "start", 1, 1)
+      pointer(tab1, "end", 1, 1)
+
+      assert_push_event(tab2, "overlay_data", %{layer: "roads"})
+      refute_push_event(tab2, "overlay_data", %{layer: "auras"}, 100)
+    end
+  end
+
   describe "overlays follow the save across tabs (STORY-044)" do
     # The newest items pushed for a layer so far (events queue up, so read them all).
     defp latest_overlay(view, layer, last \\ nil) do
@@ -1733,8 +1794,12 @@ defmodule MirrorWeb.MapLiveEditTest do
     # Known tower and magic node from SitesTest
     raw = put_bytes(raw, 0x6610, <<48, 28, 0xFF, 0>>)
 
-    raw =
-      put_bytes(raw, nodes_offset, <<42, 10, 0, 0, 5>> <> :binary.copy(<<0>>, 40) <> <<0, 2, 0>>)
+    # The Sorcery node at (42, 10), owned by wizard 0, with the five aura tiles that
+    # sparkled in the game after a real meld (the node's own tile first).
+    aura_x = <<42, 43, 41, 42, 41>> <> :binary.copy(<<0>>, 15)
+    aura_y = <<10, 10, 9, 11, 10>> <> :binary.copy(<<0>>, 15)
+
+    raw = put_bytes(raw, nodes_offset, <<42, 10, 0, 0, 5>> <> aura_x <> aura_y <> <<0, 2, 0>>)
 
     # 2. Wizard 0 banner = 4 (Yellow)
     raw = put_bytes(raw, 0x09E8 + 0x16, <<4>>)

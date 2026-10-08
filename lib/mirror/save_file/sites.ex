@@ -8,8 +8,11 @@ defmodule Mirror.SaveFile.Sites do
   Offsets are the save's own writes (docs/reference/save-to-ram-map.md):
 
     * nodes, 30 × 48 bytes at `0x6058`: `+0` x, `+1` y, `+2` plane,
-      `+3` owner (−1 none; checked: 0 after Kevin melded one), `+0x2d`
-      type (0 Sorcery, 1 Nature, 2 Chaos), `+0x2e` flags (1 warped,
+      `+3` owner (−1 none; checked: 0 after Kevin melded one), `+4` power
+      (the number of aura tiles used), `+5` twenty aura x's then `+25`
+      twenty aura y's (checked: the first entry is the node's own tile, and
+      the tiles that sparkle in the game are exactly the first `power`),
+      `+0x2d` type (0 Sorcery, 1 Nature, 2 Chaos), `+0x2e` flags (1 warped,
       2 guardian spirit). Type and flags from ReMoM.
     * towers, 6 × 4 bytes at `0x6610`: `+0` x, `+1` y (a tower stands on
       both planes), `+2` owner. From ReMoM.
@@ -59,7 +62,10 @@ defmodule Mirror.SaveFile.Sites do
         do: site
   end
 
-  defp magic_node(<<x, y, plane, owner::signed, _::binary-size(41), type, flags, _pad>>)
+  defp magic_node(
+         <<x, y, plane, owner::signed, power, aura_x::binary-size(20), aura_y::binary-size(20),
+           type, flags, _pad>>
+       )
        when x < 60 and y < 40 and plane in [0, 1] do
     %{
       x: x,
@@ -68,11 +74,22 @@ defmodule Mirror.SaveFile.Sites do
       type: Map.get(@node_types, type, :unknown),
       owner: if(owner < 0, do: nil, else: owner),
       warped: Bitwise.band(flags, 1) != 0,
-      guardian: Bitwise.band(flags, 2) != 0
+      guardian: Bitwise.band(flags, 2) != 0,
+      power: power,
+      aura_tiles: aura_tiles(power, aura_x, aura_y)
     }
   end
 
   defp magic_node(_bytes), do: nil
+
+  # The first `power` (x, y) pairs, as `{x, y}`; a pair off the map is dropped.
+  defp aura_tiles(power, aura_x, aura_y) do
+    for i <- 0..(min(power, 20) - 1)//1,
+        x = :binary.at(aura_x, i),
+        y = :binary.at(aura_y, i),
+        x < 60 and y < 40,
+        do: {x, y}
+  end
 
   defp tower(<<x, y, owner::signed, _pad>>) when x < 60 and y < 40,
     do: %{x: x, y: y, owner: if(owner < 0, do: nil, else: owner)}

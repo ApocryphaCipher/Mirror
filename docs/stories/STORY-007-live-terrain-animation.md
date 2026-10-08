@@ -1,8 +1,8 @@
 # STORY-007: Live terrain animation (ocean twinkle)
 
 **Parent:** [EPIC-005](../epics/EPIC-005-animated-terrain-and-magic.md)
-**Status:** implemented 2026-10-07. Still to do by eye: watch it run at speed
-and tune the pace against the real game (see "Not yet seen").
+**Status:** implemented 2026-10-07; pace corrected the same day from a measurement
+of the real game (see "The pace"). Still to do by eye: watch it run at speed.
 **Size:** small
 
 ## Findings so far (2026-10-04)
@@ -57,7 +57,7 @@ and tune the pace against the real game (see "Not yet seen").
   (`[index, frames]` with `frames > 1`), keeping that set in step with one edited
   cell, and when the clock should advance.
 - **`MapCanvas` hook** (`map_hooks.js`): a `requestAnimationFrame` clock throttled
-  to one step every 160 ms (about 6 frames a second) that redraws **only the
+  to one step every 600 ms that redraws **only the
   animated cells**, at `frame = (phase + step) % frames`. The cell list is rebuilt
   on `tile_assets` and `map_reload`, and updated per cell in `applyTileValue`, which
   every paint, cycle, undo and redo goes through, so painting 0 → 601 adds a cell
@@ -87,10 +87,20 @@ hook, with a SAVE3 loaded, comparing every cell's pixels between frames:
 - painting 0 → 601 adds a cell to the list and painting back removes it;
 - Myrror builds its own list.
 
+## The pace (measured 2026-10-07)
+
+The first version stepped every 160 ms, a guess. Screenshots of the real game through
+the DOSBox fork's API (a 601 ocean tile over 8 s, and the node sparkles over 7 s)
+show the game steps its overland animation about **every 0.6 s** (13 intervals of
+0.46–0.68 s, mean about 0.62; a 601 tile shows its 4 looks in turn). So the interval
+is now **600 ms**, `ANIMATION_INTERVAL_MS` in `assets/js/terrain_animation.mjs`, shared
+by the terrain canvas and the overlay canvas. Both take their frame from
+`phaseAt(timestamp)`, the step the timestamp falls in, so they stay in step with
+each other without sharing a timer.
+
 ## Not yet seen
 
 The browser pane was hidden, so `requestAnimationFrame` did not run and the clock
 was stepped by hand with fake timestamps. So **nobody has watched it animate at
-speed**: whether the 160 ms pace looks like the game's, and that the live clock runs
-and pauses when a tab is hidden, is still to confirm by eye. The pace is the
-`ANIMATION_INTERVAL_MS` constant in `map_hooks.js`.
+speed** in Mirror: that the live clock runs and pauses with the tab is still to
+confirm by eye.

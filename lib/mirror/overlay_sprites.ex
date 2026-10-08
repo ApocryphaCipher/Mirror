@@ -79,10 +79,15 @@ defmodule Mirror.OverlaySprites do
     neutral: 19
   }
 
+  # Node aura sparkles: MAPBACK.LBX #63..#67, 20x18 with 6 frames, one entry per
+  # banner colour (#68 is blank). Each entry is already in its owner's colour, so
+  # the client draws it as it is (STORY-008).
+  @sparkles %{blue: 63, green: 64, purple: 65, red: 66, yellow: 67}
+
   @doc """
   `%{palette: base64 RGBA (index 0 transparent), cities: %{...}, roads: %{...},
   enchanted_roads: %{...}, specials: %{...}, corruption: %{...}, sites: %{...},
-  plaques: %{...}, units: %{...}}`, each sprite `%{width, height, frames: [base64 indices]}`, or
+  sparkles: %{...}, plaques: %{...}, units: %{...}}`, each sprite `%{width, height, frames: [base64 indices]}`, or
   `{:error, reason}` when `MAPBACK.LBX` isn't in `dir`. `UNITS1.LBX`/`UNITS2.LBX`
   are both optional in `Mirror.GameFiles.manifest/0` (an install may have
   `MAPBACK.LBX` without them), so a missing unit bank degrades to an empty
@@ -100,6 +105,7 @@ defmodule Mirror.OverlaySprites do
          {:ok, specials} <- sprites(mapback, @specials),
          {:ok, corruption} <- sprites(mapback, @corruption),
          {:ok, sites} <- sprites(mapback, @sites),
+         {:ok, sparkles} <- sprites(mapback, @sparkles),
          {:ok, plaques} <- sprites(mapback, @plaques) do
       {:ok,
        %{
@@ -110,6 +116,7 @@ defmodule Mirror.OverlaySprites do
          specials: specials,
          corruption: corruption,
          sites: sites,
+         sparkles: sparkles,
          plaques: plaques,
          units: load_units(dir)
        }}
