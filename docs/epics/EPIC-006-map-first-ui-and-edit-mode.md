@@ -65,7 +65,7 @@ STORY-017 → then the rest as their EPIC-004 data stories land.
 - [STORY-015](../stories/STORY-015-view-mode-layout.md): view mode layout (full-window map, pan/zoom, hover readout) **Done**
 - [STORY-016](../stories/STORY-016-edit-mode-shell.md): edit mode shell (toggle, pick-a-layer, tools, undo/redo, Save as) **Done**
 - [STORY-017](../stories/STORY-017-terrain-editing-autotile.md): terrain editing with auto-tiling (paint types; game picks the picture)
-- [STORY-018](../stories/STORY-018-roads-specials-editing.md): roads, corruption and resource editing
+- [STORY-018](../stories/STORY-018-roads-specials-editing.md): roads, corruption and resource editing **Implemented**, checked in the real game (bridges untried)
 - [STORY-019](../stories/STORY-019-move-structures.md): select and move structures and unit stacks
 - [STORY-020](../stories/STORY-020-structure-editors.md): structure detail editors (city / lair / unit)
 - [STORY-021](../stories/STORY-021-save-round-trip-safety.md): save round-trip safety (byte-exact, and loads in the real game) **Done**
@@ -80,7 +80,7 @@ STORY-017 → then the rest as their EPIC-004 data stories land.
 - [STORY-034](../stories/STORY-034-surveyor.md): Surveyor readout: tile value and City Resources, matched against the game's Surveyor **Done**
 - [STORY-035](../stories/STORY-035-settleable-tiles-overlay.md): overlay mode highlighting settleable tiles (nice-to-have) **Done**
 - [STORY-036](../stories/STORY-036-fog-of-war-layer.md): fog-of-war layer, off by default (nice-to-have) **Done**
-- [STORY-037](../stories/STORY-037-reveal-all.md): Reveal all: edit the save so every tile is explored (nice-to-have)
+- [STORY-037](../stories/STORY-037-reveal-all.md): Reveal all: edit the save so every tile is explored (nice-to-have) **Done**
 
 Dependencies: 018–020 need the matching EPIC-004 decode stories
 (013 roads/minerals, 010 cities, 011 sites, 012 units) first. 017 needs

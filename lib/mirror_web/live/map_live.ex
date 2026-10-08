@@ -89,6 +89,7 @@ defmodule MirrorWeb.MapLive do
       |> assign(:paint_report, nil)
       |> assign(:special, RoadTool.default_special())
       |> assign(:road_report, nil)
+      |> assign(:reveal_report, nil)
       |> assign(:discard_armed, false)
       |> assign(:fresh_mount, true)
 
@@ -224,6 +225,17 @@ defmodule MirrorWeb.MapLive do
      socket |> assign(:tool, String.to_existing_atom(tool)) |> assign(:road_report, nil)}
   end
 
+  # Reveal all (STORY-037): every tile explored, on this plane or on both.
+  def handle_event("reveal_all", %{"scope" => scope}, socket) when scope in ["plane", "both"] do
+    if socket.assigns.edit && socket.assigns.state.save do
+      {:noreply, reveal_all(socket, scope)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("reveal_all", _params, socket), do: {:noreply, socket}
+
   # The "Special" tool's option: which special a click places.
   def handle_event("set_special", %{"special" => %{"value" => value}}, socket) do
     {:noreply, assign(socket, :special, RoadTool.parse_special(value) || socket.assigns.special)}
@@ -289,6 +301,7 @@ defmodule MirrorWeb.MapLive do
           |> assign_from_state(state)
           |> assign_forms()
           |> refresh_hover()
+          |> assign(:reveal_report, nil)
           |> put_flash(:info, "Edits discarded.")
 
         socket =
@@ -1793,6 +1806,34 @@ defmodule MirrorWeb.MapLive do
               </span>
 
               <div class="ml-auto flex flex-wrap items-center gap-2">
+                <div class="flex items-center gap-1.5" role="group" aria-label="Reveal the map">
+                  <span class="text-slate-400">Reveal</span>
+                  <button
+                    :for={
+                      {scope, label, hint} <- [
+                        {"plane", "This plane",
+                         "Mark every tile of this plane explored (the fog goes; undo brings it back)"},
+                        {"both", "Both planes", "Mark every tile of Arcanus and Myrror explored"}
+                      ]
+                    }
+                    id={"reveal-#{scope}"}
+                    type="button"
+                    title={hint}
+                    phx-click="reveal_all"
+                    phx-value-scope={scope}
+                    class="rounded-lg border border-white/15 px-2.5 py-0.5 hover:border-white/40"
+                  >
+                    {label}
+                  </button>
+                  <span
+                    id="reveal-report"
+                    role="status"
+                    aria-live="polite"
+                    class="text-xs text-emerald-200"
+                  >
+                    {@reveal_report}
+                  </span>
+                </div>
                 <button
                   type="button"
                   phx-click="undo"
@@ -2359,6 +2400,50 @@ defmodule MirrorWeb.MapLive do
     end)
   end
 
+  # Each plane is one compound step on its own undo stack. The client only holds
+  # this plane's bytes, so only this plane's change is pushed to it; the other
+  # plane's reaches the engine now and the page when it is viewed.
+  defp reveal_all(socket, scope) do
+    current = socket.assigns.plane
+    planes = if scope == "both", do: [:arcanus, :myrror], else: [current]
+
+    {socket, counts} =
+      Enum.reduce(planes, {socket, []}, fn plane, {acc, counts} ->
+        {:ok, state, result} =
+          SessionStore.update(acc.assigns.session_id, fn st ->
+            case Editor.reveal_all(st, plane) do
+              {next, :none} -> {next, []}
+              {next, {:applied, _entry, parts}} -> {next, parts}
+            end
+          end)
+
+        acc = assign_state(acc, state)
+
+        acc =
+          if plane == current,
+            do: push_layer_parts(acc, plane, result),
+            else: Enum.reduce(result, acc, &emit_engine_delta(&2, plane, &1.layer, &1.changes))
+
+        {acc, [{plane, result |> Enum.flat_map(& &1.changes) |> length()} | counts]}
+      end)
+
+    socket
+    |> refresh_hover()
+    |> push_map_layers()
+    |> assign(:reveal_report, reveal_message(Enum.reverse(counts)))
+  end
+
+  defp reveal_message(counts) do
+    case for({plane, n} <- counts, n > 0, do: {plane |> to_string() |> String.capitalize(), n}) do
+      [] ->
+        "Already fully explored"
+
+      [{plane, n} | rest] ->
+        "Revealed #{n} tiles on #{plane}" <>
+          Enum.map_join(rest, "", fn {other, m} -> " and #{m} on #{other}" end)
+    end
+  end
+
   # Roads, corruption and specials (STORY-018): one click changes one byte of
   # the flags or minerals layer, as its own one-tile stroke (one undo step).
   # `change` maps the tile's current byte to the new one. It runs inside the
@@ -2532,6 +2617,7 @@ defmodule MirrorWeb.MapLive do
 
   defp finish_history_step(socket, state, plane, parts) do
     socket
+    |> assign(:reveal_report, nil)
     |> assign_state(state)
     |> push_layer_parts(plane, parts)
     |> refresh_hover()

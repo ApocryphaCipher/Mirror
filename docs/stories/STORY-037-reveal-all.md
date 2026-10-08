@@ -1,7 +1,7 @@
 # STORY-037: Reveal all: make every tile explored for the player
 
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
-**Status:** open, nice-to-have
+**Status:** implemented and checked in the real game (2026-10-07).
 **Size:** small
 **Requested by:** [Kevin](https://github.com/KevinAsbury), 2026-09-24
 
@@ -61,3 +61,40 @@ itself is checked.
   a lair that was never looked at still says "Unexplored".
 - A test covers it: after the action, the exploration layer is all 15;
   after undo, it's the original bytes.
+
+## What was built
+
+- **Edit toolbar:** a "Reveal" group with **This plane** and **Both planes**
+  (`#reveal-plane`, `#reveal-both`) and a polite status line ("Revealed 2397 tiles
+  on Arcanus", or "Already fully explored").
+- **`Editor.reveal_all/2`:** one compound step per plane that sets the
+  `exploration` layer to 15, recording only the tiles that were not already 15
+  (so partly explored 1–14 tiles are included, and undo restores each one's old
+  value). Nothing else is touched.
+- **Undo:** each plane has its own undo stack, so **Both planes** is two steps,
+  one on each plane (undo on Arcanus, then switch to Myrror and undo there).
+- **Redraw:** the fog layer is rebuilt at once. The page only holds the current
+  plane's bytes, so the other plane's change goes to the engine now and to the
+  page when it is viewed.
+- **Tests:** `editor_test.exs` ("reveal_all/2") and `map_live_edit_test.exs`
+  ("Reveal all"): the layer is all 15, undo and redo restore the exact bytes, the
+  other plane and layers are untouched, Save as writes the 4,800 bytes and no other
+  byte differs, view mode and an unknown scope are ignored.
+
+## Checked in the real game (2026-10-07)
+
+A save was made from SAVE8 (Freya, 279 explored tiles on Arcanus, none on Myrror,
+including 84 partly explored 1–14 tiles) with `Editor.reveal_all/2` on both planes
+and written with `SaveFile.write`, into slot 6. Only the 4,800 explored bytes
+differ from SAVE8 (4,605 of them changed). Loaded in the DOSBox fork
+(checkpoint 71, collection `mom-live-2026-10-07`):
+
+- **The game loads it without complaint and keeps every byte:** the explored block
+  in RAM is identical to the file's, all 4,800 tiles at 15.
+- **No fog on either plane, and the mini-map shows the whole world.** The main
+  view has no black pixels, and the mini-map's only black pixels are its own frame.
+- **A site that was never looked at still says "Unexplored"** in the Surveyor, so
+  Reveal all leaves the sites' looked-at flag alone.
+
+SAVE3 is not a usable source for this check: it is the "God mode" save and is
+already fully explored on both planes, so revealing it changes nothing.
