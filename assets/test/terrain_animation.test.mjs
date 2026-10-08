@@ -4,6 +4,7 @@ import {
   ANIMATION_INTERVAL_MS,
   ANIMATION_STORAGE_KEY,
   animatedCells,
+  hasEnchantedRoad,
   isAnimatedTile,
   loadAnimationPreference,
   phaseAt,
@@ -110,4 +111,16 @@ test("the choice is stored as 1 or 0 and read back", () => {
   assert.equal(loadAnimationPreference(storage, false), false)
   saveAnimationPreference(storage, true)
   assert.equal(loadAnimationPreference(storage, true), true)
+})
+
+test("only an enchanted road makes the roads layer animate", () => {
+  assert.equal(hasEnchantedRoad([{kind: "road", enchanted: true}]), true)
+  assert.equal(hasEnchantedRoad([{kind: "road", enchanted: false}]), false)
+  // specials and corruption do not animate
+  assert.equal(hasEnchantedRoad([{kind: "special"}, {kind: "corruption"}]), false)
+  // an item that merely carries the flag but is not a road
+  assert.equal(hasEnchantedRoad([{kind: "special", enchanted: true}]), false)
+  assert.equal(hasEnchantedRoad([]), false)
+  assert.equal(hasEnchantedRoad(undefined), false)
+  assert.equal(hasEnchantedRoad([{kind: "special"}, {kind: "road", enchanted: true}]), true)
 })

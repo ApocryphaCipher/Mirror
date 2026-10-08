@@ -12,7 +12,12 @@
 // list). Each layer's items arrive with the "overlay_data" event;
 // visibility is remembered per browser.
 
-import {ANIMATION_INTERVAL_MS, loadAnimationPreference, phaseAt} from "./terrain_animation.mjs"
+import {
+  ANIMATION_INTERVAL_MS,
+  hasEnchantedRoad,
+  loadAnimationPreference,
+  phaseAt,
+} from "./terrain_animation.mjs"
 
 const STORAGE_KEY = "mirror.overlayLayers.v1"
 
@@ -151,8 +156,12 @@ const DRAWERS = {
     }
   },
 
-  // STORY-013: roads, specials/minerals, and corruption.
-  roads(ctx, items, {tileSize, sprites}) {
+  // STORY-013: roads, specials/minerals, and corruption. STORY-045: an enchanted
+  // road shimmers: its six frames (colour A, B, A, C, A, B) all step together,
+  // every tile and piece on the same frame, `step mod 6` (checked against DOSBox,
+  // 2026-10-07). Frame 0 is the plain colour, which is what holds when the
+  // animation is off.
+  roads(ctx, items, {tileSize, sprites, phase = 0}) {
     if (!sprites) return
 
     for (const item of items) {
@@ -167,7 +176,8 @@ const DRAWERS = {
           if (!sprite) continue
           const w = Math.round((sprite.width * tileSize) / TILE_ART_W)
           const h = Math.round((sprite.height * tileSize) / TILE_ART_H)
-          const image = sprites.image(`${groupKey}.${piece}`, sprite, 0, null)
+          const frame = item.enchanted ? phase % sprite.frames.length : 0
+          const image = sprites.image(`${groupKey}.${piece}`, sprite, frame, null)
           const left = Math.round((item.x + 0.5) * tileSize - w / 2)
           const top = Math.round((item.y + 0.5) * tileSize - h / 2)
           ctx.drawImage(image, left, top, w, h)
@@ -308,6 +318,7 @@ const MapOverlays = {
 
     this.handleEvent("overlay_data", ({layer, items}) => {
       this.items[layer] = items || []
+      if (layer === "roads") this.enchantedRoadOnMap = hasEnchantedRoad(items)
       this.render()
       this.syncAnimation()
     })
@@ -326,11 +337,12 @@ const MapOverlays = {
     this.teardownAnimation()
   },
 
-  // --- Node sparkles (STORY-008) ---
-  // The sparkles step on the same clock and the same "Animate terrain" choice as the
+  // --- Node sparkles and enchanted roads (STORY-008, 045) ---
+  // The sparkles and the roads step on the same clock and the same "Animate terrain" choice as the
   // terrain (map_hooks.js owns the checkbox and remembers it); this canvas only
   // redraws while an aura is on screen, and not while the tab is hidden.
   setupAnimation() {
+    this.enchantedRoadOnMap = false
     this.animPhase = 0
     this.animLastPhase = null
     this.animFrameId = null
@@ -374,14 +386,15 @@ const MapOverlays = {
     }
   },
 
+  // Something on screen that animates: an owned node's aura, or an enchanted road.
+  hasAnimatedOverlay() {
+    const auras = !!this.visible.auras && (this.items.auras?.length ?? 0) > 0
+    const roads = !!this.visible.roads && this.enchantedRoadOnMap
+    return auras || roads
+  },
+
   shouldAnimate() {
-    return (
-      this.animateEnabled &&
-      !document.hidden &&
-      !!this.sprites?.sparkles &&
-      !!this.visible.auras &&
-      (this.items.auras?.length ?? 0) > 0
-    )
+    return this.animateEnabled && !document.hidden && !!this.sprites && this.hasAnimatedOverlay()
   },
 
   syncAnimation() {

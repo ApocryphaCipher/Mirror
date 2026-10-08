@@ -74,8 +74,6 @@ Unsorted, not yet promoted to a story.
   further DOSBox time for now (Kevin, 2026-09-27). Mirror keeps the
   existing ramp-based guess for all colours until this is picked up
   again.
-- **Enchanted roads should animate** (found 2026-10-07 while doing STORY-008). The
-  game's enchanted-road art (`MAPBACK #54..#62`) has 6 frames that change colour, and
-  the overlay draws frame 0 only. The overlay clock from STORY-008 (`phaseAt`) is there
-  to drive it. Check the per-piece frame offset against the game first, as the node
-  sparkles turned out to be offset per tile.
+- ~~**Enchanted roads should animate**~~ (found 2026-10-07 while doing STORY-008): done in
+  [stories/STORY-045-enchanted-road-shimmer.md](stories/STORY-045-enchanted-road-shimmer.md). The game shows one frame
+  across the whole road, not a per-tile offset like the node sparkles.

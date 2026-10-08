@@ -114,3 +114,76 @@ test("auras: scales with the tile size", () => {
   assert.equal(drawn[0].h, 40)
   assert.equal(drawn[0].left, 2 * 40)
 })
+
+// --- roads (STORY-045) ---
+function roadHarness() {
+  const piece = {width: 20, height: 18, frames: [0, 1, 2, 3, 4, 5]}
+  const asked = []
+  const ctx = {drawImage: () => {}}
+  const sprites = {
+    roads: {c: {...piece, frames: [0]}, ne: {...piece, frames: [0]}},
+    enchanted_roads: {c: piece, ne: piece},
+    specials: {gold: {width: 20, height: 18, frames: [0]}},
+    image(name, sprite, frame, banner) {
+      asked.push({name, frame, banner})
+      return `${name}#${frame}`
+    },
+  }
+  return {ctx, sprites, asked}
+}
+
+test("roads: an enchanted road's pieces all show frame (step mod 6)", () => {
+  for (const [phase, frame] of [[0, 0], [1, 1], [3, 3], [5, 5], [6, 0], [10, 4]]) {
+    const {ctx, sprites, asked} = roadHarness()
+    const item = {kind: "road", x: 4, y: 4, pieces: ["c", "ne"], enchanted: true}
+    OVERLAY_DRAWERS.roads(ctx, [item], {tileSize: 20, sprites, phase})
+    assert.deepEqual(
+      asked.map(a => [a.name, a.frame]),
+      [["enchanted_roads.c", frame], ["enchanted_roads.ne", frame]],
+      `phase ${phase}`
+    )
+  }
+})
+
+test("roads: every enchanted tile is on the same frame, with no per-tile offset", () => {
+  // The game shows one frame across a whole enchanted road (unlike the node sparkles).
+  const {ctx, sprites, asked} = roadHarness()
+  const items = [0, 1, 2, 3].map(i => ({kind: "road", x: i, y: 2, pieces: ["c"], enchanted: true}))
+  OVERLAY_DRAWERS.roads(ctx, items, {tileSize: 20, sprites, phase: 3})
+  assert.deepEqual(asked.map(a => a.frame), [3, 3, 3, 3])
+})
+
+test("roads: a plain road never animates", () => {
+  for (const phase of [0, 1, 2, 3, 7]) {
+    const {ctx, sprites, asked} = roadHarness()
+    OVERLAY_DRAWERS.roads(
+      ctx,
+      [{kind: "road", x: 4, y: 4, pieces: ["c", "ne"], enchanted: false}],
+      {tileSize: 20, sprites, phase}
+    )
+    assert.deepEqual(asked.map(a => [a.name, a.frame]), [["roads.c", 0], ["roads.ne", 0]])
+  }
+})
+
+test("roads: with animation off (no phase) an enchanted road holds frame 0, today's picture", () => {
+  const {ctx, sprites, asked} = roadHarness()
+  OVERLAY_DRAWERS.roads(
+    ctx,
+    [{kind: "road", x: 4, y: 4, pieces: ["c"], enchanted: true}],
+    {tileSize: 20, sprites}
+  )
+  assert.equal(asked[0].frame, 0)
+})
+
+test("roads: specials still draw their one frame while enchanted roads step", () => {
+  const {ctx, sprites, asked} = roadHarness()
+  OVERLAY_DRAWERS.roads(
+    ctx,
+    [
+      {kind: "special", x: 1, y: 1, special: "gold"},
+      {kind: "road", x: 2, y: 2, pieces: ["c"], enchanted: true},
+    ],
+    {tileSize: 20, sprites, phase: 4}
+  )
+  assert.deepEqual(asked.map(a => [a.name, a.frame]), [["specials.gold", 0], ["enchanted_roads.c", 4]])
+})

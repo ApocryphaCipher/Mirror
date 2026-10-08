@@ -183,6 +183,13 @@ Draw the pieces for every connected neighbour, plus the centre piece.
 The `E_ROADS` rows have no descriptions in the name table. Their order was
 read off the pictures and matches `ROADS` exactly.
 
+**The enchanted frames, checked in the game (2026-10-07, collection
+`mom-live-2026-10-07`).** The six frames are only three pictures: frames 0, 2 and 4
+are one colour (`190,125,20`), 1 and 5 another (`166,109,28`), and 3 a brighter one
+(`206,138,24`), so a cycle runs A B A C A B. The game shows **one frame across the whole
+road** (every tile and piece the same), stepping every 0.6 s: `frame = step mod 6`.
+Unlike the node sparkles there is no per-tile offset.
+
 ### Sparkles / node auras: `MAPBACK.LBX` #63–#68 (20×18, 6 frames)
 
 Twinkling star sparkles, one colour each. The name table says blue, green,
