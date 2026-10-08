@@ -55,6 +55,14 @@ defmodule Mirror.OverlaySpritesTest do
       assert %{width: 20, height: 18, frames: [_]} = sprites.plaques[banner]
     end
 
+    # Node sparkles: one 6-frame entry per banner colour, none for neutral
+    for banner <- [:blue, :green, :purple, :red, :yellow] do
+      assert %{width: 20, height: 18, frames: frames} = sprites.sparkles[banner]
+      assert length(frames) == 6
+    end
+
+    refute Map.has_key?(sprites.sparkles, :neutral)
+
     # Units: 198 unit figures (18x16)
     for type <- 0..197 do
       assert %{width: 18, height: 16, frames: [_]} = sprites.units[type]

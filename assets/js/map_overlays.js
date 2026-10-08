@@ -12,6 +12,8 @@
 // list). Each layer's items arrive with the "overlay_data" event;
 // visibility is remembered per browser.
 
+import {ANIMATION_INTERVAL_MS, loadAnimationPreference, phaseAt} from "./terrain_animation.mjs"
+
 const STORAGE_KEY = "mirror.overlayLayers.v1"
 
 // Terrain tiles are 20x18 art pixels drawn into a square cell, so overlay
@@ -61,6 +63,26 @@ function bitCount(n) {
 // data (STORY-013 roads/specials, 008 auras, 011 sites, 010 cities, 012
 // units). Each receives (ctx, items, geometry) and draws every item.
 const DRAWERS = {
+  // STORY-008: the sparkles on every tile of an owned node's aura, in the owner's
+  // colour (a separate MAPBACK entry per colour, so no recolouring). `phase` is the
+  // shared animation step (0 when animation is off). The game shows frame
+  // (step + i) mod 6 on the aura's i-th tile, so the sparkles ripple across the field
+  // (checked against DOSBox frames, 2026-10-07).
+  auras(ctx, items, {tileSize, sprites, phase = 0}) {
+    if (!sprites?.sparkles) return
+
+    for (const {x, y, banner, i = 0} of items) {
+      const sprite = sprites.sparkles[banner]
+      if (!sprite) continue
+      const w = Math.round((sprite.width * tileSize) / TILE_ART_W)
+      const h = Math.round((sprite.height * tileSize) / TILE_ART_H)
+      const image = sprites.image(`sparkles.${banner}`, sprite, (phase + i) % sprite.frames.length, false)
+      const left = Math.round((x + 0.5) * tileSize - w / 2)
+      const top = Math.round((y + 0.5) * tileSize - h / 2)
+      ctx.drawImage(image, left, top, w, h)
+    }
+  },
+
   // STORY-035: where a new city could go, greener where its Maximum Pop
   // would be higher (the cap is 25).
   settleable(ctx, items, {tileSize}) {
@@ -219,7 +241,9 @@ function spriteBank({palette, ...groups}) {
       const key = `${name}/${frame}/${banner}`
       if (cache.has(key)) return cache.get(key)
 
-      const remap = flagRemap(banner)
+      // `false` draws the sprite's own colours (the sparkles, one entry per banner);
+      // any other value recolours the flag pixels for that banner.
+      const remap = banner === false ? new Map() : flagRemap(banner)
       const canvas = document.createElement("canvas")
       canvas.width = sprite.width
       canvas.height = sprite.height
@@ -260,6 +284,7 @@ const MapOverlays = {
         this.visible[input.value] = input.checked
         this.saveVisibility()
         this.render()
+        this.syncAnimation()
       })
     }
 
@@ -273,14 +298,18 @@ const MapOverlays = {
     }
 
     this.sprites = null
+    this.setupAnimation()
+
     this.handleEvent("overlay_sprites", payload => {
       this.sprites = spriteBank(payload)
       this.render()
+      this.syncAnimation()
     })
 
     this.handleEvent("overlay_data", ({layer, items}) => {
       this.items[layer] = items || []
       this.render()
+      this.syncAnimation()
     })
 
     this.onResize = () => {
@@ -294,6 +323,93 @@ const MapOverlays = {
 
   destroyed() {
     window.removeEventListener("resize", this.onResize)
+    this.teardownAnimation()
+  },
+
+  // --- Node sparkles (STORY-008) ---
+  // The sparkles step on the same clock and the same "Animate terrain" choice as the
+  // terrain (map_hooks.js owns the checkbox and remembers it); this canvas only
+  // redraws while an aura is on screen, and not while the tab is hidden.
+  setupAnimation() {
+    this.animPhase = 0
+    this.animLastPhase = null
+    this.animFrameId = null
+    this.animateEnabled = loadAnimationPreference(
+      this.safeStorage(),
+      window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches
+    )
+    this.animationTick = timestamp => this.stepAnimation(timestamp)
+
+    this.onAnimateToggle = event => {
+      const toggle = event.target
+      if (toggle && toggle.matches && toggle.matches("[data-animate-toggle]")) {
+        this.animateEnabled = toggle.checked
+        if (!this.animateEnabled) {
+          this.stopAnimation()
+          if (this.animPhase !== 0) {
+            this.animPhase = 0
+            this.render()
+          }
+        } else {
+          this.syncAnimation()
+        }
+      }
+    }
+    this.onVisibilityChange = () => this.syncAnimation()
+    document.addEventListener("change", this.onAnimateToggle)
+    document.addEventListener("visibilitychange", this.onVisibilityChange)
+  },
+
+  teardownAnimation() {
+    this.stopAnimation()
+    document.removeEventListener("change", this.onAnimateToggle)
+    document.removeEventListener("visibilitychange", this.onVisibilityChange)
+  },
+
+  safeStorage() {
+    try {
+      return window.localStorage
+    } catch (_error) {
+      return null
+    }
+  },
+
+  shouldAnimate() {
+    return (
+      this.animateEnabled &&
+      !document.hidden &&
+      !!this.sprites?.sparkles &&
+      !!this.visible.auras &&
+      (this.items.auras?.length ?? 0) > 0
+    )
+  },
+
+  syncAnimation() {
+    if (!this.shouldAnimate()) {
+      this.stopAnimation()
+    } else if (this.animFrameId === null) {
+      this.animLastPhase = null
+      this.animFrameId = requestAnimationFrame(this.animationTick)
+    }
+  },
+
+  stopAnimation() {
+    if (this.animFrameId !== null) cancelAnimationFrame(this.animFrameId)
+    this.animFrameId = null
+    this.animLastPhase = null
+  },
+
+  stepAnimation(timestamp) {
+    this.animFrameId = null
+    if (!this.shouldAnimate()) return
+
+    const phase = phaseAt(timestamp, ANIMATION_INTERVAL_MS)
+    if (phase !== this.animLastPhase) {
+      this.animLastPhase = phase
+      this.animPhase = phase
+      this.render()
+    }
+    this.animFrameId = requestAnimationFrame(this.animationTick)
   },
 
   // Same CSS size as the terrain canvas; backing store at device pixels.
@@ -318,7 +434,7 @@ const MapOverlays = {
     ctx.clearRect(0, 0, this.el.width, this.el.height)
     ctx.imageSmoothingEnabled = false
 
-    const geometry = {tileSize: this.deviceTileSize, sprites: this.sprites}
+    const geometry = {tileSize: this.deviceTileSize, sprites: this.sprites, phase: this.animPhase}
     for (const layer of this.layers) {
       if (!this.visible[layer]) continue
       const items = this.items[layer]

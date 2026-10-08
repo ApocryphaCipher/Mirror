@@ -101,6 +101,8 @@ Entry 1 marks 42 tiles on plane 0 as animated (4 frames each) and 37 on plane 1:
 
 The ported table's `:shore` label covers coast corners, channel pieces and sparkle pieces alike, so it is too coarse to pick animation by.
 
+**How fast (measured live, 2026-10-07).** The game steps its overland animation about every **0.6 s**: a plain `601` ocean tile showed its 4 looks one at a time at 0.46–0.68 s intervals (mean about 0.62 s), and the node sparkles step at the same pace (DOSBox fork screenshots through the API, collection `mom-live-2026-10-07`).
+
 **What animates (frame diff of the 4 frames, 2026-10-04).** On the coast pieces (`34`-`49`, `146`-`161`) only about 36 of 360 pixels change, and they trace the shoreline, the band where water meets land, plus a few points just offshore: a wash of waves along the edge (Kevin's reading, matched by the pixel map). On open ocean (`601`) about 22 scattered pixels change across the whole tile, the sparkle. `31` changes 4 corner pixels; `54` and `18` change 1-4 pixels. The nodes and volcano change 35-80 pixels inside the tile. So the animated cells are three kinds: shore waves, ocean sparkle, and node / volcano effects.
 
 ## Water, shore and painting a type (STORY-017)

@@ -23,10 +23,10 @@ The overland map should move the way the real game's does:
   tiles are almost certainly listed per node there, not derived from
   terrain. The record layout still needs verifying. See [../reference/overland-sprites-and-save-blocks.md](../reference/overland-sprites-and-save-blocks.md).
 - `MAPBACK.LBX` has `MAGIC` blue/green/purple/red/white/yellow entries,
-  which are the prime candidates for the sparkle art. Unconfirmed.
+  which are the prime candidates for the sparkle art. **Confirmed 2026-10-07:** they are `#63–#67`, one per owner colour (STORY-008).
 
 ## Stories
 
 - [STORY-006](../stories/STORY-006-sprite-groundwork.md): sprite groundwork (full GOG install, named-sprite catalog). Shared with EPIC-004
 - [STORY-007](../stories/STORY-007-live-terrain-animation.md): live terrain animation (ocean twinkle) **Implemented**, pace to tune by eye
-- [STORY-008](../stories/STORY-008-node-auras.md): node auras (Chaos / Nature / Sorcery sparkle)
+- [STORY-008](../stories/STORY-008-node-auras.md): node auras (Chaos / Nature / Sorcery sparkle) **Done**

@@ -1943,7 +1943,7 @@ defmodule MirrorWeb.MapLive do
                   <li class="border-t border-white/10 pt-1">
                     <label
                       class="flex items-center gap-2"
-                      title="Twinkling ocean, shore waves, nodes and volcanoes; off keeps the still picture"
+                      title="Twinkling ocean, shore waves, nodes, volcanoes and node sparkles; off keeps the still picture"
                     >
                       <input
                         type="checkbox"
@@ -3227,6 +3227,7 @@ defmodule MirrorWeb.MapLive do
     |> push_event("overlay_data", %{layer: "sites", items: site_items(state, plane)})
     |> push_event("overlay_data", %{layer: "cities", items: city_items(state, plane)})
     |> push_event("overlay_data", %{layer: "units", items: unit_items(state, plane)})
+    |> push_event("overlay_data", %{layer: "auras", items: aura_items(state, plane)})
   end
 
   # For updates that arrive from another tab or a discard: tile edits leave the
@@ -3335,6 +3336,33 @@ defmodule MirrorWeb.MapLive do
   end
 
   defp site_items(_state, _plane), do: []
+
+  # Node auras (STORY-008): each tile of an owned node's aura, in its owner's
+  # banner colour. An unowned node shows nothing. The sparkle art exists for the
+  # five wizard colours only. `i` is the tile's place in the node's aura list: the
+  # game shows frame (step + i) mod 6 on tile i, so the sparkles ripple (checked
+  # against DOSBox frames, 2026-10-07).
+  @aura_banners [:blue, :green, :purple, :red, :yellow]
+
+  defp aura_items(%{save: %{raw: raw}}, plane) do
+    banners = Wizards.banners(raw)
+
+    case Sites.parse(raw) do
+      {:ok, %{nodes: nodes}} ->
+        for %{plane: ^plane, owner: owner, aura_tiles: tiles} <- nodes,
+            owner != nil,
+            banner = Map.get(banners, owner),
+            banner in @aura_banners,
+            {{x, y}, i} <- Enum.with_index(tiles),
+            uniq: true,
+            do: %{x: x, y: y, banner: banner, i: i}
+
+      {:error, _} ->
+        []
+    end
+  end
+
+  defp aura_items(_state, _plane), do: []
 
   defp city_items(%{save: %{raw: raw}}, plane) do
     banners = Wizards.banners(raw)

@@ -5,7 +5,7 @@
 - [STORY-005](STORY-005-render-from-terrain-lbx.md): render the map from `TERRAIN.LBX` in the app (EPIC-002). **Done** (MOMIME removal completed in STORY-014)
 - [STORY-006](STORY-006-sprite-groundwork.md): sprite groundwork, full GOG install + named-sprite catalog (EPIC-004/005). **Done**
 - [STORY-007](STORY-007-live-terrain-animation.md): live terrain animation / ocean twinkle (EPIC-005) **Implemented**, pace to tune by eye
-- [STORY-008](STORY-008-node-auras.md): node auras, owner-coloured sparkle on melded nodes (EPIC-005)
+- [STORY-008](STORY-008-node-auras.md): node auras, owner-coloured sparkle on melded nodes (EPIC-005) **Done**
 - [STORY-009](STORY-009-overlay-layer-toggles.md): overlay layers with on/off toggles (EPIC-004) **Done**
 - [STORY-010](STORY-010-cities.md): cities (EPIC-004) **Done**
 - [STORY-011](STORY-011-sites-towers-lairs.md): towers, fortresses, lairs, ruins, sites (EPIC-004) **Done**

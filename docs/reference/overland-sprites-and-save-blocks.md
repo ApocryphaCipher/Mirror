@@ -199,7 +199,18 @@ purple, red, white, yellow, but the pixels say otherwise:
 
 So sparkle = `MAPBACK.LBX #(63 + banner)` for banners 0–4. kazzmir draws
 them as the melded-node aura sparkles in the owner's colour, one per aura
-tile (STORY-008). Still to check in the game on a melded node.
+tile (STORY-008). **Checked in the game (2026-10-07, SAVE4 with three
+owned nodes, collection `mom-live-2026-10-07`):** all 128 screenshot crops of a
+Chaos node's eight aura tiles matched a `#67` frame on every opaque pixel, so the
+entry and the yellow-for-Freya mapping are right. The sparkle is drawn **in the
+owner's colour** whatever the node's realm.
+
+- **The frames ripple.** Tile *i* of the node's aura list shows frame
+  `(step + i) mod 6`, and every tile advances one frame per step (about 0.6 s;
+  see [classic-terrain-format.md](classic-terrain-format.md)). Not one shared frame.
+- **No recolouring.** Each colour is its own entry. The green one uses palette
+  indices 216 and 218, the same ones the banner remap rewrites, so it must be drawn
+  as it is.
 
 ### Other `MAPBACK.LBX` entries
 

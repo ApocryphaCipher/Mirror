@@ -1,10 +1,12 @@
 import {layerTypeAfterDelta} from "./layer_type.mjs"
-import {animatedCells, shouldAdvance, updateAnimatedCell} from "./terrain_animation.mjs"
-
-// How often the terrain animation steps (STORY-007): about 6 frames a second.
-// Tune by eye against the real game.
-const ANIMATION_INTERVAL_MS = 160
-const ANIMATION_STORAGE_KEY = "mirror.animateTerrain"
+import {
+  ANIMATION_INTERVAL_MS,
+  animatedCells,
+  loadAnimationPreference,
+  phaseAt,
+  saveAnimationPreference,
+  updateAnimatedCell,
+} from "./terrain_animation.mjs"
 
 const LAYER_STACK = [
   "terrain",
@@ -306,9 +308,12 @@ const MapCanvas = {
   setupTerrainAnimation() {
     this.animatedCellSet = new Set()
     this.animPhase = 0
-    this.animLast = null
+    this.animLastPhase = null
     this.animFrameId = null
-    this.animateEnabled = this.loadAnimationPreference()
+    this.animateEnabled = loadAnimationPreference(
+      this.safeStorage(),
+      window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches
+    )
     this.animationTick = timestamp => this.stepAnimation(timestamp)
 
     this.onAnimateToggle = event => {
@@ -334,26 +339,18 @@ const MapCanvas = {
     }
   },
 
-  // On unless the viewer chose otherwise, or their system asks for reduced motion.
-  loadAnimationPreference() {
+  // localStorage can throw (private windows, blocked site data).
+  safeStorage() {
     try {
-      const stored = window.localStorage.getItem(ANIMATION_STORAGE_KEY)
-      if (stored === "1") return true
-      if (stored === "0") return false
+      return window.localStorage
     } catch (_error) {
-      // storage can be blocked or throw; the default applies
+      return null
     }
-    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)")
-    return !(reduced && reduced.matches)
   },
 
   setAnimationEnabled(enabled) {
     this.animateEnabled = enabled
-    try {
-      window.localStorage.setItem(ANIMATION_STORAGE_KEY, enabled ? "1" : "0")
-    } catch (_error) {
-      // not remembered, still applied
-    }
+    saveAnimationPreference(this.safeStorage(), enabled)
 
     if (enabled) {
       this.syncAnimation()
@@ -389,7 +386,7 @@ const MapCanvas = {
     if (!this.shouldAnimate()) {
       this.stopAnimation()
     } else if (this.animFrameId === null) {
-      this.animLast = null
+      this.animLastPhase = null
       this.animFrameId = requestAnimationFrame(this.animationTick)
     }
   },
@@ -397,16 +394,17 @@ const MapCanvas = {
   stopAnimation() {
     if (this.animFrameId !== null) cancelAnimationFrame(this.animFrameId)
     this.animFrameId = null
-    this.animLast = null
+    this.animLastPhase = null
   },
 
   stepAnimation(timestamp) {
     this.animFrameId = null
     if (!this.shouldAnimate()) return
 
-    if (shouldAdvance(timestamp, this.animLast, ANIMATION_INTERVAL_MS)) {
-      this.animLast = timestamp
-      this.animPhase += 1
+    const phase = phaseAt(timestamp, ANIMATION_INTERVAL_MS)
+    if (phase !== this.animLastPhase) {
+      this.animLastPhase = phase
+      this.animPhase = phase
       this.redrawAnimatedCells()
     }
     this.animFrameId = requestAnimationFrame(this.animationTick)
