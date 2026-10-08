@@ -35,7 +35,9 @@ Unsorted, not yet promoted to a story.
 - ~~`lib/mirror/map.ex` and related bitstring-match warnings on Elixir 1.20~~:
   fixed 2026-09-23 so CI can compile with `--warnings-as-errors` (EPIC-007).
 - `Mirror.Quality.SmoothingRules` (and its test) is dead code since terrain
-  renders from `TERRAIN.LBX` (EPIC-002). Propose deleting it.
+  renders from `TERRAIN.LBX` (EPIC-002); nothing in `lib/` calls it (checked 2026-10-07), and
+  STORY-017 was done with kazzmir's terrain table instead, so the "possible cross-check"
+  below never happened. Propose deleting it (its own decision, not slipped into another change).
 - ~~`mix tailwind mirror` crashes with SIGKILL (exit 137)~~ — fixed
   2026-09-22. Root cause: Tailwind's standalone macOS binary (a Bun-compiled
   executable) ships with an invalid ad-hoc code signature. We checked it is
