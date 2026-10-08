@@ -301,6 +301,7 @@ defmodule MirrorWeb.MapLive do
           |> assign_from_state(state)
           |> assign_forms()
           |> refresh_hover()
+          |> assign(:reveal_report, nil)
           |> put_flash(:info, "Edits discarded.")
 
         socket =
@@ -2616,6 +2617,7 @@ defmodule MirrorWeb.MapLive do
 
   defp finish_history_step(socket, state, plane, parts) do
     socket
+    |> assign(:reveal_report, nil)
     |> assign_state(state)
     |> push_layer_parts(plane, parts)
     |> refresh_hover()

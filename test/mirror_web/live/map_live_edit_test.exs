@@ -781,11 +781,6 @@ defmodule MirrorWeb.MapLiveEditTest do
       path |> File.read!() |> binary_part(offset, 2400)
     end
 
-    defp fog_tiles(view) do
-      assert_push_event(view, "overlay_data", %{layer: "fog", items: items})
-      length(items)
-    end
-
     defp session_planes(session_id), do: Mirror.SessionStore.get(session_id).planes
 
     defp revealing(conn, save) do
@@ -873,6 +868,27 @@ defmodule MirrorWeb.MapLiveEditTest do
       assert File.read!(save) == before
     end
 
+    test "undo, redo and discard clear the reveal message, which no longer applies", %{
+      conn: conn,
+      save: save
+    } do
+      {view, _} = revealing(conn, save)
+      report = fn -> view |> element("#reveal-report") |> render() |> text_of() end
+
+      view |> element("#reveal-plane") |> render_click()
+      assert report.() =~ "Revealed"
+      render_click(view, "undo", %{})
+      assert report.() == ""
+
+      render_click(view, "redo", %{})
+      assert report.() == ""
+
+      view |> element("#reveal-both") |> render_click()
+      render_click(view, "arm_discard", %{})
+      render_click(view, "discard_edits", %{})
+      assert report.() == ""
+    end
+
     test "a second reveal says there is nothing left to do", %{conn: conn, save: save} do
       {view, _} = revealing(conn, save)
       view |> element("#reveal-plane") |> render_click()
@@ -922,7 +938,7 @@ defmodule MirrorWeb.MapLiveEditTest do
 
     # Reads and drops every queued push of an event.
     defp drain(view, event) do
-      assert_push_event(view, event, _, 50)
+      assert_push_event(view, ^event, _, 50)
       drain(view, event)
     rescue
       ExUnit.AssertionError -> :ok
