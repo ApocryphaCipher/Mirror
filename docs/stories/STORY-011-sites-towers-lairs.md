@@ -23,7 +23,7 @@ defenders are encounter records on both planes (0–5 Arcanus, 6–11
 Myrror).
 **Live RAM (2026-09-24):** guard nibbles settled (low = left, high =
 starting); several kinds checked on screen; still open: the `+15`
-explored-by flags and the cleared look. See
+explored-by flags and the cleared look (for towers: [STORY-046](STORY-046-tower-of-wizardry-lit-look.md)). See
 [the evaluation](../notes/2026-09-24-live-ram-evaluation.md).
 **Size:** medium
 

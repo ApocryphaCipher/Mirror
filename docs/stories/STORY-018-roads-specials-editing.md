@@ -1,8 +1,8 @@
 # STORY-018: Roads, corruption and resource editing
 
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
-**Status:** implemented and checked in the running game (2026-10-06): the bytes
-and what the player sees. The Road, Corruption
+**Status:** Done (2026-10-06): checked in the running game, the bytes and what the player
+sees. Roads on ocean tiles ("bridges") are allowed but were not tried in the game. The Road, Corruption
 and Special tools are in the edit toolbar (`MirrorWeb.RoadTool`,
 `MirrorWeb.MapLive`); the meanings they use are in
 [kazzmir-save-layouts.md](../reference/kazzmir-save-layouts.md). It builds on

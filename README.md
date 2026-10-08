@@ -6,20 +6,25 @@ files. It reads a `SAVEn.GAM`, draws the overland map of both planes
 terrain and save the result back to a new `.GAM`. It's a Phoenix/LiveView
 app; everything renders live in the browser.
 
-**Status:** terrain renders directly from the game's `TERRAIN.LBX` and
-matches a reference decode pixel for pixel. Cities are drawn with
-owner-coloured flags and size-appropriate frames from `MAPBACK.LBX`. The map
-pages have a view mode (zoom, pan, hover readout with the full Surveyor card,
-and layer toggles for cities, settleable tile grading, and fog of war) and an
-edit mode (paint a terrain type with auto-tiling, cycle or paint raw tiles,
-undo/redo, Save as). Note on editing: **Paint type** keeps the landmass/continent
-IDs consistent; the raw tools (Cycle, Paint tile) update terrain tiles and the
-recomputed adjacency mask only and do **not** keep the landmass/continent IDs
-consistent (tracked in STORY-017 and STORY-029). Other overland features
-(units with banner plaques, towers, encounter sites, roads, specials) and node
-auras are next. The sprites for all of them are identified and decode correctly
-([sprite catalog](docs/reference/overland-sprites-and-save-blocks.md)), but
-they aren't drawn on the map yet ([EPIC-004](docs/epics/EPIC-004-overland-map-features.md)).
+**Status:** terrain renders directly from the game's `TERRAIN.LBX` and matches a
+reference decode pixel for pixel, and the map pages draw the save's overland
+features with the game's own art: cities (owner-coloured flags, population
+frames, walls, names), units on banner-colour plaques, towers and encounter
+sites, roads, specials and corruption, the sparkles on owned magic nodes, and the
+player's fog of war. The ocean, the other animated tiles, the node sparkles and
+enchanted roads move on the game's 0.6 s step (an **Animate terrain** toggle turns
+it off). The map pages have a view mode (zoom, pan, a hover readout with the full
+Surveyor card, and a toggle for each layer) and an edit mode: paint a terrain type
+with auto-tiling, cycle or paint raw tiles, set roads, enchanted roads, corruption
+and specials, reveal the whole map, undo/redo, and Save as. Note on editing:
+**Paint type** keeps the landmass/continent IDs consistent; the raw tools (Cycle,
+Paint tile) update terrain tiles and the recomputed adjacency mask only and do
+**not** keep the landmass/continent IDs consistent (tracked in STORY-017 and
+STORY-029). Next is moving and editing structures and units
+([EPIC-006](docs/epics/EPIC-006-map-first-ui-and-edit-mode.md)). Every edit
+feature is checked against the real game before its story is closed
+([how](docs/reference/real-game-acceptance.md)). The sprites are catalogued in the
+[sprite catalog](docs/reference/overland-sprites-and-save-blocks.md).
 [docs/epics/](docs/epics/) is the living status; this paragraph is a summary.
 
 ## Quick start
@@ -74,7 +79,7 @@ Visit `localhost:4000`:
 - `/arcanus`, `/myrror`: the map for each plane. Pan, zoom, inspect tiles with
   the Surveyor readout, and toggle layers (cities, settleable sites, fog of war).
   Load a save with the path field in the header (it defaults to
-  `$MIRROR_MOM_PATH/SAVE1.GAM`), then ✎ Edit. **Paint type** paints water or a land type (dropdown, brush 1×1 to 5×5, fill; right-click picks the terrain under the pointer) and re-tiles the coast and edges around it; **Paint tile** writes one exact tile number (with a quick pick of plain tiles) and leaves neighbours alone; **Cycle** steps a tile to the next picture. Undo and redo cover everything, including the landmass layer.
+  `$MIRROR_MOM_PATH/SAVE1.GAM`), then ✎ Edit. **Paint type** paints water or a land type (dropdown, brush 1×1 to 5×5, fill; right-click picks the terrain under the pointer) and re-tiles the coast and edges around it; **Paint tile** writes one exact tile number (with a quick pick of plain tiles) and leaves neighbours alone; **Cycle** steps a tile to the next picture. **Road** steps a tile none, road, enchanted road; **Corruption** switches it on or off; **Special** places an ore, gems, crystals, wild game or nightshade. **Reveal** marks every tile of this plane, or both, as explored. Undo and redo cover everything, including the landmass layer.
 - `/lab/arcanus`, `/lab/myrror`: the research workbench. Raw layers,
   value/bit labelling, histograms, the raw-value painter.
 - `/tile-probe`: the LBX explorer. Browse any LBX file's entries by name,
@@ -84,7 +89,8 @@ Visit `localhost:4000`:
 ## Tests
 
 ```bash
-mix test                  # everything that doesn't need game files (including editing/save-safety tests)
+mix test                  # everything that doesn't need game files (including editing/save-safety tests,
+                          # and the client's JavaScript unit tests in assets/test when `node` is installed)
 bash scripts/test_game.sh # real-file tests using dev_server.sh's game-file env
 ```
 
@@ -121,6 +127,15 @@ each fact came from; [docs/notes/](docs/notes/) holds dated session notes.
 **`docs/` is where the project state lives:** epics, stories, the backlog
 and research notes. If you're picking this project up (human or AI), start
 at [docs/README.md](docs/README.md).
+
+**Checking against the real game.** Mirror's guesses about the formats are
+checked in the real game, not assumed. For edits, load the saved file in DOSBox
+([docs/reference/real-game-acceptance.md](docs/reference/real-game-acceptance.md)).
+For research, a DOSBox Staging fork with a read-only web API lets an agent read
+the running game's memory and screen
+([docs/reference/live-ram-map.md](docs/reference/live-ram-map.md),
+`scripts/live_session.sh`); it is a research tool, and Mirror itself never talks to
+DOSBox.
 
 ## Keeping this file current
 

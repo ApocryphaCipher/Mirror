@@ -1,7 +1,10 @@
 # STORY-020: Structure detail editors (city / lair / unit)
 
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
-**Status:** later; blocked on the matching record layouts being decoded
+**Status:** later (2026-10-07). The records for the first slice are decoded for reading (cities:
+name, owner, race, population; units: type, owner; sites: kind, guards, rewards, see
+[kazzmir-save-layouts.md](../reference/kazzmir-save-layouts.md)); what it needs next is each
+editable field checked in the real game, one at a time.
 **Size:** large (do incrementally)
 
 ## What to do

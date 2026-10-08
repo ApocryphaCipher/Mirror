@@ -1,9 +1,12 @@
 # STORY-029: Safe map editing: see everything, and don't create impossible states
 
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
-**Status:** later. **Blocked** on decoding and drawing the other layers:
-EPIC-004 (cities, sites, **units**, roads, **specials**) and the
-exploration (fog-of-war) layer's meaning.
+**Status:** open, unblocked (2026-10-07). The layers it was waiting for are decoded and
+drawn: EPIC-004 (cities, sites, units, roads, specials), the exploration layer (a 4-bit
+mask, 0 to 15; STORY-036) and the landmass rule (`Mirror.Landmass`, used by Paint type).
+STORY-037 added **Reveal all**, which edits the save. Still to do: a "show everything"
+view that does not touch the save, the edit checker for impossible states, and brush
+safety.
 **Size:** medium–large
 **Raised by:** [Kevin](https://github.com/KevinAsbury), 2026-09-23
 
@@ -65,11 +68,12 @@ or splits land regions, it recomputes the affected regions using the
 game's rule. The edit checker (below) flags any tile whose ID doesn't
 match that rule.
 
-## What to do (once unblocked)
+## What to do
 
 1. **"Show everything" toggle** in edit mode: ignore exploration/fog, show
-   all units, sites and specials. Needs the exploration layer's bits
-   understood (they're mostly `0`/`255`-ish today; not yet decoded).
+   all units, sites and specials. The exploration bits are understood now (STORY-036
+   draws them, off by default; STORY-037's Reveal all sets them all to 15 in the save),
+   so this is a view toggle and not research.
 2. **An edit checker** that runs after each stroke and flags problems on
    the map (outline plus tooltip). Warn, don't block; some odd states are
    legal and fun (bridges).

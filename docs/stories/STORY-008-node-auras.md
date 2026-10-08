@@ -60,10 +60,10 @@ DOSBox fork, and the game's sparkles compared with Mirror's art:
   a banner it would be brown.
 - **Unowned nodes** show nothing, and only the viewed plane's nodes are pushed.
 
-## Not yet seen
+## Seen, and what wasn't
 
-Nobody has watched Mirror's sparkles animate on screen: the browser pane was hidden,
-so the clock was stepped by hand. The Chaos and Nature nodes' sparkles (and the green,
+My checks stepped the clock by hand (the browser pane was hidden). **Kevin has watched the yellow sparkles
+animate in a visible browser (2026-10-07) and says they look right.** The Chaos and Nature nodes' sparkles (and the green,
 blue, red and purple art) were checked by pixels or by the sprite dump, not against a
 real-game screenshot of an owner of that colour. Other realms' sparkle in the owner's
 colour is from the docs and the Sorcery node's earlier meld.

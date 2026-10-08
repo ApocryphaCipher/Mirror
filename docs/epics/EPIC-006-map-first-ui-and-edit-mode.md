@@ -65,7 +65,7 @@ STORY-017 → then the rest as their EPIC-004 data stories land.
 - [STORY-015](../stories/STORY-015-view-mode-layout.md): view mode layout (full-window map, pan/zoom, hover readout) **Done**
 - [STORY-016](../stories/STORY-016-edit-mode-shell.md): edit mode shell (toggle, pick-a-layer, tools, undo/redo, Save as) **Done**
 - [STORY-017](../stories/STORY-017-terrain-editing-autotile.md): terrain editing with auto-tiling (paint types; game picks the picture)
-- [STORY-018](../stories/STORY-018-roads-specials-editing.md): roads, corruption and resource editing **Implemented**, checked in the real game (bridges untried)
+- [STORY-018](../stories/STORY-018-roads-specials-editing.md): roads, corruption and resource editing **Done** (checked in the real game; roads on ocean, "bridges", untried)
 - [STORY-019](../stories/STORY-019-move-structures.md): select and move structures and unit stacks
 - [STORY-020](../stories/STORY-020-structure-editors.md): structure detail editors (city / lair / unit)
 - [STORY-021](../stories/STORY-021-save-round-trip-safety.md): save round-trip safety (byte-exact, and loads in the real game) **Done**
@@ -76,12 +76,14 @@ STORY-017 → then the rest as their EPIC-004 data stories land.
 - [STORY-026](../stories/STORY-026-bug-discard-and-stuck-edit-state.md): **bug**: Discard does nothing; edits feel impossible to clear **Fixed**
 - [STORY-027](../stories/STORY-027-cycle-tile-tool.md): Cycle tool (click = next tile picture); Paint becomes its own tool **Done**
 - [STORY-028](../stories/STORY-028-floating-tool-palette.md): floating emoji tool palette with Cycle instructions and a Paint panel (nice-to-have)
-- [STORY-029](../stories/STORY-029-safe-editing-see-everything.md): safe editing: see everything, flag impossible states (later; blocked on EPIC-004)
+- [STORY-029](../stories/STORY-029-safe-editing-see-everything.md): safe editing: see everything, flag impossible states (open; unblocked)
 - [STORY-034](../stories/STORY-034-surveyor.md): Surveyor readout: tile value and City Resources, matched against the game's Surveyor **Done**
 - [STORY-035](../stories/STORY-035-settleable-tiles-overlay.md): overlay mode highlighting settleable tiles (nice-to-have) **Done**
 - [STORY-036](../stories/STORY-036-fog-of-war-layer.md): fog-of-war layer, off by default (nice-to-have) **Done**
 - [STORY-037](../stories/STORY-037-reveal-all.md): Reveal all: edit the save so every tile is explored (nice-to-have) **Done**
 
-Dependencies: 018–020 need the matching EPIC-004 decode stories
-(013 roads/minerals, 010 cities, 011 sites, 012 units) first. 017 needs
-`TERRTYPE.LBX` decoded properly.
+Dependencies (2026-10-07): the EPIC-004 decode stories (013 roads/minerals, 010
+cities, 011 sites, 012 units) and STORY-008 (nodes) are all Done, so 019 and 020 are
+no longer blocked on reading the records; what they still need is every *written*
+field checked in the real game. 017's lookup is done (kazzmir's terrain table; see the
+story for what is left).

@@ -1,8 +1,8 @@
 # STORY-045: Enchanted roads shimmer
 
 **Parent:** [EPIC-005](../epics/EPIC-005-animated-terrain-and-magic.md)
-**Status:** implemented and checked against the real game (2026-10-07). It builds on
-STORY-008's overlay clock, so it ships after (or with) that story.
+**Status:** Done (2026-10-07), checked against the real game and watched by Kevin in his
+browser. It builds on STORY-008's overlay clock.
 **Size:** small
 **Requested by:** [Kevin](https://github.com/KevinAsbury), 2026-10-07, after seeing the
 node sparkles: "the road shimmer is the only thing I see missing".
@@ -55,9 +55,8 @@ roads, specials and corruption do not animate.
 - The clock runs while an enchanted road is on screen, stops when the checkbox or the
   Roads & specials layer is turned off, and starts again when turned back on.
 
-## Not yet seen
+## Seen, and what wasn't
 
-As with the sparkles, nobody has watched Mirror's roads shimmer on screen: the browser
-pane was hidden, so the clock was stepped by hand. Only Myrror's enchanted roads were
-measured in the game (Arcanus has none in these saves); the shimmer is the same art, so
-the same frames apply.
+My checks stepped the clock by hand (the browser pane was hidden); **Kevin has since watched the
+roads shimmer in a visible browser (2026-10-07).** Only Myrror's enchanted roads were measured in the
+game (Arcanus has none in these saves); the shimmer is the same art, so the same frames apply.

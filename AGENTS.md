@@ -23,7 +23,10 @@ bash scripts/test_game.sh   # when the game files are available (see §5)
 ```
 
 CI runs the first three on every pull request and on `main`
-([.github/workflows/ci.yml](.github/workflows/ci.yml)).
+([.github/workflows/ci.yml](.github/workflows/ci.yml)). Also run
+`mix test --warnings-as-errors` before opening a PR: an unused test helper or variable only
+warns there, and a reviewer may run it. Try a couple of seeds as CI does
+(`mix test --seed 1 --max-cases 8`) when you add tests that share state.
 
 Do not weaken, delete or skip a test to get green. Do not suppress a warning
 without a written reason. If you couldn't run a check, say so and why.
@@ -42,6 +45,9 @@ without a written reason. If you couldn't run a check, say so and why.
   `main`**. A PR targeting another PR's branch once merged into a stale
   branch and never reached `main`.
 - Don't discard or "clean up" changes you didn't make.
+- Copilot reviews every PR. Fix each finding, or say why not, in a reply on its thread, and
+  say what you checked (and what you didn't). A fix gets its own commit and the same checks.
+  Resolving a thread and merging are Kevin's.
 
 ## 3. Stay inside the task
 
@@ -198,6 +204,20 @@ These all bit a previous session:
   tests few, tagged and skippable.
 - Tests must be deterministic: no wall-clock sleeps, no dependence on
   order or on a running dev server.
+- LiveView tests that read push events have three traps we have hit:
+  - `assert_push_event(view, event, ...)` with a *variable* event name matches **any** event,
+    because the unpinned variable is a pattern. Pin it: `^event`.
+  - Push events queue up. `assert_push_event` returns the *first* match, so after a load the
+    "latest" event is not the one you get. Read them all and keep the last (see `latest_overlay/2`
+    in `map_live_edit_test.exs`), or assert the event is absent with `refute_push_event`.
+  - Don't hard-code an id that also comes from a global counter. `apply_single_tile` takes its
+    history id from `System.unique_integer([:positive, :monotonic])`; a test that used
+    `stroke: 3` passed until another test shifted the counter to 3, then failed on one seed
+    in CI. Use a value the counter can't reach (a negative one).
+- A client change needs a client check: pure helpers go in `assets/js/*.mjs` with Node tests
+  in `assets/test/` (`mix test` runs them), and the canvas result is checked in a browser or
+  against the game, in numbers where possible.
+
 
 ## 11. Running the app
 

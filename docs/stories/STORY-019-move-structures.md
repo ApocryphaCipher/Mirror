@@ -1,7 +1,10 @@
 # STORY-019: Select and move structures and unit stacks
 
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
-**Status:** blocked on EPIC-004 decode stories (010 cities, 011 sites, 012 units; STORY-008 for nodes)
+**Status:** open, no longer blocked (2026-10-07): the decode stories (010 cities, 011 sites,
+012 units, 008 nodes) are Done, so the records can be read. What is still unproven is
+writing them: each moved structure's x/y and every cross-reference has to load cleanly in the
+real game, one kind at a time.
 **Size:** medium–large
 
 ## What to do

@@ -4,7 +4,7 @@
 - [STORY-004](STORY-004-add-river-volcano-node-kinds.md): river/volcano/node kinds. Obsolete for rendering
 - [STORY-005](STORY-005-render-from-terrain-lbx.md): render the map from `TERRAIN.LBX` in the app (EPIC-002). **Done** (MOMIME removal completed in STORY-014)
 - [STORY-006](STORY-006-sprite-groundwork.md): sprite groundwork, full GOG install + named-sprite catalog (EPIC-004/005). **Done**
-- [STORY-007](STORY-007-live-terrain-animation.md): live terrain animation / ocean twinkle (EPIC-005) **Implemented**, pace to tune by eye
+- [STORY-007](STORY-007-live-terrain-animation.md): live terrain animation / ocean twinkle (EPIC-005) **Done**, paced at the game's 0.6 s
 - [STORY-008](STORY-008-node-auras.md): node auras, owner-coloured sparkle on melded nodes (EPIC-005) **Done**
 - [STORY-009](STORY-009-overlay-layer-toggles.md): overlay layers with on/off toggles (EPIC-004) **Done**
 - [STORY-010](STORY-010-cities.md): cities (EPIC-004) **Done**
@@ -15,7 +15,7 @@
 - [STORY-015](STORY-015-view-mode-layout.md): view mode, full-window map with pan/zoom (EPIC-006) **Done**
 - [STORY-016](STORY-016-edit-mode-shell.md): edit mode shell (EPIC-006) **Done**
 - [STORY-017](STORY-017-terrain-editing-autotile.md): terrain editing with auto-tiling via `TERRTYPE.LBX` (EPIC-006)
-- [STORY-018](STORY-018-roads-specials-editing.md): roads, corruption, resource editing (EPIC-006) **Implemented**, checked in the real game (bridges untried)
+- [STORY-018](STORY-018-roads-specials-editing.md): roads, corruption, resource editing (EPIC-006) **Done** (checked in the real game; bridges untried)
 - [STORY-019](STORY-019-move-structures.md): select and move structures and unit stacks (EPIC-006)
 - [STORY-020](STORY-020-structure-editors.md): structure detail editors (EPIC-006)
 - [STORY-021](STORY-021-save-round-trip-safety.md): save round-trip safety (EPIC-006) **Done**
@@ -26,7 +26,7 @@
 - [STORY-026](STORY-026-bug-discard-and-stuck-edit-state.md): **bug**: Discard does nothing (in-app browser swallows `confirm()`); edits feel impossible to clear (EPIC-006) **Fixed**
 - [STORY-027](STORY-027-cycle-tile-tool.md): Cycle tool: click steps a tile to the next picture (#134 → #135); today's click-to-paint becomes the Paint tool (EPIC-006) **Done**
 - [STORY-028](STORY-028-floating-tool-palette.md): floating emoji tool palette (🔄 Cycle, 🎨 Paint) with Cycle instructions and a Paint panel (brush size, quick terrain buttons) (EPIC-006, nice-to-have)
-- [STORY-029](STORY-029-safe-editing-see-everything.md): safe map editing: see everything past the fog, and flag impossible states (units on water…) (EPIC-006, later; blocked on EPIC-004)
+- [STORY-029](STORY-029-safe-editing-see-everything.md): safe map editing: see everything past the fog, and flag impossible states (units on water…) (EPIC-006, open; unblocked 2026-10-07)
 - [STORY-030](STORY-030-docker-image-and-compose.md): Docker release image + `compose.yaml`, game files mounted read-write, never baked in (EPIC-007) **Done**
 - [STORY-031](STORY-031-spike-download-own-gog-copy.md): **spike**: script the download of the user's own GOG purchase (their GOG login), feeding `mix mirror.import_game` (EPIC-007)
 - [STORY-032](STORY-032-cities-walls-labels-verify.md): cities follow-up: walls, name labels, check size frame / flag colour against the real game (EPIC-004) **Done**
@@ -43,3 +43,4 @@
 - [STORY-043](STORY-043-maintainability.md): maintainability: split map_live.ex, dead code (EPIC-008) **Done**
 - [STORY-044](STORY-044-bug-stale-overlays-across-tabs.md): **bug**: cities/units/sites overlays go stale on cross-tab save updates (EPIC-004) **Fixed**
 - [STORY-045](STORY-045-enchanted-road-shimmer.md): enchanted roads shimmer on the overlay clock, frame `step mod 6` like the game (EPIC-005) **Done**
+- [STORY-046](STORY-046-tower-of-wizardry-lit-look.md): what clearing a Tower of Wizardry changes, and its lit look (EPIC-004)

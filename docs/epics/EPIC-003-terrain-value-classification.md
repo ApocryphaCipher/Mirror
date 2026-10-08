@@ -102,10 +102,10 @@ wrong, not the fix itself.
 
 ## Stories
 
-- [STORY-002](../stories/STORY-002-stop-circular-terrain-source-heuristic.md) — stop the circular auto-detect heuristic (small, ~30–60 min, but low value alone — see the story for why it's best paired with STORY-003)
-- [STORY-003](../stories/STORY-003-find-real-terrain-value-table.md) — find or derive the complete real terrain-value table (the actual research task; size unknown, cheapest lead is decoding `Terrstat.lbx`)
-- [STORY-004](../stories/STORY-004-add-river-volcano-node-kinds.md) — add river/river-mouth/volcano/node kinds once the table is known (blocked on STORY-003; mechanical once unblocked, since the algorithm and art already exist from PR #4)
-- [STORY-001](../stories/STORY-001-jagged-shorelines.md) (lives under EPIC-001, blocked here too) — re-verify the shoreline once STORY-003/004 land, using the same `fallbackStep`-counting + native-resolution-crop method from PR #4
+- [STORY-002](../stories/STORY-002-stop-circular-terrain-source-heuristic.md) — stop the circular auto-detect heuristic. **Rescoped and folded into STORY-005** (2026-09-22)
+- [STORY-003](../stories/STORY-003-find-real-terrain-value-table.md) — find or derive the complete real terrain-value table. **Done** (2026-09-22): it is `TERRAIN.LBX` entry 1
+- [STORY-004](../stories/STORY-004-add-river-volcano-node-kinds.md) — add river/river-mouth/volcano/node kinds. **Obsolete for rendering** (2026-09-22): they are ordinary `TERRAIN.LBX` tiles
+- [STORY-001](../stories/STORY-001-jagged-shorelines.md) (lives under EPIC-001, blocked here too) — re-verify the shoreline. **Closed, obsolete** (2026-09-22): on the `TERRAIN.LBX` path the save stores the finished coastline
 
 ## Dependency note for EPIC-004
 

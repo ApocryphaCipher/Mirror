@@ -157,6 +157,38 @@ map is at save `0x14814` (15 = fully explored). Back the save up first.
 Used for the Raise Volcano and Change Terrain checks in
 [classic-terrain-format.md](classic-terrain-format.md).
 
+## Findings, 2026-10-06/07 (STORY-018, 037, 008, 007, 045)
+
+Collections `mom-live-2026-10-06` and `mom-live-2026-10-07`; checkpoints 70 (Enchant Road), 71
+(Reveal all) and 72 (nodes owned). Test saves were built from SAVE3 or SAVE8 with Mirror's own code
+([real-game-acceptance.md](real-game-acceptance.md)).
+
+- **Enchant Road writes `0x18`.** Casting it turned five connected Arcanus road tiles from `0x08`
+  to `0x18` (the road bit is kept, `0x10` added), including a road Mirror had written. SAVE3's 13
+  Myrror road tiles are `0x18` too. **checked**
+- **The game keeps what Mirror writes.** Road `0x08`, enchanted road `0x18`, corruption `0x20`,
+  minerals `6`, an explored block of all 15, and node owner bytes were all in RAM exactly as in the
+  file after Load Game; the corruption and mithril drew correctly. **checked**
+- **Reveal all leaves sites alone.** After the explored block was set to 15, a never-looked-at site still
+  said "Unexplored" in the Surveyor (the looked-at flag is separate). **checked**
+- **A meld is the owner byte.** A node record's `+3` going from `0xFF` to the wizard's index is all it takes;
+  there is no separate "melded" flag. The node's guardian encounter is cleared separately
+  (`intact` 1 to 0, guard count low nibble 0). The sparkles show in the **owner's** colour.
+  **checked** (three nodes, one of each realm)
+- **Node sparkles ripple.** On the aura's *i*-th tile the game shows sparkle frame `(step + i) mod 6`
+  (`MAPBACK #63`..`#67`); all 128 screenshot crops of one node's eight tiles matched a `#67` frame on every
+  opaque pixel. **checked**
+- **The overland animation step is about 0.6 s** (a plain `601` ocean tile, the sparkles, the enchanted
+  roads: 0.46 to 0.68 s between changes, mean about 0.6). **checked**
+- **Enchanted roads shimmer as one.** The six frames are three pictures (A B A C A B), and every tile and
+  piece of the road shows the same frame at once. **checked**
+- **The view origin (`0x2F9EE`) and plane (`0x34776`) matched the screen every time** in these checks (tile boxes
+  computed from them lined up with the screenshots pixel for pixel, on both planes). That is more support than
+  the one miss noted above; still check it against the screen before relying on it.
+- **To measure an animation:** loop `POST /api/v1/capture/screenshot?inline=1` for several seconds, crop the
+  tile (`x = (tile_x - origin_x) * 20`, `y = 20 + (tile_y - origin_y) * 18`, 20 x 18 pixels), classify each crop
+  against the decoded sprite frames, and look at when the class changes.
+
 ## How to work with it
 
 The game is turn-based, so Kevin stops at a **checkpoint** (a screen that

@@ -1,5 +1,10 @@
 # 2026-09-24: Surveyor done; where things stand
 
+> [!NOTE] Superseded
+> For current project status, see [2026-10-07-handoff.md](2026-10-07-handoff.md). This note
+> records the state on 2026-09-24; the editing tools, Reveal all, the overlay layers, the
+> animation and the node sparkles have landed since.
+
 This supersedes the STORY-034 row of
 [2026-09-24-live-ram-evaluation.md](2026-09-24-live-ram-evaluation.md),
 which still says "formula no".
