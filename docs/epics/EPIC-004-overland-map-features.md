@@ -1,6 +1,6 @@
 # EPIC-004: Render towns, forts, towers, tombs, and other overland features
 
-**Status:** done. Cities are decoded and rendered with owner flags and population-driven frames (STORY-010, STORY-032, STORY-033). Sites are decoded (`Mirror.SaveFile.Sites`) and drawn (STORY-011). Roads, minerals/specials, and corruption are decoded and rendered (STORY-013). Units are decoded and rendered with banner-colour plaques (STORY-012). Rival flag colours beyond yellow and `CITYNOWA` are unresolved but moved to backlog.md as very-low-priority, not tracked as remaining epic work.
+**Status:** done, apart from [STORY-046](../stories/STORY-046-tower-of-wizardry-lit-look.md) (the lit look of a cleared Tower of Wizardry, raised 2026-10-07). Cities are decoded and rendered with owner flags and population-driven frames (STORY-010, STORY-032, STORY-033). Sites are decoded (`Mirror.SaveFile.Sites`) and drawn (STORY-011). Roads, minerals/specials, and corruption are decoded and rendered (STORY-013). Units are decoded and rendered with banner-colour plaques (STORY-012). Rival flag colours beyond yellow and `CITYNOWA` are unresolved but moved to backlog.md as very-low-priority, not tracked as remaining epic work.
 Scope widened by [Kevin](https://github.com/KevinAsbury) to include **units** (figure on a banner-colour
 plaque) and **per-layer on/off toggles**. Sprite and save-block survey:
 [../reference/overland-sprites-and-save-blocks.md](../reference/overland-sprites-and-save-blocks.md).
@@ -72,6 +72,7 @@ STORY-011 → STORY-013.
 - [STORY-011](../stories/STORY-011-sites-towers-lairs.md) (**Done**): towers, fortresses, lairs, ruins and other sites
 - [STORY-012](../stories/STORY-012-units-with-banner-plaques.md) (**Done**): units with banner-colour plaques
 - [STORY-013](../stories/STORY-013-roads-minerals-corruption.md) (**Done**): specials and bonuses (ores, gems, nightshade, wild game…), roads, corruption
+- [STORY-046](../stories/STORY-046-tower-of-wizardry-lit-look.md) (**open**): what clearing a Tower of Wizardry changes, and its lit look
 - [STORY-044](../stories/STORY-044-bug-stale-overlays-across-tabs.md) (**Fixed**): **bug**: cities, units and sites overlays go stale on cross-tab save updates
 
 Superseded from the original scoping above: the plan to use MOMIME

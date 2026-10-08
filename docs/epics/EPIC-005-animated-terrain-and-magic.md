@@ -1,6 +1,6 @@
 # EPIC-005: Animated terrain and magic effects
 
-**Status:** done (2026-10-07), apart from a look at speed: Kevin has watched the node sparkles animate in a visible browser, but nobody has yet watched the terrain (STORY-007) or the enchanted roads (STORY-045) move.
+**Status:** done (2026-10-07). Kevin watched the terrain, the node sparkles and the enchanted roads animate in his browser.
 **Owner:** [Kevin](https://github.com/KevinAsbury)
 **Requested:** 2026-09-22, right after STORY-005 (map renders from `TERRAIN.LBX`)
 
@@ -34,6 +34,6 @@ and it pauses while the tab is hidden.
 ## Stories
 
 - [STORY-006](../stories/STORY-006-sprite-groundwork.md): sprite groundwork (full GOG install, named-sprite catalog). Shared with EPIC-004
-- [STORY-007](../stories/STORY-007-live-terrain-animation.md): live terrain animation (ocean twinkle) **Implemented**, paced at the game's 0.6 s
+- [STORY-007](../stories/STORY-007-live-terrain-animation.md): live terrain animation (ocean twinkle) **Done**, paced at the game's 0.6 s
 - [STORY-008](../stories/STORY-008-node-auras.md): node auras (Chaos / Nature / Sorcery sparkle) **Done**
 - [STORY-045](../stories/STORY-045-enchanted-road-shimmer.md): enchanted roads shimmer on the same clock **Done**

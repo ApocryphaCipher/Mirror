@@ -4,7 +4,7 @@
 - [STORY-004](STORY-004-add-river-volcano-node-kinds.md): river/volcano/node kinds. Obsolete for rendering
 - [STORY-005](STORY-005-render-from-terrain-lbx.md): render the map from `TERRAIN.LBX` in the app (EPIC-002). **Done** (MOMIME removal completed in STORY-014)
 - [STORY-006](STORY-006-sprite-groundwork.md): sprite groundwork, full GOG install + named-sprite catalog (EPIC-004/005). **Done**
-- [STORY-007](STORY-007-live-terrain-animation.md): live terrain animation / ocean twinkle (EPIC-005) **Implemented**, paced at the game's 0.6 s
+- [STORY-007](STORY-007-live-terrain-animation.md): live terrain animation / ocean twinkle (EPIC-005) **Done**, paced at the game's 0.6 s
 - [STORY-008](STORY-008-node-auras.md): node auras, owner-coloured sparkle on melded nodes (EPIC-005) **Done**
 - [STORY-009](STORY-009-overlay-layer-toggles.md): overlay layers with on/off toggles (EPIC-004) **Done**
 - [STORY-010](STORY-010-cities.md): cities (EPIC-004) **Done**
@@ -43,3 +43,4 @@
 - [STORY-043](STORY-043-maintainability.md): maintainability: split map_live.ex, dead code (EPIC-008) **Done**
 - [STORY-044](STORY-044-bug-stale-overlays-across-tabs.md): **bug**: cities/units/sites overlays go stale on cross-tab save updates (EPIC-004) **Fixed**
 - [STORY-045](STORY-045-enchanted-road-shimmer.md): enchanted roads shimmer on the overlay clock, frame `step mod 6` like the game (EPIC-005) **Done**
+- [STORY-046](STORY-046-tower-of-wizardry-lit-look.md): what clearing a Tower of Wizardry changes, and its lit look (EPIC-004)

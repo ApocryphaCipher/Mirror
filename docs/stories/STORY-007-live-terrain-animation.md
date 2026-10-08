@@ -1,8 +1,8 @@
 # STORY-007: Live terrain animation (ocean twinkle)
 
 **Parent:** [EPIC-005](../epics/EPIC-005-animated-terrain-and-magic.md)
-**Status:** implemented 2026-10-07; pace corrected the same day from a measurement
-of the real game (see "The pace"). Still to do by eye: watch it run at speed.
+**Status:** Done (2026-10-07). Pace corrected the same day from a measurement of the real
+game (see "The pace"), and Kevin confirmed it animating in his browser.
 **Size:** small
 
 ## Findings so far (2026-10-04)
@@ -98,9 +98,8 @@ by the terrain canvas and the overlay canvas. Both take their frame from
 `phaseAt(timestamp)`, the step the timestamp falls in, so they stay in step with
 each other without sharing a timer.
 
-## Not yet seen
+## Seen
 
-The browser pane was hidden, so `requestAnimationFrame` did not run and the clock
-was stepped by hand with fake timestamps. So **nobody has watched it animate at
-speed** in Mirror: that the live clock runs and pauses with the tab is still to
-confirm by eye.
+My checks stepped the clock by hand (the browser pane was hidden, so
+`requestAnimationFrame` did not run). **Kevin has watched it run in a visible browser (2026-10-07):**
+the terrain, the node sparkles and the enchanted roads all animate and "look great".
