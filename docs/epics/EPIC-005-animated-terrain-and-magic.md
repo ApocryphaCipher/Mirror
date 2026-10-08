@@ -28,5 +28,5 @@ The overland map should move the way the real game's does:
 ## Stories
 
 - [STORY-006](../stories/STORY-006-sprite-groundwork.md): sprite groundwork (full GOG install, named-sprite catalog). Shared with EPIC-004
-- [STORY-007](../stories/STORY-007-live-terrain-animation.md): live terrain animation (ocean twinkle)
+- [STORY-007](../stories/STORY-007-live-terrain-animation.md): live terrain animation (ocean twinkle) **Implemented**, pace to tune by eye
 - [STORY-008](../stories/STORY-008-node-auras.md): node auras (Chaos / Nature / Sorcery sparkle)

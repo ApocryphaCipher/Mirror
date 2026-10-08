@@ -1,7 +1,8 @@
 # STORY-007: Live terrain animation (ocean twinkle)
 
 **Parent:** [EPIC-005](../epics/EPIC-005-animated-terrain-and-magic.md)
-**Status:** open, ready to start (no dependency on STORY-006)
+**Status:** implemented 2026-10-07. Still to do by eye: watch it run at speed
+and tune the pace against the real game (see "Not yet seen").
 **Size:** small
 
 ## Findings so far (2026-10-04)
@@ -48,3 +49,48 @@
 - Ocean visibly twinkles in `/arcanus` and `/myrror`; static tiles are not
   redrawn each tick.
 - Toggling it off leaves frame 0, which is identical to today's render.
+
+## What was built
+
+- **`assets/js/terrain_animation.mjs`** (pure, with Node tests in
+  `assets/test/terrain_animation.test.mjs`): which cells hold an animated tile
+  (`[index, frames]` with `frames > 1`), keeping that set in step with one edited
+  cell, and when the clock should advance.
+- **`MapCanvas` hook** (`map_hooks.js`): a `requestAnimationFrame` clock throttled
+  to one step every 160 ms (about 6 frames a second) that redraws **only the
+  animated cells**, at `frame = (phase + step) % frames`. The cell list is rebuilt
+  on `tile_assets` and `map_reload`, and updated per cell in `applyTileValue`, which
+  every paint, cycle, undo and redo goes through, so painting 0 → 601 adds a cell
+  and undoing it removes it.
+- **Pause and toggle:** the clock stops while the tab is hidden and restarts when
+  it is shown. An **Animate terrain** checkbox in the Layers panel
+  (`#animate-terrain`) turns it off, which redraws the animated cells at the
+  server's phase, the same picture as before this story. The choice is kept in
+  `localStorage` (`mirror.animateTerrain`); with no choice stored it starts off if
+  the system asks for reduced motion.
+- **The Lab** is left alone: its Phase control is still manual and the toggle is not
+  shown there.
+- **Scope:** every animated tile, not only the ocean sparkle, since the cell list
+  comes from the atlas (601 and 31–33, the shore waves, channel, nodes, volcano and
+  lake). A SAVE3 Arcanus has 300 animated cells and Myrror 317.
+
+## Checked
+
+In a real browser (the Docker image, in the built-in browser pane), driving the page's
+hook, with a SAVE3 loaded, comparing every cell's pixels between frames:
+
+- only animated cells change between ticks (300 of 300 on the first step; 0 static
+  cells ever change), and the picture repeats after 4 ticks;
+- a step inside the interval changes nothing (the throttle);
+- toggling off with the checkbox restores exactly the picture as loaded, a stray
+  tick does nothing while off, and the choice is stored;
+- painting 0 → 601 adds a cell to the list and painting back removes it;
+- Myrror builds its own list.
+
+## Not yet seen
+
+The browser pane was hidden, so `requestAnimationFrame` did not run and the clock
+was stepped by hand with fake timestamps. So **nobody has watched it animate at
+speed**: whether the 160 ms pace looks like the game's, and that the live clock runs
+and pauses when a tab is hidden, is still to confirm by eye. The pace is the
+`ANIMATION_INTERVAL_MS` constant in `map_hooks.js`.

@@ -27,4 +27,17 @@ defmodule Mirror.ClientJsTest do
     assert length(Regex.scan(~r/layerTypeAfterDelta\(/, source)) == 2
     refute source =~ "if (payload.layer_type) this.layerType = payload.layer_type"
   end
+
+  test "the canvas hook animates only the cells the helper lists, and keeps them in step with edits" do
+    source = File.read!("assets/js/map_hooks.js")
+
+    assert source =~ ~s|from "./terrain_animation.mjs"|
+    # the full list is rebuilt on load and reload, one cell is updated per terrain edit
+    assert length(Regex.scan(~r/this\.rebuildAnimatedCells\(\)/, source)) >= 2
+    assert source =~ "updateAnimatedCell(this.animatedCellSet"
+    # one redraw path for the tick, and it walks the list rather than the whole map
+    assert source =~ "this.animatedCellSet.forEach"
+    # the Lab keeps its own phase control
+    assert source =~ ~s|this.interaction !== "lab"|
+  end
 end

@@ -1940,6 +1940,21 @@ defmodule MirrorWeb.MapLive do
                       <span>{label}</span>
                     </label>
                   </li>
+                  <li class="border-t border-white/10 pt-1">
+                    <label
+                      class="flex items-center gap-2"
+                      title="Twinkling ocean, shore waves, nodes and volcanoes; off keeps the still picture"
+                    >
+                      <input
+                        type="checkbox"
+                        id="animate-terrain"
+                        data-animate-toggle
+                        checked
+                        class="rounded border-white/20 bg-slate-900"
+                      />
+                      <span>Animate terrain</span>
+                    </label>
+                  </li>
                 </ul>
               </details>
 
