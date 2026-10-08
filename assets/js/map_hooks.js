@@ -1,4 +1,10 @@
 import {layerTypeAfterDelta} from "./layer_type.mjs"
+import {animatedCells, shouldAdvance, updateAnimatedCell} from "./terrain_animation.mjs"
+
+// How often the terrain animation steps (STORY-007): about 6 frames a second.
+// Tune by eye against the real game.
+const ANIMATION_INTERVAL_MS = 160
+const ANIMATION_STORAGE_KEY = "mirror.animateTerrain"
 
 const LAYER_STACK = [
   "terrain",
@@ -38,6 +44,7 @@ const MapCanvas = {
     this.phaseLoopDetecting = false
     this.phaseLoopCanvas = null
     this.phaseLoopCtx = null
+    this.setupTerrainAnimation()
 
     this.ctx = this.el.getContext("2d", {alpha: false})
     this.ctx.imageSmoothingEnabled = false
@@ -133,6 +140,7 @@ const MapCanvas = {
       if (Object.prototype.hasOwnProperty.call(payload, "snapshot_mode")) {
         this.snapshotMode = this.parseBool(payload.snapshot_mode, this.snapshotMode)
       }
+      this.rebuildAnimatedCells()
       this.renderAll()
     })
 
@@ -170,6 +178,7 @@ const MapCanvas = {
     this.handleEvent("tile_assets", payload => {
       if (!payload) return
       this.terrainLbx = payload.terrain_lbx ? this.buildTerrainLbxAtlas(payload.terrain_lbx) : null
+      this.rebuildAnimatedCells()
       this.renderAll()
       this.drawBrushPreview()
     })
@@ -206,6 +215,7 @@ const MapCanvas = {
     if (this.handleResize) {
       window.removeEventListener("resize", this.handleResize)
     }
+    this.teardownTerrainAnimation()
   },
 
   resizeCanvas() {
@@ -280,9 +290,133 @@ const MapCanvas = {
   resolveRender(render) {
     const ctx = render?.ctx || this.ctx
     const size = render?.size || this.deviceTileSize
-    const phaseIndex = this.normalizePhaseIndex(render?.phaseIndex ?? this.phaseIndex)
+    // The animation step rides on top of the server's phase (the Lab's control), so a
+    // full redraw while it runs draws the animated tiles at the current frame.
+    const phaseIndex = this.normalizePhaseIndex(
+      render?.phaseIndex ?? this.phaseIndex + this.animPhase
+    )
     const usePhase = render?.usePhase ?? this.snapshotMode
     return {ctx, size, phaseIndex, usePhase}
+  },
+
+  // --- Terrain animation (STORY-007) ---
+  // Only the cells holding an animated tile are redrawn, on a throttled clock that
+  // pauses while the tab is hidden. The Lab keeps its manual phase control, and the
+  // toggle (Layers panel) is remembered per browser.
+  setupTerrainAnimation() {
+    this.animatedCellSet = new Set()
+    this.animPhase = 0
+    this.animLast = null
+    this.animFrameId = null
+    this.animateEnabled = this.loadAnimationPreference()
+    this.animationTick = timestamp => this.stepAnimation(timestamp)
+
+    this.onAnimateToggle = event => {
+      const toggle = event.target
+      if (toggle && toggle.matches && toggle.matches("[data-animate-toggle]")) {
+        this.setAnimationEnabled(toggle.checked)
+      }
+    }
+    this.onVisibilityChange = () => this.syncAnimation()
+    document.addEventListener("change", this.onAnimateToggle)
+    document.addEventListener("visibilitychange", this.onVisibilityChange)
+
+    document.querySelectorAll("[data-animate-toggle]").forEach(toggle => {
+      toggle.checked = this.animateEnabled
+    })
+  },
+
+  teardownTerrainAnimation() {
+    this.stopAnimation()
+    if (this.onAnimateToggle) document.removeEventListener("change", this.onAnimateToggle)
+    if (this.onVisibilityChange) {
+      document.removeEventListener("visibilitychange", this.onVisibilityChange)
+    }
+  },
+
+  // On unless the viewer chose otherwise, or their system asks for reduced motion.
+  loadAnimationPreference() {
+    try {
+      const stored = window.localStorage.getItem(ANIMATION_STORAGE_KEY)
+      if (stored === "1") return true
+      if (stored === "0") return false
+    } catch (_error) {
+      // storage can be blocked or throw; the default applies
+    }
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)")
+    return !(reduced && reduced.matches)
+  },
+
+  setAnimationEnabled(enabled) {
+    this.animateEnabled = enabled
+    try {
+      window.localStorage.setItem(ANIMATION_STORAGE_KEY, enabled ? "1" : "0")
+    } catch (_error) {
+      // not remembered, still applied
+    }
+
+    if (enabled) {
+      this.syncAnimation()
+    } else {
+      this.stopAnimation()
+      // Back to the still frame, the same picture as before the animation existed.
+      if (this.animPhase !== 0) {
+        this.animPhase = 0
+        this.redrawAnimatedCells()
+      }
+    }
+  },
+
+  rebuildAnimatedCells() {
+    const planeTiles = this.terrainLbx?.tiles?.[this.plane]
+    this.animatedCellSet = animatedCells(this.terrainValues, planeTiles)
+    this.syncAnimation()
+  },
+
+  shouldAnimate() {
+    return (
+      this.animateEnabled &&
+      this.interaction !== "lab" &&
+      this.renderMode === "tiles" &&
+      this.hasTileAssets() &&
+      !document.hidden &&
+      this.animatedCellSet.size > 0
+    )
+  },
+
+  // Start the clock if it should run and isn't, stop it if it shouldn't.
+  syncAnimation() {
+    if (!this.shouldAnimate()) {
+      this.stopAnimation()
+    } else if (this.animFrameId === null) {
+      this.animLast = null
+      this.animFrameId = requestAnimationFrame(this.animationTick)
+    }
+  },
+
+  stopAnimation() {
+    if (this.animFrameId !== null) cancelAnimationFrame(this.animFrameId)
+    this.animFrameId = null
+    this.animLast = null
+  },
+
+  stepAnimation(timestamp) {
+    this.animFrameId = null
+    if (!this.shouldAnimate()) return
+
+    if (shouldAdvance(timestamp, this.animLast, ANIMATION_INTERVAL_MS)) {
+      this.animLast = timestamp
+      this.animPhase += 1
+      this.redrawAnimatedCells()
+    }
+    this.animFrameId = requestAnimationFrame(this.animationTick)
+  },
+
+  redrawAnimatedCells() {
+    if (!this.hasTileAssets()) return
+    this.animatedCellSet.forEach(idx => {
+      this.drawStackedTile(idx % this.mapWidth, Math.floor(idx / this.mapWidth))
+    })
   },
 
   // Store an edited tile value and redraw just that tile. On the TERRAIN.LBX
@@ -294,6 +428,12 @@ const MapCanvas = {
     if (layer === this.activeLayer) this.values[idx] = value
     const values = this.layerValues(layer)
     if (values) values[idx] = value
+
+    // An edit can add or remove an animated cell (painting 0 -> 601, or undoing it).
+    if (layer === "terrain") {
+      const planeTiles = this.terrainLbx?.tiles?.[this.plane]
+      if (updateAnimatedCell(this.animatedCellSet, idx, planeTiles, value)) this.syncAnimation()
+    }
 
     if (this.renderMode === "tiles" && this.hasTileAssets()) {
       if (layer === "terrain" || this.isLayerVisible(layer)) this.drawStackedTile(x, y)

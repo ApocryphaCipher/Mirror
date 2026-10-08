@@ -47,4 +47,26 @@ defmodule MirrorWeb.MapOverlayLayersTest do
 
     assert LazyHTML.attribute(checked, "value") == ~w(units cities sites auras roads)
   end
+
+  describe "Animate terrain toggle (STORY-007)" do
+    for path <- ["/arcanus", "/myrror"] do
+      test "#{path} has it in the Layers panel, on, and apart from the overlay toggles",
+           %{conn: conn} do
+        {:ok, view, _html} = live(conn, unquote(path))
+
+        assert has_element?(
+                 view,
+                 "[data-overlay-panel] input#animate-terrain[data-animate-toggle][checked]"
+               )
+
+        # It is not an overlay: the overlay script must not pick it up.
+        refute has_element?(view, "input#animate-terrain[data-overlay-toggle]")
+      end
+    end
+
+    test "the Lab has no toggle; its phase control stays manual", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/lab/arcanus")
+      refute has_element?(view, "[data-animate-toggle]")
+    end
+  end
 end
