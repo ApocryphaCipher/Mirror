@@ -36,6 +36,12 @@ export function updateAnimatedCell(cells, index, planeTiles, value) {
   return true
 }
 
+// Whether a "roads" overlay's items include an enchanted road, the only road art that
+// animates. (The layer also carries specials and corruption, which do not.)
+export function hasEnchantedRoad(items) {
+  return Array.isArray(items) && items.some(item => item.kind === "road" && item.enchanted)
+}
+
 // The animation step a timestamp falls in. Everything that animates (the terrain
 // canvas and the overlay canvas) takes its frame from this, so they stay in step
 // without sharing a timer, and a throttled or backgrounded tab catches up at once.
