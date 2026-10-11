@@ -70,8 +70,7 @@ the slot 6 result above). When two structures share a tile, a city wins over a t
 the Structures edit layer and select-then-click UI, undo/redo for record edits,
 **nodes** (a node is its terrain tile, so it needs a terrain move too, plus aura tiles and
 its guardian record), and units moved on their own (stack moves). **Left alone, unchecked:**
-a city's road links (`+101`; whether the game recomputes them is unknown, results carry
-`stale: [:city_road_links]`) and any go-to target a unit record may hold.
+any go-to target a unit record may hold.
 **Size:** medium–large
 
 ## What to do
