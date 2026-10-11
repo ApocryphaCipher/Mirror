@@ -39,19 +39,23 @@ own data or seen in the game; see the prerequisite below):
 - units made able to cross water by an enchantment or spell (*guess:* Water Walking, Wind Walking,
   Flight; check each one's effect and which flag in the unit record carries it);
 - land units riding in a transport's stack at sea;
-- **cities** on water: Kevin thinks there is a flying-city spell (*guess:* Floating Island; sprite #71
-  is in the catalog, see overland-sprites-and-save-blocks.md; what the spell does to the city tile
-  is not checked), and the game tolerates cities and lairs on ocean (STORY-019).
+- **cities** on water: the game tolerates cities and lairs on ocean (STORY-019). Kevin thinks there is a
+  flying-city spell; the likely one is the `flying_fortress` city enchantment (cities block, slot 8), not
+  Floating Island, which is a *unit* (type 190, a swimming transport). What Flying Fortress does to a city
+  on water has not been looked at.
 
 So the checker has three levels, not two: *fine* (the unit can be there), *warn* (odd but
 probably playable: a land unit alone on water, a bridge, a city on water without the spell), and
 *error* (only what is known to break the game, e.g. a landmass ID that disagrees with the rule).
 When in doubt, warn.
 
-**Prerequisite (new): decode unit movement.** Find where the game stores each unit type's
-movement ability (the unit-type table in the save or in the game's data, plus the unit record's
-enchantment flags), read it, and write it into `docs/reference/`. Cross-check against the game with
-the fork's API before the checker relies on it (AGENTS.md section 6).
+**Prerequisite: decode unit movement. First half done (2026-10-11):** the type table and the rule are in
+[../reference/unit-movement.md](../reference/unit-movement.md) and `Mirror.SaveFile.UnitMovement`, from
+kazzmir's source, consistent with every unit on water in the saves here. **Still to do:** put one unit of
+each kind (a flyer, a boat, a Water Walking unit, a Wind Walking unit) on water in the real game and read
+its record back with the fork's API (AGENTS.md section 6), and read the `+24` enchantment bits from a unit
+carrying each spell. The unit-record fields (`+24` enchantments, `+23` mutations) are not yet parsed by
+`Mirror.SaveFile.Units`.
 
 ## Continents: the landmass layer must follow terrain edits
 
