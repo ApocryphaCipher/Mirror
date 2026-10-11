@@ -61,7 +61,12 @@ next to tile changes. Logic is in `MirrorWeb.MoveTool`; tests are LiveView tests
 Checked in the browser against a real save (tool shows, note text); the click-on-a-real-city path is
 covered by the LiveView tests, not yet clicked by a person.
 
-**Not done:** towers, lairs, nodes and units in the UI, a highlight on the picked-up city,
+**Slice 3 (2026-10-11): towers and lairs in the same tool.** The tool is now **🏰 Move**: click a city, a Tower
+of Wizardry or a lair (cave, dungeon, temple, ruins, keep), then click where it goes. A tower moves on both
+planes at once, and the notice warns when the new tile is water on one of them (the game allows it, see
+the slot 6 result above). When two structures share a tile, a city wins over a tower, and a tower over a lair.
+
+**Not done:** nodes and units in the UI, a highlight on the picked-up structure,
 the Structures edit layer and select-then-click UI, undo/redo for record edits,
 **nodes** (a node is its terrain tile, so it needs a terrain move too, plus aura tiles and
 its guardian record), and units moved on their own (stack moves). **Left alone, unchecked:**

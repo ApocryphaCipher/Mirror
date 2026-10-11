@@ -222,7 +222,7 @@ defmodule MirrorWeb.MapLive do
   end
 
   def handle_event("set_tool", %{"tool" => tool}, socket)
-      when tool in ["cycle", "paint", "type", "road", "corruption", "special", "move_city"] do
+      when tool in ["cycle", "paint", "type", "road", "corruption", "special", "move"] do
     {:noreply,
      socket
      |> assign(:tool, String.to_existing_atom(tool))
@@ -1613,8 +1613,8 @@ defmodule MirrorWeb.MapLive do
                       {:corruption, "☠️ Corruption", "Click to corrupt a tile or clean it"},
                       {:special, "💎 Special",
                        "Place an ore, gems, crystals, wild game or nightshade"},
-                      {:move_city, "🏰 Move city",
-                       "Click a city, then click where it goes; its garrison, summoning circle and fortress go with it"}
+                      {:move, "🏰 Move",
+                       "Click a city, tower or lair, then click where it goes; a city takes its garrison, summoning circle and fortress with it"}
                     ]
                   }
                   id={"tool-#{tool}"}
@@ -1730,13 +1730,13 @@ defmodule MirrorWeb.MapLive do
               </.form>
 
               <span
-                :if={@tool == :move_city}
+                :if={@tool == :move}
                 id="move-note"
                 role="status"
                 aria-live="polite"
                 class="text-xs text-emerald-200"
               >
-                {@move_note || "Click a city to pick it up."}
+                {@move_note || "Click a city, tower or lair to pick it up."}
               </span>
 
               <span
@@ -1816,8 +1816,8 @@ defmodule MirrorWeb.MapLive do
                   :special ->
                     "Click: place the chosen special · right-click or shift-click: remove it · space-drag or middle-drag to pan · Esc to finish"
 
-                  :move_city ->
-                    "Click a city, then click where it goes · right-click or click it again: cancel · Undo works · space-drag or middle-drag to pan · Esc to finish"
+                  :move ->
+                    "Click a city, tower or lair, then click where it goes · right-click or click it again: cancel · Undo works · space-drag or middle-drag to pan · Esc to finish"
 
                   :type ->
                     "Click or drag: paint the terrain, neighbours re-tile · right-click: pick the terrain under the pointer · space-drag or middle-drag to pan · Esc to finish"
@@ -2210,13 +2210,13 @@ defmodule MirrorWeb.MapLive do
   end
 
   defp handle_pointer_start(
-         %{assigns: %{edit: :terrain, tool: :move_city}} = socket,
+         %{assigns: %{edit: :terrain, tool: :move}} = socket,
          x,
          y,
          button,
          _mods
        ) do
-    move_city_click(socket, x, y, button)
+    move_click(socket, x, y, button)
   end
 
   defp handle_pointer_start(
@@ -2518,34 +2518,34 @@ defmodule MirrorWeb.MapLive do
     end
   end
 
-  # Move city tool (STORY-019): the first click picks a city up, the second puts it
+  # Move tool (STORY-019): the first click picks a structure up, the second puts it
   # down. The edit is one undo step on the record history (Editor.apply_record/4).
-  defp move_city_click(socket, x, y, button) do
+  defp move_click(socket, x, y, button) do
     %{state: state, plane: plane, move_pending: pending} = socket.assigns
-    here = valid_coord?(x, y) && MoveTool.city_at(state.save.raw, plane, x, y)
+    here = valid_coord?(x, y) && MoveTool.pick_at(state.save.raw, plane, x, y)
 
     cond do
       !valid_coord?(x, y) ->
         socket
 
-      pending && (button == 2 || (here && here.index == pending.index)) ->
+      pending && (button == 2 || (here && MoveTool.same?(here, pending))) ->
         assign(socket, move_pending: nil, move_note: "Cancelled.")
 
       is_nil(pending) && here ->
         assign(socket, move_pending: here, move_note: MoveTool.picked(here))
 
       is_nil(pending) ->
-        assign(socket, :move_note, "Click a city to pick it up.")
+        assign(socket, :move_note, "Click a city, tower or lair to pick it up.")
 
       here ->
         assign(socket, move_pending: here, move_note: MoveTool.picked(here))
 
       true ->
-        put_down_city(socket, pending, x, y)
+        put_down(socket, pending, x, y)
     end
   end
 
-  defp put_down_city(socket, pending, x, y) do
+  defp put_down(socket, pending, x, y) do
     plane = socket.assigns.plane
 
     {:ok, state, result} =
