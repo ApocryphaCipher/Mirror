@@ -53,7 +53,16 @@ in vault collection `mom-live-2026-10-10`).** Built from Kevin's "Jafar the Hack
 - **Kevin saw the moved tower, once cleared, lit with an eerie green light** (2026-10-10): the owned
   picture, see STORY-046.
 
-**Not done:** the Structures edit layer and select-then-click UI, undo/redo for record edits,
+**Slice 2 (2026-10-11): the Move city tool.** In edit mode, 🏰 Move city: click a city, then click
+where it goes (right-click or clicking it again cancels). It calls `Structures.move_city/3` and is one
+undo step: `Editor.apply_record/4` puts a *record* entry in the same history as tile strokes, undo/redo
+swap the save's raw bytes, Discard restores them, and Save as writes them. The toolbar counts moves
+next to tile changes. Logic is in `MirrorWeb.MoveTool`; tests are LiveView tests on the synthetic save.
+Checked in the browser against a real save (tool shows, note text); the click-on-a-real-city path is
+covered by the LiveView tests, not yet clicked by a person.
+
+**Not done:** towers, lairs, nodes and units in the UI, a highlight on the picked-up city,
+the Structures edit layer and select-then-click UI, undo/redo for record edits,
 **nodes** (a node is its terrain tile, so it needs a terrain move too, plus aura tiles and
 its guardian record), and units moved on their own (stack moves). **Left alone, unchecked:**
 a city's road links (`+101`; whether the game recomputes them is unknown, results carry

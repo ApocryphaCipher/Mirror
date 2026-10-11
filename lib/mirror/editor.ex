@@ -314,6 +314,58 @@ defmodule Mirror.Editor do
     end
   end
 
+  @doc """
+  Applies an edit to the save's records (STORY-019): replaces `state.save.raw`
+  with `new_raw` as one undo step on `plane`, next to the tile strokes. The tiles
+  are untouched; the map overlays (cities, units, sites) read the raw bytes.
+
+  `label` names the step for the UI ("Moved Hialanth"). Returns `{state, :none}`
+  when `new_raw` equals what is there, else `{state, {:record, label}}`.
+  """
+  def apply_record(%{save: %{raw: raw}} = state, plane, label, new_raw)
+      when is_binary(new_raw) and raw != new_raw do
+    entry = %{
+      id: System.unique_integer([:positive, :monotonic]),
+      kind: :record,
+      label: label,
+      before: raw,
+      after: new_raw
+    }
+
+    state = set_raw(state, new_raw)
+
+    {%{
+       state
+       | history: Map.put(state.history, plane, [entry | Map.get(state.history, plane, [])]),
+         redo: Map.put(state.redo, plane, [])
+     }, {:record, label}}
+  end
+
+  def apply_record(state, _plane, _label, _new_raw), do: {state, :none}
+
+  @doc """
+  How many record edits (see `apply_record/4`) are not in the loaded or last-saved
+  save yet: 0 when the raw bytes equal the original, else the number of record steps
+  made since `state.record_mark` (an id taken when the save was written), at least 1.
+  """
+  def changed_record_count(%{save: %{raw: raw}, original_raw: original} = state)
+      when is_binary(original) and raw != original do
+    mark = Map.get(state, :record_mark, 0)
+
+    state.history
+    |> Map.values()
+    |> List.flatten()
+    |> Enum.count(&match?(%{kind: :record, id: id} when id > mark, &1))
+    |> max(1)
+  end
+
+  def changed_record_count(_state), do: 0
+
+  defp set_raw(%{save: %{} = save} = state, raw), do: %{state | save: %{save | raw: raw}}
+
+  defp restore_raw(save, raw) when is_binary(raw), do: %{save | raw: raw}
+  defp restore_raw(save, _raw), do: save
+
   @fully_explored 15
 
   @doc """
@@ -589,6 +641,16 @@ defmodule Mirror.Editor do
     history = Map.get(state.history, plane, [])
 
     case history do
+      [%{kind: :record} = entry | rest] ->
+        redo = [entry | Map.get(state.redo, plane, [])]
+        next_state = set_raw(state, entry.before)
+
+        {%{
+           next_state
+           | history: Map.put(next_state.history, plane, rest),
+             redo: Map.put(next_state.redo, plane, redo)
+         }, {:record, entry.label}}
+
       [stroke | rest] ->
         {next_state, updates, layer, extras} = apply_stroke(state, plane, stroke, :undo)
         changes = stroke_changes(stroke, :undo)
@@ -614,6 +676,16 @@ defmodule Mirror.Editor do
     redo = Map.get(state.redo, plane, [])
 
     case redo do
+      [%{kind: :record} = entry | rest] ->
+        history = [entry | Map.get(state.history, plane, [])]
+        next_state = set_raw(state, entry.after)
+
+        {%{
+           next_state
+           | history: Map.put(next_state.history, plane, history),
+             redo: Map.put(next_state.redo, plane, rest)
+         }, {:record, entry.label}}
+
       [stroke | rest] ->
         {next_state, updates, layer, extras} = apply_stroke(state, plane, stroke, :redo)
         changes = stroke_changes(stroke, :redo)
@@ -649,12 +721,17 @@ defmodule Mirror.Editor do
         redo: %{arcanus: [], myrror: []}
     }
 
+    original_raw = Map.get(state, :original_raw)
+
     restored_save =
       if state.save do
-        %{state.save | planes: state.original_planes}
+        restore_raw(%{state.save | planes: state.original_planes}, original_raw)
       else
         nil
       end
+
+    updated_state =
+      if restored_save, do: %{updated_state | save: restored_save}, else: updated_state
 
     {updated_state, restored_save}
   end

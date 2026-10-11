@@ -20,7 +20,7 @@ defmodule MirrorWeb.MapLive do
   alias Mirror.TileAtlas
   alias Mirror.SaveFile.{Cities, Roads, Sites, Units, Wizards}
   alias Mirror.Map, as: MirrorMap
-  alias MirrorWeb.{PaintTool, RoadTool}
+  alias MirrorWeb.{MoveTool, PaintTool, RoadTool}
 
   @layers [
     :terrain,
@@ -89,6 +89,8 @@ defmodule MirrorWeb.MapLive do
       |> assign(:paint_report, nil)
       |> assign(:special, RoadTool.default_special())
       |> assign(:road_report, nil)
+      |> assign(:move_pending, nil)
+      |> assign(:move_note, nil)
       |> assign(:reveal_report, nil)
       |> assign(:discard_armed, false)
       |> assign(:fresh_mount, true)
@@ -220,9 +222,13 @@ defmodule MirrorWeb.MapLive do
   end
 
   def handle_event("set_tool", %{"tool" => tool}, socket)
-      when tool in ["cycle", "paint", "type", "road", "corruption", "special"] do
+      when tool in ["cycle", "paint", "type", "road", "corruption", "special", "move_city"] do
     {:noreply,
-     socket |> assign(:tool, String.to_existing_atom(tool)) |> assign(:road_report, nil)}
+     socket
+     |> assign(:tool, String.to_existing_atom(tool))
+     |> assign(:road_report, nil)
+     |> assign(:move_pending, nil)
+     |> assign(:move_note, nil)}
   end
 
   # Reveal all (STORY-037): every tile explored, on this plane or on both.
@@ -1605,7 +1611,10 @@ defmodule MirrorWeb.MapLive do
                        "Paint one exact tile number; neighbours are not touched"},
                       {:road, "🛣️ Road", "Click to step a tile: no road, road, enchanted road"},
                       {:corruption, "☠️ Corruption", "Click to corrupt a tile or clean it"},
-                      {:special, "💎 Special", "Place an ore, gems, crystals, wild game or nightshade"}
+                      {:special, "💎 Special",
+                       "Place an ore, gems, crystals, wild game or nightshade"},
+                      {:move_city, "🏰 Move city",
+                       "Click a city, then click where it goes; its garrison, summoning circle and fortress go with it"}
                     ]
                   }
                   id={"tool-#{tool}"}
@@ -1721,6 +1730,16 @@ defmodule MirrorWeb.MapLive do
               </.form>
 
               <span
+                :if={@tool == :move_city}
+                id="move-note"
+                role="status"
+                aria-live="polite"
+                class="text-xs text-emerald-200"
+              >
+                {@move_note || "Click a city to pick it up."}
+              </span>
+
+              <span
                 :if={@tool in [:road, :corruption, :special]}
                 id="road-report"
                 role="status"
@@ -1797,6 +1816,9 @@ defmodule MirrorWeb.MapLive do
                   :special ->
                     "Click: place the chosen special · right-click or shift-click: remove it · space-drag or middle-drag to pan · Esc to finish"
 
+                  :move_city ->
+                    "Click a city, then click where it goes · right-click or click it again: cancel · Undo works · space-drag or middle-drag to pan · Esc to finish"
+
                   :type ->
                     "Click or drag: paint the terrain, neighbours re-tile · right-click: pick the terrain under the pointer · space-drag or middle-drag to pan · Esc to finish"
 
@@ -1855,7 +1877,9 @@ defmodule MirrorWeb.MapLive do
                     @changed_tiles == 0 && "text-slate-500"
                   ]}
                 >
-                  {@changed_tiles} {if @changed_tiles == 1, do: "tile", else: "tiles"} changed
+                  {@changed_tiles - @changed_records} {if @changed_tiles - @changed_records == 1,
+                    do: "tile",
+                    else: "tiles"} changed{if @changed_records > 0, do: " · #{@changed_records} moved"}
                 </span>
                 <.discard_control changed_tiles={@changed_tiles} armed={@discard_armed} />
                 <.form
@@ -2186,6 +2210,16 @@ defmodule MirrorWeb.MapLive do
   end
 
   defp handle_pointer_start(
+         %{assigns: %{edit: :terrain, tool: :move_city}} = socket,
+         x,
+         y,
+         button,
+         _mods
+       ) do
+    move_city_click(socket, x, y, button)
+  end
+
+  defp handle_pointer_start(
          %{assigns: %{edit: :terrain, tool: :road}} = socket,
          x,
          y,
@@ -2484,6 +2518,61 @@ defmodule MirrorWeb.MapLive do
     end
   end
 
+  # Move city tool (STORY-019): the first click picks a city up, the second puts it
+  # down. The edit is one undo step on the record history (Editor.apply_record/4).
+  defp move_city_click(socket, x, y, button) do
+    %{state: state, plane: plane, move_pending: pending} = socket.assigns
+    here = valid_coord?(x, y) && MoveTool.city_at(state.save.raw, plane, x, y)
+
+    cond do
+      !valid_coord?(x, y) ->
+        socket
+
+      pending && (button == 2 || (here && here.index == pending.index)) ->
+        assign(socket, move_pending: nil, move_note: "Cancelled.")
+
+      is_nil(pending) && here ->
+        assign(socket, move_pending: here, move_note: MoveTool.picked(here))
+
+      is_nil(pending) ->
+        assign(socket, :move_note, "Click a city to pick it up.")
+
+      here ->
+        assign(socket, move_pending: here, move_note: MoveTool.picked(here))
+
+      true ->
+        put_down_city(socket, pending, x, y)
+    end
+  end
+
+  defp put_down_city(socket, pending, x, y) do
+    plane = socket.assigns.plane
+
+    {:ok, state, result} =
+      SessionStore.update(socket.assigns.session_id, fn current ->
+        with {:ok, raw, report} <- MoveTool.move(current.save.raw, pending, plane, x, y),
+             {next, {:record, _}} <-
+               Editor.apply_record(current, plane, "Moved #{pending.name}", raw) do
+          {next, {:ok, report}}
+        else
+          {:error, reason} -> {current, {:error, reason}}
+          {_unchanged, :none} -> {current, {:error, :unchanged}}
+        end
+      end)
+
+    case result do
+      {:ok, report} ->
+        socket
+        |> assign_state(state)
+        |> assign(move_pending: nil, move_note: MoveTool.moved(pending, {x, y}, report))
+        |> push_overlay_items()
+        |> push_map_layers()
+
+      {:error, reason} ->
+        assign(socket, :move_note, MoveTool.error_message(reason))
+    end
+  end
+
   # Cycle tool: step the tile's number by ±1 (wrapping 0..761). Each click
   # is its own one-tile stroke, so each click is one undo step.
   defp cycle_tile(socket, x, y, direction) do
@@ -2583,7 +2672,11 @@ defmodule MirrorWeb.MapLive do
   # Cheap state update (no re-encoding of layers) that keeps the
   # unsaved-edits counter honest.
   defp assign_state(socket, state) do
-    assign(socket, state: state, changed_tiles: changed_tile_count(state))
+    assign(socket,
+      state: state,
+      changed_tiles: changed_tile_count(state),
+      changed_records: Editor.changed_record_count(state)
+    )
   end
 
   defp sample_tile(socket, layer, x, y) do
@@ -2606,13 +2699,13 @@ defmodule MirrorWeb.MapLive do
     end
   end
 
-  defp apply_undo(socket), do: apply_history_step(socket, &Editor.undo/2)
+  defp apply_undo(socket), do: apply_history_step(socket, &Editor.undo/2, "Undid")
 
-  defp apply_redo(socket), do: apply_history_step(socket, &Editor.redo/2)
+  defp apply_redo(socket), do: apply_history_step(socket, &Editor.redo/2, "Redid")
 
   # An undo or redo step may cover several layers (terrain and landmass for a
   # painted type); each layer's updates go to the client and the engine.
-  defp apply_history_step(socket, step) do
+  defp apply_history_step(socket, step, verb) do
     plane = socket.assigns.plane
 
     case SessionStore.update(socket.assigns.session_id, fn current -> step.(current, plane) end) do
@@ -2624,6 +2717,13 @@ defmodule MirrorWeb.MapLive do
       {:ok, state, {:applied, updates, layer, changes, extras}} ->
         parts = [%{layer: layer, updates: updates, changes: changes} | extras]
         finish_history_step(socket, state, plane, parts)
+
+      {:ok, state, {:record, label}} ->
+        socket
+        |> assign_state(state)
+        |> assign(move_pending: nil, move_note: "#{verb}: #{label}")
+        |> push_overlay_items()
+        |> push_map_layers()
 
       {:ok, _state, :none} ->
         socket
@@ -2750,6 +2850,7 @@ defmodule MirrorWeb.MapLive do
       snapshot_mode: Map.get(state, :snapshot_mode, true),
       engine_session_id: Map.get(state, :engine_session_id),
       changed_tiles: changed_tile_count(state),
+      changed_records: Editor.changed_record_count(state),
       brush: Map.get(state.selection, :terrain, 0)
     )
   end
@@ -3446,7 +3547,8 @@ defmodule MirrorWeb.MapLive do
     push_event(socket, "brush", %{tile: Map.get(socket.assigns.state.selection, :terrain, 0)})
   end
 
-  defp changed_tile_count(state), do: Editor.changed_tile_count(state)
+  defp changed_tile_count(state),
+    do: Editor.changed_tile_count(state) + Editor.changed_record_count(state)
 
   defp edit_path(:arcanus), do: ~p"/arcanus?edit=terrain"
   defp edit_path(:myrror), do: ~p"/myrror?edit=terrain"
