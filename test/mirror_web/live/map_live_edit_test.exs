@@ -1705,8 +1705,10 @@ defmodule MirrorWeb.MapLiveEditTest do
 
       click(view, 40, 23)
       assert note(view) =~ "Moved Deventor to (40, 23)"
+      assert note(view) =~ "Laid a road under it"
       assert city_xy(latest_cities(view), "Deventor") == {40, 23}
-      assert changed(view) =~ "0 tiles changed · 1 moved"
+      # the game keeps a road under every city, so the new tile got one: a tile and a move
+      assert changed(view) =~ "1 tile changed · 1 moved"
 
       render_click(view, "undo", %{})
       assert note(view) =~ "Undid: Moved Deventor"
@@ -1716,6 +1718,30 @@ defmodule MirrorWeb.MapLiveEditTest do
 
       render_click(view, "redo", %{})
       assert city_xy(latest_cities(view), "Deventor") == {40, 23}
+      assert changed(view) =~ "1 tile changed · 1 moved"
+    end
+
+    test "a moved city gets a road under it, unless the tile has one already", %{
+      conn: conn,
+      dir: dir,
+      save: save
+    } do
+      view = editing(conn, save, "road")
+      click(view, 42, 25)
+      assert flags_byte(save, 42, 25) == 0x00
+
+      render_click(view, "set_tool", %{"tool" => "move"})
+      click(view, 38, 21)
+      click(view, 40, 23)
+      click(view, 40, 23)
+      click(view, 42, 25)
+      assert note(view) =~ "Moved Deventor to (42, 25)."
+      refute note(view) =~ "Laid a road"
+
+      target = Path.join(dir, "SAVE5.GAM")
+      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+      assert flags_byte(target, 40, 23) == 0x08
+      assert flags_byte(target, 42, 25) == 0x08
     end
 
     test "Save as writes the move and Discard takes it back", %{conn: conn, dir: dir, save: save} do
