@@ -6,6 +6,23 @@
 **Raised by:** [Kevin](https://github.com/KevinAsbury), 2026-10-07: the game draws a Tower of
 Wizardry differently, "lit up", once it has been cleared of its occupants.
 
+## Evidence: what clearing a tower writes (2026-10-10, STORY-019 slot 6)
+
+Kevin cleared a tower with flying units in the real game (checkpoint 77, vault collection
+`mom-live-2026-10-10`, "story019-slot6-tower-cleared"), entering from Arcanus. Read back
+from RAM against the file it was loaded from:
+
+- **Tower record:** owner byte `0xFF` (none) became **0** (the clearing wizard). The 4th byte stayed 0.
+- **Arcanus encounter record** (the side entered): `intact` 1 became **0**, and the flags byte
+  (`+15`) became **6** (bits `0x02` and `0x04`; it was 0). Guard count bytes dropped (casualties).
+- **Myrror encounter record:** `intact` 1 became **0** too, flags unchanged (0). So clearing one side
+  clears **both**, and only the entered side's flags change.
+- Kevin also gained 1 fame (wizard `+0x24`: 0 to 1).
+
+So "owner" is what changes, matching the guess that `#70` ("owned") is the lit look; what the game
+actually draws, and whether it animates, is still to be seen: Kevin did not look at the sprite
+in this check (the screenshot in checkpoint 77 may show it).
+
 ## What we know, and what we only assume
 
 - Mirror already draws two tower pictures, and picks between them on the tower block's

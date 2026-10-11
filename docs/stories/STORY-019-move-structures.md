@@ -27,6 +27,24 @@ and the old tile empty:
 | 6 | Tower of Wizardry (33, 7) to (39, 9) | a tower on both planes; its guards (Unicorns x3, Guardian Spirits x4) on entering |
 | 7 | the lair at (18, 29) to (15, 26) | its guards and treasure unchanged |
 
+**Real-game results (2026-10-10, Kevin at the keyboard, fork API read-back, checkpoints 73-77
+in vault collection `mom-live-2026-10-10`).** Built from Kevin's "Jafar the Hacker" save.
+- **Slot 3, neutral city with garrison: passes.** The game's RAM holds the city at the new tile and
+  both garrison units there; units, fortress, towers, encounters, nodes and every map layer equal
+  the file. Kevin: city is in the new spot.
+- **Slot 4, capital, same plane: passes.** Circle and fortress follow; RAM equals the file; End
+  Turn ran with no trouble. The city-road-link question is **still open**: that save has no roads,
+  so the link bytes were zero before and after.
+- **Slot 5, capital to the other plane (Arcanus to Myrror): passes.** City, circle and fortress all
+  read (9, 18, plane 1) in RAM; a turn passed. Units standing next to the city were left behind, as
+  designed: only units on the city's own tile move.
+- **Slot 6, tower: passes, with a lesson.** The tower record and both encounter sides read the new
+  tile in RAM. The destination was land on Arcanus but **ocean on Myrror**, and the game loaded it
+  and let Kevin clear it with flying units, and shows the units on both planes. A tower should be
+  land on both planes: `move_tower/3` now returns `warnings: [water: :myrror]` for that.
+  Land units can't reach such a tower (water-walkers and flyers can).
+- **Slot 7 (keep) and slot 8 (all three): not yet checked.**
+
 **Not done:** the Structures edit layer and select-then-click UI, undo/redo for record edits,
 **nodes** (a node is its terrain tile, so it needs a terrain move too, plus aura tiles and
 its guardian record), and units moved on their own (stack moves). **Left alone, unchecked:**

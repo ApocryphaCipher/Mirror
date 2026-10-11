@@ -194,6 +194,16 @@ defmodule Mirror.SaveFile.StructuresTest do
                Units.parse(moved)
     end
 
+    test "warns when the new tile is not land on both planes" do
+      # landmass ids at 0x4D98: land on Arcanus (7), ocean on Myrror (0)
+      raw = blank() |> tower(0, 33, 7) |> put(0x4D98 + 7 * 60 + 20, <<7>>)
+
+      assert {:ok, _, %{warnings: [water: :myrror]}} = Structures.move_tower(raw, 0, {20, 7})
+
+      assert {:ok, _, %{warnings: [water: :arcanus, water: :myrror]}} =
+               Structures.move_tower(raw, 0, {21, 7})
+    end
+
     test "refuses another tower's tile and a tile off the map" do
       raw = blank() |> tower(0, 33, 7) |> tower(1, 12, 12)
       assert {:error, :tower_at_destination} = Structures.move_tower(raw, 0, {12, 12})

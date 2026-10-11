@@ -132,6 +132,7 @@ defmodule Mirror.SaveFile.Structures do
          to: to,
          encounter_sides: length(sides),
          garrison: length(garrison),
+         warnings: water_planes(raw, to),
          stale: []
        }}
     end
@@ -157,6 +158,20 @@ defmodule Mirror.SaveFile.Structures do
          stale: []
        }}
     end
+  end
+
+  # A tower stands on both planes, so its tile should be land on both. The game
+  # loads a tower on ocean (checked 2026-10-10: Myrror ocean, slot 6 of STORY-019),
+  # which only land-bound units cannot then reach, so this is a warning.
+  # Land is a non-zero landmass id (Mirror.Landmass, classic-terrain-format.md).
+  @landmass 0x4D98
+  @plane_tiles @width * @height
+
+  defp water_planes(raw, {x, y}) do
+    for plane <- [0, 1],
+        byte_size(raw) >= @landmass + 2 * @plane_tiles,
+        :binary.at(raw, @landmass + plane * @plane_tiles + y * @width + x) == 0,
+        do: {:water, if(plane == 0, do: :arcanus, else: :myrror)}
   end
 
   # -- checks -------------------------------------------------------------
