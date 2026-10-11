@@ -6,6 +6,8 @@ defmodule MirrorWeb.MoveTool do
   (`MirrorWeb.MapLive`) only wires these to pointer events.
   """
 
+  import Bitwise
+
   alias Mirror.SaveFile.{Cities, Structures}
 
   @type kind :: :city | :tower | :lair
@@ -79,13 +81,32 @@ defmodule MirrorWeb.MoveTool do
   def move(raw, %{kind: :lair, index: index}, plane, x, y),
     do: Structures.move_encounter(raw, index, {x, y, plane_number(plane)})
 
+  @road 0x08
+  @road_bits 0x18
+
+  @doc """
+  The tile edits that go with putting a city down: the game keeps a road under every
+  city (all 31 cities of a turn-one save, all 34 of a played one), and a city whose tile
+  has none is not joined to its neighbours' roads (checked 2026-10-11, STORY-019). So a
+  city moved onto a tile with no road gets a plain one. `flags` is the tile's current
+  `terrain_flags` byte. Towers and lairs get nothing.
+  """
+  @spec road_edits(pending(), integer() | nil, integer(), integer()) :: [tuple()]
+  def road_edits(%{kind: :city}, flags, x, y)
+      when is_integer(flags) and (flags &&& @road_bits) == 0,
+      do: [{:terrain_flags, [{x, y, flags ||| @road}]}]
+
+  def road_edits(_pending, _flags, _x, _y), do: []
+
   @doc "The notice for a structure that was just picked up."
   def picked(%{name: name}),
     do: "Moving #{name}: click where it should go. Right-click, or click it again, to cancel."
 
   @doc "The notice after a move."
-  def moved(%{name: name}, {x, y}, report) do
-    "Moved #{name} to (#{x}, #{y})" <> followed(report) <> "." <> warnings(report)
+  def moved(%{name: name}, {x, y}, report, road? \\ false) do
+    "Moved #{name} to (#{x}, #{y})" <>
+      followed(report) <>
+      "." <> if(road?, do: " Laid a road under it.", else: "") <> warnings(report)
   end
 
   defp followed(%{garrison: n, followed: followed}) do

@@ -66,11 +66,18 @@ of Wizardry or a lair (cave, dungeon, temple, ruins, keep), then click where it 
 planes at once, and the notice warns when the new tile is water on one of them (the game allows it, see
 the slot 6 result above). When two structures share a tile, a city wins over a tower, and a tower over a lair.
 
-**Not done:** nodes and units in the UI, a highlight on the picked-up structure,
-the Structures edit layer and select-then-click UI, undo/redo for record edits,
-**nodes** (a node is its terrain tile, so it needs a terrain move too, plus aura tiles and
-its guardian record), and units moved on their own (stack moves). **Left alone, unchecked:**
-any go-to target a unit record may hold.
+**A road under every city (2026-10-11, checkpoints 85-87).** Kevin moved two cities in the Docker build onto
+a road he drew (Blademarsh (21, 28) to Jet (27, 28) on Myrror), but left Blademarsh's own tile without a
+road. The game loaded it with **no link** between them, before and after an End Turn. With a plain road
+on Blademarsh's tile (one byte, slot 4) it linked them **on load**. And every city in every save here
+(31 at turn one, 34 in a played game) stands on a tile with the road bit set. So the game keeps a road
+under each city, links are built from that network on load, and a city without one is outside it. The Move
+tool now lays a plain road under a moved city when its new tile has none, in the same undo step
+(`Editor.apply_record/5`); the old tile keeps its road. Towers and lairs get nothing.
+
+**Not done:** nodes (a node is its terrain tile, so moving one needs a terrain move too, plus its aura
+tiles and guardian record) and units on their own (stack moves; a unit record also has a go-to target at
+`+9`/`+10`, see [../reference/unit-movement.md](../reference/unit-movement.md)), in the code and the UI.
 **Size:** medium–large
 
 ## What to do

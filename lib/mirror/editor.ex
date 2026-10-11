@@ -316,20 +316,31 @@ defmodule Mirror.Editor do
 
   @doc """
   Applies an edit to the save's records (STORY-019): replaces `state.save.raw`
-  with `new_raw` as one undo step on `plane`, next to the tile strokes. The tiles
-  are untouched; the map overlays (cities, units, sites) read the raw bytes.
+  with `new_raw` as one undo step on `plane`, next to the tile strokes. The overlays
+  (cities, units, sites) read the raw bytes.
+
+  `tile_edits` (optional, the `edits` of `apply_compound/3`) are tile changes made in
+  the same step, for edits that touch the map too (a moved city gets a road under it).
+  Undo and redo restore both together.
 
   `label` names the step for the UI ("Moved Hialanth"). Returns `{state, :none}`
-  when `new_raw` equals what is there, else `{state, {:record, label}}`.
+  when `new_raw` equals what is there, else `{state, {:record, label, parts}}` where
+  `parts` are the changed tile layers (`%{layer, updates, changes}`, empty without
+  `tile_edits`), ready for the client and the engine.
   """
-  def apply_record(%{save: %{raw: raw}} = state, plane, label, new_raw)
+  def apply_record(state, plane, label, new_raw, tile_edits \\ [])
+
+  def apply_record(%{save: %{raw: raw}} = state, plane, label, new_raw, tile_edits)
       when is_binary(new_raw) and raw != new_raw do
+    {state, tiles, parts} = apply_record_tiles(state, plane, tile_edits)
+
     entry = %{
       id: System.unique_integer([:positive, :monotonic]),
       kind: :record,
       label: label,
       before: raw,
-      after: new_raw
+      after: new_raw,
+      tiles: tiles
     }
 
     state = set_raw(state, new_raw)
@@ -338,10 +349,33 @@ defmodule Mirror.Editor do
        state
        | history: Map.put(state.history, plane, [entry | Map.get(state.history, plane, [])]),
          redo: Map.put(state.redo, plane, [])
-     }, {:record, label}}
+     }, {:record, label, parts}}
   end
 
-  def apply_record(state, _plane, _label, _new_raw), do: {state, :none}
+  def apply_record(state, _plane, _label, _new_raw, _tile_edits), do: {state, :none}
+
+  # The tile part of a record step is a stroke entry made by `apply_compound/3`, kept
+  # inside the record's entry instead of on the history stack of its own.
+  defp apply_record_tiles(state, _plane, []), do: {state, nil, []}
+
+  defp apply_record_tiles(state, plane, tile_edits) do
+    case apply_compound(state, plane, tile_edits) do
+      {_unchanged, :none} ->
+        {state, nil, []}
+
+      {next, {:applied, tiles, parts}} ->
+        history = Map.update!(next.history, plane, &tl/1)
+        {%{next | history: history}, tiles, parts}
+    end
+  end
+
+  defp apply_record_step(state, _plane, %{tiles: nil}, _mode), do: {state, []}
+
+  defp apply_record_step(state, plane, %{tiles: tiles}, mode) do
+    {state, updates, layer, extras} = apply_stroke(state, plane, tiles, mode)
+    main = %{layer: layer, updates: updates, changes: stroke_changes(tiles, mode)}
+    {state, [main | extras]}
+  end
 
   @doc """
   How many record edits (see `apply_record/4`) are not in the loaded or last-saved
@@ -643,13 +677,13 @@ defmodule Mirror.Editor do
     case history do
       [%{kind: :record} = entry | rest] ->
         redo = [entry | Map.get(state.redo, plane, [])]
-        next_state = set_raw(state, entry.before)
+        {next_state, parts} = apply_record_step(set_raw(state, entry.before), plane, entry, :undo)
 
         {%{
            next_state
            | history: Map.put(next_state.history, plane, rest),
              redo: Map.put(next_state.redo, plane, redo)
-         }, {:record, entry.label}}
+         }, {:record, entry.label, parts}}
 
       [stroke | rest] ->
         {next_state, updates, layer, extras} = apply_stroke(state, plane, stroke, :undo)
@@ -678,13 +712,13 @@ defmodule Mirror.Editor do
     case redo do
       [%{kind: :record} = entry | rest] ->
         history = [entry | Map.get(state.history, plane, [])]
-        next_state = set_raw(state, entry.after)
+        {next_state, parts} = apply_record_step(set_raw(state, entry.after), plane, entry, :redo)
 
         {%{
            next_state
            | history: Map.put(next_state.history, plane, history),
              redo: Map.put(next_state.redo, plane, rest)
-         }, {:record, entry.label}}
+         }, {:record, entry.label, parts}}
 
       [stroke | rest] ->
         {next_state, updates, layer, extras} = apply_stroke(state, plane, stroke, :redo)

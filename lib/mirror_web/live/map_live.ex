@@ -2550,10 +2550,13 @@ defmodule MirrorWeb.MapLive do
 
     {:ok, state, result} =
       SessionStore.update(socket.assigns.session_id, fn current ->
+        flags = Editor.tile_value(current, plane, :terrain_flags, x, y)
+        tile_edits = MoveTool.road_edits(pending, flags, x, y)
+
         with {:ok, raw, report} <- MoveTool.move(current.save.raw, pending, plane, x, y),
-             {next, {:record, _}} <-
-               Editor.apply_record(current, plane, "Moved #{pending.name}", raw) do
-          {next, {:ok, report}}
+             {next, {:record, _label, parts}} <-
+               Editor.apply_record(current, plane, "Moved #{pending.name}", raw, tile_edits) do
+          {next, {:ok, report, parts, tile_edits != []}}
         else
           {:error, reason} -> {current, {:error, reason}}
           {_unchanged, :none} -> {current, {:error, :unchanged}}
@@ -2561,10 +2564,11 @@ defmodule MirrorWeb.MapLive do
       end)
 
     case result do
-      {:ok, report} ->
+      {:ok, report, parts, road?} ->
         socket
         |> assign_state(state)
-        |> assign(move_pending: nil, move_note: MoveTool.moved(pending, {x, y}, report))
+        |> assign(move_pending: nil, move_note: MoveTool.moved(pending, {x, y}, report, road?))
+        |> push_layer_parts(plane, parts)
         |> push_overlay_items()
         |> push_map_layers()
 
@@ -2718,10 +2722,11 @@ defmodule MirrorWeb.MapLive do
         parts = [%{layer: layer, updates: updates, changes: changes} | extras]
         finish_history_step(socket, state, plane, parts)
 
-      {:ok, state, {:record, label}} ->
+      {:ok, state, {:record, label, parts}} ->
         socket
         |> assign_state(state)
         |> assign(move_pending: nil, move_note: "#{verb}: #{label}")
+        |> push_layer_parts(plane, parts)
         |> push_overlay_items()
         |> push_map_layers()
 
