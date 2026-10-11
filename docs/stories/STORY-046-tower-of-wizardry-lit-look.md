@@ -19,9 +19,9 @@ from RAM against the file it was loaded from:
   clears **both**, and only the entered side's flags change.
 - Kevin also gained 1 fame (wizard `+0x24`: 0 to 1).
 
-So "owner" is what changes, matching the guess that `#70` ("owned") is the lit look; what the game
-actually draws, and whether it animates, is still to be seen: Kevin did not look at the sprite
-in this check (the screenshot in checkpoint 77 may show it).
+So "owner" is what changes. **Kevin saw the cleared tower drawn lit, with an eerie green light**
+(2026-10-10), which fits `#70` ("owned"); that it is exactly picture `#70`, and whether it animates,
+is not yet compared against the decoded sprite (checkpoint 77's screenshot can be).
 
 ## What we know, and what we only assume
 

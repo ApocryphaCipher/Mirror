@@ -43,7 +43,12 @@ in vault collection `mom-live-2026-10-10`).** Built from Kevin's "Jafar the Hack
   and let Kevin clear it with flying units, and shows the units on both planes. A tower should be
   land on both planes: `move_tower/3` now returns `warnings: [water: :myrror]` for that.
   Land units can't reach such a tower (water-walkers and flyers can).
-- **Slot 7 (keep) and slot 8 (all three): not yet checked.**
+- **Slot 7, abandoned keep: loads, bytes verified; not looked at on screen.** In RAM the keep is the same
+  record (kind 7, intact, guards and treasure unchanged) at the new tile, with nothing at the old tile, and
+  encounters, units and towers equal the file (checkpoint 79). Kevin did not confirm it on the map.
+- **Slot 8 (city, tower and keep together): not yet checked.**
+- **Kevin saw the moved tower, once cleared, lit with an eerie green light** (2026-10-10): the owned
+  picture, see STORY-046.
 
 **Not done:** the Structures edit layer and select-then-click UI, undo/redo for record edits,
 **nodes** (a node is its terrain tile, so it needs a terrain move too, plus aura tiles and
