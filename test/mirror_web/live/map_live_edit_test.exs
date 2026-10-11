@@ -1670,6 +1670,104 @@ defmodule MirrorWeb.MapLiveEditTest do
     end
   end
 
+  describe "Move city tool (STORY-019)" do
+    # The newest cities overlay pushed so far (the load and every edit push one).
+    defp latest_cities(view, last \\ nil) do
+      next =
+        try do
+          assert_push_event(view, "overlay_data", %{layer: "cities", items: items}, 50)
+          items
+        rescue
+          ExUnit.AssertionError -> :none
+        end
+
+      case {next, last} do
+        {:none, nil} -> flunk("no cities overlay was pushed")
+        {:none, last} -> last
+        {items, _} -> latest_cities(view, items)
+      end
+    end
+
+    defp city_xy(items, name),
+      do: items |> Enum.find(&(&1.name == name)) |> then(&{&1.x, &1.y})
+
+    defp note(view), do: view |> element("#move-note") |> render() |> text_of()
+
+    test "pick a city up, put it down: it moves, is counted, and undo and redo follow", %{
+      conn: conn,
+      save: save
+    } do
+      view = editing(conn, save, "move_city")
+      assert note(view) =~ "Click a city to pick it up"
+
+      click(view, 38, 21)
+      assert note(view) =~ "Moving Deventor"
+
+      click(view, 40, 23)
+      assert note(view) =~ "Moved Deventor to (40, 23)"
+      assert city_xy(latest_cities(view), "Deventor") == {40, 23}
+      assert changed(view) =~ "0 tiles changed · 1 moved"
+
+      render_click(view, "undo", %{})
+      assert note(view) =~ "Undid: Moved Deventor"
+      assert city_xy(latest_cities(view), "Deventor") == {38, 21}
+      assert changed(view) =~ "0 tiles changed"
+      refute changed(view) =~ "moved"
+
+      render_click(view, "redo", %{})
+      assert city_xy(latest_cities(view), "Deventor") == {40, 23}
+    end
+
+    test "Save as writes the move and Discard takes it back", %{conn: conn, dir: dir, save: save} do
+      view = editing(conn, save, "move_city")
+      click(view, 38, 21)
+      click(view, 40, 23)
+
+      target = Path.join(dir, "SAVE4.GAM")
+      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+      assert {:ok, cities} = Mirror.SaveFile.Cities.parse(File.read!(target))
+      assert %{x: 40, y: 23} = Enum.find(cities, &(&1.name == "Deventor"))
+      assert {:ok, original} = Mirror.SaveFile.Cities.parse(File.read!(save))
+      assert %{x: 38, y: 21} = Enum.find(original, &(&1.name == "Deventor"))
+
+      click(view, 40, 23)
+      click(view, 42, 25)
+      assert changed(view) =~ "1 moved"
+      render_click(view, "arm_discard", %{})
+      render_click(view, "discard_edits", %{})
+      assert city_xy(latest_cities(view), "Deventor") == {40, 23}
+      refute changed(view) =~ "moved"
+    end
+
+    test "an empty tile picks nothing up, and right-click cancels a pick", %{
+      conn: conn,
+      save: save
+    } do
+      view = editing(conn, save, "move_city")
+      click(view, 5, 5)
+      assert note(view) =~ "Click a city to pick it up"
+
+      click(view, 38, 21)
+      click(view, 38, 21, button: 2)
+      assert note(view) =~ "Cancelled"
+      click(view, 40, 23)
+      assert note(view) =~ "Click a city to pick it up"
+      assert changed(view) =~ "0 tiles changed"
+      refute changed(view) =~ "moved"
+    end
+
+    test "clicking a different city switches the pick instead of moving onto it", %{
+      conn: conn,
+      save: save
+    } do
+      view = editing(conn, save, "move_city")
+      click(view, 38, 21)
+      click(view, 12, 35)
+      assert note(view) =~ "Moving City1"
+      refute changed(view) =~ "moved"
+    end
+  end
+
   describe "real-save integration" do
     @tag skip:
            !@has_real_save_and_sprites &&

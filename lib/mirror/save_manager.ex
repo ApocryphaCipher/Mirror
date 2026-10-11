@@ -103,6 +103,7 @@ defmodule Mirror.SaveManager do
           save: save,
           planes: planes,
           original_planes: save.planes,
+          original_raw: save.raw,
           active_layer: :terrain,
           selection: default_selection(),
           history: %{arcanus: [], myrror: []},
@@ -157,12 +158,14 @@ defmodule Mirror.SaveManager do
           {:ok, save_path} ->
             save = %{save | path: save_path, planes: saved_planes}
 
-            updated_state = %{
-              state
-              | save: save,
+            updated_state =
+              Map.merge(state, %{
+                save: save,
                 save_path: save_path,
-                original_planes: saved_planes
-            }
+                original_planes: saved_planes,
+                original_raw: save.raw,
+                record_mark: System.unique_integer([:positive, :monotonic])
+              })
 
             {:ok, updated_state, save_path}
 
@@ -338,6 +341,7 @@ defmodule Mirror.SaveManager do
       save: nil,
       planes: %{},
       original_planes: nil,
+      original_raw: nil,
       active_layer: :terrain,
       selection: default_selection(),
       history: %{arcanus: [], myrror: []},
@@ -373,6 +377,7 @@ defmodule Mirror.SaveManager do
       |> Map.put_new(:snapshot_mode, true)
       |> Map.put_new(:snapshot_values, %{})
       |> Map.put_new(:original_planes, Map.get(state, :save) && Map.get(state.save, :planes))
+      |> Map.put_new(:original_raw, Map.get(state, :save) && Map.get(state.save, :raw))
       |> Map.put_new(:phase_loop_len, nil)
       |> Map.put_new(:phase_loop_status, :unknown)
       |> Map.update(:phase_loop_status, :unknown, &normalize_phase_loop_status/1)
