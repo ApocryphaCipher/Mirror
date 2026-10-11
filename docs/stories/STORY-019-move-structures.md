@@ -15,6 +15,18 @@ two garrison units' x. A tower moves its tower record, both encounter sides and 
 its tile. "One kind at a time" means each kind gets its own real-game check
 (real-game-acceptance.md), because each carries different cross-references; it does not mean
 one building per code change.
+**Test saves for the real-game check (2026-10-10, not yet loaded).** Built from SAVE1 with the
+code above, in `~/DOS/MAGIC` (what the slots held before is in `~/.mirror/dev/DOSbox/backups/`,
+`SAVEn-pre-story019-2026-10-10.GAM`). Look for the structure in the new place, working normally,
+and the old tile empty:
+
+| Slot | Move | Also check |
+| --- | --- | --- |
+| 4 | Breslau (neutral city) (26, 21) to (29, 18) | opens its city screen; no garrison on this one |
+| 5 | Deventor, Freya's capital (38, 21) to (35, 18) | fortress and summoning circle are there; the 2 garrison units went along; a turn ends without trouble |
+| 6 | Tower of Wizardry (33, 7) to (39, 9) | a tower on both planes; its guards (Unicorns x3, Guardian Spirits x4) on entering |
+| 7 | the lair at (18, 29) to (15, 26) | its guards and treasure unchanged |
+
 **Not done:** the Structures edit layer and select-then-click UI, undo/redo for record edits,
 **nodes** (a node is its terrain tile, so it needs a terrain move too, plus aura tiles and
 its guardian record), and units moved on their own (stack moves). **Left alone, unchecked:**
