@@ -174,6 +174,26 @@ defmodule Mirror.SaveFile.Structures do
         do: {:water, if(plane == 0, do: :arcanus, else: :myrror)}
   end
 
+  @doc """
+  The tower standing on `{x, y}` (towers stand on both planes), as
+  `%{index, x, y}`, or `nil`.
+  """
+  @spec tower_at(binary(), integer(), integer()) :: map() | nil
+  def tower_at(raw, x, y), do: Enum.find(tower_records(raw), &({&1.x, &1.y} == {x, y}))
+
+  @doc """
+  The movable encounter (a lair, cave, temple, ruin or keep: not a tower side or a
+  node guardian) on `{x, y}` of `plane` (0 or 1), as `%{index, x, y, plane, kind}`,
+  or `nil`.
+  """
+  @spec encounter_at(binary(), integer(), integer(), 0 | 1) :: map() | nil
+  def encounter_at(raw, x, y, plane) do
+    Enum.find(encounter_records(raw), fn e ->
+      {e.x, e.y, e.plane} == {x, y, plane} and e.kind != @tower_kind and
+        e.kind not in @node_guardian_kinds
+    end)
+  end
+
   # -- checks -------------------------------------------------------------
 
   defp check_position({x, y, plane})

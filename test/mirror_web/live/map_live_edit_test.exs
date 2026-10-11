@@ -1670,7 +1670,7 @@ defmodule MirrorWeb.MapLiveEditTest do
     end
   end
 
-  describe "Move city tool (STORY-019)" do
+  describe "Move tool (STORY-019)" do
     # The newest cities overlay pushed so far (the load and every edit push one).
     defp latest_cities(view, last \\ nil) do
       next =
@@ -1697,8 +1697,8 @@ defmodule MirrorWeb.MapLiveEditTest do
       conn: conn,
       save: save
     } do
-      view = editing(conn, save, "move_city")
-      assert note(view) =~ "Click a city to pick it up"
+      view = editing(conn, save, "move")
+      assert note(view) =~ "Click a city, tower or lair to pick it up"
 
       click(view, 38, 21)
       assert note(view) =~ "Moving Deventor"
@@ -1719,7 +1719,7 @@ defmodule MirrorWeb.MapLiveEditTest do
     end
 
     test "Save as writes the move and Discard takes it back", %{conn: conn, dir: dir, save: save} do
-      view = editing(conn, save, "move_city")
+      view = editing(conn, save, "move")
       click(view, 38, 21)
       click(view, 40, 23)
 
@@ -1743,24 +1743,84 @@ defmodule MirrorWeb.MapLiveEditTest do
       conn: conn,
       save: save
     } do
-      view = editing(conn, save, "move_city")
+      view = editing(conn, save, "move")
       click(view, 5, 5)
-      assert note(view) =~ "Click a city to pick it up"
+      assert note(view) =~ "Click a city, tower or lair to pick it up"
 
       click(view, 38, 21)
       click(view, 38, 21, button: 2)
       assert note(view) =~ "Cancelled"
       click(view, 40, 23)
-      assert note(view) =~ "Click a city to pick it up"
+      assert note(view) =~ "Click a city, tower or lair to pick it up"
       assert changed(view) =~ "0 tiles changed"
       refute changed(view) =~ "moved"
+    end
+
+    defp latest_sites(view, last \\ nil) do
+      next =
+        try do
+          assert_push_event(view, "overlay_data", %{layer: "sites", items: items}, 50)
+          items
+        rescue
+          ExUnit.AssertionError -> :none
+        end
+
+      case {next, last} do
+        {:none, nil} -> flunk("no sites overlay was pushed")
+        {:none, last} -> last
+        {items, _} -> latest_sites(view, items)
+      end
+    end
+
+    test "a tower moves, with a heads-up when the new tile is water", %{conn: conn, dir: dir} do
+      # Land everywhere except (50, 30) on Myrror (landmass ids at 0x4D98, 2400 tiles a plane)
+      raw = synthetic_save_bytes() |> put_bytes(0x4D98, :binary.copy(<<1>>, 4800))
+      tower = Path.join(dir, "TOWER.GAM")
+      File.write!(tower, put_bytes(raw, 0x4D98 + 2400 + 30 * 60 + 50, <<0>>))
+
+      view = editing(conn, tower, "move")
+      click(view, 48, 28)
+      assert note(view) =~ "Moving the Tower of Wizardry"
+
+      click(view, 50, 30)
+      assert note(view) =~ "Moved the Tower of Wizardry to (50, 30)."
+      assert note(view) =~ "water on Myrror, so land units"
+      refute note(view) =~ "water on Arcanus"
+
+      sites = latest_sites(view)
+      assert Enum.any?(sites, &match?(%{x: 50, y: 30}, &1))
+      refute Enum.any?(sites, &match?(%{x: 48, y: 28}, &1))
+      assert changed(view) =~ "1 moved"
+
+      render_click(view, "undo", %{})
+      assert Enum.any?(latest_sites(view), &match?(%{x: 48, y: 28}, &1))
+    end
+
+    test "a lair moves on its own plane", %{conn: conn, dir: dir} do
+      keep = Path.join(dir, "KEEP.GAM")
+
+      File.write!(
+        keep,
+        put_bytes(synthetic_save_bytes(), 0x6628 + 20 * 24, encounter_bytes(26, 25, 0, 1, 7))
+      )
+
+      view = editing(conn, keep, "move")
+      click(view, 26, 25)
+      assert note(view) =~ "Moving the abandoned keep"
+
+      click(view, 28, 27)
+      assert note(view) =~ "Moved the abandoned keep to (28, 27)."
+      refute note(view) =~ "water"
+      sites = latest_sites(view)
+      assert Enum.any?(sites, &match?(%{x: 28, y: 27, sprite: "abandoned_keep"}, &1))
+      refute Enum.any?(sites, &match?(%{x: 26, y: 25}, &1))
     end
 
     test "clicking a different city switches the pick instead of moving onto it", %{
       conn: conn,
       save: save
     } do
-      view = editing(conn, save, "move_city")
+      view = editing(conn, save, "move")
       click(view, 38, 21)
       click(view, 12, 35)
       assert note(view) =~ "Moving City1"
