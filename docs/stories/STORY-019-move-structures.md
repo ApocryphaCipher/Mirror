@@ -46,7 +46,10 @@ in vault collection `mom-live-2026-10-10`).** Built from Kevin's "Jafar the Hack
 - **Slot 7, abandoned keep: loads, bytes verified; not looked at on screen.** In RAM the keep is the same
   record (kind 7, intact, guards and treasure unchanged) at the new tile, with nothing at the old tile, and
   encounters, units and towers equal the file (checkpoint 79). Kevin did not confirm it on the map.
-- **Slot 8 (city, tower and keep together): not yet checked.**
+- **Slot 8, city, tower and keep together: loads, bytes verified** (checkpoint 80, 2026-10-11).
+  RAM has Hialanth at (9, 13), the tower at (8, 11) and the keep at (15, 20); encounters, units and
+  towers equal the file. The tower's new tile is ocean on Myrror again (the save builder only checked
+  Arcanus), which the game tolerates. Not looked at on screen.
 - **Kevin saw the moved tower, once cleared, lit with an eerie green light** (2026-10-10): the owned
   picture, see STORY-046.
 
