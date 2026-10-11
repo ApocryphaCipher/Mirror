@@ -25,14 +25,14 @@ defmodule Mirror.SaveFile.Structures do
     * **Nodes.** A node is its terrain tile, so moving one means moving
       terrain too, and its aura tiles and guardian record. That is a map
       edit, not a record edit.
-    * **City road links** (`+101`) are left as they are. They name *which*
-      cities are joined, and the roads themselves are terrain flags; whether
-      the game recomputes them was not checked. Each result carries
-      `stale: [...]` naming what was left alone.
+    * **City road links** (`+101`) are left as they are: the game rebuilds them
+      from the roads and the city positions when it loads a save (checked
+      2026-10-11: a save with stale links came out of the load with none, while
+      the untouched save kept its real ones; STORY-019).
     * **Units' own go-to targets**, if the record has any, are not known.
 
-  Nothing here has been seen in the real game yet. `docs/reference/real-game-acceptance.md`
-  says how to check one kind at a time, and STORY-019 records the outcome.
+  Each kind of move was loaded in the real game (STORY-019 has the results);
+  `docs/reference/real-game-acceptance.md` says how to check one.
   """
 
   alias Mirror.SaveFile.{Cities, Sites, Units, Wizards}
@@ -92,8 +92,7 @@ defmodule Mirror.SaveFile.Structures do
          from: from,
          to: to,
          garrison: length(garrison),
-         followed: followed,
-         stale: [:city_road_links]
+         followed: followed
        }}
     end
   end
@@ -132,8 +131,7 @@ defmodule Mirror.SaveFile.Structures do
          to: to,
          encounter_sides: length(sides),
          garrison: length(garrison),
-         warnings: water_planes(raw, to),
-         stale: []
+         warnings: water_planes(raw, to)
        }}
     end
   end
@@ -154,8 +152,7 @@ defmodule Mirror.SaveFile.Structures do
        %{
          moved: :encounter,
          from: {encounter.x, encounter.y, encounter.plane},
-         to: to,
-         stale: []
+         to: to
        }}
     end
   end
