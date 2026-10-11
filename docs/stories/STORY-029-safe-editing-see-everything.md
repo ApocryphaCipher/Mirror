@@ -19,12 +19,39 @@ one, is only safe if you can see what the terrain supports:
   player. You need to see *everything*, not the player's view, while
   editing. (MMS had "reveal all" for exactly this.)
 - **Impossible or odd states** an edit can create:
-  - land units standing on water (a tile turned to ocean under an army);
+  - land-bound units standing on water (a tile turned to ocean under an army), see
+    "What can legally be where" below: many units can be on water on purpose;
   - ships stranded on land;
   - cities, lairs, towers or nodes whose tile changes type under them;
   - roads over ocean. MMS says the game allows this as a "bridge", so it's
     a warning, not an error: "truly magic!";
   - specials or bonuses (below) left on terrain that can't hold them.
+
+## What can legally be where (Kevin, 2026-10-10)
+
+"Units on water" is **not** an error by itself. A checker that flagged it would mark valid saves as
+broken. Whether a unit may stand on a water tile depends on the unit, so the checker needs each
+unit's movement ability first. Cases it must allow (all *guess* until each is read from the game's
+own data or seen in the game; see the prerequisite below):
+
+- units that fly, swim or sail by nature (flyers, swimmers, boats), and **lizardmen**, which Kevin
+  says can be on water;
+- units made able to cross water by an enchantment or spell (*guess:* Water Walking, Wind Walking,
+  Flight; check each one's effect and which flag in the unit record carries it);
+- land units riding in a transport's stack at sea;
+- **cities** on water: Kevin thinks there is a flying-city spell (*guess:* Floating Island; sprite #71
+  is in the catalog, see overland-sprites-and-save-blocks.md; what the spell does to the city tile
+  is not checked), and the game tolerates cities and lairs on ocean (STORY-019).
+
+So the checker has three levels, not two: *fine* (the unit can be there), *warn* (odd but
+probably playable: a land unit alone on water, a bridge, a city on water without the spell), and
+*error* (only what is known to break the game, e.g. a landmass ID that disagrees with the rule).
+When in doubt, warn.
+
+**Prerequisite (new): decode unit movement.** Find where the game stores each unit type's
+movement ability (the unit-type table in the save or in the game's data, plus the unit record's
+enchantment flags), read it, and write it into `docs/reference/`. Cross-check against the game with
+the fork's API before the checker relies on it (AGENTS.md section 6).
 
 ## Continents: the landmass layer must follow terrain edits
 
@@ -74,7 +101,7 @@ match that rule.
    all units, sites and specials. The exploration bits are understood now (STORY-036
    draws them, off by default; STORY-037's Reveal all sets them all to 15 in the save),
    so this is a view toggle and not research.
-2. **An edit checker** that runs after each stroke and flags problems on
+2. **An edit checker**, movement-aware (see "What can legally be where"), that runs after each stroke and flags problems on
    the map (outline plus tooltip). Warn, don't block; some odd states are
    legal and fun (bridges).
 3. **Brush safety for STORY-028**: big brushes skip or ask about tiles

@@ -76,7 +76,7 @@ STORY-017 → then the rest as their EPIC-004 data stories land.
 - [STORY-026](../stories/STORY-026-bug-discard-and-stuck-edit-state.md): **bug**: Discard does nothing; edits feel impossible to clear **Fixed**
 - [STORY-027](../stories/STORY-027-cycle-tile-tool.md): Cycle tool (click = next tile picture); Paint becomes its own tool **Done**
 - [STORY-028](../stories/STORY-028-floating-tool-palette.md): floating emoji tool palette with Cycle instructions and a Paint panel (nice-to-have)
-- [STORY-029](../stories/STORY-029-safe-editing-see-everything.md): safe editing: see everything, flag impossible states (open; unblocked)
+- [STORY-029](../stories/STORY-029-safe-editing-see-everything.md): safe editing: see everything, flag impossible states, movement-aware (open; unblocked; decode unit movement first)
 - [STORY-034](../stories/STORY-034-surveyor.md): Surveyor readout: tile value and City Resources, matched against the game's Surveyor **Done**
 - [STORY-035](../stories/STORY-035-settleable-tiles-overlay.md): overlay mode highlighting settleable tiles (nice-to-have) **Done**
 - [STORY-036](../stories/STORY-036-fog-of-war-layer.md): fog-of-war layer, off by default (nice-to-have) **Done**

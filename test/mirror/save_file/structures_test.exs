@@ -1,0 +1,242 @@
+defmodule Mirror.SaveFile.StructuresTest do
+  use ExUnit.Case, async: true
+
+  alias Mirror.SaveFile.{Cities, Sites, Structures, Units}
+
+  @cities 0x8AAC
+  @units 0xB734
+  @wizards 0x9E8
+  @wizard 0x4C8
+  @fortresses 0x65F8
+  @towers 0x6610
+  @encounters 0x6628
+
+  defp put(raw, at, bytes) do
+    size = byte_size(bytes)
+    <<head::binary-size(^at), _::binary-size(^size), tail::binary>> = raw
+    head <> bytes <> tail
+  end
+
+  defp blank, do: :binary.copy(<<0>>, @units + 1009 * 32)
+
+  defp city(raw, i, name, x, y, plane, owner) do
+    count = max(i + 1, binary_part(raw, 0x9E0, 2) |> :binary.decode_unsigned(:little))
+
+    raw
+    |> put(0x9E0, <<count::little-16>>)
+    |> put(
+      @cities + i * 114,
+      String.pad_trailing(name, 14, <<0>>) <> <<5, x, y, plane, owner, 1, 4>>
+    )
+  end
+
+  defp unit(raw, i, x, y, plane, owner) do
+    count = max(i + 1, binary_part(raw, 0x9E2, 2) |> :binary.decode_unsigned(:little))
+
+    raw
+    |> put(0x9E2, <<count::little-16>>)
+    |> put(@units + i * 32, <<x, y, plane, owner, 2, 39>>)
+  end
+
+  defp wizard_circle(raw, owner, x, y, plane) do
+    at = @wizards + owner * @wizard
+    put(raw, at + 0x2E, <<x::little-16, y::little-16, plane::little-16>>)
+  end
+
+  defp circle(raw, owner) do
+    at = @wizards + owner * @wizard
+    <<x::little-16>> = binary_part(raw, at + 0x2E, 2)
+    <<y::little-16>> = binary_part(raw, at + 0x30, 2)
+    <<p::little-16>> = binary_part(raw, at + 0x32, 2)
+    {x, y, p}
+  end
+
+  defp fortress(raw, i, x, y, plane), do: put(raw, @fortresses + i * 4, <<x, y, plane, 1>>)
+
+  defp tower(raw, i, x, y), do: put(raw, @towers + i * 4, <<x, y, 255, 0>>)
+
+  defp encounter(raw, i, x, y, plane, kind),
+    do: put(raw, @encounters + i * 24, <<x, y, plane, 1, kind, 7, 1>>)
+
+  defp city_at(raw, i) do
+    {:ok, cities} = Cities.parse(raw)
+    Enum.find(cities, &(&1.index == i))
+  end
+
+  describe "move_city/3" do
+    test "moves the city and its garrison, and nothing else" do
+      raw =
+        blank()
+        |> city(0, "Norport", 38, 21, 0, 0)
+        |> city(1, "Other", 5, 5, 0, 1)
+        |> unit(0, 38, 21, 0, 0)
+        |> unit(1, 38, 21, 0, 0)
+        |> unit(2, 38, 22, 0, 0)
+        |> unit(3, 38, 21, 1, 0)
+
+      assert {:ok, moved, report} = Structures.move_city(raw, 0, {10, 12, 0})
+
+      assert %{x: 10, y: 12, plane: :arcanus, name: "Norport", owner: 0} = city_at(moved, 0)
+      assert %{x: 5, y: 5} = city_at(moved, 1)
+      assert report.garrison == 2
+
+      {:ok, units} = Units.parse(moved)
+
+      assert for(u <- units, do: {u.x, u.y, u.plane}) ==
+               [{10, 12, :arcanus}, {10, 12, :arcanus}, {38, 22, :arcanus}, {38, 21, :myrror}]
+
+      # only the city's x, y and the garrison's x, y changed
+      diffs =
+        for {a, b} <- Enum.zip(:binary.bin_to_list(raw), :binary.bin_to_list(moved)),
+            a != b,
+            do: 1
+
+      assert length(diffs) <= 2 + 2 * 2
+    end
+
+    test "to the other plane changes the plane of the city and its garrison" do
+      raw = blank() |> city(0, "A", 3, 4, 0, 2) |> unit(0, 3, 4, 0, 2)
+
+      assert {:ok, moved, _} = Structures.move_city(raw, 0, {7, 8, 1})
+      assert %{x: 7, y: 8, plane: :myrror} = city_at(moved, 0)
+      assert {:ok, [%{x: 7, y: 8, plane: :myrror}]} = Units.parse(moved)
+    end
+
+    test "a capital takes its summoning circle and fortress with it" do
+      raw =
+        blank()
+        |> city(0, "Capital", 38, 21, 0, 0)
+        |> wizard_circle(0, 38, 21, 0)
+        |> fortress(0, 38, 21, 0)
+
+      assert {:ok, moved, %{followed: [:summoning_circle, :fortress]}} =
+               Structures.move_city(raw, 0, {20, 9, 1})
+
+      assert circle(moved, 0) == {20, 9, 1}
+      assert binary_part(moved, @fortresses, 4) == <<20, 9, 1, 1>>
+    end
+
+    test "leaves a circle and fortress that are somewhere else alone" do
+      raw =
+        blank()
+        |> city(0, "Colony", 14, 14, 0, 0)
+        |> wizard_circle(0, 38, 21, 0)
+        |> fortress(0, 38, 21, 0)
+
+      assert {:ok, moved, %{followed: []}} = Structures.move_city(raw, 0, {15, 15, 0})
+      assert circle(moved, 0) == {38, 21, 0}
+      assert binary_part(moved, @fortresses, 4) == <<38, 21, 0, 1>>
+    end
+
+    test "a neutral city (owner 5) has no wizard to follow" do
+      raw = blank() |> city(0, "Free", 3, 3, 0, 5)
+      assert {:ok, _moved, %{followed: []}} = Structures.move_city(raw, 0, {4, 4, 0})
+    end
+
+    test "refuses a destination off the map" do
+      raw = blank() |> city(0, "A", 3, 3, 0, 0)
+      assert {:error, :off_map} = Structures.move_city(raw, 0, {60, 3, 0})
+      assert {:error, :off_map} = Structures.move_city(raw, 0, {3, 40, 0})
+      assert {:error, :off_map} = Structures.move_city(raw, 0, {3, 3, 2})
+    end
+
+    test "refuses another city's tile, but only on the same plane" do
+      raw = blank() |> city(0, "A", 3, 3, 0, 0) |> city(1, "B", 9, 9, 0, 1)
+      assert {:error, :city_at_destination} = Structures.move_city(raw, 0, {9, 9, 0})
+      assert {:ok, _, _} = Structures.move_city(raw, 0, {9, 9, 1})
+    end
+
+    test "refuses a tile holding another owner's units, accepts the owner's own" do
+      raw = blank() |> city(0, "A", 3, 3, 0, 0) |> unit(0, 8, 8, 0, 1) |> unit(1, 6, 6, 0, 0)
+      assert {:error, :foreign_units_at_destination} = Structures.move_city(raw, 0, {8, 8, 0})
+      assert {:ok, _, _} = Structures.move_city(raw, 0, {6, 6, 0})
+    end
+
+    test "an unknown city is an error" do
+      assert {:error, :no_such_city} = Structures.move_city(blank(), 3, {1, 1, 0})
+    end
+
+    test "garbage input is an error, not a crash" do
+      assert {:error, _} = Structures.move_city(<<1, 2, 3>>, 0, {1, 1, 0})
+    end
+  end
+
+  describe "move_tower/3" do
+    test "moves the tower, both of its sides, and units on its tile on either plane" do
+      raw =
+        blank()
+        |> tower(0, 33, 7)
+        |> tower(1, 12, 12)
+        |> encounter(0, 33, 7, 0, 0)
+        |> encounter(6, 33, 7, 1, 0)
+        |> encounter(1, 12, 12, 0, 0)
+        |> unit(0, 33, 7, 0, 0)
+        |> unit(1, 33, 7, 1, 0)
+
+      assert {:ok, moved, report} = Structures.move_tower(raw, 0, {20, 20})
+      assert report.encounter_sides == 2
+      assert report.garrison == 2
+
+      assert {:ok, %{towers: towers, encounters: encounters}} = Sites.parse(moved)
+
+      assert towers |> Enum.map(&{&1.x, &1.y}) |> Enum.reject(&(&1 == {0, 0})) |> Enum.sort() ==
+               [{12, 12}, {20, 20}]
+
+      assert binary_part(moved, @towers, 8) == <<20, 20, 255, 0, 12, 12, 255, 0>>
+
+      assert encounters
+             |> Enum.filter(&(&1.kind == 0 and {&1.x, &1.y} != {0, 0}))
+             |> Enum.map(&{&1.x, &1.y, &1.plane})
+             |> Enum.sort() ==
+               Enum.sort([{20, 20, :arcanus}, {20, 20, :myrror}, {12, 12, :arcanus}])
+
+      assert {:ok, [%{x: 20, y: 20, plane: :arcanus}, %{x: 20, y: 20, plane: :myrror}]} =
+               Units.parse(moved)
+    end
+
+    test "warns when the new tile is not land on both planes" do
+      # landmass ids at 0x4D98: land on Arcanus (7), ocean on Myrror (0)
+      raw = blank() |> tower(0, 33, 7) |> put(0x4D98 + 7 * 60 + 20, <<7>>)
+
+      assert {:ok, _, %{warnings: [water: :myrror]}} = Structures.move_tower(raw, 0, {20, 7})
+
+      assert {:ok, _, %{warnings: [water: :arcanus, water: :myrror]}} =
+               Structures.move_tower(raw, 0, {21, 7})
+    end
+
+    test "refuses another tower's tile and a tile off the map" do
+      raw = blank() |> tower(0, 33, 7) |> tower(1, 12, 12)
+      assert {:error, :tower_at_destination} = Structures.move_tower(raw, 0, {12, 12})
+      assert {:error, :off_map} = Structures.move_tower(raw, 0, {70, 1})
+      assert {:error, :no_such_tower} = Structures.move_tower(raw, 4, {1, 1})
+    end
+  end
+
+  describe "move_encounter/3" do
+    test "moves a lair to the other plane and leaves other encounters alone" do
+      raw = blank() |> encounter(20, 10, 11, 0, 8) |> encounter(21, 30, 30, 1, 4)
+
+      assert {:ok, moved, %{from: {10, 11, 0}, to: {15, 16, 1}}} =
+               Structures.move_encounter(raw, 20, {15, 16, 1})
+
+      assert binary_part(moved, @encounters + 20 * 24, 3) == <<15, 16, 1>>
+      assert binary_part(moved, @encounters + 21 * 24, 3) == <<30, 30, 1>>
+    end
+
+    test "towers and node guardians move with their tower or node" do
+      raw = blank() |> encounter(0, 33, 7, 0, 0) |> encounter(1, 8, 8, 0, 2)
+      assert {:error, :move_the_tower} = Structures.move_encounter(raw, 0, {1, 1, 0})
+      assert {:error, :move_the_node} = Structures.move_encounter(raw, 1, {1, 1, 0})
+    end
+
+    test "refuses a tile that holds another encounter on that plane" do
+      raw = blank() |> encounter(20, 10, 11, 0, 8) |> encounter(21, 30, 30, 0, 4)
+      assert {:error, :encounter_at_destination} = Structures.move_encounter(raw, 20, {30, 30, 0})
+      assert {:ok, _, _} = Structures.move_encounter(raw, 20, {30, 30, 1})
+    end
+
+    test "an empty slot is not an encounter" do
+      assert {:error, :no_such_encounter} = Structures.move_encounter(blank(), 99, {1, 1, 0})
+    end
+  end
+end

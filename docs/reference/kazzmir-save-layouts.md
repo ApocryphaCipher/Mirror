@@ -124,9 +124,10 @@ owner), and the encounter holds the guards. SAVE1's guards are all
 summoned creatures, e.g. tower (33, 7): Unicorns ×3 and Guardian Spirits
 ×4, plus 10 gold and 30 mana.
 
+*Checked 2026-10-10:* clearing a tower from one side sets `intact` to 0 on **both** records and the
+tower's owner to the clearer (STORY-046 has the bytes).
+
 *To check:*
-- Clear one side of a tower, then diff the two records. Does the game
-  update both (one tower, two records) or only the side you entered?
 - There's no link field between the tower and the encounter; they match
   only by position.
 
