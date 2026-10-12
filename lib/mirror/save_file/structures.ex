@@ -191,6 +191,10 @@ defmodule Mirror.SaveFile.Structures do
   any value is refused.
   """
   @spec edit_city(binary(), non_neg_integer(), keyword()) :: result()
+  # `buildings: ids` is the set of building ids (3..35) the city should have, built or replaced.
+  # Removing one first (a building that replaced another restores it), then adding: an added
+  # building marks the one it replaces as replaced, as the game does when it is built. Needs are
+  # not enforced.
   def edit_city(raw, index, changes) when is_list(changes) do
     with {:ok, cities} <- Cities.parse(raw),
          {:ok, _city} <- fetch(cities, index, :no_such_city),
@@ -199,8 +203,14 @@ defmodule Mirror.SaveFile.Structures do
 
       raw =
         Enum.reduce(edits, raw, fn
-          {:name, bytes}, acc -> put(acc, base, bytes)
-          {:population, n}, acc -> put(acc, base + 20, <<n>>)
+          {:name, bytes}, acc ->
+            put(acc, base, bytes)
+
+          {:population, n}, acc ->
+            put(acc, base + 20, <<n>>)
+
+          {:buildings, ids}, acc ->
+            put(acc, base + 31, set_buildings(binary_part(acc, base + 31, 36), ids))
         end)
 
       {:ok, raw, %{changed: Keyword.keys(edits)}}
@@ -221,6 +231,11 @@ defmodule Mirror.SaveFile.Structures do
       {:population, _}, _acc ->
         {:halt, {:error, :bad_population}}
 
+      {:buildings, ids}, {:ok, acc} ->
+        if is_list(ids) and Enum.all?(ids, &(&1 in 3..35//1)),
+          do: {:cont, {:ok, [{:buildings, Enum.uniq(ids)} | acc]}},
+          else: {:halt, {:error, :bad_buildings}}
+
       {other, _}, _acc ->
         {:halt, {:error, {:unknown_field, other}}}
     end)
@@ -228,6 +243,61 @@ defmodule Mirror.SaveFile.Structures do
       {:ok, edits} -> {:ok, Enum.reverse(edits)}
       error -> error
     end)
+  end
+
+  # The city's 36 building bytes (`+31..+66`: 1 built, 0 replaced, 0xFF none) after making
+  # exactly `wanted` present.
+  defp set_buildings(bytes, wanted) do
+    state = for {b, id} <- Enum.with_index(:binary.bin_to_list(bytes)), into: %{}, do: {id, b}
+    present? = fn st, id -> id > 0 and Map.fetch!(st, id) in [0, 1] end
+
+    current = for id <- 3..35, present?.(state, id), do: id
+    wanted = MapSet.new(wanted)
+
+    state =
+      current
+      |> Enum.reject(&MapSet.member?(wanted, &1))
+      |> Enum.reduce(state, fn id, st ->
+        st = Map.put(st, id, 0xFF)
+
+        case Cities.building_replaces(id) do
+          nil -> st
+          replaced -> restore_replaced(st, replaced)
+        end
+      end)
+
+    state =
+      wanted
+      |> Enum.sort()
+      |> Enum.reduce(state, fn id, st ->
+        if present?.(st, id) do
+          st
+        else
+          st = Map.put(st, id, 1)
+
+          case Cities.building_replaces(id) do
+            replaced when is_integer(replaced) ->
+              if present?.(st, replaced), do: Map.put(st, replaced, 0), else: st
+
+            nil ->
+              st
+          end
+        end
+      end)
+
+    for id <- 0..35, into: <<>>, do: <<Map.fetch!(state, id)>>
+  end
+
+  # A replaced building comes back as built when nothing present still replaces it.
+  defp restore_replaced(state, replaced) do
+    still_replaced? =
+      Enum.any?(3..35, fn id ->
+        Cities.building_replaces(id) == replaced and Map.fetch!(state, id) in [0, 1]
+      end)
+
+    if Map.fetch!(state, replaced) == 0 and not still_replaced?,
+      do: Map.put(state, replaced, 1),
+      else: state
   end
 
   defp city_name_bytes(name) when is_binary(name) do

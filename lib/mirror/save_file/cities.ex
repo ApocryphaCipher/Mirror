@@ -208,6 +208,70 @@ defmodule Mirror.SaveFile.Cities do
   @spec size_name(non_neg_integer()) :: String.t()
   def size_name(size), do: Map.get(@size_names, size, "size #{size}")
 
+  # What each building replaces (BUILDDAT.LBX, the game's own table, read 2026-10-11; its entry
+  # index is the save's building id, which confirms the ids above): building => the building it
+  # replaces. The game marks the replaced one `0` ("replaced") instead of removing it.
+  @replaces %{
+    4 => 3,
+    6 => 5,
+    7 => 6,
+    11 => 9,
+    13 => 12,
+    14 => 13,
+    20 => 16,
+    21 => 19,
+    23 => 22,
+    24 => 23,
+    25 => 24,
+    27 => 26,
+    28 => 27,
+    30 => 29
+  }
+
+  # What a building needs first, as building ids (BUILDDAT.LBX). The game enforces this only
+  # when a player builds: neutral cities in saves have Shrines without a Builders Hall, so the
+  # editor treats it as a hint. Terrain needs (forest for a Sawmill, water for a Shipwrights'
+  # Guild, minerals for a Miners' Guild) are not listed.
+  @requires %{
+    4 => [8, 3],
+    5 => [4],
+    6 => [5],
+    7 => [20, 6],
+    9 => [8],
+    10 => [23, 9],
+    11 => [6, 10],
+    13 => [15, 12],
+    14 => [4, 13],
+    16 => [32],
+    17 => [16],
+    18 => [24, 20],
+    19 => [17],
+    20 => [17],
+    21 => [19, 20],
+    22 => [32],
+    23 => [22],
+    24 => [23],
+    25 => [24],
+    26 => [8],
+    27 => [26, 20],
+    28 => [13, 27],
+    29 => [32],
+    30 => [29, 26],
+    31 => [15],
+    33 => [34, 20],
+    34 => [32],
+    35 => [32]
+  }
+
+  @doc "The building ids a city can have (3 to 35; 1 and 2 are production items)."
+  def building_ids, do: Enum.to_list(3..35)
+
+  @doc "The id of the building `id` replaces, or `nil`."
+  def building_replaces(id), do: Map.get(@replaces, id)
+
+  @doc "The building ids `id` needs first (a hint; see the table's note)."
+  def building_requires(id), do: Map.get(@requires, id, [])
+
   @doc "The race's name, or `\"race N\"` for an id outside the game's 14."
   @spec race_name(non_neg_integer()) :: String.t()
   def race_name(race), do: Enum.at(@race_names, race) || "race #{race}"
