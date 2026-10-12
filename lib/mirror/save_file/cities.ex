@@ -272,6 +272,10 @@ defmodule Mirror.SaveFile.Cities do
   @doc "The building ids `id` needs first (a hint; see the table's note)."
   def building_requires(id), do: Map.get(@requires, id, [])
 
+  @doc "The races the game has, as `{id, name}`."
+  @spec races() :: [{non_neg_integer(), String.t()}]
+  def races, do: Enum.with_index(@race_names, fn name, id -> {id, name} end)
+
   @doc "The race's name, or `\"race N\"` for an id outside the game's 14."
   @spec race_name(non_neg_integer()) :: String.t()
   def race_name(race), do: Enum.at(@race_names, race) || "race #{race}"
