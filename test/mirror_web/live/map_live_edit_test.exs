@@ -2371,6 +2371,166 @@ defmodule MirrorWeb.MapLiveEditTest do
     end
   end
 
+  describe "Lair tool (STORY-020)" do
+    # An abandoned keep at (26, 25): 3 of 5 Barbarian Spearmen (39), 120 gold, 40 mana; and a tower
+    # at (48, 28) as two sides (Arcanus and Myrror) with 2 Unicorns... (type 108) each.
+    defp lair_record(x, y, plane, intact, kind, g1, c1, gold, mana),
+      do:
+        <<x, y, plane, intact, kind, g1, c1, 0, 0, 0, gold::little-signed-16,
+          mana::little-signed-16, 4, 0, 0, 0, 0::16, 0::16, 0::16>>
+
+    defp lairs_save(dir) do
+      raw =
+        synthetic_save_bytes()
+        |> put_bytes(0x6628 + 20 * 24, lair_record(26, 25, 0, 1, 7, 39, 0x53, 120, 40))
+        |> put_bytes(0x6628 + 0 * 24, lair_record(48, 28, 0, 1, 0, 108, 0x22, 10, 30))
+        |> put_bytes(0x6628 + 6 * 24, lair_record(48, 28, 1, 1, 0, 108, 0x22, 10, 30))
+
+      path = Path.join(dir, "LAIRS.GAM")
+      File.write!(path, raw)
+      path
+    end
+
+    defp lpanel(view), do: view |> element("#lair-panel") |> render() |> text_of()
+
+    defp lair_form(view, fields) do
+      base = %{
+        "intact_present" => "1",
+        "intact" => "on",
+        "guard1_type" => "39",
+        "guard1_count" => "3",
+        "guard2_type" => "",
+        "guard2_count" => "1",
+        "gold" => "120",
+        "mana" => "40"
+      }
+
+      view |> element("#lair-form") |> render_submit(%{"lair" => Map.merge(base, fields)})
+    end
+
+    defp encounters_of(path) do
+      Mirror.SaveFile.Encounters.all(File.read!(path))
+    end
+
+    test "a click shows the site's guards and treasure; Apply changes them, undoably and into Save as",
+         %{
+           conn: conn,
+           dir: dir
+         } do
+      view = editing(conn, lairs_save(dir), "lair")
+      click(view, 26, 25)
+      text = lpanel(view)
+      assert text =~ "Abandoned keep"
+      assert text =~ "Not cleared yet"
+
+      assert has_element?(
+               view,
+               ~s|select[name="lair[guard1_type]"] option[value="39"][selected]|,
+               "Barbarian Spearmen"
+             )
+
+      assert has_element?(view, ~s|input[name="lair[guard1_count]"][value="3"]|)
+      assert has_element?(view, "#lair-panel", "started with 5")
+
+      lair_form(view, %{"guard1_type" => "196", "guard1_count" => "2", "gold" => "500"})
+      assert has_element?(view, "#lair-note", "Edited the abandoned keep")
+      assert changed(view) =~ "1 edited"
+
+      target = Path.join(dir, "SAVE5.GAM")
+      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+
+      assert %{gold: 500, guards: [%{type: 196, left: 2, start: 2}]} =
+               Enum.find(encounters_of(target), &(&1.index == 20))
+
+      render_click(view, "undo", %{})
+      assert has_element?(view, ~s|select[name="lair[guard1_type]"] option[value="39"][selected]|)
+      assert has_element?(view, ~s|input[name="lair[gold]"][value="120"]|)
+    end
+
+    test "clearing a site and emptying a guard slot", %{conn: conn, dir: dir} do
+      view = editing(conn, lairs_save(dir), "lair")
+      click(view, 26, 25)
+
+      lair_form(view, %{"guard1_type" => ""})
+      assert has_element?(view, "#lair-note", "Changed the abandoned keep's guards (-guard)")
+
+      # an unticked box posts nothing, which render_submit cannot express (it keeps the form's
+      # ticked default), so send the params as the browser would
+      render_hook(view, "lair_edit", %{
+        "lair" => %{
+          "intact_present" => "1",
+          "guard1_type" => "",
+          "guard1_count" => "1",
+          "guard2_type" => "",
+          "guard2_count" => "1",
+          "gold" => "120",
+          "mana" => "40"
+        }
+      })
+
+      assert has_element?(view, "#lair-note", "Cleared the abandoned keep")
+    end
+
+    test "a refused value says why and changes nothing", %{conn: conn, dir: dir} do
+      view = editing(conn, lairs_save(dir), "lair")
+      click(view, 26, 25)
+
+      lair_form(view, %{"guard1_count" => "9"})
+      assert has_element?(view, "#lair-note", "A guard needs a unit and a count")
+      lair_form(view, %{"gold" => "-5"})
+      assert has_element?(view, "#lair-note", "Gold is a whole number")
+      lair_form(view, %{})
+      assert has_element?(view, "#lair-note", "Nothing to change")
+      refute changed(view) =~ "edited"
+    end
+
+    test "a tower's guards are edited on both of its sides", %{conn: conn, dir: dir} do
+      view = editing(conn, lairs_save(dir), "lair")
+      click(view, 48, 28)
+      assert lpanel(view) =~ "Tower of Wizardry"
+      assert lpanel(view) =~ "both sides"
+
+      lair_form(view, %{"guard1_type" => "108", "guard1_count" => "2", "gold" => "99"})
+      target = Path.join(dir, "SAVE6.GAM")
+      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+
+      sides = encounters_of(target) |> Enum.filter(&(&1.kind == 0))
+      assert Enum.map(sides, & &1.plane) |> Enum.sort() == [0, 1]
+      assert Enum.all?(sides, &(&1.gold == 99))
+    end
+
+    test "View mode shows the site read-only; a click elsewhere closes it", %{
+      conn: conn,
+      dir: dir
+    } do
+      {:ok, view, _} = live(conn, ~p"/arcanus")
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => lairs_save(dir)}})
+
+      pointer(view, "click", 26, 25)
+      assert lpanel(view) =~ "Abandoned keep"
+      assert has_element?(view, "#lair-readout", "3 × Barbarian Spearmen")
+      assert has_element?(view, "#lair-readout", "started with 5")
+      assert has_element?(view, "#lair-readout", "Gold 120")
+      refute has_element?(view, "#lair-form")
+
+      pointer(view, "click", 3, 3)
+      refute has_element?(view, "#lair-panel")
+
+      pointer(view, "click", 26, 25)
+      view |> element("#lair-close") |> render_click()
+      refute has_element?(view, "#lair-panel")
+    end
+
+    test "loading another save drops the picked site", %{conn: conn, dir: dir} do
+      path = lairs_save(dir)
+      view = editing(conn, path, "lair")
+      click(view, 26, 25)
+      assert has_element?(view, "#lair-panel")
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => path}})
+      refute has_element?(view, "#lair-panel")
+    end
+  end
+
   describe "real-save integration" do
     @tag skip:
            !@has_real_save_and_sprites &&

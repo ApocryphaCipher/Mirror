@@ -78,7 +78,30 @@ wiping them is the simple rule); the panel's notice says so. **Not checked:** th
 (`Units.stack/2`, `UnitTypes.display_name/1`) with owner, level, experience, damage and orders; in edit mode the ticked
 ones can be moved (STORY-019 has the rules and the game check). Editing a unit's own fields is not done.
 
-**Not done:** the lair panel; editing a unit's fields (type, level, experience, damage, owner).
+**Lairs and other encounter zones (2026-10-12).** The **🏚️ Lair** tool, and a View-mode click on a site with no city or
+units, open a panel for the encounter on the tile: a cave, dungeon, ancient temple, abandoned keep, monster lair, ruins,
+fallen temple, a node's guardians or a Tower of Wizardry (`Mirror.SaveFile.Encounters`, `MirrorWeb.LairPanel`,
+`Structures.edit_encounter/3`). In edit mode you can change:
+- the **Not cleared** state (`+3`);
+- each of the **two guard slots**: a unit type (names from `UnitTypes`) and a count 1 to 8, written with both nibbles equal as
+  every full slot in the saves is (low nibble = left, high = starting; a half-fought guard shows "started with N" and keeps
+  its count if untouched); an empty slot is type 0, count 0 (all 247 empty slots seen);
+- **gold and mana** (i16, 0 to 30000; the largest seen are 620 and 330).
+A tower is two records (an Arcanus and a Myrror side) with the same guards, and the game clears both together, so a tower is
+edited on **both**. Not editable: the **treasure code** (`+14`: it is 0 to 6 in every save, so it is a code, not a spell id,
+and what the codes mean is not decoded), the flags, and the items (ids not decoded).
+**Real game (slot 5, vault checkpoint 98):** the abandoned keep near Kevin's capital rewritten to 1 Sprite and 2 High Elf Pegasai,
+777 gold and 333 mana loaded with the game's memory identical to the file (guard counts `0x11` and `0x22`). **Kevin attacked
+it:** the guards were two Pegasai and a Sprite, and the reward screen read "Inside you find 777 gold, 333 mana crystals and a
+Create Artifact spell" (checkpoint 98's save; his screenshot). That keep's treasure code was 1.
+**The treasure code does not decide the reward (2026-10-12, two more experiments):** keeps next to Blackstone with no gold, mana or items,
+one per code 2 to 6 and then a row of six for codes 1 to 6 (one to six Sprites each), cleared by Kevin. The same code gave different
+rewards (code 1: a Create Artifact spell once, nothing once; code 5: a Chain Mail once, a Disjunction spell once), so the reward is
+**rolled when the site is cleared**: nothing, spells from the realms the wizard has books in plus Arcane (Create Artifact, Summon Hero,
+Disjunction, Weakness), a spell book, or an item (the cleared record's item count goes 0 to 1). Gold and mana are the record's own fields.
+kazzmir's remake does the same kind of roll, from a budget. What the code itself means is unknown; the panel shows it and does not edit it.
+
+**Not done:** editing a unit's fields (type, level, experience, damage, owner); what the treasure code means (it does not decide the reward) and the item ids.
 **Size:** large (do incrementally)
 
 ## What to do
