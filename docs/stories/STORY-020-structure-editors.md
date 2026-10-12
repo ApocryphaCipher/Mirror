@@ -88,7 +88,7 @@ fallen temple, a node's guardians or a Tower of Wizardry (`Mirror.SaveFile.Encou
   its count if untouched); an empty slot is type 0, count 0 (all 247 empty slots seen);
 - **gold and mana** (i16, 0 to 30000; the largest seen are 620 and 330).
 A tower is two records (an Arcanus and a Myrror side) with the same guards, and the game clears both together, so a tower is
-edited on **both**. Not editable: the **spell reward code** (`+14`: it is 0 to 6 in every save, so it is a code, not a spell id,
+edited on **both**. Not editable: the **treasure code** (`+14`: it is 0 to 6 in every save, so it is a code, not a spell id,
 and what the codes mean is not decoded), the flags, and the items (ids not decoded).
 **Real game (slot 5, vault checkpoint 98):** the abandoned keep near Kevin's capital rewritten to 1 Sprite and 2 High Elf Pegasai,
 777 gold and 333 mana loaded with the game's memory identical to the file (guard counts `0x11` and `0x22`). **Kevin attacked
@@ -101,7 +101,7 @@ rewards (code 1: a Create Artifact spell once, nothing once; code 5: a Chain Mai
 Disjunction, Weakness), a spell book, or an item (the cleared record's item count goes 0 to 1). Gold and mana are the record's own fields.
 kazzmir's remake does the same kind of roll, from a budget. What the code itself means is unknown; the panel shows it and does not edit it.
 
-**Not done:** editing a unit's fields (type, level, experience, damage, owner); decoding the spell reward code and the items.
+**Not done:** editing a unit's fields (type, level, experience, damage, owner); what the treasure code means (it does not decide the reward) and the item ids.
 **Size:** large (do incrementally)
 
 ## What to do
