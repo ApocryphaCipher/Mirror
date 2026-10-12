@@ -46,6 +46,12 @@ defmodule Mirror.GameFiles do
       required: false,
       used_for: "unit figures, types 120-197",
       sha256: "d94bd85267ffb7fe8fa9eb1cf9753a6eda7e592cf0f27d7574a50b9d8fd72dd8"
+    },
+    %{
+      name: "SPELLDAT.LBX",
+      required: false,
+      used_for: "spell names, realms and costs (the wizard page)",
+      sha256: "428e1fd02698ae0c1d5f48b753bb155df271f5bec10e65d32cd8ec1807926844"
     }
   ]
 

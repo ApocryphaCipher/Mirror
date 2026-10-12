@@ -25,6 +25,7 @@ defmodule MirrorWeb.WizardPanel do
              ["Charismatic", "Artificer"]
 
   @realms ["Nature", "Sorcery", "Chaos", "Life", "Death"]
+  @realms_atoms [:nature, :sorcery, :chaos, :life, :death]
 
   # Spell numbers per ReMoM: 1..40 Nature, 41..80 Sorcery, 81..120 Chaos, 121..160 Life,
   # 161..200 Death, 201..214 Arcane.
@@ -127,6 +128,8 @@ defmodule MirrorWeb.WizardPanel do
           ),
         researching: spell(researching),
         research_left: research_left,
+        researching_number: researching,
+        library: :binary.bin_to_list(binary_part(library, 0, 214)),
         spells: known_by_realm(library),
         standing: standing(raw, record)
       }
@@ -193,8 +196,14 @@ defmodule MirrorWeb.WizardPanel do
     with {:ok, nums} <- numbers(params, details),
          {:ok, books} <- books(params, details),
          {:ok, retorts} <- retorts(params, details),
+         {:ok, spells} <- spells(params, details),
+         {:ok, research} <- research(params, details),
          {:ok, name} <- name(params, details) do
-      changes = nums ++ if(name != details.name, do: [name: name], else: []) ++ books ++ retorts
+      changes =
+        nums ++
+          if(name != details.name, do: [name: name], else: []) ++
+          books ++ retorts ++ spells ++ research
+
       {:ok, changes}
     end
   end
@@ -260,6 +269,99 @@ defmodule MirrorWeb.WizardPanel do
 
   defp retorts(_params, _details), do: {:ok, []}
 
+  # The spell checkboxes (`spells[N]` = "on" for known); `spells_present` says the form had them. Ticking a
+  # spell makes it known (2); unticking a known one makes it knowable again (1). Others are left as they are.
+  defp spells(%{"spells_present" => _} = params, details) do
+    case Map.get(params, "spells", %{}) do
+      given when is_map(given) ->
+        changes =
+          for {state, number} <- Enum.with_index(details.library, 1),
+              # a generator, not `want = ...`: a `false` there would be a filter and drop the spell
+              want <- [Map.get(given, Integer.to_string(number)) in ["on", "true"]],
+              new <- [spell_state(state, want)],
+              new != state,
+              do: {number, new}
+
+        {:ok, if(changes == [], do: [], else: [spells: changes])}
+
+      _ ->
+        {:error, :bad_spells}
+    end
+  end
+
+  defp spells(_params, _details), do: {:ok, []}
+
+  defp spell_state(_state, true), do: 2
+  defp spell_state(2, false), do: 1
+  defp spell_state(state, false), do: state
+
+  defp research(params, details) do
+    with {:ok, spell} <-
+           optional_change(params, "researching", details.researching_number, :bad_researching),
+         {:ok, left} <-
+           optional_change(params, "research_left", details.research_left, :bad_research_left) do
+      {:ok, Enum.reject([researching: spell, research_left: left], &(elem(&1, 1) == :same))}
+    end
+  end
+
+  defp optional_change(params, key, current, error) do
+    case number(Map.get(params, key)) do
+      :skip -> {:ok, :same}
+      {:ok, ^current} -> {:ok, :same}
+      {:ok, n} -> {:ok, n}
+      :error -> {:error, error}
+    end
+  end
+
+  @doc """
+  The change that makes every spell of `realm` (an atom of `Mirror.Spells.realms/0`) known, or `[]` when all are. Spells
+  are numbered by realm: 40 each for the five realms, then the 14 Arcane spells (201 to 214).
+  """
+  @spec learn_realm(map(), atom()) :: keyword()
+  def learn_realm(details, realm) do
+    numbers = realm_numbers(realm)
+
+    case for(n <- numbers, Enum.at(details.library, n - 1) != 2, do: {n, 2}) do
+      [] -> []
+      changes -> [spells: changes]
+    end
+  end
+
+  @doc "The spell numbers of a realm."
+  @spec realm_numbers(atom()) :: [pos_integer()]
+  def realm_numbers(:arcane), do: Enum.to_list(201..214)
+
+  def realm_numbers(realm) do
+    case Enum.find_index(@realms_atoms, &(&1 == realm)) do
+      nil -> []
+      i -> Enum.to_list((i * 40 + 1)..(i * 40 + 40))
+    end
+  end
+
+  @doc """
+  The spell library of `details` grouped by realm, each spell with its name, cost and state, for the page. `table` is
+  `Mirror.Spells.table/0`'s map (or `nil`, then spells have number names).
+  """
+  @spec spell_rows(map(), map() | nil) :: [{atom(), [map()]}]
+  def spell_rows(details, table) do
+    for realm <- @realms_atoms ++ [:arcane] do
+      rows =
+        for n <- realm_numbers(realm) do
+          state = Enum.at(details.library, n - 1)
+          spell = if is_map(table), do: Map.get(table, n)
+
+          %{
+            number: n,
+            name: Mirror.Spells.name(table, n),
+            cost: spell && spell.cost,
+            state: state
+          }
+        end
+
+      {realm, rows}
+    end
+  end
+
   defp number(nil), do: :skip
   defp number(""), do: :skip
 
@@ -283,6 +385,10 @@ defmodule MirrorWeb.WizardPanel do
         {:name, n} -> "name #{n}"
         {:books, _} -> "books"
         {:retorts, _} -> "retorts"
+        {:spells, list} -> "#{length(list)} #{if length(list) == 1, do: "spell", else: "spells"}"
+        {:researching, 0} -> "no spell researched"
+        {:researching, n} -> "researching spell #{n}"
+        {:research_left, n} -> "#{n} research points left"
       end)
 
     "Edited #{details.name}: #{Enum.join(parts, ", ")}"
@@ -298,6 +404,14 @@ defmodule MirrorWeb.WizardPanel do
     do: "A name is 1 to 19 letters, digits or punctuation (no accents)."
 
   def error_message(:bad_books), do: "Books are whole numbers from 0 to 13."
+  def error_message(:bad_spells), do: "Those spells could not be read."
+
+  def error_message(:bad_researching),
+    do: "Researching is a spell number from 1 to 214, or 0 for none."
+
+  def error_message(:bad_research_left),
+    do: "Research points left is a whole number from 0 to 65535."
+
   def error_message(:bad_retorts), do: "Those retorts could not be read."
   def error_message(:no_such_wizard), do: "That wizard is no longer in the save."
   def error_message(:nothing_changed), do: "Nothing to change."

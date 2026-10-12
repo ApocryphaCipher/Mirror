@@ -1064,6 +1064,7 @@ defmodule Mirror.SaveFile.Structures do
   @max_wizard_value 30_000
   @max_books 13
   @retort_count 18
+  @spell_count 214
 
   @doc """
   Edits wizard `record` (0 is the player, 0 to 4 the wizards) with `changes`, a keyword list:
@@ -1073,9 +1074,13 @@ defmodule Mirror.SaveFile.Structures do
     * `:name` (printable ASCII, 1 to 19 characters, written NUL-padded to 20 bytes)
     * `:books` (five numbers 0 to #{@max_books}, in the order Nature, Sorcery, Chaos, Life, Death; *guess* on the top)
     * `:retorts` (#{@retort_count} booleans, in the save's byte order)
+    * `:spells` (a list of `{spell number 1..#{@spell_count}, state}`; state 0 unknown, 1 knowable, 2 known, 3 on the research list;
+      only the listed spells are written)
+    * `:researching` (the spell being researched, 0 for none, or a spell number 1..#{@spell_count}) and `:research_left` (research
+      points left, 0 to 65535)
 
   Refused: a record with no name (`:no_such_wizard`), a bad value (`:bad_gold`, `:bad_mana`, `:bad_fame`,
-  `:bad_name`, `:bad_books`, `:bad_retorts`) or an unknown field. The power base, casting skill and the
+  `:bad_name`, `:bad_books`, `:bad_retorts`, `:bad_spells`, `:bad_researching`, `:bad_research_left`) or an unknown field. The power base, casting skill and the
   research candidates are worked out again by the game, so they are not touched.
   """
   @spec edit_wizard(binary(), non_neg_integer(), keyword()) :: result()
@@ -1101,6 +1106,15 @@ defmodule Mirror.SaveFile.Structures do
 
           {:books, v}, acc ->
             put(acc, at + 0x5A, for(n <- v, into: <<>>, do: <<n::little-16>>))
+
+          {:spells, v}, acc ->
+            Enum.reduce(v, acc, fn {n, state}, acc -> put(acc, at + 0x264 + n - 1, <<state>>) end)
+
+          {:researching, v}, acc ->
+            put(acc, at + 0x262, <<v::little-16>>)
+
+          {:research_left, v}, acc ->
+            put(acc, at + 0x25A, <<v::little-16>>)
 
           {:retorts, v}, acc ->
             put(acc, at + 0x64, for(on <- v, into: <<>>, do: <<bool_byte(on)>>))
@@ -1152,6 +1166,19 @@ defmodule Mirror.SaveFile.Structures do
   end
 
   defp wizard_value(:retorts, _), do: {:error, :bad_retorts}
+
+  defp wizard_value(:spells, v) when is_list(v) and v != [] do
+    if Enum.all?(v, &match?({n, s} when n in 1..@spell_count//1 and s in 0..3//1, &1)),
+      do: :ok,
+      else: {:error, :bad_spells}
+  end
+
+  defp wizard_value(:spells, _), do: {:error, :bad_spells}
+
+  defp wizard_value(:researching, v) when is_integer(v) and v in 0..@spell_count//1, do: :ok
+  defp wizard_value(:researching, _), do: {:error, :bad_researching}
+  defp wizard_value(:research_left, v) when is_integer(v) and v in 0..65_535//1, do: :ok
+  defp wizard_value(:research_left, _), do: {:error, :bad_research_left}
   defp wizard_value(other, _), do: {:error, {:unknown_field, other}}
 
   defp set_bit(flags, bit, true), do: Bitwise.bor(flags, bit)
