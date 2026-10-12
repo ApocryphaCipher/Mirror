@@ -623,6 +623,193 @@ defmodule Mirror.SaveFile.StructuresTest do
     end
   end
 
+  describe "move_node/4" do
+    @nodes 0x6058
+
+    defp magic_node(raw, i, x, y, plane, owner, power, type) do
+      xs = for k <- 0..19, into: <<>>, do: <<if(k < power, do: x + rem(k, 3) - 1, else: 0)>>
+      ys = for k <- 0..19, into: <<>>, do: <<if(k < power, do: y + div(k, 3) - 1, else: 0)>>
+      put(raw, @nodes + i * 48, <<x, y, plane, owner, power>> <> xs <> ys <> <<type, 0, 0>>)
+    end
+
+    # Grass (tile 1) everywhere, except the node's own tile, which is the node (168 + type).
+    defp terrain(overrides \\ %{}) do
+      fn pos -> Map.get(overrides, pos, 1) end
+    end
+
+    defp node_at(raw, i), do: binary_part(raw, @nodes + i * 48, 48)
+
+    test "moves the record, the aura squares together, the guardians and the units on it" do
+      raw =
+        blank()
+        |> magic_node(3, 20, 10, 0, 0, 5, 0)
+        |> encounter(7, 20, 10, 0, 3)
+        |> encounter(8, 33, 7, 0, 8)
+        |> unit(0, 20, 10, 0, 0)
+        |> unit(1, 21, 10, 0, 0)
+
+      assert {:ok, moved, report} =
+               Structures.move_node(raw, 3, {23, 12}, terrain(%{{20, 10} => 168}))
+
+      <<x, y, plane, owner, power, ax::binary-size(20), ay::binary-size(20), type, _::binary>> =
+        node_at(moved, 3)
+
+      assert {x, y, plane, owner, power, type} == {23, 12, 0, 0, 5, 0}
+      # the first five aura squares moved by (+3, +2); the unused slots stayed zero
+      assert binary_part(ax, 0, 5) == <<22, 23, 24, 22, 23>>
+      assert binary_part(ay, 0, 5) == <<11, 11, 11, 12, 12>>
+      assert binary_part(ax, 5, 15) == :binary.copy(<<0>>, 15)
+
+      assert %{moved: :node, from: {20, 10}, to: {23, 12}, guardians: 1, units: 1} = report
+      assert Mirror.SaveFile.Encounters.get(moved, 7) |> then(&{&1.x, &1.y}) == {23, 12}
+      assert Mirror.SaveFile.Encounters.get(moved, 8) |> then(&{&1.x, &1.y}) == {33, 7}
+      assert {:ok, [moved_unit, other]} = Units.parse(moved)
+      assert {moved_unit.x, moved_unit.y} == {23, 12}
+      assert {other.x, other.y} == {21, 10}
+
+      # the caller turns the new spot into this tile (and the old one back into land)
+      assert report.node_tile == 168
+    end
+
+    test "the new tile is the node of its type: 168 Sorcery, 169 Nature, 170 Chaos" do
+      for {type, tile} <- [{0, 168}, {1, 169}, {2, 170}] do
+        raw = blank() |> magic_node(0, 20, 10, 0, 5, 3, type)
+
+        assert {:ok, _, %{node_tile: ^tile}} = Structures.move_node(raw, 0, {22, 10}, terrain())
+      end
+    end
+
+    test "a node can go on any land, not on water, a river, a lake, a volcano, a node or the polar rows" do
+      raw = blank() |> magic_node(0, 20, 10, 0, 5, 3, 1)
+
+      for {name, tile} <- [
+            grass: 1,
+            forest: 163,
+            swamp: 166,
+            desert: 165,
+            tundra: 167,
+            hill: 171,
+            mountain: 164
+          ] do
+        assert {:ok, _, _} = Structures.move_node(raw, 0, {22, 10}, terrain(%{{22, 10} => tile})),
+               "#{name} should do"
+      end
+
+      for {name, tile} <- [ocean: 0, coast: 2, river: 185, lake: 18, volcano: 179, node: 169] do
+        assert {:error, :bad_terrain} =
+                 Structures.move_node(raw, 0, {22, 10}, terrain(%{{22, 10} => tile})),
+               "#{name} should be refused"
+      end
+
+      # the polar rows are tundra, but a node does not go there
+      polar = blank() |> magic_node(0, 20, 5, 0, 3, 3, 1)
+
+      assert {:error, :bad_terrain} =
+               Structures.move_node(polar, 0, {22, 1}, terrain(%{{22, 1} => 167}))
+    end
+
+    test "refuses what it cannot do, and writes nothing" do
+      raw =
+        blank()
+        |> city(0, "Mine", 9, 9, 0, 2)
+        |> city(1, "Theirs", 12, 12, 0, 3)
+        |> unit(0, 5, 5, 0, 2)
+        |> unit(1, 6, 6, 0, 3)
+        |> unit(2, 20, 20, 0, 3)
+
+      assert {:error, :off_map} = Structures.move_units(raw, [0], {60, 5, 0})
+      assert {:error, :no_units} = Structures.move_units(raw, [], {7, 7, 0})
+      assert {:error, :no_such_unit} = Structures.move_units(raw, [9], {7, 7, 0})
+      assert {:error, :no_such_unit} = Structures.move_units(raw, [0, 0], {7, 7, 0})
+      assert {:error, :mixed_owners} = Structures.move_units(raw, [0, 1], {7, 7, 0})
+      assert {:error, :foreign_city_at_destination} = Structures.move_units(raw, [0], {12, 12, 0})
+      assert {:error, :foreign_units_at_destination} = Structures.move_units(raw, [0], {6, 6, 0})
+      assert {:ok, _, _} = Structures.move_units(raw, [0], {9, 9, 0})
+    end
+
+    test "a stack holds at most nine" do
+      raw =
+        Enum.reduce(0..8, blank(), &unit(&2, &1, 5, 5, 0, 2))
+        |> unit(9, 8, 8, 0, 2)
+        |> unit(10, 8, 8, 0, 2)
+
+      assert {:error, :stack_full} = Structures.move_units(raw, [9], {5, 5, 0})
+      assert {:ok, _, _} = Structures.move_units(raw, [0, 1], {8, 8, 0})
+      # units already on the tile do not count twice when they are the ones moving
+      assert {:ok, _, _} = Structures.move_units(raw, Enum.to_list(0..8), {5, 5, 0})
+    end
+
+    test "warns about a land unit on water, a boat on land, and not about a boat's passengers or flyers" do
+      base = blank() |> unit(0, 5, 5, 0, 2) |> land(0, 7, 7)
+
+      # the blank save has no land anywhere: (8, 8) is water
+      assert {:ok, _, %{warnings: [cannot_be_on_water: [39]]}} =
+               Structures.move_units(base, [0], {8, 8, 0})
+
+      assert {:ok, _, %{warnings: []}} = Structures.move_units(base, [0], {7, 7, 0})
+
+      flyer = base |> unit_type(0, 136)
+      assert {:ok, _, %{warnings: []}} = Structures.move_units(flyer, [0], {8, 8, 0})
+
+      boat = base |> unit_type(0, 35)
+
+      assert {:ok, _, %{warnings: [boat_on_land: [35]]}} =
+               Structures.move_units(boat, [0], {7, 7, 0})
+
+      assert {:ok, _, %{warnings: []}} = Structures.move_units(boat, [0], {8, 8, 0})
+
+      # demon wings (mutation bit 8, record +23) fly, whatever the type
+      winged = put(base, 0xB734 + 23, <<8>>)
+      assert {:ok, _, %{warnings: []}} = Structures.move_units(winged, [0], {8, 8, 0})
+      wingless = put(base, 0xB734 + 23, <<32>>)
+
+      assert {:ok, _, %{warnings: [cannot_be_on_water: [39]]}} =
+               Structures.move_units(wingless, [0], {8, 8, 0})
+
+      # a land unit joining a boat on the water is aboard it
+      aboard = base |> unit(1, 8, 8, 0, 2) |> unit_type(1, 36)
+      assert {:ok, _, %{warnings: []}} = Structures.move_units(aboard, [0], {8, 8, 0})
+
+      # a boat in a city is fine
+      port = boat |> city(0, "Port", 7, 7, 0, 2)
+      assert {:ok, _, %{warnings: []}} = Structures.move_units(port, [0], {7, 7, 0})
+
+      # the polar rows have no landmass id and are land
+      assert {:ok, _, %{warnings: []}} = Structures.move_units(base, [0], {8, 0, 0})
+    end
+
+    test "a stack of nine on the destination leaves no room" do
+      raw =
+        Enum.reduce(
+          0..8,
+          blank() |> magic_node(0, 20, 10, 0, 0, 5, 0),
+          &unit(&2, &1, 30, 10, 0, 0)
+        )
+        |> unit(9, 20, 10, 0, 0)
+
+      assert {:error, :stack_full} = Structures.move_node(raw, 0, {30, 10}, terrain())
+      assert {:ok, _, _} = Structures.move_node(raw, 0, {31, 10}, terrain())
+    end
+
+    test "a truncated save or a zeroed node slot is no node, not a crash" do
+      assert {:error, :no_such_node} = Structures.move_node(<<1, 2, 3>>, 0, {22, 10}, terrain())
+      assert {:error, :no_such_node} = Structures.move_node(blank(), 0, {22, 10}, terrain())
+      assert Structures.node_at(<<1, 2, 3>>, 0, 0, 0) == nil
+      assert Structures.node_at(blank(), 0, 0, 0) == nil
+
+      raw = blank() |> magic_node(4, 20, 10, 0, 5, 3, 1)
+      assert %{index: 4, type: 1} = Structures.node_at(raw, 20, 10, 0)
+      assert Structures.node_at(raw, 20, 10, 1) == nil
+      assert Structures.node_at(raw, 21, 10, 0) == nil
+    end
+
+    test "a node with no units may move onto a tile where another player's units stand" do
+      # nothing of its own to bring, so there is nobody to put among them
+      raw = blank() |> magic_node(0, 20, 10, 0, 5, 3, 1) |> unit(0, 22, 10, 0, 3)
+      assert {:ok, _, %{units: 0}} = Structures.move_node(raw, 0, {22, 10}, terrain())
+    end
+  end
+
   describe "move_tower/3" do
     test "moves the tower, both of its sides, and units on its tile on either plane" do
       raw =

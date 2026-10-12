@@ -88,9 +88,24 @@ Drakes and a hero leaving his capital's garrison all loaded in place (memory ide
 order was gone (status 0, no target), and after an End Turn it **stayed where it was put** instead of walking
 off to its old target.
 
-**Not done:** nodes (a node is its terrain tile, so moving one needs a terrain move too, plus its aura
-tiles and guardian record), in the code and the UI. What the unit status values 1 means (sentry is a guess) and
-the demon-wings case (mutation bit 8, covered by a unit test, never seen in a save) are unchecked in the game.
+**Nodes (2026-10-12).** The 🏰 Move tool now picks up a magic node (`Structures.move_node/4`, `MoveTool`). A node is its terrain
+tile, so one move is: the node record's x and y; its aura squares (the first `power` of them, shifted by the same step); its
+guardians' encounter record (kinds 1 to 3 at the old tile); the units standing on it (a melded node holds a Guardian Spirit);
+and the **terrain**, made as map edits in the same undo step by `Mirror.NodeTerrain`: the new tile becomes the node (168 Sorcery,
+169 Nature, 170 Chaos, the same on both planes), the old tile becomes land again, **the same type the node moved onto** with the
+variant `Mirror.TerrainPaint` picks for its own neighbours (plain grass if nothing fits), and the destination's neighbours are
+**not** re-tiled (the game never does). Any land will do: grass, forest, swamp, desert, tundra, hills or mountains. Water, rivers, lakes,
+volcanoes, other nodes and the polar rows are refused. **Roads on the destination tile are removed.** Also refused: off the map or an
+aura that would run off it, the node's own tile, a city, a tower, an encounter, another node, another player's units *joining the
+node's own units*, or a stack over 9. Same plane only. The landmass layer is untouched (land to land). A first version accepted only
+grass, forest and swamp, because it swapped the two tiles; Kevin's suggestion (repaint the old tile, remove roads) replaced it.
+**Real game, two rounds (vault checkpoints 100 and 101, Kevin at the keyboard):** two melded nodes (a Sorcery node holding a Guardian
+Spirit, a Nature node without one) moved onto plain land: memory identical to the file, the spirit with the node, auras in his colour
+at the new spots, ordinary land at the old ones, Power Base unchanged (952), End Turn normal. Then the Sorcery node onto **desert** and
+the Nature node onto a **forest tile with a road** (the road gone): memory identical to the file, and Kevin saw the old spots blend
+in (desert and forest), the nodes with their auras at the new spots, nothing odd near Dover, and nothing odd after End Turn.
+**Not done:** moving a node to another plane. What the unit status value 1 means (sentry is a guess), and the demon-wings
+case (mutation bit 8, unit-tested, never seen in a save), are unchecked in the game.
 **Size:** medium–large
 
 ## What to do

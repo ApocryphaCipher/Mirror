@@ -1698,7 +1698,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       save: save
     } do
       view = editing(conn, save, "move")
-      assert note(view) =~ "Click a city, tower or lair to pick it up"
+      assert note(view) =~ "Click a city, tower, lair or node to pick it up"
 
       click(view, 38, 21)
       assert note(view) =~ "Moving Deventor"
@@ -1771,13 +1771,13 @@ defmodule MirrorWeb.MapLiveEditTest do
     } do
       view = editing(conn, save, "move")
       click(view, 5, 5)
-      assert note(view) =~ "Click a city, tower or lair to pick it up"
+      assert note(view) =~ "Click a city, tower, lair or node to pick it up"
 
       click(view, 38, 21)
       click(view, 38, 21, button: 2)
       assert note(view) =~ "Cancelled"
       click(view, 40, 23)
-      assert note(view) =~ "Click a city, tower or lair to pick it up"
+      assert note(view) =~ "Click a city, tower, lair or node to pick it up"
       assert changed(view) =~ "0 tiles changed"
       refute changed(view) =~ "edited"
     end
@@ -2302,6 +2302,90 @@ defmodule MirrorWeb.MapLiveEditTest do
       click(view, 22, 20)
       assert has_element?(view, "#units-note", "Moved 1 unit to (22, 20).")
       refute has_element?(view, "#units-note", "cannot stand on water")
+    end
+
+    test "a node moves with its terrain: the old tile takes the destination's tile, one undo step",
+         %{
+           conn: conn,
+           dir: dir,
+           save: save
+         } do
+      view = editing(conn, save, "move")
+      assert tile_at(view, 44, 12) == 163
+
+      click(view, 42, 10)
+      assert note(view) =~ "Moving the Sorcery node"
+
+      click(view, 44, 12)
+      assert note(view) =~ "Moved the Sorcery node to (44, 12)"
+      # the fixture's node tile is plain forest like its destination, so only the new node tile
+      # differs; in a real save the old tile (a node tile) changes too
+      assert changed(view) =~ "1 tile changed · 1 edited"
+      assert tile_at(view, 44, 12) == 168
+      assert tile_at(view, 42, 10) == 163
+
+      auras = latest_overlay(view, "auras")
+      assert Enum.any?(auras, &match?(%{x: 44, y: 12}, &1))
+      refute Enum.any?(auras, &match?(%{x: 42, y: 10}, &1))
+
+      target = Path.join(dir, "SAVE5.GAM")
+      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+      assert {:ok, saved} = Mirror.SaveFile.load(target)
+      assert {:ok, %{nodes: nodes}} = Mirror.SaveFile.Sites.parse(saved.raw)
+      assert Enum.any?(nodes, &match?(%{x: 44, y: 12, type: :sorcery}, &1))
+      refute Enum.any?(nodes, &match?(%{x: 42, y: 10}, &1))
+      assert Mirror.Map.get_tile_u16_le(saved.planes.arcanus.terrain, 44, 12) == 168
+
+      render_click(view, "undo", %{})
+      assert tile_at(view, 44, 12) == 163
+      assert tile_at(view, 42, 10) == 163
+      # undone past the save: that is an unsaved change again
+      assert changed(view) =~ "1 tile changed · 1 edited"
+    end
+
+    test "a node moves onto mountains too, leaving land behind, and removes the road it lands on",
+         %{
+           conn: conn,
+           save: save
+         } do
+      view = editing(conn, save, "road")
+      click(view, 39, 20)
+      assert has_element?(view, "#road-report")
+      render_click(view, "set_tool", %{"tool" => "move"})
+      {old_here, old_there} = {tile_at(view, 42, 10), tile_at(view, 39, 20)}
+
+      click(view, 42, 10)
+      click(view, 39, 20)
+      assert note(view) =~ "Moved the Sorcery node to (39, 20)"
+      assert note(view) =~ "Removed the road that was there"
+      assert tile_at(view, 39, 20) == 168
+      # the old tile is land again, whatever the painter picked for its forest neighbourhood
+      assert Mirror.TerrainType.terrain_type(tile_at(view, 42, 10)) not in [
+               nil,
+               :ocean,
+               :shore,
+               :lake
+             ]
+
+      # one undo step takes the tiles, the road and the node back
+      render_click(view, "undo", %{})
+      assert tile_at(view, 42, 10) == old_here
+      assert tile_at(view, 39, 20) == old_there
+    end
+
+    test "a node will not move onto water, a city or another node, and says why", %{
+      conn: conn,
+      save: save
+    } do
+      view = editing(conn, save, "move")
+      click(view, 42, 10)
+
+      click(view, 5, 5)
+      assert note(view) =~ "not on water"
+
+      click(view, 38, 21)
+      assert note(view) =~ "Moving Deventor"
+      refute changed(view) =~ "edited"
     end
 
     test "loading another save drops armed units instead of moving whatever has those indexes", %{

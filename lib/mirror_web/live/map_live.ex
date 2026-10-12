@@ -1752,7 +1752,7 @@ defmodule MirrorWeb.MapLive do
                       {:city, "🏙️ City",
                        "Click a city to see its details and change its name or population"},
                       {:move, "🏰 Move",
-                       "Click a city, tower or lair, then click where it goes; a city takes its garrison, summoning circle and fortress with it"}
+                       "Click a city, tower, lair or node, then click where it goes; a city takes its garrison, summoning circle and fortress with it, a node its aura and guardians"}
                     ]
                   }
                   id={"tool-#{tool}"}
@@ -1874,7 +1874,7 @@ defmodule MirrorWeb.MapLive do
                 aria-live="polite"
                 class="text-xs text-emerald-200"
               >
-                {@move_note || "Click a city, tower or lair to pick it up."}
+                {@move_note || "Click a city, tower, lair or node to pick it up."}
               </span>
 
               <span
@@ -1964,7 +1964,7 @@ defmodule MirrorWeb.MapLive do
                     "Click a city to see its details · change its name or population in the panel · Undo works · space-drag or middle-drag to pan · Esc to finish"
 
                   :move ->
-                    "Click a city, tower or lair, then click where it goes · right-click or click it again: cancel · Undo works · space-drag or middle-drag to pan · Esc to finish"
+                    "Click a city, tower, lair or node, then click where it goes · right-click or click it again: cancel · Undo works · space-drag or middle-drag to pan · Esc to finish"
 
                   :type ->
                     "Click or drag: paint the terrain, neighbours re-tile · right-click: pick the terrain under the pointer · space-drag or middle-drag to pan · Esc to finish"
@@ -3265,7 +3265,7 @@ defmodule MirrorWeb.MapLive do
         assign(socket, move_pending: here, move_note: MoveTool.picked(here))
 
       is_nil(pending) ->
-        assign(socket, :move_note, "Click a city, tower or lair to pick it up.")
+        assign(socket, :move_note, "Click a city, tower, lair or node to pick it up.")
 
       here ->
         assign(socket, move_pending: here, move_note: MoveTool.picked(here))
@@ -3283,10 +3283,26 @@ defmodule MirrorWeb.MapLive do
         flags = Editor.tile_value(current, plane, :terrain_flags, x, y)
         tile_edits = MoveTool.road_edits(pending, flags, x, y)
 
-        with {:ok, raw, report} <- MoveTool.move(current.save.raw, pending, plane, x, y),
+        terrain_at = fn {tx, ty} -> Editor.tile_value(current, plane, :terrain, tx, ty) end
+
+        with {:ok, raw, report} <-
+               MoveTool.move(current.save.raw, pending, plane, x, y, terrain_at),
+             node_flags = Editor.tile_value(current, plane, :terrain_flags, x, y),
+             tile_edits =
+               tile_edits ++
+                 MoveTool.terrain_edits(
+                   report,
+                   get_in(current, [:planes, plane, :terrain]),
+                   node_flags
+                 ),
              {next, {:record, _label, parts}} <-
                Editor.apply_record(current, plane, "Moved #{pending.name}", raw, tile_edits) do
-          {next, {:ok, report, parts, tile_edits != []}}
+          road_removed? =
+            pending.kind == :node and is_integer(node_flags) and
+              Bitwise.band(node_flags, 0x18) != 0
+
+          {next,
+           {:ok, report, parts, MoveTool.road_edits(pending, flags, x, y) != [], road_removed?}}
         else
           {:error, reason} -> {current, {:error, reason}}
           {_unchanged, :none} -> {current, {:error, :unchanged}}
@@ -3294,10 +3310,13 @@ defmodule MirrorWeb.MapLive do
       end)
 
     case result do
-      {:ok, report, parts, road?} ->
+      {:ok, report, parts, road?, road_removed?} ->
         socket
         |> assign_state(state)
-        |> assign(move_pending: nil, move_note: MoveTool.moved(pending, {x, y}, report, road?))
+        |> assign(
+          move_pending: nil,
+          move_note: MoveTool.moved(pending, {x, y}, report, road?, road_removed?)
+        )
         |> push_layer_parts(plane, parts)
         |> push_overlay_items()
         |> push_map_layers()
