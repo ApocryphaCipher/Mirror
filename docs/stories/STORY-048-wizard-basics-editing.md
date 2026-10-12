@@ -50,11 +50,20 @@ one undo step on the Arcanus history; Undo and Save as are on the map pages. The
 - After **one End Turn** everything held: Jafar gold 12345 to 12383 (+38, the main screen's "+38 Gold"), mana 20000 to 19981 (the screen's "-19 Mana"),
   name, books, retorts and fame unchanged; Freya 30000 to 29959 gold and 29984 mana (normal AI spending).
   Vault checkpoint 105, `wizard-edit-after-endturn` (collection mom-live-2026-10-12).
-- **Fame:** the Info screen showed **90** while RAM held the 77 we wrote, so the screen is not the raw field. *Guess:* it adds a bonus (the hero
-  Sir Harold, or the Famous retort); not tested. The stored field is the base.
+- **Fame:** the Info screen showed **90** while RAM held the 77 we wrote, so the screen is not the raw field; see the maximum test below, where it
+  showed 30013 for a stored 30000.
 
-**Still guesses:** the limits the form enforces. Books to 13 per realm (15 total showed fine; 13 in one realm untried), fame to 30000 (the game took
-10008 earlier, higher untried), gold and mana to 30000 (30000 held; the game's own cap per the earlier notes, values above it untried). *To confirm:* a save with 13 books, and fame, gold
-and mana above 30000, loaded and read back.
+**The maximum test, slot 8** (SAVE2 copy, only wizard 0 changed, 23 bytes): "MAXIMUS", gold, mana and fame 30000, **13 books in every realm (65)**, all 18
+retorts. It loaded and ran with no complaint, and survived one End Turn (vault checkpoint 106, `wizard-max-after-endturn`):
 
-**Not done:** warnings for retort combinations. No rule has been checked against the game, so none is shown, and nothing is blocked.
+- Name, 13 books each and all 18 retorts held. The Info screen draws the 65 books as a shelf running off both edges of its panel, and lists every retort.
+- Gold 30000 stayed 30000 after a turn that had +38 gold income (nothing above 30000 was seen), mana 30000 went to 29999 (the screen's "-1 Mana"), fame 30000 stayed.
+- The game recomputed power base (1379 at load, 1385 after the turn) and casting skill (217 at load, 222 after).
+- **Fame display:** the Info screen showed **30013** for a stored 30000, and 90 for a stored 77 in the first test. Both are the stored value **plus 13**, so it is
+  the same bonus in both saves (*guess:* the hero Sir Harold's fame; the same save and hero in both). It is not a limit on the field.
+
+**Limits, now:** books 13 per realm, fame, gold and mana 30000 are all **accepted by the real game** (so they are the form's safe maximum, not a guess).
+*Untried:* values above 30000 for fame, gold or mana, and more than 13 books in a realm; the form still refuses them.
+
+**Not done:** warnings for retort combinations. No rule has been checked against the game, so none is shown, and nothing is blocked. (All 18 retorts together, and
+both Life and Death books at 13, loaded and ran: the save does not enforce the new-game rules.)
