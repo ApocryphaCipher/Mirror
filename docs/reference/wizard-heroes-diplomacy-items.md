@@ -86,14 +86,27 @@ free is not yet read.
   (22 bytes), then a kind (u8), a realm (u8), an amount (u8), a pad, and a **u32 ability mask**. The item's abilities are the OR of
   its powers' masks.
 
-**Checked against `ITEMMAKE.EXE` itself (Kevin ran it, 2026-10-12, screenshot):** its first screen is "Item #1", **Black Asp**,
-a **Sword**, **+1 Attack** and **Resist Elements**, **Cost: 250**. The first `ITEMDATA` record reads exactly that: name "Black Asp", type 0,
-cost 250, attack 1, abilities `0x200`, and `0x200` is the mask of the Resist Elements power in `ITEMPOW`. So the program is an
-editor for the premade table (*guess:* it saves back to `ITEMDATA.LBX`), the item records above are right, and the
-**type codes follow the program's ten tabs in order: 0 Sword, 1 Mace, 2 Axe, 3 Bow, 4 Staff, 5 Wand, 6 Misc, 7 Shield, 8 Chain, 9 Plate**
-(three data points: Black Asp is type 0, Protection of Ramses is type 7, a mail shirt is type 8; the order between the others is the
-screen's order and unchecked). The power's **realm byte** is 0 Nature, 1 Sorcery, 2 Chaos, 3 Life, 4 Death, which matches every
-named spell power (Resist Elements is 0, Haste 1, Flaming 2, Holy Avenger 3, Vampiric 4).
+**Checked against `ITEMMAKE.EXE` itself (Kevin ran it, 2026-10-12, 14 screenshots, item numbers 1, 15, 25, 31, 37, 45, 50, 53, 58, 62,
+65, 76, 85 and 95):** the program's "Item #n" is `ITEMDATA` record n − 1, and for **every one of the 14** the program's name,
+tab, cost, ticked stat powers and ticked special powers equal the record's name, type, cost, stat bytes and ability mask (the mask
+is the OR of the ticked powers' masks in `ITEMPOW`). So the program is an editor for the premade table (*guess:* it saves back to
+`ITEMDATA.LBX`), the item records above are right, and:
+
+- **Type codes** are the program's ten tabs in order: **0 Sword, 1 Mace, 2 Axe, 3 Bow, 4 Staff, 5 Wand, 6 Misc, 7 Shield, 8 Chain,
+  9 Plate** (seen: 0, 1, 2, 3, 4, 5, 6, 7, 8 and 9 each on at least one item).
+- **Slot codes** (what a hero's slot type must equal; the heroes' own three slot types are in the hero list): **1** melee weapon (sword,
+  mace, axe), **2** bow, **4** staff and wand, **5** armor and shield (shield, chain, plate), **6** misc (amulets and the like). Seen
+  on all 14 items.
+- **Stat bytes** are the plain numbers on the screen: attack, to hit, defense, movement, resistance, spell skill, and spell save (the
+  save byte `1` is the screen's "−1 Spell Save").
+- **A charged spell** is the `spell` byte plus `charges`: "Mind Storm x4" is spell byte 67 and charges 4. The spell number is
+  **1-based**: the manual's list numbers Mind Storm 066.
+- The power's **realm byte** is 0 Nature, 1 Sorcery, 2 Chaos, 3 Life, 4 Death, which matches every named spell power (Resist Elements
+  is 0, Haste 1, Flaming 2, Holy Avenger 3, Vampiric 4).
+- **The 6-byte tail of a premade record** (*unknown*): its last byte is 1 for every item but the plain amulet, and the other
+  bytes hold small numbers equal to the amounts of the item's powers (3 for a +3 power, 6 for a 6, 2 for a 2) in positions that
+  do not follow the realm order cleanly, so they look like per-realm book requirements; not decoded.
+
 - **`ITEMS.LBX`** (116 pictures) and **`ITEMISC.LBX`** (36): the item art.
 
 The 250 premade names and the 67 powers are game data and stay out of the repository; the decoder will read them from
