@@ -2200,6 +2200,32 @@ defmodule MirrorWeb.MapLive do
             </label>
           </div>
         </fieldset>
+
+        <fieldset id="city-enchantments-form" class="mt-1 w-full">
+          <legend class="text-slate-500">Enchantments (who cast it)</legend>
+          <input type="hidden" name="city[enchantments_present]" value="1" />
+          <div class="mt-1 grid max-h-44 grid-cols-1 gap-y-0.5 overflow-y-auto pr-1">
+            <label
+              :for={row <- CityPanel.enchantment_rows(@details)}
+              class="flex items-center justify-between gap-2"
+            >
+              <span class={[row.caster == nil && "text-slate-500"]}>{row.title}</span>
+              <select
+                name={"city[enchantments][#{row.name}]"}
+                class="rounded border border-white/15 bg-slate-950 px-1 py-0.5 text-slate-100"
+              >
+                <option value="" selected={row.caster == nil}>none</option>
+                <option
+                  :for={{index, wizard} <- CityPanel.caster_options(@details, row)}
+                  value={index}
+                  selected={row.caster == index}
+                >
+                  {wizard}
+                </option>
+              </select>
+            </label>
+          </div>
+        </fieldset>
       </.form>
       <p :if={@note} id="city-note" role="status" aria-live="polite" class="mt-1 text-emerald-200">
         {@note}
@@ -2220,7 +2246,7 @@ defmodule MirrorWeb.MapLive do
       <p :if={!@editable && @details.replaced != []} class="mt-1 text-slate-500">
         Replaced: {Enum.join(@details.replaced, ", ")}
       </p>
-      <p :if={@details.enchantments != []} class="mt-1 text-slate-300">
+      <p :if={!@editable && @details.enchantments != []} class="mt-1 text-slate-300">
         <span class="text-slate-500">Enchantments:</span>
         {Enum.map_join(@details.enchantments, ", ", fn {name, by} -> "#{name} (#{by})" end)}
       </p>

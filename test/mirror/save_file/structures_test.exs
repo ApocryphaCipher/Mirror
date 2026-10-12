@@ -327,6 +327,69 @@ defmodule Mirror.SaveFile.StructuresTest do
     end
   end
 
+  describe "edit_city/3 enchantments" do
+    # slots: 14 Nature's Eye, 7 Famine
+    test "sets a caster as index plus one and clears with nil, touching only that byte" do
+      raw = blank() |> city(0, "A", 1, 1, 0, 0)
+      eye = 0x8AAC + 67 + 14
+
+      assert {:ok, edited, %{changed: [:enchantments]}} =
+               Structures.edit_city(raw, 0, enchantments: %{natures_eye: 2})
+
+      assert :binary.at(edited, eye) == 3
+      assert %{enchantments: %{natures_eye: 2}} = city_at(edited, 0)
+
+      diff =
+        for {{a, b}, i} <-
+              Enum.with_index(Enum.zip(:binary.bin_to_list(raw), :binary.bin_to_list(edited))),
+            a != b,
+            do: i
+
+      assert diff == [eye]
+
+      assert {:ok, cleared, _} =
+               Structures.edit_city(edited, 0, enchantments: %{natures_eye: nil})
+
+      assert :binary.at(cleared, eye) == 0
+      assert city_at(cleared, 0).enchantments == %{}
+    end
+
+    test "several at once, and a mix with a population change" do
+      raw = blank() |> city(0, "A", 1, 1, 0, 0)
+
+      assert {:ok, edited, %{changed: [:population, :enchantments]}} =
+               Structures.edit_city(raw, 0,
+                 population: 7,
+                 enchantments: %{famine: 1, nature_ward: 0, wall_of_fire: 4}
+               )
+
+      assert %{population: 7, enchantments: %{famine: 1, nature_ward: 0, wall_of_fire: 4}} =
+               city_at(edited, 0)
+    end
+
+    test "the neutral record (5) is a caster like any other" do
+      raw = blank() |> city(0, "A", 1, 1, 0, 0)
+      assert {:ok, edited, _} = Structures.edit_city(raw, 0, enchantments: %{famine: 5})
+      assert :binary.at(edited, 0x8AAC + 67 + 7) == 6
+      assert %{enchantments: %{famine: 5}} = city_at(edited, 0)
+    end
+
+    test "refuses an unknown enchantment or a caster outside 0..5" do
+      raw = blank() |> city(0, "A", 1, 1, 0, 0)
+
+      assert {:error, :bad_enchantments} =
+               Structures.edit_city(raw, 0, enchantments: %{fireball: 1})
+
+      assert {:error, :bad_enchantments} =
+               Structures.edit_city(raw, 0, enchantments: %{famine: 6})
+
+      assert {:error, :bad_enchantments} =
+               Structures.edit_city(raw, 0, enchantments: %{famine: -1})
+
+      assert {:error, :bad_enchantments} = Structures.edit_city(raw, 0, enchantments: [famine: 1])
+    end
+  end
+
   describe "move_tower/3" do
     test "moves the tower, both of its sides, and units on its tile on either plane" do
       raw =

@@ -48,7 +48,18 @@ real saves break them, since neutral cities have Shrines without a Builders' Hal
 - **Not modelled:** race restrictions, terrain needs (a Sawmill wants forest, a Shipwrights' Guild water, a
   Miners' Guild minerals), and what a building does to the city's output (the game derives that).
 
-**Not done:** editing owner, race or enchantments; lairs and units (the other panels in this story).
+**Enchantments (2026-10-11).** The panel has a select for each of the 26 city enchantments: none, or the wizard who
+cast it (the byte is the caster's index plus one, 0 for none; `Structures.edit_city/3`, `enchantments:`).
+The slot order matches kazzmir's `convert.go` exactly (0 to 24; Nightshade is slot 25, from ReMoM) and the
+casters' checks in surveyor-formula.md. **Real game (slot 8, vault checkpoint 93, screenshots by Kevin):**
+Sawtooth with Flying Fortress, Nature's Eye, Prosperity and Heavenly Light cast by Jafar showed **Flying**,
+Nature's Eye, Prosperity and Heavenly Light in blue (Jafar's banner); Hialanth with Pestilence cast by Sss'ra and
+Famine cast by Freya showed them in purple and green, their banners. The game's memory matched the file. So an
+enchantment's colour follows the caster, and the game names Flying Fortress "Flying" on the city screen.
+Effects are the game's to derive; the editor does not check who may cast what, or whether a city has the walls
+a Wall of Fire needs.
+
+**Not done:** editing owner or race; lairs and units (the other panels in this story).
 **Size:** large (do incrementally)
 
 ## What to do

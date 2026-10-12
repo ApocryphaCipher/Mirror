@@ -63,4 +63,59 @@ defmodule MirrorWeb.CityPanelTest do
   test "a bad population is refused" do
     assert {:error, :bad_population} = CityPanel.changes(form(%{"population" => "six"}), @details)
   end
+
+  describe "enchantments" do
+    @details_ench %{
+      name: "Hialanth",
+      population: 6,
+      building_states: %{},
+      enchantment_casters: %{famine: 5, natures_eye: 0},
+      owners: [{0, "Jafar"}, {1, "Freya"}, {5, "Neutral"}]
+    }
+
+    defp ench_form(chosen), do: form(%{"enchantments_present" => "1", "enchantments" => chosen})
+
+    test "the form as posted, unchanged, is no change (a neutral caster stays selected)" do
+      assert {:ok, []} =
+               CityPanel.changes(
+                 ench_form(%{"famine" => "5", "natures_eye" => "0", "prosperity" => ""}),
+                 @details_ench
+               )
+    end
+
+    test "a different caster, a new one and 'none' are each a change" do
+      assert {:ok, [enchantments: %{famine: nil, natures_eye: 1, prosperity: 0}]} =
+               CityPanel.changes(
+                 ench_form(%{"famine" => "", "natures_eye" => "1", "prosperity" => "0"}),
+                 @details_ench
+               )
+    end
+
+    test "an unreadable caster, an unknown enchantment or a non-map are refused, not skipped" do
+      for bad <- [
+            %{"famine" => "9"},
+            %{"famine" => "x"},
+            %{"fireball" => "1"},
+            %{"famine" => 1},
+            "famine",
+            ["famine"]
+          ] do
+        assert {:error, :bad_enchantments} = CityPanel.changes(ench_form(bad), @details_ench),
+               "expected #{inspect(bad)} to be refused"
+      end
+    end
+
+    test "no enchantment list in the form leaves the enchantments alone" do
+      assert {:ok, []} = CityPanel.changes(form(%{}), @details_ench)
+    end
+
+    test "the caster select always offers the current caster" do
+      row = fn caster -> %{caster: caster} end
+      assert CityPanel.caster_options(@details_ench, row.(5)) == @details_ench.owners
+      assert CityPanel.caster_options(@details_ench, row.(nil)) == @details_ench.owners
+      # a wizard record with no name is not in the list: it is added, so Apply cannot clear it
+      assert CityPanel.caster_options(@details_ench, row.(3)) ==
+               @details_ench.owners ++ [{3, "Wizard 4"}]
+    end
+  end
 end

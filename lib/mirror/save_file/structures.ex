@@ -175,7 +175,7 @@ defmodule Mirror.SaveFile.Structures do
   @max_population 25
 
   @doc """
-  Changes a city's `name`, `population` and/or `buildings` (STORY-020), as a keyword list:
+  Changes a city's `name`, `population`, `buildings` and/or `enchantments` (STORY-020), as a keyword list:
   `edit_city(raw, index, name: "Hialanth", population: 6, buildings: [16, 23])`.
 
   * `name`: trimmed, 1 to #{@name_bytes} printable ASCII characters (the field is 14 bytes with a
@@ -194,9 +194,14 @@ defmodule Mirror.SaveFile.Structures do
     replaces as replaced (`0`), when that one is there. A building whose predecessor is absent is
     just built. Needs (a Shrine wants a Builders' Hall) are **not** enforced: neutral cities in
     saves break them. Ids outside 3..35 give `{:error, :bad_buildings}`.
+  * `enchantments`: a map `%{name => caster | nil}` over the city enchantment names of
+    `Mirror.SaveFile.Cities.enchantment_names/0`; `nil` clears one, a caster `0..5` (the wizard
+    record, 5 being the neutral one) sets it. The byte (`+67 + slot`) is the caster's index plus
+    one, 0 for none, and only the named slots are written. An unknown name or a caster outside
+    `0..5` gives `{:error, :bad_enchantments}`.
 
   Returns `{:ok, raw, %{changed: [...]}}` or `{:error, reason}` (`:bad_name`, `:bad_population`,
-  `:bad_buildings`, `:no_such_city` or `{:unknown_field, field}`); nothing is written if any
+  `:bad_buildings`, `:bad_enchantments`, `:no_such_city` or `{:unknown_field, field}`); nothing is written if any
   value is refused.
   """
   @spec edit_city(binary(), non_neg_integer(), keyword()) :: result()
@@ -216,6 +221,12 @@ defmodule Mirror.SaveFile.Structures do
 
           {:buildings, ids}, acc ->
             put(acc, base + 31, set_buildings(binary_part(acc, base + 31, 36), ids))
+
+          {:enchantments, wanted}, acc ->
+            Enum.reduce(wanted, acc, fn {name, caster}, inner ->
+              slot = Enum.find_index(Cities.enchantment_names(), &(&1 == name))
+              put(inner, base + 67 + slot, <<if(caster, do: caster + 1, else: 0)>>)
+            end)
         end)
 
       {:ok, raw, %{changed: Keyword.keys(edits)}}
@@ -235,6 +246,14 @@ defmodule Mirror.SaveFile.Structures do
 
       {:population, _}, _acc ->
         {:halt, {:error, :bad_population}}
+
+      {:enchantments, wanted}, {:ok, acc} ->
+        if is_map(wanted) and
+             Enum.all?(wanted, fn {name, caster} ->
+               name in Cities.enchantment_names() and (is_nil(caster) or caster in 0..5//1)
+             end),
+           do: {:cont, {:ok, [{:enchantments, wanted} | acc]}},
+           else: {:halt, {:error, :bad_enchantments}}
 
       {:buildings, ids}, {:ok, acc} ->
         if is_list(ids) and Enum.all?(ids, &(&1 in 3..35//1)),
