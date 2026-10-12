@@ -969,6 +969,18 @@ defmodule Mirror.SaveFile.StructuresTest do
       assert %{owner: 2} = unit_fields(edited, 0)
     end
 
+    test "a unit that already has that owner keeps its go-to order" do
+      raw =
+        blank() |> unit(0, 5, 5, 0, 1) |> unit(1, 5, 5, 0, 2) |> put(@units + 9, <<12, 13, 3>>)
+
+      raw = put(raw, @units + 32 + 9, <<14, 15, 3>>)
+
+      assert {:ok, edited, _} = Structures.edit_units(raw, [0, 1], owner: 1, level: 2)
+      assert binary_part(edited, @units + 9, 3) == <<12, 13, 3>>
+      assert binary_part(edited, @units + 32 + 9, 3) == <<0, 0, 0>>
+      assert %{owner: 1, level: 2} = unit_fields(edited, 0)
+    end
+
     test "a stack changes hands together, but not unit by unit" do
       raw = blank() |> unit(0, 5, 5, 0, 1) |> unit(1, 5, 5, 0, 1)
 

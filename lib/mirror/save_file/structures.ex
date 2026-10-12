@@ -665,10 +665,19 @@ defmodule Mirror.SaveFile.Structures do
           at = base + index * @unit_record
 
           Enum.reduce(edits, acc, fn
-            {:level, v}, acc -> put(acc, at + 12, <<v>>)
-            {:experience, v}, acc -> put(acc, at + 14, <<v::little-signed-16>>)
-            {:damage, v}, acc -> put(acc, at + 17, <<v>>)
-            {:owner, v}, acc -> acc |> put(at + 3, <<v>>) |> clear_goto(at)
+            {:level, v}, acc ->
+              put(acc, at + 12, <<v>>)
+
+            {:experience, v}, acc ->
+              put(acc, at + 14, <<v::little-signed-16>>)
+
+            {:damage, v}, acc ->
+              put(acc, at + 17, <<v>>)
+
+            {:owner, v}, acc ->
+              if :binary.at(acc, at + 3) == v,
+                do: acc,
+                else: acc |> put(at + 3, <<v>>) |> clear_goto(at)
           end)
         end)
 
