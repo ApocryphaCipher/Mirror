@@ -7,6 +7,7 @@
 
 ## What to do
 
+- The spell numbering is in the game folder's `MMOMS.TXT` (appendix A.2): 0 to 239 by realm in the order Nature, Sorcery, Chaos, Life, Death, Arcane (40 per realm; Arcane uses 200 to 213), which gives the names without a new file; the old editor's states are *not known / known / unchangeable (in the research book) / researchable*, our 0, 2, 3 and 1.
 - Show and edit the **spell library** (`+0x264`, 214 states: 0 unknown, 1 knowable, 2 known, 3 on the research list,
   [wizard-record-and-exploration.md](../reference/wizard-record-and-exploration.md)), grouped by realm with the spell
   names (the game's own `SPELLS.LBX` has them; it is not in the manifest yet, so adding it means a `Mirror.GameFiles.manifest/0`

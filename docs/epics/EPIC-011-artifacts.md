@@ -15,10 +15,8 @@ Lair panels already show "N items" and cannot edit them (STORY-020: "the items (
 - **Known:** a lair's encounter record has an item count (`+16`) and an item area after it; clearing a lair can
   roll an item into the record (a Chain Mail and a Sword were seen as rewards, 2026-10-12); the game ships item data
   files that are not in Mirror's manifest (the small `ITEM*` LBX files are on Kevin's Drive, `docs/backlog.md`).
-- **Unknown:** the item record layout (name, type, picture, cost, the power list and each power's value), where a hero's
-  slots and a wizard's vault live in the save, how the game checks an item's powers (the Artificer's Create Artifact
-  rules: realm books, cost) and whether it checks them on load at all. Start from kazzmir's loader and the
-  `ITEM*`/`ITEMDATA` LBX files; confirm with a diff of a save before and after Kevin equips or creates one.
+- **Found (2026-10-12), [wizard-heroes-diplomacy-items.md](../reference/wizard-heroes-diplomacy-items.md):** **the save has an item block of 138 records of 50 bytes at `0x6fb8`**, between the encounters and the cities (the sum checks); every item index in the save points into it. A record has the name, icon, slot, type, cost, eight stat bytes, charges and an ability mask. A hero's three items are at `+0x76 + 28n + 16`, a wizard's four vault items at `+0x120`. Checked on SAVE2: Sir Harold's item and Jafar's vault item read as real items with matching stats. **The "artifact database" is also in the game folder:** `ITEMDATA.LBX` (250 premade items), `ITEMPOW.LBX` (67 item powers) and `ITEMS.LBX`/`ITEMISC.LBX` (the art), which `ITEMMAKE.EXE`, the Create Artifact screen, reads.
+- **Unknown:** what the slot, type and ability codes mean, how a free item slot is marked, how an item is made from powers (the Create Artifact cost and book rules, which `ITEMMAKE.EXE` enforces) and whether the game checks an item on load at all.
 
 ## Stories
 

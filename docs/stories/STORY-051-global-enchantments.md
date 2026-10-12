@@ -1,13 +1,14 @@
 # STORY-051: Global enchantments: see, add, remove
 
 **Parent:** [EPIC-009](../epics/EPIC-009-wizard-editing.md)
-**Status:** open (2026-10-12), starts with a decode
+**Status:** open (2026-10-12). The layout is located (see below); the non-zero encoding is unseen.
 **Size:** medium to large (the decode decides)
 **Raised by:** [Kevin](https://github.com/KevinAsbury), 2026-10-12
 
 ## What to do
 
-1. **Decode** where the save keeps the global (overland, whole-world) enchantments and who cast each: the spells that
+0. **Found (2026-10-12), see [wizard-heroes-diplomacy-items.md](../reference/wizard-heroes-diplomacy-items.md):** 24 bytes at `+0x482` of the wizard record of the caster, in the order of the manual's globals list (Eternal Night first). The old DOS editor's wizard screen has a "globals" yes/no, so they are flags, which fits. SAVE2 has none active, so the value of an active one is not seen: have Kevin cast one (Nature Awareness is cheap) and read it back.
+1. **Confirm** (was: decode) where the save keeps the global (overland, whole-world) enchantments and who cast each: the spells that
    stay active until dispelled, such as Eternal Night, Evil Omens, Zombie Mastery and the like. *Unknown:* whether they are
    in the wizard record (per caster) or in a block of their own, and the encoding (a list of ids, or flags). kazzmir's loader
    first; then a real game where Kevin casts one and the memory is diffed before and after.

@@ -17,8 +17,8 @@ correct stop until the hero list is decoded (STORY-020).
 - **Known:** unit types 0 to 34 are heroes; the unit record's `+6` is the hero slot (kazzmir's reading, never checked
   on its own); in the saves here every hero's level and experience are on the unit record, and the game works the
   level out from experience at End Turn (STORY-020, 2026-10-12, checked for a normal unit; **not** for a hero).
-- **Unknown:** where each wizard's hero list sits, what it holds (the unit's index? a name? a count?), how many
-  slots there are (*guess:* six), hero names, hero levels' experience thresholds (*guess:* a longer table than the
+- **Found (2026-10-12), [wizard-heroes-diplomacy-items.md](../reference/wizard-heroes-diplomacy-items.md):** the hero list is **6 entries of 28 bytes at `+0x76` of the wizard record**: the unit's index, the hero's own given name (14 bytes), three item indexes and three slot types. Checked in SAVE2: Jafar's entry 0 is unit 51, Sir Harold. kazzmir's loader also reads a per-hero table of 35 (level, abilities, casting skill, spells) and a 35-entry table of names and experience; those are not placed yet.
+- **Unknown:** what a hero's death or dismissal writes, how a hero is hired, hero levels' experience thresholds (*guess:* a longer table than the
   normal unit's, from the saves: level 2 at 25 xp), what a hero's death or dismissal writes, and how a hero is
   hired or summoned. Start from kazzmir's loader and a diff of a game where a hero is hired.
 

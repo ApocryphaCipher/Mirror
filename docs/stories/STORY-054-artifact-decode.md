@@ -1,13 +1,13 @@
 # STORY-054: Decode artifacts
 
 **Parent:** [EPIC-011](../epics/EPIC-011-artifacts.md)
-**Status:** open (2026-10-12), starts with a decode
+**Status:** open (2026-10-12). The item block is located and its record read (see below); the codes are not mapped.
 **Size:** large
 **Raised by:** [Kevin](https://github.com/KevinAsbury), 2026-10-12
 
 ## What to do
 
-Find and document, with two sources each:
+**Found (2026-10-12):** the 138 × 50-byte item block at `0x6fb8`, the hero and vault item indexes, and the game's own `ITEMDATA.LBX` and `ITEMPOW.LBX` (see [wizard-heroes-diplomacy-items.md](../reference/wizard-heroes-diplomacy-items.md)). Left to do, with two sources each:
 
 - the **item record**: name, type (sword, staff, ring...), picture, cost, and the list of powers with each one's value;
 - where items live: a **hero's equipment slots**, a **wizard's vault** of spare items, and a **lair's reward items**

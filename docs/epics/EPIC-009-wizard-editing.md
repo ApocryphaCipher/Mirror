@@ -33,14 +33,16 @@ Decoded and checked against the game's own screens
 (`+0x16`), fame (`+0x24`), power base (`+0x26`, derived by the game), research/mana/skill ratios (`+0x2a..`),
 summoning circle, casting skill (`+0x54`, `+0x56`), tax rate (`+0x58`), books per realm (`+0x5a`), the 18 retorts
 (`+0x64..+0x75`), research points left (`+0x25a`), mana (`+0x25c`), the spell being researched (`+0x262`), the
-spell library (`+0x264`, 214 states) and gold (`+0x356`).
+spell library (`+0x264`, 240 states: 214 used) and gold (`+0x356`).
 
-**Not decoded:** relations between wizards (peace, war, treaties, attitude), the global enchantments (which
-spells are active on the whole world and who cast them; *unknown* whether they live in the wizard record or a
-block of their own). Heroes and artifacts are [EPIC-010](EPIC-010-heroes.md) and [EPIC-011](EPIC-011-artifacts.md). kazzmir's loader (`game/magic/load/load.go`, the source the wizard
-table already comes from) is the first place to look; every offset still has to be confirmed in the real game
-before it is written ([real-game-acceptance.md](../reference/real-game-acceptance.md)). The gap is why the stories
-are ordered read, then edit what is known, then decode and edit the rest.
+**Located, not yet changed in the game (2026-10-12):** relations between wizards (a 306-byte diplomacy block at `+0x128`) and the
+global enchantments (24 bytes at `+0x482`, one per global spell, in the wizard record of whoever cast it). Found from kazzmir's
+loader (`game/magic/load/load.go`, the source the wizard table already comes from) and read in Kevin's played save, where the
+values are sensible; see [wizard-heroes-diplomacy-items.md](../reference/wizard-heroes-diplomacy-items.md). What each code means
+(the status byte, a global's non-zero value) is still a guess until one is changed in the real game
+([real-game-acceptance.md](../reference/real-game-acceptance.md)). The game folder also holds the 1995 DOS editor's manual
+(`MMOMS.TXT`), whose wizard screen already edits gold, mana, fame, books, retorts, spells and the globals. Heroes and artifacts are
+[EPIC-010](EPIC-010-heroes.md) and [EPIC-011](EPIC-011-artifacts.md).
 
 ## Stories
 
