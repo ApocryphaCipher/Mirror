@@ -1926,6 +1926,77 @@ defmodule MirrorWeb.MapLiveEditTest do
     end
   end
 
+  describe "City inspector in View mode (STORY-020)" do
+    defp viewing(conn, save) do
+      {:ok, view, _} = live(conn, ~p"/arcanus")
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      view
+    end
+
+    test "a click on a city shows its details read-only, a click elsewhere closes them", %{
+      conn: conn,
+      save: save
+    } do
+      view = viewing(conn, save)
+      refute has_element?(view, "#city-panel")
+
+      pointer(view, "click", 38, 21)
+      assert panel(view) =~ "Deventor"
+      assert panel(view) =~ "Hamlet, Gnoll"
+      assert has_element?(view, "#city-readout")
+      refute has_element?(view, "#city-form")
+
+      pointer(view, "click", 5, 5)
+      refute has_element?(view, "#city-panel")
+
+      pointer(view, "click", 38, 21)
+      view |> element("#city-close") |> render_click()
+      refute has_element?(view, "#city-panel")
+    end
+
+    test "a click off the map, or with no save loaded, does nothing", %{conn: conn, save: save} do
+      {:ok, empty, _} = live(conn, ~p"/arcanus")
+      pointer(empty, "click", 38, 21)
+      refute has_element?(empty, "#city-panel")
+
+      view = viewing(conn, save)
+      pointer(view, "click", -1, -1)
+      refute has_element?(view, "#city-panel")
+    end
+
+    test "edit mode keeps the form on the City tool and hides the panel for other tools", %{
+      conn: conn,
+      save: save
+    } do
+      view = viewing(conn, save)
+      pointer(view, "click", 38, 21)
+      assert has_element?(view, "#city-readout")
+
+      render_click(view, "toggle_edit", %{})
+      render_click(view, "set_tool", %{"tool" => "cycle"})
+      refute has_element?(view, "#city-panel")
+
+      render_click(view, "set_tool", %{"tool" => "city"})
+      click(view, 38, 21)
+      assert has_element?(view, "#city-form")
+      refute has_element?(view, "#city-readout")
+    end
+
+    test "an edit in the panel still counts when the panel is then read in View mode", %{
+      conn: conn,
+      save: save
+    } do
+      view = editing(conn, save, "city")
+      click(view, 38, 21)
+      edit_city_form(view, "Nar", 9)
+
+      render_click(view, "exit_edit", %{})
+      pointer(view, "click", 38, 21)
+      assert panel(view) =~ "Nar"
+      assert panel(view) =~ "Population 9"
+    end
+  end
+
   describe "real-save integration" do
     @tag skip:
            !@has_real_save_and_sprites &&

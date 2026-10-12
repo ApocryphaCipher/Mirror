@@ -23,8 +23,13 @@ Villages, rebels from the sudden growth, "nothing unusual").
 - Race names are checked for Dwarf, Halfling and Lizardman; the panel's race table fixes an earlier
   off-by-one bug in the first draft (a `~w` sigil split "Dark Elf").
 
-**Not done:** editing owner, race, buildings or enchantments; the panel in View mode as an inspector; lairs
-and units (the other panels in this story).
+**View-mode inspector (2026-10-11).** In View mode, a plain click on a city (one that does not pan) opens the same
+panel read-only, with a ✕ to close it; a click on empty ground closes it too. The viewport reports the
+click (`assets/js/view_click.mjs` maps the point to a tile through the zoom and pan, Node-tested) and the
+server shares the City tool's selection. Checked in the browser on a real save at the fit zoom: Sawtooth
+and Hialanth open with their details, no form, close on empty ground and on ✕.
+
+**Not done:** editing owner, race, buildings or enchantments; lairs and units (the other panels in this story).
 **Size:** large (do incrementally)
 
 ## What to do

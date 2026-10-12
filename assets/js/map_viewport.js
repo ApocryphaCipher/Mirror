@@ -7,6 +7,8 @@
 // keeps tiles crisp, and MapCanvas's hover picking keeps working because it
 // reads the transformed bounding rect.
 
+import {tileAtViewportPoint} from "./view_click.mjs"
+
 const ZOOM_LEVELS = [0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25, 1.5, 2, 3, 4]
 const DRAG_THRESHOLD_PX = 3
 const MIN_VISIBLE_PX = 120
@@ -174,9 +176,27 @@ const MapViewport = {
 
   onPointerUp(event) {
     if (!this.drag) return
+    // A click that did not pan, in view mode: tell the server which tile (city inspector).
+    if (!this.drag.moved && !this.editing && event.button === 0) this.pushViewClick(event)
     this.drag = null
     this.el.style.cursor = ""
     if (this.el.hasPointerCapture(event.pointerId)) this.el.releasePointerCapture(event.pointerId)
+  },
+
+  pushViewClick(event) {
+    const d = this.canvas.dataset
+    const tile = tileAtViewportPoint({
+      clientX: event.clientX,
+      clientY: event.clientY,
+      rect: this.el.getBoundingClientRect(),
+      tx: this.tx,
+      ty: this.ty,
+      scale: this.scale,
+      tileSize: parseInt(d.tileSize || "12", 10),
+      mapWidth: parseInt(d.mapWidth || "60", 10),
+      mapHeight: parseInt(d.mapHeight || "40", 10),
+    })
+    this.pushEvent("map_pointer", {action: "click", x: tile ? tile.x : -1, y: tile ? tile.y : -1, button: 0})
   },
 
   // Keep at least a strip of map on screen; centre an axis that fits.
