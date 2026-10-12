@@ -198,7 +198,11 @@ defmodule Mirror.SaveFile.Structures do
     derives from it (what the city can build, how its screen looks) is not touched.
   * `owner`: the byte at `+18`, a wizard record 0 to 4 or 5 for neutral. The units standing on
     the city's tile that belong to the old owner change hands with it, so a garrison is never
-    left inside a city that is not theirs (the result's `units_handed_over` counts them). A city
+    left inside a city that is not theirs (the result's `units_handed_over` counts them). **The
+    city's enchantments are cleared** (`enchantments_cleared` counts them): which would survive a
+    change of owner is not worked out, and wiping them is the simple rule. An `enchantments:`
+    change in the same call is applied after the wipe. Giving a city to its current owner changes
+    nothing. A city
     that is a wizard's fortress or summoning circle is refused with `{:error, :capital}`: the
     wizard record would still point at a city he no longer owns.
   * `enchantments`: a map `%{name => caster | nil}` over the city enchantment names of
@@ -217,6 +221,7 @@ defmodule Mirror.SaveFile.Structures do
     with {:ok, cities} <- Cities.parse(raw),
          {:ok, city} <- fetch(cities, index, :no_such_city),
          {:ok, edits} <- city_edits(changes),
+         edits = edits |> drop_same_owner(city) |> owner_first(),
          :ok <- check_owner_change(raw, city, edits) do
       base = elem(Cities.block_range(), 0) + index * @city_record
       original = raw
@@ -233,7 +238,10 @@ defmodule Mirror.SaveFile.Structures do
             put(acc, base + 14, <<race>>)
 
           {:owner, owner}, acc ->
-            acc |> put(base + 18, <<owner>>) |> hand_over_units(city, owner)
+            acc
+            |> put(base + 18, <<owner>>)
+            |> put(base + 67, :binary.copy(<<0>>, 26))
+            |> hand_over_units(city, owner)
 
           {:buildings, ids}, acc ->
             put(acc, base + 31, set_buildings(binary_part(acc, base + 31, 36), ids))
@@ -248,9 +256,26 @@ defmodule Mirror.SaveFile.Structures do
       handed =
         if Keyword.has_key?(edits, :owner), do: garrison_indexes(units(original), city), else: []
 
-      {:ok, raw, %{changed: Keyword.keys(edits), units_handed_over: length(handed)}}
+      cleared =
+        if Keyword.has_key?(edits, :owner),
+          do: Enum.count(:binary.bin_to_list(binary_part(original, base + 67, 26)), &(&1 != 0)),
+          else: 0
+
+      {:ok, raw,
+       %{
+         changed: Keyword.keys(edits),
+         units_handed_over: length(handed),
+         enchantments_cleared: cleared
+       }}
     end
   end
+
+  # Giving a city to its owner is no edit; and the owner edit goes first, so the enchantments
+  # it clears are not the ones the same call sets.
+  defp drop_same_owner(edits, city),
+    do: Enum.reject(edits, &(&1 == {:owner, city.owner}))
+
+  defp owner_first(edits), do: Enum.sort_by(edits, fn {field, _} -> field != :owner end)
 
   defp units(raw) do
     case Units.parse(raw) do

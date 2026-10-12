@@ -71,8 +71,8 @@ the city's current value, even an unnamed wizard record, so Apply cannot change 
 units, given to Freya as a Dwarf city, loaded with its banner green, "Dwarf" on its screen, all 5 units
 Freya's (the game's memory shows owner 1, race 4 and units owned only by 1 on its tile), and no unrest;
 Ashwall, one of Jafar's, made neutral showed no owner and no units. The memory matched the file for both.
-**Not checked:** a city whose owner is changed having enchantments cast by the old owner (they keep their
-casters); the capital's race (the wizard record also has a "capital race" byte at `+0x15`).
+**Enchantments are cleared on a change of owner** (Kevin's call, 2026-10-11: which ones would survive is not worked out, and
+wiping them is the simple rule); the panel's notice says so. **Not checked:** the capital's race (the wizard record also has a "capital race" byte at `+0x15`).
 
 **Not done:** lairs and units (the other panels in this story).
 **Size:** large (do incrementally)

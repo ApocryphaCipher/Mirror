@@ -363,6 +363,31 @@ defmodule Mirror.SaveFile.StructuresTest do
       assert Enum.map(units, & &1.owner) == [4, 4, 2, 2]
     end
 
+    test "a new owner clears the city's enchantments; an enchantment set in the same call stays" do
+      raw = blank() |> city(0, "A", 5, 5, 0, 2)
+
+      {:ok, raw, _} =
+        Structures.edit_city(raw, 0, enchantments: %{famine: 1, natures_eye: 2, prosperity: 2})
+
+      assert {:ok, edited, %{enchantments_cleared: 3}} = Structures.edit_city(raw, 0, owner: 4)
+      assert city_at(edited, 0).enchantments == %{}
+
+      assert {:ok, set_after, %{enchantments_cleared: 3}} =
+               Structures.edit_city(raw, 0, enchantments: %{wall_of_fire: 4}, owner: 4)
+
+      assert city_at(set_after, 0).enchantments == %{wall_of_fire: 4}
+    end
+
+    test "giving a city to its own owner changes nothing, so it keeps its enchantments" do
+      raw = blank() |> city(0, "A", 5, 5, 0, 2) |> unit(0, 5, 5, 0, 2)
+      {:ok, raw, _} = Structures.edit_city(raw, 0, enchantments: %{famine: 1})
+
+      assert {:ok, same, %{changed: [], units_handed_over: 0, enchantments_cleared: 0}} =
+               Structures.edit_city(raw, 0, owner: 2)
+
+      assert same == raw
+    end
+
     test "to neutral and back; a bad owner is refused" do
       raw = blank() |> city(0, "A", 5, 5, 0, 1) |> unit(0, 5, 5, 0, 1)
       assert {:ok, neutral, _} = Structures.edit_city(raw, 0, owner: 5)

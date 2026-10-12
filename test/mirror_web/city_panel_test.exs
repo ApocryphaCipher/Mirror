@@ -160,6 +160,9 @@ defmodule MirrorWeb.CityPanelTest do
     test "labels say what happened" do
       assert CityPanel.label(@details_ro, race: 4) == "Changed Hialanth's race to Dwarf"
       assert CityPanel.label(@details_ro, owner: 1) == "Gave Hialanth to Freya"
+
+      assert CityPanel.label(%{@details_ro | enchantment_casters: %{famine: 1}}, owner: 1) ==
+               "Gave Hialanth to Freya (its enchantments are cleared)"
     end
   end
 end

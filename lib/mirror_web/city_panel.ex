@@ -275,7 +275,8 @@ defmodule MirrorWeb.CityPanel do
         "Changed #{details.name}'s race to #{Cities.race_name(changes[:race])}"
 
       [:owner] ->
-        "Gave #{details.name} to #{owner_name(details, changes[:owner])}"
+        "Gave #{details.name} to #{owner_name(details, changes[:owner])}" <>
+          if(details.enchantment_casters == %{}, do: "", else: " (its enchantments are cleared)")
 
       [:enchantments] ->
         "Changed #{details.name}'s enchantments" <>
