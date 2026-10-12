@@ -100,6 +100,7 @@ rewards (code 1: a Create Artifact spell once, nothing once; code 5: a Chain Mai
 **rolled when the site is cleared**: nothing, spells from the realms the wizard has books in plus Arcane (Create Artifact, Summon Hero,
 Disjunction, Weakness), a spell book, or an item (the cleared record's item count goes 0 to 1). Gold and mana are the record's own fields.
 kazzmir's remake does the same kind of roll, from a budget. What the code itself means is unknown; the panel shows it and does not edit it.
+**A lead (2026-10-12):** the 1995 DOS editor that ships in the game folder (`MAPEDIT7.COM`, manual `MMOMS.TXT`) labels a lair's treasure as gold, mana, a **prisoner** yes/no, **"magic": none, common, uncommon, rare, very rare spell, 1 retort or spellbook pick, 2 retort or spellbook picks** (seven values, like the seven codes), a count of magic items and an **item chance out of 16**. It does not fit our experiments cleanly (a code 5 keep gave a Chain Mail and a Disjunction spell), so it is worth a retest rather than a conclusion; see [wizard-heroes-diplomacy-items.md](../reference/wizard-heroes-diplomacy-items.md).
 
 **Nodes (2026-10-12).** The **🔮 Node** tool opens a panel for the magic node on a tile (`Structures.edit_node/3`, `MirrorWeb.NodePanel`):
 its type, plane, power, owner (the melder, a wizard record 0 to 4 or none = 0xFF at `+3`), the **warped** (`+0x2E` bit 1) and **Guardian Spirit meld**
