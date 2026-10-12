@@ -18,9 +18,9 @@ defmodule MirrorWeb.MapLive do
   }
 
   alias Mirror.TileAtlas
-  alias Mirror.SaveFile.{Cities, Roads, Sites, Units, Wizards}
+  alias Mirror.SaveFile.{Cities, Roads, Sites, Structures, Units, Wizards}
   alias Mirror.Map, as: MirrorMap
-  alias MirrorWeb.{MoveTool, PaintTool, RoadTool}
+  alias MirrorWeb.{CityPanel, MoveTool, PaintTool, RoadTool}
 
   @layers [
     :terrain,
@@ -91,6 +91,8 @@ defmodule MirrorWeb.MapLive do
       |> assign(:road_report, nil)
       |> assign(:move_pending, nil)
       |> assign(:move_note, nil)
+      |> assign(:city_sel, nil)
+      |> assign(:city_note, nil)
       |> assign(:reveal_report, nil)
       |> assign(:discard_armed, false)
       |> assign(:fresh_mount, true)
@@ -222,13 +224,15 @@ defmodule MirrorWeb.MapLive do
   end
 
   def handle_event("set_tool", %{"tool" => tool}, socket)
-      when tool in ["cycle", "paint", "type", "road", "corruption", "special", "move"] do
+      when tool in ["cycle", "paint", "type", "road", "corruption", "special", "move", "city"] do
     {:noreply,
      socket
      |> assign(:tool, String.to_existing_atom(tool))
      |> assign(:road_report, nil)
      |> assign(:move_pending, nil)
-     |> assign(:move_note, nil)}
+     |> assign(:move_note, nil)
+     |> assign(:city_sel, nil)
+     |> assign(:city_note, nil)}
   end
 
   # Reveal all (STORY-037): every tile explored, on this plane or on both.
@@ -241,6 +245,44 @@ defmodule MirrorWeb.MapLive do
   end
 
   def handle_event("reveal_all", _params, socket), do: {:noreply, socket}
+
+  # The city panel's form (STORY-020): name and population, one record edit.
+  def handle_event("city_edit", %{"city" => params}, socket) do
+    index = socket.assigns.city_sel
+    plane = socket.assigns.plane
+
+    if socket.assigns.edit && socket.assigns.state.save && index do
+      {:ok, state, result} =
+        SessionStore.update(socket.assigns.session_id, fn current ->
+          raw = current.save.raw
+
+          case edit_city(current, raw, plane, index, params) do
+            {:ok, next, label} -> {next, {:ok, label}}
+            {:error, reason} -> {current, {:error, reason}}
+          end
+        end)
+
+      socket =
+        case result do
+          {:ok, label} ->
+            socket
+            |> assign_state(state)
+            |> assign(:city_note, label)
+            |> push_overlay_items()
+            |> push_map_layers()
+
+          {:error, :nothing_changed} ->
+            assign(socket, :city_note, "Nothing to change.")
+
+          {:error, reason} ->
+            assign(socket, :city_note, CityPanel.error_message(reason))
+        end
+
+      {:noreply, socket}
+    else
+      {:noreply, socket}
+    end
+  end
 
   # The "Special" tool's option: which special a click places.
   def handle_event("set_special", %{"special" => %{"value" => value}}, socket) do
@@ -1613,6 +1655,8 @@ defmodule MirrorWeb.MapLive do
                       {:corruption, "☠️ Corruption", "Click to corrupt a tile or clean it"},
                       {:special, "💎 Special",
                        "Place an ore, gems, crystals, wild game or nightshade"},
+                      {:city, "🏙️ City",
+                       "Click a city to see its details and change its name or population"},
                       {:move, "🏰 Move",
                        "Click a city, tower or lair, then click where it goes; a city takes its garrison, summoning circle and fortress with it"}
                     ]
@@ -1816,6 +1860,9 @@ defmodule MirrorWeb.MapLive do
                   :special ->
                     "Click: place the chosen special · right-click or shift-click: remove it · space-drag or middle-drag to pan · Esc to finish"
 
+                  :city ->
+                    "Click a city to see its details · change its name or population in the panel · Undo works · space-drag or middle-drag to pan · Esc to finish"
+
                   :move ->
                     "Click a city, tower or lair, then click where it goes · right-click or click it again: cancel · Undo works · space-drag or middle-drag to pan · Esc to finish"
 
@@ -1879,7 +1926,8 @@ defmodule MirrorWeb.MapLive do
                 >
                   {@changed_tiles - @changed_records} {if @changed_tiles - @changed_records == 1,
                     do: "tile",
-                    else: "tiles"} changed{if @changed_records > 0, do: " · #{@changed_records} moved"}
+                    else: "tiles"} changed{if @changed_records > 0,
+                    do: " · #{@changed_records} edited"}
                 </span>
                 <.discard_control changed_tiles={@changed_tiles} armed={@discard_armed} />
                 <.form
@@ -2030,9 +2078,106 @@ defmodule MirrorWeb.MapLive do
           </div>
 
           <.surveyor_card :if={@hover && @hover.survey && !@edit} survey={@hover.survey} />
+
+          <.city_panel
+            :if={@edit && @tool == :city && @city_sel && @state.save}
+            details={CityPanel.details(@state.save.raw, @city_sel)}
+            note={@city_note}
+          />
         </div>
       <% end %>
     </Layouts.app>
+    """
+  end
+
+  # The city panel (STORY-020): one city's decoded fields, with its name and population
+  # editable. An overlay, so it never shifts the map under the pointer.
+  attr :details, :map, required: true
+  attr :note, :string, default: nil
+
+  defp city_panel(%{details: nil} = assigns) do
+    ~H"""
+    <div id="city-panel" class={city_panel_class()}>
+      <p class="text-slate-400">That city is no longer in the save.</p>
+    </div>
+    """
+  end
+
+  defp city_panel(assigns) do
+    ~H"""
+    <div id="city-panel" class={city_panel_class()}>
+      <p class="font-semibold text-slate-200">
+        {@details.name}
+        <span class="font-normal text-slate-400">· {@details.size}, {@details.race}</span>
+      </p>
+      <p class="text-slate-400">
+        {plane_name(@details.plane)} ({@details.x}, {@details.y}) ·
+        <span class="text-amber-200">{@details.owner_name}</span>
+        ({@details.banner})
+      </p>
+
+      <.form
+        for={%{}}
+        as={:city}
+        id="city-form"
+        phx-submit="city_edit"
+        class="mt-2 flex flex-wrap items-end gap-2"
+      >
+        <label class="text-slate-400">
+          Name
+          <input
+            id="city-name"
+            name="city[name]"
+            type="text"
+            value={@details.name}
+            maxlength="13"
+            class="mt-0.5 block w-32 rounded border border-white/15 bg-slate-950 px-1.5 py-0.5 text-slate-100"
+          />
+        </label>
+        <label class="text-slate-400">
+          Population
+          <input
+            id="city-population"
+            name="city[population]"
+            type="number"
+            min="1"
+            max="25"
+            value={@details.population}
+            class="mt-0.5 block w-16 rounded border border-white/15 bg-slate-950 px-1.5 py-0.5 text-slate-100"
+          />
+        </label>
+        <button
+          id="city-apply"
+          type="submit"
+          class="rounded-lg bg-emerald-300 px-2.5 py-0.5 font-semibold text-slate-950 hover:bg-emerald-200"
+        >
+          Apply
+        </button>
+      </.form>
+      <p :if={@note} id="city-note" role="status" aria-live="polite" class="mt-1 text-emerald-200">
+        {@note}
+      </p>
+
+      <p class="mt-2 text-slate-400">
+        {@details.garrison} {if @details.garrison == 1, do: "unit", else: "units"} here{if @details.walled,
+          do: " · walled"}
+      </p>
+      <p :if={@details.buildings != []} id="city-buildings" class="mt-1 text-slate-300">
+        <span class="text-slate-500">Buildings:</span>
+        {Enum.join(@details.buildings, ", ")}
+      </p>
+      <p :if={@details.replaced != []} class="mt-1 text-slate-500">
+        Replaced: {Enum.join(@details.replaced, ", ")}
+      </p>
+      <p :if={@details.enchantments != []} class="mt-1 text-slate-300">
+        <span class="text-slate-500">Enchantments:</span>
+        {Enum.map_join(@details.enchantments, ", ", fn {name, by} -> "#{name} (#{by})" end)}
+      </p>
+      <p :if={@details.road_links != []} class="mt-1 text-slate-300">
+        <span class="text-slate-500">Road links:</span>
+        {Enum.join(@details.road_links, ", ")}
+      </p>
+    </div>
     """
   end
 
@@ -2077,6 +2222,12 @@ defmodule MirrorWeb.MapLive do
     </div>
     """
   end
+
+  # Fixed over the right of the map, below the toolbar; it takes clicks (it has a form).
+  defp city_panel_class,
+    do:
+      "fixed right-4 top-28 z-30 w-72 rounded-lg border border-white/10 bg-slate-950/90 " <>
+        "px-3 py-2 text-left font-mono text-xs text-slate-300 shadow-lg"
 
   defp surveyor_class,
     do:
@@ -2207,6 +2358,23 @@ defmodule MirrorWeb.MapLive do
        ) do
     direction = if button == 2 or truthy?(mods["shift"]), do: -1, else: 1
     cycle_tile(socket, x, y, direction)
+  end
+
+  defp handle_pointer_start(
+         %{assigns: %{edit: :terrain, tool: :city}} = socket,
+         x,
+         y,
+         _button,
+         _mods
+       ) do
+    picked =
+      valid_coord?(x, y) &&
+        MoveTool.pick_at(socket.assigns.state.save.raw, socket.assigns.plane, x, y)
+
+    case picked do
+      %{kind: :city, index: index} -> assign(socket, city_sel: index, city_note: nil)
+      _ -> assign(socket, city_sel: nil, city_note: nil)
+    end
   end
 
   defp handle_pointer_start(
@@ -2515,6 +2683,35 @@ defmodule MirrorWeb.MapLive do
       end
     else
       socket
+    end
+  end
+
+  defp edit_city(current, raw, plane, index, params) do
+    with {:ok, details} <- fetch_city_details(raw, index),
+         {:ok, changes} <- CityPanel.changes(params, details),
+         :ok <- if(changes == [], do: {:error, :nothing_changed}, else: :ok),
+         {:ok, edited, _} <- Structures.edit_city(raw, index, changes),
+         label = city_edit_label(details, changes),
+         {next, {:record, _label, _parts}} <- Editor.apply_record(current, plane, label, edited) do
+      {:ok, next, label}
+    else
+      {:error, reason} -> {:error, reason}
+      _ -> {:error, :unchanged}
+    end
+  end
+
+  defp fetch_city_details(raw, index) do
+    case CityPanel.details(raw, index) do
+      nil -> {:error, :no_such_city}
+      details -> {:ok, details}
+    end
+  end
+
+  defp city_edit_label(details, changes) do
+    case {Keyword.fetch(changes, :name), Keyword.fetch(changes, :population)} do
+      {{:ok, name}, :error} -> "Renamed #{details.name} to #{name}"
+      {:error, {:ok, n}} -> "Set #{details.name}'s population to #{n}"
+      _ -> "Edited #{details.name}"
     end
   end
 

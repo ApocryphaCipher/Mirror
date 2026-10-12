@@ -171,6 +171,77 @@ defmodule Mirror.SaveFile.Structures do
         do: {:water, if(plane == 0, do: :arcanus, else: :myrror)}
   end
 
+  @name_bytes 13
+  @max_population 25
+
+  @doc """
+  Changes a city's `name` and/or `population` (STORY-020), as a keyword list:
+  `edit_city(raw, index, name: "Hialanth", population: 6)`.
+
+  The name is trimmed, must be 1 to #{@name_bytes} printable ASCII characters (the field is
+  14 bytes with a NUL), and fills the whole field, so no tail of the old name is left
+  behind. Nothing beyond ASCII: the game's font has no "ü", and a name saved with one
+  showed as "Zrich" (checked in the game, 2026-10-11). Population is the byte at `+20`, in thousands, 1 to
+  #{@max_population} (*guess* for the upper end: the largest city seen is 25). The size
+  class (`+19`) is left alone: the game does not recompute it from the population, on
+  load or after a turn (checked 2026-10-11: pop 12 and 20 stayed Village), and across the
+  saves here the classes overlap in population, so it is not a function of it.
+
+  Returns `{:ok, raw, %{changed: [...]}}` or `{:error, reason}`; nothing is written if
+  any value is refused.
+  """
+  @spec edit_city(binary(), non_neg_integer(), keyword()) :: result()
+  def edit_city(raw, index, changes) when is_list(changes) do
+    with {:ok, cities} <- Cities.parse(raw),
+         {:ok, _city} <- fetch(cities, index, :no_such_city),
+         {:ok, edits} <- city_edits(changes) do
+      base = elem(Cities.block_range(), 0) + index * @city_record
+
+      raw =
+        Enum.reduce(edits, raw, fn
+          {:name, bytes}, acc -> put(acc, base, bytes)
+          {:population, n}, acc -> put(acc, base + 20, <<n>>)
+        end)
+
+      {:ok, raw, %{changed: Keyword.keys(edits)}}
+    end
+  end
+
+  defp city_edits(changes) do
+    Enum.reduce_while(changes, {:ok, []}, fn
+      {:name, name}, {:ok, acc} ->
+        case city_name_bytes(name) do
+          {:ok, bytes} -> {:cont, {:ok, [{:name, bytes} | acc]}}
+          error -> {:halt, error}
+        end
+
+      {:population, n}, {:ok, acc} when is_integer(n) and n in 1..@max_population//1 ->
+        {:cont, {:ok, [{:population, n} | acc]}}
+
+      {:population, _}, _acc ->
+        {:halt, {:error, :bad_population}}
+
+      {other, _}, _acc ->
+        {:halt, {:error, {:unknown_field, other}}}
+    end)
+    |> then(fn
+      {:ok, edits} -> {:ok, Enum.reverse(edits)}
+      error -> error
+    end)
+  end
+
+  defp city_name_bytes(name) when is_binary(name) do
+    trimmed = String.trim(name)
+
+    if byte_size(trimmed) in 1..@name_bytes//1 and trimmed =~ ~r/\A[\x20-\x7e]+\z/ do
+      {:ok, trimmed <> :binary.copy(<<0>>, @name_bytes + 1 - byte_size(trimmed))}
+    else
+      {:error, :bad_name}
+    end
+  end
+
+  defp city_name_bytes(_name), do: {:error, :bad_name}
+
   @doc """
   The tower standing on `{x, y}` (towers stand on both planes), as
   `%{index, x, y}`, or `nil`.

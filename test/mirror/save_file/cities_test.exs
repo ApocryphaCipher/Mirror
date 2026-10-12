@@ -125,4 +125,20 @@ defmodule Mirror.SaveFile.CitiesTest do
       assert Wizards.banners(raw)[0] == :yellow
     end
   end
+
+  test "race and building names follow the game's ids" do
+    # checked in the game: Dwarf 4 (Fire Keep), Halfling 6 (Hialanth), Lizardman 10 (Sawtooth)
+    assert Cities.race_name(4) == "Dwarf"
+    assert Cities.race_name(6) == "Halfling"
+    assert Cities.race_name(10) == "Lizardman"
+    assert Cities.race_name(2) == "Dark Elf"
+    assert Cities.race_name(13) == "Troll"
+    assert Cities.race_name(14) == "race 14"
+
+    # checked in the game: Marketplace 26, Granary 29, City Walls 35
+    assert Cities.building_name(26) == "Marketplace"
+    assert Cities.building_name(29) == "Granary"
+    assert Cities.building_name(35) == "City Walls"
+    assert Cities.building_name(99) == "building 99"
+  end
 end
