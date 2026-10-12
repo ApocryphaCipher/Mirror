@@ -36,7 +36,7 @@ defmodule Mirror.SaveFile.Structures do
   `docs/reference/real-game-acceptance.md` says how to check one.
   """
 
-  alias Mirror.SaveFile.{Cities, Sites, Units, Wizards}
+  alias Mirror.SaveFile.{Cities, Encounters, Sites, Units, Wizards}
 
   @width 60
   @height 40
@@ -450,6 +450,131 @@ defmodule Mirror.SaveFile.Structures do
   end
 
   defp city_name_bytes(_name), do: {:error, :bad_name}
+
+  @max_guards 8
+  @max_reward 30_000
+
+  @doc """
+  Changes an encounter zone (a lair, cave, temple, ruin, keep, node's guardians or a Tower of
+  Wizardry; STORY-020) by its record index, as a keyword list:
+
+      edit_encounter(raw, index, intact: false, gold: 100, guards: %{1 => {189, 3}, 2 => nil})
+
+  * `intact`: `true` (not yet cleared) or `false` (the byte at `+3`).
+  * `guards`: a map from slot (1 or 2) to `{unit_type, count}` or `nil` to empty the slot. The
+    type is 0..197 and the count 1..#{@max_guards} (the most seen). The count byte is written with both
+    nibbles equal, as every full slot in the saves is (low nibble = left, high = starting count).
+    An empty slot is type 0, count 0.
+  * `gold` and `mana`: 0..#{@max_reward}, the i16 values at `+10` and `+12` (the largest seen are
+    620 and 330).
+
+  A Tower of Wizardry is two records (an Arcanus and a Myrror side) with the same guards, and
+  the game clears both together, so a tower is edited on **both**. The spell code (`+14`), flags,
+  items and the unknown bytes are left alone.
+
+  Returns `{:ok, raw, %{changed: [...], records: [indexes written]}}` or `{:error, reason}`
+  (`:no_such_encounter`, `:bad_intact`, `:bad_guards`, `:bad_gold`, `:bad_mana` or
+  `{:unknown_field, field}`); nothing is written if any value is refused.
+  """
+  @spec edit_encounter(binary(), non_neg_integer(), keyword()) :: result()
+  def edit_encounter(raw, index, changes) when is_list(changes) do
+    with %{} = record <- Encounters.get(raw, index) || {:error, :no_such_encounter},
+         {:ok, edits} <- encounter_edits(changes) do
+      targets =
+        if record.kind == @tower_kind,
+          do:
+            for(
+              e <- Encounters.all(raw),
+              e.kind == @tower_kind,
+              {e.x, e.y} == {record.x, record.y},
+              do: e.index
+            ),
+          else: [index]
+
+      {base, _} = Sites.encounters_range()
+
+      raw =
+        Enum.reduce(targets, raw, fn target, acc ->
+          Enum.reduce(
+            edits,
+            acc,
+            &write_encounter_edit(&1, &2, base + target * @encounter_record)
+          )
+        end)
+
+      {:ok, raw, %{changed: Keyword.keys(edits), records: targets}}
+    else
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp write_encounter_edit({:intact, intact?}, raw, at),
+    do: put(raw, at + 3, <<if(intact?, do: 1, else: 0)>>)
+
+  defp write_encounter_edit({:gold, n}, raw, at), do: put(raw, at + 10, <<n::little-signed-16>>)
+  defp write_encounter_edit({:mana, n}, raw, at), do: put(raw, at + 12, <<n::little-signed-16>>)
+
+  defp write_encounter_edit({:guards, slots}, raw, at) do
+    Enum.reduce(slots, raw, fn {slot, guard}, acc ->
+      offset = at + if(slot == 1, do: 5, else: 7)
+
+      case guard do
+        nil -> put(acc, offset, <<0, 0>>)
+        {type, count} -> put(acc, offset, <<type, count * 16 + count>>)
+      end
+    end)
+  end
+
+  defp encounter_edits(changes) do
+    changes
+    |> Enum.reduce_while({:ok, []}, fn
+      {:intact, v}, {:ok, acc} when is_boolean(v) ->
+        {:cont, {:ok, [{:intact, v} | acc]}}
+
+      {:intact, _}, _ ->
+        {:halt, {:error, :bad_intact}}
+
+      {:gold, n}, {:ok, acc} when is_integer(n) and n in 0..@max_reward//1 ->
+        {:cont, {:ok, [{:gold, n} | acc]}}
+
+      {:gold, _}, _ ->
+        {:halt, {:error, :bad_gold}}
+
+      {:mana, n}, {:ok, acc} when is_integer(n) and n in 0..@max_reward//1 ->
+        {:cont, {:ok, [{:mana, n} | acc]}}
+
+      {:mana, _}, _ ->
+        {:halt, {:error, :bad_mana}}
+
+      {:guards, slots}, {:ok, acc} ->
+        if valid_guards?(slots),
+          do: {:cont, {:ok, [{:guards, slots} | acc]}},
+          else: {:halt, {:error, :bad_guards}}
+
+      {other, _}, _ ->
+        {:halt, {:error, {:unknown_field, other}}}
+    end)
+    |> then(fn
+      {:ok, edits} -> {:ok, Enum.reverse(edits)}
+      error -> error
+    end)
+  end
+
+  defp valid_guards?(slots) when is_map(slots) and map_size(slots) > 0 do
+    Enum.all?(slots, fn
+      {slot, nil} ->
+        slot in [1, 2]
+
+      {slot, {type, count}} ->
+        slot in [1, 2] and is_integer(type) and type in 0..197//1 and is_integer(count) and
+          count in 1..@max_guards//1
+
+      _ ->
+        false
+    end)
+  end
+
+  defp valid_guards?(_slots), do: false
 
   @max_stack 9
   @goto_status 3

@@ -18,9 +18,9 @@ defmodule MirrorWeb.MapLive do
   }
 
   alias Mirror.TileAtlas
-  alias Mirror.SaveFile.{Cities, Roads, Sites, Structures, Units, Wizards}
+  alias Mirror.SaveFile.{Cities, Encounters, Roads, Sites, Structures, Units, Wizards}
   alias Mirror.Map, as: MirrorMap
-  alias MirrorWeb.{CityPanel, MoveTool, PaintTool, RoadTool, UnitPanel}
+  alias MirrorWeb.{CityPanel, LairPanel, MoveTool, PaintTool, RoadTool, UnitPanel}
 
   @layers [
     :terrain,
@@ -96,6 +96,8 @@ defmodule MirrorWeb.MapLive do
       |> assign(:unit_sel, nil)
       |> assign(:unit_armed, nil)
       |> assign(:unit_note, nil)
+      |> assign(:lair_sel, nil)
+      |> assign(:lair_note, nil)
       |> assign(:reveal_report, nil)
       |> assign(:discard_armed, false)
       |> assign(:fresh_mount, true)
@@ -236,7 +238,8 @@ defmodule MirrorWeb.MapLive do
              "special",
              "move",
              "city",
-             "units"
+             "units",
+             "lair"
            ] do
     {:noreply,
      socket
@@ -248,7 +251,9 @@ defmodule MirrorWeb.MapLive do
      |> assign(:city_note, nil)
      |> assign(:unit_sel, nil)
      |> assign(:unit_armed, nil)
-     |> assign(:unit_note, nil)}
+     |> assign(:unit_note, nil)
+     |> assign(:lair_sel, nil)
+     |> assign(:lair_note, nil)}
   end
 
   # Reveal all (STORY-037): every tile explored, on this plane or on both.
@@ -278,6 +283,43 @@ defmodule MirrorWeb.MapLive do
         {:error, reason} ->
           {:noreply, assign(socket, :unit_note, UnitPanel.error_message(reason))}
       end
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("lair_close", _params, socket) do
+    {:noreply, assign(socket, lair_sel: nil, lair_note: nil)}
+  end
+
+  # The lair panel's form (STORY-020): a site's cleared state, guards and gold and mana.
+  def handle_event("lair_edit", %{"lair" => params}, socket) do
+    index = socket.assigns.lair_sel
+    plane = socket.assigns.plane
+
+    if socket.assigns.edit && socket.assigns.state.save && index do
+      {:ok, state, result} =
+        SessionStore.update(socket.assigns.session_id, fn current ->
+          case edit_lair(current, plane, index, params) do
+            {:ok, next, label} -> {next, {:ok, label}}
+            {:error, reason} -> {current, {:error, reason}}
+          end
+        end)
+
+      socket =
+        case result do
+          {:ok, label} ->
+            socket
+            |> assign_state(state)
+            |> assign(:lair_note, label)
+            |> push_overlay_items()
+            |> push_map_layers()
+
+          {:error, reason} ->
+            assign(socket, :lair_note, LairPanel.error_message(reason))
+        end
+
+      {:noreply, socket}
     else
       {:noreply, socket}
     end
@@ -1703,6 +1745,8 @@ defmodule MirrorWeb.MapLive do
                       {:corruption, "☠️ Corruption", "Click to corrupt a tile or clean it"},
                       {:special, "💎 Special",
                        "Place an ore, gems, crystals, wild game or nightshade"},
+                      {:lair, "🏚️ Lair",
+                       "Click a lair, temple, ruin, keep, node or tower to see and change its guards and treasure"},
                       {:units, "👥 Units",
                        "Click a tile to list its units; tick some and move them to another tile"},
                       {:city, "🏙️ City",
@@ -1909,6 +1953,9 @@ defmodule MirrorWeb.MapLive do
 
                   :special ->
                     "Click: place the chosen special · right-click or shift-click: remove it · space-drag or middle-drag to pan · Esc to finish"
+
+                  :lair ->
+                    "Click a lair, cave, temple, ruin, keep, node or tower · change its guards, gold and mana in the panel · Undo works · space-drag or middle-drag to pan · Esc to finish"
 
                   :units ->
                     "Click a tile with units, tick the ones to move, press Move, then click where they go · right-click: cancel · space-drag or middle-drag to pan · Esc to finish"
@@ -2132,6 +2179,13 @@ defmodule MirrorWeb.MapLive do
 
           <.surveyor_card :if={@hover && @hover.survey && !@edit} survey={@hover.survey} />
 
+          <.lair_panel
+            :if={(!@edit || @tool == :lair) && @lair_sel && @state.save}
+            details={LairPanel.details(@state.save.raw, @lair_sel)}
+            note={@lair_note}
+            editable={@edit == :terrain}
+          />
+
           <.unit_panel
             :if={(!@edit || @tool == :units) && @unit_sel && @state.save}
             rows={UnitPanel.rows(@state.save.raw, @unit_sel)}
@@ -2151,6 +2205,136 @@ defmodule MirrorWeb.MapLive do
         </div>
       <% end %>
     </Layouts.app>
+    """
+  end
+
+  # One encounter zone (STORY-020): guards, state and treasure; in edit mode they can be changed.
+  attr :details, :map, required: true
+  attr :note, :string, default: nil
+  attr :editable, :boolean, default: false
+
+  defp lair_panel(%{details: nil} = assigns) do
+    ~H"""
+    <div id="lair-panel" class={city_panel_class()}>
+      <p class="text-slate-400">That site is no longer in the save.</p>
+    </div>
+    """
+  end
+
+  defp lair_panel(assigns) do
+    ~H"""
+    <div id="lair-panel" class={city_panel_class()}>
+      <div class="flex items-start justify-between gap-2">
+        <p class="font-semibold text-slate-200">
+          {@details.kind_name}
+          <span class="font-normal text-slate-400">
+            · {plane_name(@details.plane)} ({@details.x}, {@details.y})
+          </span>
+        </p>
+        <button
+          id="lair-close"
+          type="button"
+          phx-click="lair_close"
+          aria-label="Close"
+          class="text-slate-500 hover:text-white"
+        >
+          ✕
+        </button>
+      </div>
+      <p class="text-slate-400">
+        {if @details.intact, do: "Not cleared yet", else: "Cleared"}{if @details.tower?,
+          do: " · a tower is one site on both planes: edits go to both sides"}
+      </p>
+
+      <.form :if={@editable} for={%{}} as={:lair} id="lair-form" phx-submit="lair_edit" class="mt-2">
+        <input type="hidden" name="lair[intact_present]" value="1" />
+        <label class="flex items-center gap-1.5 text-slate-300">
+          <input type="checkbox" name="lair[intact]" value="on" checked={@details.intact} />
+          Not cleared (guards still there)
+        </label>
+
+        <fieldset :for={slot <- @details.slots} class="mt-2">
+          <legend class="text-slate-500">Guard {slot.slot}</legend>
+          <div class="flex items-center gap-1.5">
+            <input
+              type="number"
+              name={"lair[guard#{slot.slot}_count]"}
+              min="1"
+              max="8"
+              value={slot.left || 1}
+              aria-label={"Guard #{slot.slot} count"}
+              class="w-12 rounded border border-white/15 bg-slate-950 px-1 py-0.5 text-slate-100"
+            />
+            <select
+              name={"lair[guard#{slot.slot}_type]"}
+              aria-label={"Guard #{slot.slot} unit"}
+              class="min-w-0 flex-1 rounded border border-white/15 bg-slate-950 px-1 py-0.5 text-slate-100"
+            >
+              <option value="" selected={slot.type == nil}>none</option>
+              <option
+                :for={{id, name} <- LairPanel.unit_type_options()}
+                value={id}
+                selected={id == slot.type}
+              >
+                {name}
+              </option>
+            </select>
+          </div>
+          <p :if={slot.start && slot.start != slot.left} class="text-slate-500">
+            started with {slot.start}
+          </p>
+        </fieldset>
+
+        <div class="mt-2 flex items-end gap-3">
+          <label class="text-slate-400">
+            Gold
+            <input
+              type="number"
+              name="lair[gold]"
+              min="0"
+              max="30000"
+              value={@details.gold}
+              class="mt-0.5 block w-20 rounded border border-white/15 bg-slate-950 px-1.5 py-0.5 text-slate-100"
+            />
+          </label>
+          <label class="text-slate-400">
+            Mana
+            <input
+              type="number"
+              name="lair[mana]"
+              min="0"
+              max="30000"
+              value={@details.mana}
+              class="mt-0.5 block w-20 rounded border border-white/15 bg-slate-950 px-1.5 py-0.5 text-slate-100"
+            />
+          </label>
+          <button
+            id="lair-apply"
+            type="submit"
+            class="rounded-lg bg-emerald-300 px-2.5 py-0.5 font-semibold text-slate-950 hover:bg-emerald-200"
+          >
+            Apply
+          </button>
+        </div>
+      </.form>
+
+      <div :if={!@editable} id="lair-readout" class="mt-2 space-y-0.5 text-slate-300">
+        <p :for={slot <- @details.slots} :if={slot.type}>
+          Guard {slot.slot}: {slot.left} × {slot.name}{if slot.start != slot.left,
+            do: " (started with #{slot.start})"}
+        </p>
+        <p :if={Enum.all?(@details.slots, &(&1.type == nil))} class="text-slate-500">No guards</p>
+        <p>Gold {@details.gold} · Mana {@details.mana}</p>
+      </div>
+
+      <p :if={@note} id="lair-note" role="status" aria-live="polite" class="mt-1 text-emerald-200">
+        {@note}
+      </p>
+      <p class="mt-2 text-slate-500">
+        Spell reward code {@details.spell_code}{if @details.item_count > 0,
+          do: " · #{@details.item_count} #{if @details.item_count == 1, do: "item", else: "items"}"} (not editable: what the codes and item ids mean is not decoded)
+      </p>
+    </div>
     """
   end
 
@@ -2594,6 +2778,15 @@ defmodule MirrorWeb.MapLive do
   end
 
   defp handle_pointer_start(
+         %{assigns: %{edit: :terrain, tool: :lair}} = socket,
+         x,
+         y,
+         _button,
+         _mods
+       ),
+       do: select_site(socket, x, y)
+
+  defp handle_pointer_start(
          %{assigns: %{edit: :terrain, tool: :units}} = socket,
          x,
          y,
@@ -2956,9 +3149,43 @@ defmodule MirrorWeb.MapLive do
     socket = inspect_city(socket, x, y)
 
     if socket.assigns.city_sel do
-      assign(socket, unit_sel: nil)
+      assign(socket, unit_sel: nil, lair_sel: nil)
     else
-      select_units(socket, x, y)
+      socket = select_units(socket, x, y)
+
+      if socket.assigns.unit_sel,
+        do: assign(socket, lair_sel: nil),
+        else: select_site(socket, x, y)
+    end
+  end
+
+  # The Lair tool, and the View-mode inspector after cities and units: the encounter on a tile.
+  defp select_site(socket, x, y) do
+    plane = MoveTool.plane_number(socket.assigns.plane)
+
+    found =
+      valid_coord?(x, y) && socket.assigns.state.save &&
+        Encounters.at(socket.assigns.state.save.raw, {x, y, plane})
+
+    case found do
+      [%{index: index} | _] -> assign(socket, lair_sel: index, lair_note: nil)
+      _ -> assign(socket, lair_sel: nil, lair_note: nil)
+    end
+  end
+
+  defp edit_lair(current, plane, index, params) do
+    raw = current.save.raw
+
+    with %{} = details <- LairPanel.details(raw, index) || {:error, :no_such_encounter},
+         {:ok, changes} <- LairPanel.changes(params, details),
+         :ok <- if(changes == [], do: {:error, :nothing_changed}, else: :ok),
+         {:ok, edited, _} <- Structures.edit_encounter(raw, index, changes),
+         label = LairPanel.label(details, changes),
+         {next, {:record, _, _}} <- Editor.apply_record(current, plane, label, edited) do
+      {:ok, next, label}
+    else
+      {:error, reason} -> {:error, reason}
+      _ -> {:error, :unchanged}
     end
   end
 
@@ -3871,6 +4098,8 @@ defmodule MirrorWeb.MapLive do
       unit_sel: nil,
       unit_armed: nil,
       unit_note: nil,
+      lair_sel: nil,
+      lair_note: nil,
       move_pending: nil,
       move_note: nil
     )

@@ -674,6 +674,92 @@ defmodule Mirror.SaveFile.StructuresTest do
     end
   end
 
+  describe "edit_encounter/3" do
+    defp enc(raw, i), do: Mirror.SaveFile.Encounters.get(raw, i)
+
+    test "intact, gold and mana are written, and only those bytes change" do
+      raw = blank() |> encounter(20, 10, 11, 0, 8)
+
+      assert {:ok, edited, %{changed: [:intact, :gold, :mana], records: [20]}} =
+               Structures.edit_encounter(raw, 20, intact: false, gold: 620, mana: 330)
+
+      assert %{intact: false, gold: 620, mana: 330, kind: 8, x: 10, y: 11} = enc(edited, 20)
+
+      diff =
+        for {{a, b}, i} <-
+              Enum.with_index(Enum.zip(:binary.bin_to_list(raw), :binary.bin_to_list(edited))),
+            a != b,
+            do: i
+
+      assert diff == [
+               @encounters + 20 * 24 + 3,
+               @encounters + 20 * 24 + 10,
+               @encounters + 20 * 24 + 11,
+               @encounters + 20 * 24 + 12,
+               @encounters + 20 * 24 + 13
+             ]
+    end
+
+    test "guards: set a slot with equal nibbles, empty another" do
+      # encounter/6 gives guard 1 = type 7, count byte 1 and nothing in slot 2
+      raw = blank() |> encounter(20, 10, 11, 0, 8)
+
+      assert {:ok, edited, %{changed: [:guards]}} =
+               Structures.edit_encounter(raw, 20, guards: %{1 => {189, 3}, 2 => {180, 8}})
+
+      assert binary_part(edited, @encounters + 20 * 24 + 5, 4) == <<189, 0x33, 180, 0x88>>
+
+      assert [%{type: 189, left: 3, start: 3}, %{type: 180, left: 8, start: 8}] =
+               enc(edited, 20).guards
+
+      assert {:ok, emptied, _} = Structures.edit_encounter(edited, 20, guards: %{1 => nil})
+      assert binary_part(emptied, @encounters + 20 * 24 + 5, 4) == <<0, 0, 180, 0x88>>
+      assert [%{slot: 2}] = enc(emptied, 20).guards
+    end
+
+    test "a tower is edited on both sides; a lair on its own record only" do
+      raw =
+        blank()
+        |> encounter(0, 33, 7, 0, 0)
+        |> encounter(6, 33, 7, 1, 0)
+        |> encounter(1, 12, 12, 0, 0)
+        |> encounter(20, 33, 7, 0, 8)
+
+      assert {:ok, edited, %{records: [0, 6]}} =
+               Structures.edit_encounter(raw, 6, gold: 77, intact: false)
+
+      assert %{gold: 77, intact: false} = enc(edited, 0)
+      assert %{gold: 77, intact: false} = enc(edited, 6)
+      assert %{gold: 0, intact: true} = enc(edited, 1)
+      # a lair on the same tile as the tower is not one of its sides
+      assert %{gold: 0, intact: true} = enc(edited, 20)
+
+      assert {:ok, lair, %{records: [20]}} = Structures.edit_encounter(raw, 20, gold: 5)
+      assert %{gold: 5} = enc(lair, 20)
+      assert %{gold: 0} = enc(lair, 0)
+    end
+
+    test "refuses bad values and writes nothing" do
+      raw = blank() |> encounter(20, 10, 11, 0, 8)
+
+      assert {:error, :no_such_encounter} = Structures.edit_encounter(raw, 21, gold: 1)
+      assert {:error, :bad_intact} = Structures.edit_encounter(raw, 20, intact: 1)
+      assert {:error, :bad_gold} = Structures.edit_encounter(raw, 20, gold: -1)
+      assert {:error, :bad_gold} = Structures.edit_encounter(raw, 20, gold: 30_001)
+      assert {:error, :bad_gold} = Structures.edit_encounter(raw, 20, gold: "5")
+      assert {:error, :bad_mana} = Structures.edit_encounter(raw, 20, mana: 40_000)
+      assert {:error, :bad_guards} = Structures.edit_encounter(raw, 20, guards: %{})
+      assert {:error, :bad_guards} = Structures.edit_encounter(raw, 20, guards: %{3 => {7, 1}})
+      assert {:error, :bad_guards} = Structures.edit_encounter(raw, 20, guards: %{1 => {198, 1}})
+      assert {:error, :bad_guards} = Structures.edit_encounter(raw, 20, guards: %{1 => {7, 0}})
+      assert {:error, :bad_guards} = Structures.edit_encounter(raw, 20, guards: %{1 => {7, 9}})
+      assert {:error, :bad_guards} = Structures.edit_encounter(raw, 20, guards: [{1, {7, 1}}])
+      assert {:error, {:unknown_field, :spell}} = Structures.edit_encounter(raw, 20, spell: 1)
+      # a good field next to a bad one: nothing applied
+      assert {:error, :bad_mana} = Structures.edit_encounter(raw, 20, gold: 9, mana: -5)
+    end
+  end
+
   describe "move_encounter/3" do
     test "moves a lair to the other plane and leaves other encounters alone" do
       raw = blank() |> encounter(20, 10, 11, 0, 8) |> encounter(21, 30, 30, 1, 4)

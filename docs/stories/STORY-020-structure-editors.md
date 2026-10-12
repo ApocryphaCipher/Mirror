@@ -78,7 +78,23 @@ wiping them is the simple rule); the panel's notice says so. **Not checked:** th
 (`Units.stack/2`, `UnitTypes.display_name/1`) with owner, level, experience, damage and orders; in edit mode the ticked
 ones can be moved (STORY-019 has the rules and the game check). Editing a unit's own fields is not done.
 
-**Not done:** the lair panel; editing a unit's fields (type, level, experience, damage, owner).
+**Lairs and other encounter zones (2026-10-12).** The **🏚️ Lair** tool, and a View-mode click on a site with no city or
+units, open a panel for the encounter on the tile: a cave, dungeon, ancient temple, abandoned keep, monster lair, ruins,
+fallen temple, a node's guardians or a Tower of Wizardry (`Mirror.SaveFile.Encounters`, `MirrorWeb.LairPanel`,
+`Structures.edit_encounter/3`). In edit mode you can change:
+- the **Not cleared** state (`+3`);
+- each of the **two guard slots**: a unit type (names from `UnitTypes`) and a count 1 to 8, written with both nibbles equal as
+  every full slot in the saves is (low nibble = left, high = starting; a half-fought guard shows "started with N" and keeps
+  its count if untouched); an empty slot is type 0, count 0 (all 247 empty slots seen);
+- **gold and mana** (i16, 0 to 30000; the largest seen are 620 and 330).
+A tower is two records (an Arcanus and a Myrror side) with the same guards, and the game clears both together, so a tower is
+edited on **both**. Not editable: the **spell reward code** (`+14`: it is 0 to 6 in every save, so it is a code, not a spell id,
+and what the codes mean is not decoded), the flags, and the items (ids not decoded).
+**Real game (slot 5, vault checkpoint 98):** the abandoned keep near Kevin's capital rewritten to 1 Sprite and 2 High Elf Pegasai,
+777 gold and 333 mana loaded with the game's memory identical to the file (guard counts `0x11` and `0x22`). *Not yet seen:* the
+battle and the reward screen after winning.
+
+**Not done:** editing a unit's fields (type, level, experience, damage, owner); decoding the spell reward code and the items.
 **Size:** large (do incrementally)
 
 ## What to do
