@@ -1,7 +1,7 @@
 # STORY-046: Tower of Wizardry: what clearing it changes, and its lit look
 
 **Parent:** [EPIC-004](../epics/EPIC-004-overland-map-features.md)
-**Status:** open, ready to start. Nothing is decoded about this yet beyond the guesses below.
+**Status:** open. What clearing a tower writes is decoded (the evidence section below, 2026-10-10) and Kevin saw the lit look; what is left is comparing the game's pixels with `#69` and `#70`, and whether it animates.
 **Size:** small to medium (mostly one live experiment)
 **Raised by:** [Kevin](https://github.com/KevinAsbury), 2026-10-07: the game draws a Tower of
 Wizardry differently, "lit up", once it has been cleared of its occupants.

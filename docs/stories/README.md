@@ -16,8 +16,8 @@
 - [STORY-016](STORY-016-edit-mode-shell.md): edit mode shell (EPIC-006) **Done**
 - [STORY-017](STORY-017-terrain-editing-autotile.md): terrain editing with auto-tiling via `TERRTYPE.LBX` (EPIC-006)
 - [STORY-018](STORY-018-roads-specials-editing.md): roads, corruption, resource editing (EPIC-006) **Done** (checked in the real game; bridges untried)
-- [STORY-019](STORY-019-move-structures.md): select and move structures and unit stacks (EPIC-006)
-- [STORY-020](STORY-020-structure-editors.md): structure detail editors (EPIC-006)
+- [STORY-019](STORY-019-move-structures.md): select and move cities, towers, lairs, magic nodes and unit stacks (EPIC-006) **Done** except moving a node to the other plane and a look at a moved lair on screen (it was read back from memory only)
+- [STORY-020](STORY-020-structure-editors.md): structure detail editors: city (name, population, buildings, enchantments, race, owner), lair, node and unit panels (EPIC-006) **Mostly done**; a unit's type, enchantments and max moves, a hero's owner and the meaning of the lair treasure code left
 - [STORY-021](STORY-021-save-round-trip-safety.md): save round-trip safety (EPIC-006) **Done**
 - [STORY-022](STORY-022-bug-raw-value-paint-artifacts.md): **bug**: stray raw-value paint shows up as map artifacts (EPIC-006) **Partially fixed**
 - [STORY-023](STORY-023-bug-edit-paint-no-live-redraw.md): **bug**: painting in edit mode doesn't redraw the tile until reload (EPIC-006) **Fixed**
@@ -26,7 +26,7 @@
 - [STORY-026](STORY-026-bug-discard-and-stuck-edit-state.md): **bug**: Discard does nothing (in-app browser swallows `confirm()`); edits feel impossible to clear (EPIC-006) **Fixed**
 - [STORY-027](STORY-027-cycle-tile-tool.md): Cycle tool: click steps a tile to the next picture (#134 → #135); today's click-to-paint becomes the Paint tool (EPIC-006) **Done**
 - [STORY-028](STORY-028-floating-tool-palette.md): floating emoji tool palette (🔄 Cycle, 🎨 Paint) with Cycle instructions and a Paint panel (brush size, quick terrain buttons) (EPIC-006, nice-to-have)
-- [STORY-029](STORY-029-safe-editing-see-everything.md): safe map editing: see everything past the fog, and flag impossible states, movement-aware (units on water are fine if they fly, swim, sail or walk on water) (EPIC-006, open; unblocked 2026-10-07)
+- [STORY-029](STORY-029-safe-editing-see-everything.md): safe map editing: see everything past the fog, and flag impossible states, movement-aware (units on water are fine if they fly, swim, sail or walk on water) (EPIC-006, open; unblocked 2026-10-07; the movement-aware rule is written, the checker is not)
 - [STORY-030](STORY-030-docker-image-and-compose.md): Docker release image + `compose.yaml`, game files mounted read-write, never baked in (EPIC-007) **Done**
 - [STORY-031](STORY-031-spike-download-own-gog-copy.md): **spike**: script the download of the user's own GOG purchase (their GOG login), feeding `mix mirror.import_game` (EPIC-007)
 - [STORY-032](STORY-032-cities-walls-labels-verify.md): cities follow-up: walls, name labels, check size frame / flag colour against the real game (EPIC-004) **Done**
@@ -43,4 +43,4 @@
 - [STORY-043](STORY-043-maintainability.md): maintainability: split map_live.ex, dead code (EPIC-008) **Done**
 - [STORY-044](STORY-044-bug-stale-overlays-across-tabs.md): **bug**: cities/units/sites overlays go stale on cross-tab save updates (EPIC-004) **Fixed**
 - [STORY-045](STORY-045-enchanted-road-shimmer.md): enchanted roads shimmer on the overlay clock, frame `step mod 6` like the game (EPIC-005) **Done**
-- [STORY-046](STORY-046-tower-of-wizardry-lit-look.md): what clearing a Tower of Wizardry changes, and its lit look (EPIC-004)
+- [STORY-046](STORY-046-tower-of-wizardry-lit-look.md): what clearing a Tower of Wizardry changes, and its lit look (EPIC-004); what clearing writes is decoded, the lit picture is not yet compared with the game
