@@ -283,6 +283,28 @@ defmodule Mirror.SaveFile.StructuresTest do
       assert city_at(swapped, 0).walled
     end
 
+    test "unticking everything leaves nothing behind, replaced buildings included" do
+      raw =
+        blank()
+        |> city(0, "A", 1, 1, 0, 0)
+        |> with_buildings(0, %{
+          22 => :replaced,
+          23 => :replaced,
+          24 => :built,
+          26 => :built,
+          35 => :built
+        })
+
+      assert {:ok, edited, _} = Structures.edit_city(raw, 0, buildings: [])
+      assert city_at(edited, 0).buildings == %{}
+
+      # dropping the top of a chain brings back only what was asked for
+      assert {:ok, partial, _} = Structures.edit_city(raw, 0, buildings: [23, 26, 35])
+      assert building_state(partial, 0, 22) == 0xFF
+      assert building_state(partial, 0, 23) == 1
+      assert building_state(partial, 0, 24) == 0xFF
+    end
+
     test "only the building bytes change, and byte 0 stays 0" do
       raw = blank() |> city(0, "A", 1, 1, 0, 0) |> with_buildings(0, %{35 => :built})
       assert {:ok, edited, _} = Structures.edit_city(raw, 0, buildings: [35, 26])
@@ -343,6 +365,13 @@ defmodule Mirror.SaveFile.StructuresTest do
 
       assert %{population: 7, enchantments: %{famine: 1, nature_ward: 0, wall_of_fire: 4}} =
                city_at(edited, 0)
+    end
+
+    test "the neutral record (5) is a caster like any other" do
+      raw = blank() |> city(0, "A", 1, 1, 0, 0)
+      assert {:ok, edited, _} = Structures.edit_city(raw, 0, enchantments: %{famine: 5})
+      assert :binary.at(edited, 0x8AAC + 67 + 7) == 6
+      assert %{enchantments: %{famine: 5}} = city_at(edited, 0)
     end
 
     test "refuses an unknown enchantment or a caster outside 0..5" do

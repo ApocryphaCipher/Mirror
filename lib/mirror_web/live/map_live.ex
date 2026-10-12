@@ -2216,7 +2216,7 @@ defmodule MirrorWeb.MapLive do
               >
                 <option value="" selected={row.caster == nil}>none</option>
                 <option
-                  :for={{index, wizard} <- @details.owners}
+                  :for={{index, wizard} <- CityPanel.caster_options(@details, row)}
                   value={index}
                   selected={row.caster == index}
                 >

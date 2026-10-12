@@ -35,7 +35,9 @@ defmodule MirrorWeb.CityPanel do
         buildings: buildings(city, :built),
         building_states: city.buildings,
         enchantment_casters: city.enchantments,
-        owners: for(owner <- 0..4, name = Map.get(names, owner), name != "", do: {owner, name}),
+        owners:
+          for(owner <- 0..4, name = Map.get(names, owner), name != "", do: {owner, name}) ++
+            [{5, "Neutral"}],
         replaced: buildings(city, :replaced),
         enchantments: enchantments(city, names),
         road_links:
@@ -112,66 +114,99 @@ defmodule MirrorWeb.CityPanel do
   end
 
   @doc """
+  The options of one enchantment's caster select: the wizards, the neutral record, and the
+  current caster too if it is none of those (a record without a name), so that applying the
+  form never silently changes who cast it.
+  """
+  @spec caster_options(details(), map()) :: [{non_neg_integer(), String.t()}]
+  def caster_options(details, %{caster: caster}) do
+    if is_nil(caster) or Enum.any?(details.owners, fn {index, _} -> index == caster end),
+      do: details.owners,
+      else: details.owners ++ [{caster, "Wizard #{caster + 1}"}]
+  end
+
+  @doc """
   The edit form's params (`%{"name" => ..., "population" => ...}`) as the keyword list
   `Structures.edit_city/3` takes, keeping only what differs from `details`. `{:ok, []}`
   when nothing changed; `{:error, :bad_population}` for a population that is not a whole
-  number.
+  number, `{:error, :bad_buildings}` for a building list that is not a list of whole numbers
+  (nothing is guessed or dropped: a malformed list is refused, not read as "no buildings").
   """
-  @spec changes(map(), details()) :: {:ok, keyword()} | {:error, :bad_population}
+  @spec changes(map(), details()) ::
+          {:ok, keyword()} | {:error, :bad_population | :bad_buildings | :bad_enchantments}
   def changes(params, details) do
     name = params |> Map.get("name", details.name) |> String.trim()
     population = Map.get(params, "population", Integer.to_string(details.population))
 
-    with {:ok, population} <- parse_population(population) do
+    with {:ok, population} <- parse_population(population),
+         {:ok, buildings} <- building_changes(params, details),
+         {:ok, enchantments} <- enchantment_changes(params, details) do
       scalars =
         [name: name, population: population]
         |> Enum.reject(fn {field, value} -> Map.fetch!(details, field) == value end)
 
-      {:ok, scalars ++ building_changes(params, details) ++ enchantment_changes(params, details)}
+      {:ok, scalars ++ buildings ++ enchantments}
     end
   end
 
   # The checklist posts the ids of the boxes that are ticked, plus a marker so that
   # "all unticked" is different from "the form had no checklist".
   defp building_changes(%{"buildings_present" => _} = params, details) do
-    wanted =
-      params
-      |> Map.get("buildings", [])
-      |> List.wrap()
-      |> Enum.flat_map(fn id ->
-        case Integer.parse(to_string(id)) do
-          {n, ""} -> [n]
-          _ -> []
-        end
-      end)
-      |> Enum.sort()
-      |> Enum.uniq()
+    with {:ok, ids} <- parse_building_ids(Map.get(params, "buildings", [])) do
+      wanted = ids |> Enum.sort() |> Enum.uniq()
 
-    if wanted == details.building_states |> Map.keys() |> Enum.sort(),
-      do: [],
-      else: [buildings: wanted]
+      if wanted == details.building_states |> Map.keys() |> Enum.sort(),
+        do: {:ok, []},
+        else: {:ok, [buildings: wanted]}
+    end
   end
 
-  defp building_changes(_params, _details), do: []
+  defp building_changes(_params, _details), do: {:ok, []}
 
-  # One select per enchantment ("" for none, else the caster's wizard index); only the ones
-  # that differ from the city are changes.
-  defp enchantment_changes(%{"enchantments_present" => _, "enchantments" => chosen}, details)
-       when is_map(chosen) do
-    changed =
-      for name <- Cities.enchantment_names(),
-          {:ok, caster} <- [parse_caster(Map.get(chosen, Atom.to_string(name)))],
-          caster != Map.get(details.enchantment_casters, name),
-          into: %{},
-          do: {name, caster}
-
-    if changed == %{}, do: [], else: [enchantments: changed]
+  # Every value must be a whole number; a range check is `Structures.edit_city/3`'s job.
+  defp parse_building_ids(values) when is_list(values) do
+    Enum.reduce_while(values, {:ok, []}, fn value, {:ok, acc} ->
+      case is_binary(value) && Integer.parse(value) do
+        {n, ""} -> {:cont, {:ok, [n | acc]}}
+        _ -> {:halt, {:error, :bad_buildings}}
+      end
+    end)
   end
 
-  defp enchantment_changes(_params, _details), do: []
+  defp parse_building_ids(_values), do: {:error, :bad_buildings}
 
-  # `{:ok, nil}` for "none", `{:ok, wizard_index}`, or `:error` (a field that was not posted
-  # or is not a wizard index is left as it is).
+  # One select per enchantment ("" for none, else the caster's wizard record 0..5); only the
+  # ones that differ from the city are changes. A value that is not one of those, or a name that
+  # is not an enchantment, is refused like a malformed building list, not skipped.
+  defp enchantment_changes(%{"enchantments_present" => _} = params, details) do
+    case Map.get(params, "enchantments", %{}) do
+      chosen when is_map(chosen) ->
+        known = Map.new(Cities.enchantment_names(), &{Atom.to_string(&1), &1})
+
+        Enum.reduce_while(chosen, {:ok, %{}}, fn {key, value}, {:ok, acc} ->
+          with {:ok, name} <- Map.fetch(known, key),
+               {:ok, caster} <- parse_caster(value) do
+            if caster == Map.get(details.enchantment_casters, name),
+              do: {:cont, {:ok, acc}},
+              else: {:cont, {:ok, Map.put(acc, name, caster)}}
+          else
+            _ -> {:halt, {:error, :bad_enchantments}}
+          end
+        end)
+        |> then(fn
+          {:ok, changed} when map_size(changed) == 0 -> {:ok, []}
+          {:ok, changed} -> {:ok, [enchantments: changed]}
+          error -> error
+        end)
+
+      _ ->
+        {:error, :bad_enchantments}
+    end
+  end
+
+  defp enchantment_changes(_params, _details), do: {:ok, []}
+
+  # `{:ok, nil}` for "none", `{:ok, wizard_index}` or `:error`.
   defp parse_caster(""), do: {:ok, nil}
 
   defp parse_caster(value) when is_binary(value) do
