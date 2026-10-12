@@ -50,7 +50,7 @@ From kazzmir's `UnitData` (`load/load.go`); `+0..+5` and `+18` are already read 
 | `+6` | hero slot |
 | `+8` | moves left |
 | `+9` `+10` | **go-to destination x, y**: `0, 0` when there is no order; with status 3 it is always set (49 of 49 units in the saves). Clearing it and the status stopped a moved unit walking off (checked in the game, STORY-019) |
-| `+11` | status: 0 idle (627 units, never with a target), 1 sentry (*guess*), 3 go-to (always with a target), 4 some work (*guess*: 14 units, no target; Kevin's Sky Drakes carry it) |
+| `+11` | status: 0 ready (627 units, never with a target), 1 sentry (*guess*), 3 go-to (always with a target), **4 idle after a turn**: the game turns a no-orders unit's 0 into 4 when a turn resolves (checked: three moved Sky Drakes and a spirit went from 0 to 4 over an End Turn, STORY-019) |
 | `+12` | level |
 | `+14` `+15` | experience (i16) |
 | `+17` | damage |

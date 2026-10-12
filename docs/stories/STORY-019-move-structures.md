@@ -78,8 +78,9 @@ tool now lays a plain road under a moved city when its new tile has none, in the
 **Units on their own (2026-10-11).** `Structures.move_units/3` moves any live units of one owner to a tile:
 refused off the map, onto another player's city or units, and past 9 units on a tile (the game's limit, and the
 most seen in any save). It writes x, y and plane, and **clears orders**: a unit with a go-to target or doing work
-gets status 0 and no target (status 3 always had a target in the 49 saves' cases, status 0 never did). Sentry (1) is
-kept. It warns, without refusing, about a land unit left on water and a boat left on land outside a city, judged
+gets status 0 and no target (status 3 always had a target in the saves, status 0 never did). Sentry (1) and the
+"idle after a turn" 4 are kept: the game gives a no-orders unit a 4 when a turn resolves (units I moved with
+status 0 were 4 after the End Turn), so 4 is not an order. It warns, without refusing, about a land unit left on water and a boat left on land outside a city, judged
 from `UnitMovement`. In the UI this is the **👥 Units** tool: click a tile to list its units (type names from
 `UnitTypes`, owner, level, experience, damage, orders), tick some, press Move, click the destination; one undo step.
 **Real game (slot 6, vault checkpoints 95 and 96):** a Guardian Spirit with a go-to order, three of six Sky

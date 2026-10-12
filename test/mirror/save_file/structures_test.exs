@@ -426,7 +426,7 @@ defmodule Mirror.SaveFile.StructuresTest do
       assert length(diff) == 6
     end
 
-    test "a go-to order or a work status is cleared; sentry is kept" do
+    test "a go-to order is cleared; sentry and idle-after-a-turn are kept" do
       raw =
         blank()
         |> unit(0, 5, 5, 0, 2)
@@ -441,7 +441,7 @@ defmodule Mirror.SaveFile.StructuresTest do
       assert {:ok, moved, _} = Structures.move_units(raw, [0, 1, 2, 3], {6, 6, 0})
       assert binary_part(unit_at(moved, 0), 9, 3) == <<0, 0, 0>>
       assert binary_part(unit_at(moved, 1), 9, 3) == <<0, 0, 1>>
-      assert binary_part(unit_at(moved, 2), 9, 3) == <<0, 0, 0>>
+      assert binary_part(unit_at(moved, 2), 9, 3) == <<0, 0, 4>>
       assert binary_part(unit_at(moved, 3), 9, 3) == <<0, 0, 0>>
     end
 

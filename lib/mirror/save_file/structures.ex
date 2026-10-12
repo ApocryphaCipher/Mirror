@@ -340,7 +340,6 @@ defmodule Mirror.SaveFile.Structures do
 
   @max_stack 9
   @goto_status 3
-  @work_status 4
 
   @doc """
   Moves the units `indexes` (record indexes in the units block, as in `Units.stack/2`) to
@@ -349,9 +348,10 @@ defmodule Mirror.SaveFile.Structures do
   They must be live units of one owner. Refused: a destination off the map; a city of another
   owner there; units of another owner there; a stack that would hold more than #{@max_stack} units
   (the game's limit, and the most seen in any save). Only x, y and plane are written, plus the
-  orders: a unit with a go-to target (status #{@goto_status}, always with a target in the saves) or doing work
-  (status #{@work_status}) gets status 0 and no target, so it does not walk off again; sentry (1) is
-  left alone. *Guess*, not yet checked in the game.
+  go-to order: a unit with a go-to target (status #{@goto_status}, always with a target in the saves, or a
+  target on a status 0 unit) gets status 0 and no target, so it does not walk off again. Other
+  statuses (1 sentry, 4 idle after a turn) are left alone. Checked in the game: a spirit with such
+  an order stayed where it was put after an End Turn.
 
   The result's `warnings` lists units that cannot stand there by themselves
   (`{:cannot_be_on_water, types}` for a land unit on a water tile, `{:boat_on_land, types}` for
@@ -377,7 +377,7 @@ defmodule Mirror.SaveFile.Structures do
           <<_::binary-size(9), dx, dy, status, _::binary>> = binary_part(acc, at, 12)
           acc = put(acc, at, <<x, y, plane>>)
 
-          if status in [@goto_status, @work_status] or ((dx != 0 or dy != 0) and status == 0),
+          if status == @goto_status or ((dx != 0 or dy != 0) and status == 0),
             do: put(acc, at + 9, <<0, 0, 0>>),
             else: acc
         end)

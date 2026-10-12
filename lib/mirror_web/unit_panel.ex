@@ -9,7 +9,7 @@ defmodule MirrorWeb.UnitPanel do
 
   @sentry 1
   @goto 3
-  @working 4
+  @idle 4
 
   @doc "The units on `{x, y, plane}` (plane 0 or 1) as rows for the panel, in save order."
   @spec rows(binary(), {integer(), integer(), 0 | 1}) :: [map()]
@@ -31,11 +31,12 @@ defmodule MirrorWeb.UnitPanel do
     end
   end
 
-  # Status 3 is a go-to order and always has a target in the saves; 4 is some kind of work and
-  # 1 is sentry (*guesses* from the save counts, not checked in the game).
+  # Status 3 is a go-to order and always has a target in the saves; 4 is what the game gives a unit
+  # with no orders when a turn resolves (seen: units moved with status 0 became 4 after End Turn);
+  # 1 is sentry (*guess* from the save counts).
   defp orders(%{status: @goto, destination: {x, y}}), do: "going to (#{x}, #{y})"
   defp orders(%{status: @sentry}), do: "sentry"
-  defp orders(%{status: @working}), do: "working"
+  defp orders(%{status: @idle}), do: nil
   defp orders(_unit), do: nil
 
   @doc """
