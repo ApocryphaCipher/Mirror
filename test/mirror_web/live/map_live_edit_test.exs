@@ -2250,6 +2250,55 @@ defmodule MirrorWeb.MapLiveEditTest do
       refute changed(view) =~ "edited"
     end
 
+    defp edit_units_form(view, ids, fields) do
+      view
+      |> element("#units-form")
+      |> render_submit(%{"units" => Map.merge(%{"picked" => ids, "op" => "edit"}, fields)})
+    end
+
+    test "the ticked units' level, experience, damage and owner are edited in one undo step",
+         %{conn: conn, dir: dir} do
+      view = editing(conn, units_save(dir), "units")
+      click(view, 10, 10)
+
+      edit_units_form(view, ["0", "1"], %{"level" => "3", "experience" => "150", "damage" => "2"})
+      assert has_element?(view, "#units-note", "Edited 2 units: level 3, 150 xp, damage 2")
+      assert upanel(view) =~ "level 3 · 150 xp · damage 2"
+      assert changed(view) =~ "1 edited"
+
+      target = Path.join(dir, "SAVE5.GAM")
+      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+
+      assert [%{level: 3, experience: 150, damage: 2}, %{level: 3}, %{level: 0}] =
+               Mirror.SaveFile.Units.stack(File.read!(target), {10, 10, 0})
+
+      render_click(view, "undo", %{})
+      assert upanel(view) =~ "level 0 · 0 xp"
+      refute upanel(view) =~ "level 3 · 150 xp"
+    end
+
+    test "an owner change needs the whole stack; a refused edit says why", %{
+      conn: conn,
+      dir: dir
+    } do
+      view = editing(conn, units_save(dir), "units")
+      click(view, 10, 10)
+
+      edit_units_form(view, ["0"], %{"owner" => "1"})
+      assert has_element?(view, "#units-note", "Other units stay behind")
+
+      edit_units_form(view, ["0", "1", "2"], %{"owner" => "1"})
+      assert has_element?(view, "#units-note", "Edited 3 units: owner")
+      assert changed(view) =~ "1 edited"
+
+      edit_units_form(view, ["0"], %{"level" => "12"})
+      assert has_element?(view, "#units-note", "Level is a whole number")
+      edit_units_form(view, ["0"], %{"experience" => "lots"})
+      assert has_element?(view, "#units-note", "Experience is a whole number")
+      edit_units_form(view, ["0"], %{"level" => ""})
+      assert has_element?(view, "#units-note", "Nothing to change")
+    end
+
     test "a refused destination says why and keeps the units picked", %{conn: conn, dir: dir} do
       view = editing(conn, units_save(dir), "units")
       click(view, 10, 10)

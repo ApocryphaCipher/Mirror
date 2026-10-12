@@ -111,7 +111,17 @@ and only "not cleared" goes. Owners are not tied to a Guardian Spirit unit (37 o
 her aura and stayed hers (memory owner 1); a node made neutral with its guardians restored showed no aura and stayed neutral (owner 0xFF,
 guards 3 and 2 intact); the warped flag loaded and survived the turn, and the warped node's tile showed a **distortion animation**.
 
-**Not done:** editing a unit's fields (type, level, experience, damage, owner); what the treasure code means (it does not decide the reward) and the item ids.
+**Editing units (2026-10-12).** In edit mode the units panel changes the ticked units' **level** (`+12`), **experience** (`+14`), **damage** (`+17`)
+and **owner** (`+3`) (`Structures.edit_units/3`, `UnitPanel.changes/1`); an empty field is left alone, and one apply is one undo step. A new owner
+clears a go-to order. Refused: an owner change for a hero (he is also in his wizard's hero list), onto a tile with another owner's city, or when
+other units stay behind (tick the whole stack). Limits are mine: level 0 to 9, experience 0 to 30000, damage 0 to 255.
+**Real game (slot 7, vault checkpoints 103 and 104, Kevin at the keyboard):** Lizardman Spearmen set to level 3 with 0 xp showed "Elite (0 ep)" and
+Swordsmen set to level 0 with 200 xp showed "Recruit (200 ep)": **the level byte is shown as it is on load**, not derived. Swordsmen with 4 damage
+showed one heart fewer. A melded node's Guardian Spirit given to Freya loaded as hers (blue marker, memory owner 1). **After one End Turn** the
+game had recomputed the levels from experience: the Spearmen were level 1 with 7 xp (they gained experience), the Swordsmen level 4 with xp
+**capped at 120**, damage healed by 1, the spirit still Freya's. So experience is the lasting field and level alone is overwritten at the next
+turn (the panel says so). Not checked: the levels and caps for heroes, who level on a longer table.
+**Not done:** editing a unit's type, enchantments, max moves; what the treasure code means (it does not decide the reward) and the item ids.
 **Size:** large (do incrementally)
 
 ## What to do
