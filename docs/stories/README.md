@@ -45,7 +45,7 @@
 - [STORY-045](STORY-045-enchanted-road-shimmer.md): enchanted roads shimmer on the overlay clock, frame `step mod 6` like the game (EPIC-005) **Done**
 - [STORY-046](STORY-046-tower-of-wizardry-lit-look.md): what clearing a Tower of Wizardry changes, and its lit look (EPIC-004); what clearing writes is decoded, the lit picture is not yet compared with the game
 - [STORY-047](STORY-047-wizard-page-read-only.md): the `/wizard/:id` page, read-only, with the flag-colour gradient (EPIC-009) **Built, PR open; the game-screen check is pending**
-- [STORY-048](STORY-048-wizard-basics-editing.md): edit a wizard's gold, mana, fame, name, books and retorts (EPIC-009) **Proposed**
+- [STORY-048](STORY-048-wizard-basics-editing.md): edit a wizard's gold, mana, fame, name, books and retorts (EPIC-009) **Built, checked in the real game; PR open**
 - [STORY-049](STORY-049-wizard-spells-and-research.md): the spell library and what is being researched (EPIC-009) **Proposed**
 - [STORY-050](STORY-050-wizard-relations.md): relations between wizards, peace/war/attitude; decode first (EPIC-009) **Proposed**
 - [STORY-051](STORY-051-global-enchantments.md): global enchantments, see/add/remove; decode first (EPIC-009) **Proposed**

@@ -1,7 +1,7 @@
 # STORY-048: Edit a wizard's gold, mana, fame, name, books and retorts
 
 **Parent:** [EPIC-009](../epics/EPIC-009-wizard-editing.md)
-**Status:** open (2026-10-12), after STORY-047
+**Status:** built and checked in the real game (2026-10-12), PR open; limits still guesses, see Outcome
 **Size:** medium
 **Raised by:** [Kevin](https://github.com/KevinAsbury), 2026-10-12
 
@@ -34,3 +34,27 @@ One apply is one undo step. Changing the name also changes what every map panel 
   back from memory (`scripts/verify_loaded_save.py`) and a vault checkpoint recorded in this story.
 - Unit tests for `Structures.edit_wizard/3` (or the module it lands in) and LiveView tests for the form, refusing bad values
   and saying why.
+
+## Outcome (2026-10-12)
+
+Built: `Structures.edit_wizard/3` (gold, mana, fame, name, books, retorts; refuses with `:bad_gold`, `:bad_mana`, `:bad_fame`,
+`:bad_name`, `:bad_books`, `:bad_retorts`, `:no_such_wizard`), `WizardPanel.changes/2`, and an Edit button and form on `/wizard/:id`. One apply is
+one undo step on the Arcanus history; Undo and Save as are on the map pages. The neutral record and a nameless record are refused.
+
+**Real game, slot 7** (a SAVE2 copy built with this code; only the 24 intended bytes differed): Jafar renamed "Mirror Test", gold 12345, mana
+20000, fame 77, books Nature 0 to 3 (Sorcery 12 kept), Chaos Mastery added; Freya gold 30000, mana 30000, fame 5. Loaded with Load Game:
+
+- The main screen showed 12345 GP and 20000 MP, the Info screen the new name, 15 books and Chaos Mastery in the retort list, the Magic screen
+  a reserve of 20000. RAM equals the file except the game's own recomputation: **power base** (952 to 1129) and the order of two research candidates
+  (`+0x34`, `+0x36`). Casting skill (217) was unchanged.
+- After **one End Turn** everything held: Jafar gold 12345 to 12383 (+38, the main screen's "+38 Gold"), mana 20000 to 19981 (the screen's "-19 Mana"),
+  name, books, retorts and fame unchanged; Freya 30000 to 29959 gold and 29984 mana (normal AI spending).
+  Vault checkpoint 105, `wizard-edit-after-endturn` (collection mom-live-2026-10-12).
+- **Fame:** the Info screen showed **90** while RAM held the 77 we wrote, so the screen is not the raw field. *Guess:* it adds a bonus (the hero
+  Sir Harold, or the Famous retort); not tested. The stored field is the base.
+
+**Still guesses:** the limits the form enforces. Books to 13 per realm (15 total showed fine; 13 in one realm untried), fame to 30000 (the game took
+10008 earlier, higher untried), gold and mana to 30000 (30000 held; the game's own cap per the earlier notes, values above it untried). *To confirm:* a save with 13 books, and fame, gold
+and mana above 30000, loaded and read back.
+
+**Not done:** warnings for retort combinations. No rule has been checked against the game, so none is shown, and nothing is blocked.
