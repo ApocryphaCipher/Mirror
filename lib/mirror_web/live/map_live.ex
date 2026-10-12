@@ -430,6 +430,7 @@ defmodule MirrorWeb.MapLive do
           socket
           |> assign_from_state(state)
           |> assign_forms()
+          |> reset_picks()
           |> put_flash(:info, "Loaded save from #{normalized_path}.")
 
         socket =
@@ -2190,6 +2191,7 @@ defmodule MirrorWeb.MapLive do
               type="checkbox"
               name="units[picked][]"
               value={row.index}
+              aria-label={"#{row.name}, #{row.owner_name}"}
               checked={@armed == nil or row.index in @armed}
               class="mt-0.5"
             />
@@ -3195,6 +3197,8 @@ defmodule MirrorWeb.MapLive do
         socket
         |> assign_state(state)
         |> assign(move_pending: nil, move_note: "#{verb}: #{label}")
+        |> assign(unit_armed: nil, unit_note: "#{verb}: #{label}")
+        |> drop_empty_unit_panel()
         |> push_layer_parts(plane, parts)
         |> push_overlay_items()
         |> push_map_layers()
@@ -3203,6 +3207,15 @@ defmodule MirrorWeb.MapLive do
         socket
     end
   end
+
+  # After an undo or redo that moved units, the tile the panel was showing may be empty now.
+  defp drop_empty_unit_panel(%{assigns: %{unit_sel: nil}} = socket), do: socket
+
+  defp drop_empty_unit_panel(%{assigns: %{unit_sel: tile, state: %{save: %{raw: raw}}}} = socket) do
+    if UnitPanel.rows(raw, tile) == [], do: assign(socket, :unit_sel, nil), else: socket
+  end
+
+  defp drop_empty_unit_panel(socket), do: assign(socket, :unit_sel, nil)
 
   defp finish_history_step(socket, state, plane, parts) do
     socket
@@ -3812,8 +3825,23 @@ defmodule MirrorWeb.MapLive do
     if save_raw(previous_state) == save_raw(socket.assigns.state) do
       socket
     else
-      push_overlay_items(socket)
+      socket |> reset_picks() |> push_overlay_items()
     end
+  end
+
+  # The picked city, the armed units and the half-made move are indexes into one version of the
+  # save: when the save is replaced under them (a load, a discard, another tab's edit) they would
+  # point at other cities and units, so they are dropped.
+  defp reset_picks(socket) do
+    assign(socket,
+      city_sel: nil,
+      city_note: nil,
+      unit_sel: nil,
+      unit_armed: nil,
+      unit_note: nil,
+      move_pending: nil,
+      move_note: nil
+    )
   end
 
   defp save_raw(%{save: %{raw: raw}}), do: raw

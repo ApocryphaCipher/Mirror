@@ -89,8 +89,8 @@ order was gone (status 0, no target), and after an End Turn it **stayed where it
 off to its old target.
 
 **Not done:** nodes (a node is its terrain tile, so moving one needs a terrain move too, plus its aura
-tiles and guardian record) and units on their own (stack moves; a unit record also has a go-to target at
-`+9`/`+10`, see [../reference/unit-movement.md](../reference/unit-movement.md)), in the code and the UI.
+tiles and guardian record), in the code and the UI. What the unit status values 1 means (sentry is a guess) and
+the demon-wings case (mutation bit 8, covered by a unit test, never seen in a save) are unchecked in the game.
 **Size:** medium–large
 
 ## What to do

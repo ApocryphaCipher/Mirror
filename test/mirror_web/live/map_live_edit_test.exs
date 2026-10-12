@@ -2257,6 +2257,54 @@ defmodule MirrorWeb.MapLiveEditTest do
       refute has_element?(view, "#units-note", "cannot stand on water")
     end
 
+    test "loading another save drops armed units instead of moving whatever has those indexes", %{
+      conn: conn,
+      dir: dir
+    } do
+      path = units_save(dir)
+      view = editing(conn, path, "units")
+      click(view, 10, 10)
+      arm_units(view, ["0", "1"])
+      assert has_element?(view, "#units-note", "Moving 2 units")
+
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => path}})
+      refute has_element?(view, "#unit-panel")
+
+      # no longer armed: this click selects a tile, it does not move anything
+      click(view, 14, 10)
+      refute has_element?(view, "#units-note", "Moved")
+      refute changed(view) =~ "edited"
+    end
+
+    test "undoing a unit move leaves no stale notice or empty panel at the destination", %{
+      conn: conn,
+      dir: dir
+    } do
+      view = editing(conn, units_save(dir), "units")
+      click(view, 10, 10)
+      arm_units(view, ["0", "1", "2"])
+      click(view, 14, 10)
+      assert has_element?(view, "#units-note", "Moved 3 units")
+
+      render_click(view, "undo", %{})
+      refute has_element?(view, "#unit-panel")
+      refute render(view) =~ "Moved 3 units to (14, 10)"
+    end
+
+    test "each unit's checkbox has a name a screen reader can read", %{conn: conn, dir: dir} do
+      view = editing(conn, units_save(dir), "units")
+      click(view, 20, 20)
+
+      assert has_element?(
+               view,
+               ~s|#units-form input[type=checkbox][aria-label="Nomad Griffins, Wizard 3"]|
+             ) or
+               has_element?(
+                 view,
+                 ~s|#units-form input[type=checkbox][aria-label^="Nomad Griffins"]|
+               )
+    end
+
     test "View mode shows the units read-only, and a city wins over its garrison", %{
       conn: conn,
       dir: dir

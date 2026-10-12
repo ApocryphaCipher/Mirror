@@ -9,7 +9,8 @@ defmodule Mirror.SaveFile.UnitTypes do
   (Sky Drake 196 on Kevin's screen, the Lizardman units 120 and 121, Halfling 90); the order of
   the whole table is the game's own, since kazzmir's reads real saves.
 
-  `display_name/1` puts the race in front of the plain names that several races share
+  kazzmir's spellings were corrected where they are plainly typos ("Calvary", "ElvenLord",
+  "WereWolves"). `display_name/1` puts the race in front of the plain names that several races share
   ("Barbarian Spearmen"); heroes, fantastic creatures and the boats and catapult keep their own.
   """
 
@@ -116,7 +117,7 @@ defmodule Mirror.SaveFile.UnitTypes do
     99 => {"Magicians", :high_elf},
     100 => {"Settlers", :high_elf},
     101 => {"Longbowmen", :high_elf},
-    102 => {"ElvenLord", :high_elf},
+    102 => {"Elven Lord", :high_elf},
     103 => {"Pegasai", :high_elf},
     104 => {"Spearmen", :high_men},
     105 => {"Swordsmen", :high_men},
@@ -155,7 +156,7 @@ defmodule Mirror.SaveFile.UnitTypes do
     138 => {"Swordsmen", :orc},
     139 => {"Halberdiers", :orc},
     140 => {"Bowmen", :orc},
-    141 => {"Calvary", :orc},
+    141 => {"Cavalry", :orc},
     142 => {"Shamans", :orc},
     143 => {"Magicians", :orc},
     144 => {"Engineers", :orc},
@@ -182,7 +183,7 @@ defmodule Mirror.SaveFile.UnitTypes do
     165 => {"Skeletons", :fantastic},
     166 => {"Ghouls", :fantastic},
     167 => {"Night Stalker", :fantastic},
-    168 => {"WereWolves", :fantastic},
+    168 => {"Werewolves", :fantastic},
     169 => {"Demon", :fantastic},
     170 => {"Wraiths", :fantastic},
     171 => {"Shadow Demons", :fantastic},

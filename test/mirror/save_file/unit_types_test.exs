@@ -19,6 +19,11 @@ defmodule Mirror.SaveFile.UnitTypesTest do
     assert UnitTypes.race(154) == :fantastic
   end
 
+  test "kazzmir's plain typos are corrected" do
+    assert UnitTypes.display_name(141) == "Orc Cavalry"
+    refute Enum.any?(0..197, &(UnitTypes.name(&1) in ["Calvary", "ElvenLord", "WereWolves"]))
+  end
+
   test "an id outside the table is named, not a crash" do
     assert UnitTypes.name(198) == "unit 198"
     assert UnitTypes.display_name(-1) == "unit -1"

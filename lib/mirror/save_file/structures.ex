@@ -29,7 +29,8 @@ defmodule Mirror.SaveFile.Structures do
       from the roads and the city positions when it loads a save (checked
       2026-10-11: a save with stale links came out of the load with none, while
       the untouched save kept its real ones; STORY-019).
-    * **Units' own go-to targets**, if the record has any, are not known.
+    * **Units' status and go-to target** are cleared only by `move_units/3` (a go-to order);
+      `docs/reference/unit-movement.md` has the bytes, and what status 1 means is a guess.
 
   Each kind of move was loaded in the real game (STORY-019 has the results);
   `docs/reference/real-game-acceptance.md` says how to check one.
@@ -459,7 +460,11 @@ defmodule Mirror.SaveFile.Structures do
 
     stuck =
       for u <- moving,
-          not Mirror.SaveFile.UnitMovement.can_be_on_water?(u.type, enchantments(raw, u.index)),
+          not Mirror.SaveFile.UnitMovement.can_be_on_water?(
+            u.type,
+            enchantments(raw, u.index),
+            mutations(raw, u.index)
+          ),
           do: u.type
 
     boats = for u <- moving, Mirror.SaveFile.UnitMovement.sails?(u.type), do: u.type
@@ -474,6 +479,11 @@ defmodule Mirror.SaveFile.Structures do
       true ->
         []
     end
+  end
+
+  defp mutations(raw, index) do
+    {base, _} = Units.block_range()
+    :binary.at(raw, base + index * @unit_record + 23)
   end
 
   defp enchantments(raw, index) do

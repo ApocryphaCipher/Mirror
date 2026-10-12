@@ -495,6 +495,14 @@ defmodule Mirror.SaveFile.StructuresTest do
 
       assert {:ok, _, %{warnings: []}} = Structures.move_units(boat, [0], {8, 8, 0})
 
+      # demon wings (mutation bit 8, record +23) fly, whatever the type
+      winged = put(base, 0xB734 + 23, <<8>>)
+      assert {:ok, _, %{warnings: []}} = Structures.move_units(winged, [0], {8, 8, 0})
+      wingless = put(base, 0xB734 + 23, <<32>>)
+
+      assert {:ok, _, %{warnings: [cannot_be_on_water: [39]]}} =
+               Structures.move_units(wingless, [0], {8, 8, 0})
+
       # a land unit joining a boat on the water is aboard it
       aboard = base |> unit(1, 8, 8, 0, 2) |> unit_type(1, 36)
       assert {:ok, _, %{warnings: []}} = Structures.move_units(aboard, [0], {8, 8, 0})

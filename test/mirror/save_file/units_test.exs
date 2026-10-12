@@ -237,4 +237,55 @@ defmodule Mirror.SaveFile.UnitsTest do
       assert Units.items(raw, :myrror) == []
     end
   end
+
+  describe "stack/2" do
+    # Every decoded field gets a different non-zero value, so a wrong offset, width or sign shows.
+    defp full_record do
+      <<12, 15, 1, 3, 2, 39, 7, 1, 5, 20, 21, 3, 4, 99, -300::little-signed-16, 0, 6, 2, 0, 0, 0,
+        0, 8, 0x0D, 0x01, 0x01, 0x02, 0, 0, 0, 0>>
+    end
+
+    test "decodes level, experience, damage, hero slot, moves, status, destination, mutations and enchantments" do
+      assert byte_size(full_record()) == 32
+      raw = make_save([full_record(), make_unit_record(x: 12, y: 15, plane: 0, type: 45)])
+
+      assert [u] = Units.stack(raw, {12, 15, 1})
+
+      assert %{
+               index: 0,
+               x: 12,
+               y: 15,
+               plane: :myrror,
+               owner: 3,
+               max_moves: 2,
+               type: 39,
+               hero_slot: 7,
+               moves: 5,
+               destination: {20, 21},
+               status: 3,
+               level: 4,
+               experience: -300,
+               damage: 6,
+               mutations: 8,
+               enchantments: 0x0201010D
+             } = u
+    end
+
+    test "lists only the units on that tile and plane, and no dead ones" do
+      dead = <<12, 15, 0xFF, 0xFF, 2, 39>> <> :binary.copy(<<0>>, 26)
+
+      raw =
+        make_save([
+          make_unit_record(x: 12, y: 15, plane: 0, type: 39),
+          make_unit_record(x: 12, y: 15, plane: 1, type: 40),
+          make_unit_record(x: 13, y: 15, plane: 0, type: 41),
+          dead
+        ])
+
+      assert [%{index: 0, type: 39}] = Units.stack(raw, {12, 15, 0})
+      assert [%{index: 1, type: 40}] = Units.stack(raw, {12, 15, 1})
+      assert Units.stack(raw, {1, 1, 0}) == []
+      assert Units.stack(<<1, 2, 3>>, {12, 15, 0}) == []
+    end
+  end
 end

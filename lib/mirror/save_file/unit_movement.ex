@@ -75,17 +75,22 @@ defmodule Mirror.SaveFile.UnitMovement do
   @doc "True for non-corporeal types (spirits, wraiths, phantoms)."
   def non_corporeal?(type), do: MapSet.member?(@non_corporeal, type)
 
+  # Mutation bit 8 (record `+23`): Chaos Channels demon wings, which make a unit fly (kazzmir's
+  # `IsFlying`).
+  @demon_wings 8
+
   @doc """
-  True when a unit of `type` carrying the `enchantments` bits may stand on water
-  without help from a boat.
+  True when a unit of `type` carrying the `enchantments` bits (and, if given, the `mutations`
+  byte) may stand on water without help from a boat. Demon wings (mutation bit 8) fly.
 
   Wind Walking is counted as allowing it: kazzmir has the enchantment bit but
   `IsLandWalker` does not look at it. *Guess*, so a checker should treat it as fine.
   """
-  @spec can_be_on_water?(non_neg_integer(), non_neg_integer()) :: boolean()
-  def can_be_on_water?(type, enchantments \\ 0) do
+  @spec can_be_on_water?(non_neg_integer(), non_neg_integer(), non_neg_integer()) :: boolean()
+  def can_be_on_water?(type, enchantments \\ 0, mutations \\ 0) do
     flies?(type) or swims?(type) or sails?(type) or non_corporeal?(type) or
-      (enchantments &&& (@water_walking ||| @wind_walking ||| @flight)) != 0
+      (enchantments &&& (@water_walking ||| @wind_walking ||| @flight)) != 0 or
+      (mutations &&& @demon_wings) != 0
   end
 
   @doc "The unit types that fly, swim, sail or are non-corporeal, as a sorted list."
