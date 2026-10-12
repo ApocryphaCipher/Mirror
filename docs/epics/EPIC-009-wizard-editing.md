@@ -1,6 +1,6 @@
 # EPIC-009: Wizard editing: a page per wizard
 
-**Status:** proposed (2026-10-12), nothing built
+**Status:** in progress (2026-10-12): STORY-047 built, the rest not started
 **Owner:** [Kevin](https://github.com/KevinAsbury)
 **Requested:** 2026-10-12. Kevin: a `/wizard/:id` page that shows a wizard's information and lets you edit
 gold, mana, fame and special abilities (retorts); a relationship editor; the global enchantments, with the
@@ -17,7 +17,7 @@ of their own, reached from those names and from the header.
 ## Addresses
 
 `/wizard/1` is the player, `/wizard/2` to `/wizard/5` are the AI wizards in a full game, and **`/wizard/6` is reserved for the neutral
-player** (the save's record 5), which is a 404 unless STORY-047 finds something worth showing there. The
+player** (the save's record 5), which is a 404: STORY-047 looked (2026-10-12, SAVE1 to SAVE9) and found no name, gold, mana or books, only the banner and undecoded diplomacy bytes. The
 number is the **save's wizard record plus one** (record 0 is the player, which is what the rest of Mirror calls
 "wizard 0"; the page uses the human numbering). A small world has fewer wizards: a record with no name is "no such
 wizard" (404). The save holds a **sixth record, number 5, for the neutral player** (the brown banner: neutral cities,

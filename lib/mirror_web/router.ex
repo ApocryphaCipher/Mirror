@@ -23,6 +23,7 @@ defmodule MirrorWeb.Router do
     live "/myrror", MapLive, :myrror
     live "/tile-probe", TileProbeLive, :index
     live "/lab/:plane", MapLive, :lab
+    live "/wizard/:id", WizardLive, :show
   end
 
   # Other scopes may use custom stacks.
