@@ -49,4 +49,8 @@
 - [STORY-049](STORY-049-wizard-spells-and-research.md): the spell library and what is being researched (EPIC-009) **Proposed**
 - [STORY-050](STORY-050-wizard-relations.md): relations between wizards, peace/war/attitude; decode first (EPIC-009) **Proposed**
 - [STORY-051](STORY-051-global-enchantments.md): global enchantments, see/add/remove; decode first (EPIC-009) **Proposed**
-- [STORY-052](STORY-052-wizard-heroes-and-artifacts.md): heroes and artifacts, and a hero's owner; decode first (EPIC-009) **Proposed**
+- [STORY-052](STORY-052-hero-list-decode-and-view.md): decode the hero list; show a wizard's heroes (EPIC-010) **Proposed**
+- [STORY-053](STORY-053-hero-editing.md): edit a hero: name, experience, owner, dismiss (EPIC-010) **Proposed**
+- [STORY-054](STORY-054-artifact-decode.md): decode artifacts: the item record and where items live (EPIC-011) **Proposed**
+- [STORY-055](STORY-055-artifacts-view.md): show artifacts on heroes, the wizard page and lair panels (EPIC-011) **Proposed**
+- [STORY-056](STORY-056-artifacts-editing.md): edit, move and create artifacts (EPIC-011) **Proposed**

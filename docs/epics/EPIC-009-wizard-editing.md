@@ -37,7 +37,7 @@ spell library (`+0x264`, 214 states) and gold (`+0x356`).
 
 **Not decoded:** relations between wizards (peace, war, treaties, attitude), the global enchantments (which
 spells are active on the whole world and who cast them; *unknown* whether they live in the wizard record or a
-block of their own), heroes and their artifacts. kazzmir's loader (`game/magic/load/load.go`, the source the wizard
+block of their own). Heroes and artifacts are [EPIC-010](EPIC-010-heroes.md) and [EPIC-011](EPIC-011-artifacts.md). kazzmir's loader (`game/magic/load/load.go`, the source the wizard
 table already comes from) is the first place to look; every offset still has to be confirmed in the real game
 before it is written ([real-game-acceptance.md](../reference/real-game-acceptance.md)). The gap is why the stories
 are ordered read, then edit what is known, then decode and edit the rest.
@@ -49,6 +49,8 @@ are ordered read, then edit what is known, then decode and edit the rest.
 - [STORY-049](../stories/STORY-049-wizard-spells-and-research.md): the spell library and what is being researched
 - [STORY-050](../stories/STORY-050-wizard-relations.md): relations between wizards: peace, war, attitude (decode, then edit)
 - [STORY-051](../stories/STORY-051-global-enchantments.md): global enchantments: see, add, remove (decode, then edit)
-- [STORY-052](../stories/STORY-052-wizard-heroes-and-artifacts.md): heroes and artifacts, and a hero's owner (also unblocks STORY-020's hero case)
 
-Suggested order: 047, 048, 049, then 050 and 051 (each starts with a decode), then 052.
+Heroes and artifacts are their own epics, [EPIC-010](EPIC-010-heroes.md) and [EPIC-011](EPIC-011-artifacts.md); the wizard
+page shows their results once they exist.
+
+Suggested order: 047, 048, 049, then 050 and 051 (each starts with a decode).
