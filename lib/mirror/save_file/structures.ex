@@ -267,7 +267,7 @@ defmodule Mirror.SaveFile.Structures do
 
         case Cities.building_replaces(id) do
           nil -> st
-          replaced -> restore_replaced(st, replaced)
+          replaced -> restore_replaced(st, replaced, wanted)
         end
       end)
 
@@ -293,16 +293,18 @@ defmodule Mirror.SaveFile.Structures do
     for id <- 0..35, into: <<>>, do: <<Map.fetch!(state, id)>>
   end
 
-  # A replaced building comes back as built when nothing present still replaces it.
-  defp restore_replaced(state, replaced) do
+  # A replaced building comes back as built when nothing present still replaces it, and the
+  # caller asked for it: one that is not in `wanted` stays gone, whatever order they are handled in.
+  defp restore_replaced(state, replaced, wanted) do
     still_replaced? =
       Enum.any?(3..35, fn id ->
         Cities.building_replaces(id) == replaced and Map.fetch!(state, id) in [0, 1]
       end)
 
-    if Map.fetch!(state, replaced) == 0 and not still_replaced?,
-      do: Map.put(state, replaced, 1),
-      else: state
+    if MapSet.member?(wanted, replaced) and Map.fetch!(state, replaced) == 0 and
+         not still_replaced?,
+       do: Map.put(state, replaced, 1),
+       else: state
   end
 
   defp city_name_bytes(name) when is_binary(name) do
