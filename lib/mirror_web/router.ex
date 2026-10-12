@@ -11,6 +11,12 @@ defmodule MirrorWeb.Router do
     plug :put_secure_browser_headers
   end
 
+  # A wizard that does not exist answers 404; path params are not set until the route matches,
+  # so this runs after `:browser` and after matching.
+  pipeline :wizard_status do
+    plug MirrorWeb.WizardStatusPlug
+  end
+
   pipeline :api do
     plug :accepts, ["json"]
   end
@@ -23,6 +29,11 @@ defmodule MirrorWeb.Router do
     live "/myrror", MapLive, :myrror
     live "/tile-probe", TileProbeLive, :index
     live "/lab/:plane", MapLive, :lab
+  end
+
+  scope "/", MirrorWeb do
+    pipe_through [:browser, :wizard_status]
+
     live "/wizard/:id", WizardLive, :show
   end
 

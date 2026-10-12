@@ -32,12 +32,28 @@ defmodule MirrorWeb.WizardLiveTest do
     assert has_element?(view, "#wizard-switcher a[href='/wizard/2']", "Sharee")
   end
 
-  test "a missing wizard says so", %{conn: conn, sid: sid} do
-    load_save(sid)
+  test "a missing wizard answers 404 with the note; an existing one 200", %{conn: conn, sid: sid} do
+    assert get(conn, ~p"/wizard/6").status == 404
+    assert get(conn, ~p"/wizard/abc").status == 404
+    # in range, nothing loaded yet: 200 with "no save is loaded"
+    assert html_response(get(conn, ~p"/wizard/1"), 200) =~ "No save is loaded"
 
-    for id <- ["3", "6", "0", "abc"] do
-      {:ok, view, _} = live(conn, ~p"/wizard/#{id}")
-      assert has_element?(view, "#wizard-missing")
-    end
+    load_save(sid)
+    assert get(conn, ~p"/wizard/1").status == 200
+    resp = get(conn, ~p"/wizard/3")
+    assert html_response(resp, 404) =~ "There is no wizard 3"
+  end
+
+  test "the page says so when the wizard disappears from the save", %{conn: conn, sid: sid} do
+    load_save(sid)
+    {:ok, view, _} = live(conn, ~p"/wizard/2")
+    refute has_element?(view, "#wizard-missing")
+
+    # the loaded save changes underneath the open page (another tab, an undo, a new load)
+    raw = MirrorWeb.WizardPanelTest.synthetic()
+    <<head::binary-size(0x9E8 + 0x4C8 + 1), _::binary-size(20), tail::binary>> = raw
+    SessionStore.put(sid, %{save: %{raw: head <> :binary.copy(<<0>>, 20) <> tail}})
+
+    assert has_element?(view, "#wizard-missing", "There is no wizard 2")
   end
 end

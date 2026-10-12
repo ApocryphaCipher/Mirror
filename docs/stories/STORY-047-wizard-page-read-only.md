@@ -38,10 +38,11 @@ it read-only with the brown gradient, and if not `/wizard/6` stays a 404.
 Built: `MirrorWeb.WizardPanel` (pure, `details/2`), `MirrorWeb.WizardLive` at `/wizard/:id`, and links from the owner names in the
 city, node and unit panels (neutral stays plain text). The page shows the header numbers, books, retorts, research ratios, the spell being
 researched (its number and realm), known spells counted per realm, and the city, unit and node counts, on a gradient from the banner colour to black.
-A wizard switcher lists the named wizards.
+A wizard switcher lists the named wizards. A wizard that does not exist answers HTTP 404 (`MirrorWeb.WizardStatusPlug`) with the note on the page; an owner name links only when that wizard has a name.
 
 - **First question answered:** record 5 (the neutral player) has no name, gold, mana, books or retorts in SAVE1 to SAVE9 (checked
   2026-10-12); only its banner (5) and bytes in the undecoded diplomacy block are set. So `/wizard/6` is a 404, like any nameless record.
+- **Review fix:** the researched spell is at `+0x262` and the library at `+0x264` (the first version read both two bytes early); the test now places a single known spell at library byte 0 so a shift shows.
 - **Not done yet:** spell *names* (the page shows a number and realm; names need `SPELLDAT.LBX`, not read by Mirror yet), the portrait (id only), the
   summoning-circle link opens the right plane but does not centre the map (the map has no such parameter), and a wizard link in the map page header.
 - **Colours:** the page uses fixed CSS hues for the five banners and brown for neutral, close to the map's flags. *Guess* that

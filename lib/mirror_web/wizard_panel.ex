@@ -48,10 +48,16 @@ defmodule MirrorWeb.WizardPanel do
 
   def wizards(_raw), do: []
 
-  @doc "The page number of a map owner (a record index), or `nil` for the neutral player."
-  @spec page_id(term()) :: pos_integer() | nil
-  def page_id(owner) when is_integer(owner) and owner in 0..(@wizards - 1)//1, do: owner + 1
-  def page_id(_owner), do: nil
+  @doc """
+  The page number of a map owner (a record index) given the name the panel shows for it, or `nil`
+  when there is no page: the neutral player, or a record with no name (a small world).
+  """
+  @spec page_id(term(), term()) :: pos_integer() | nil
+  def page_id(owner, name)
+      when is_integer(owner) and owner in 0..(@wizards - 1)//1 and is_binary(name) and name != "",
+      do: owner + 1
+
+  def page_id(_owner, _name), do: nil
 
   @doc "The banner colour (a CSS colour) for a banner atom."
   @spec colour(atom()) :: String.t()
@@ -81,7 +87,7 @@ defmodule MirrorWeb.WizardPanel do
       <<_::binary-size(0x5A), books::binary-size(10), _::binary>> = rec
       <<_::binary-size(0x64), retorts::binary-size(18), _::binary>> = rec
 
-      <<_::binary-size(0x25A), research_left::little-16, mana::little-16, _::binary-size(2),
+      <<_::binary-size(0x25A), research_left::little-16, mana::little-16, _::binary-size(4),
         researching::little-16, library::binary-size(240), _::binary>> = rec
 
       <<_::binary-size(0x356), gold::little-16, _::binary>> = rec

@@ -30,8 +30,12 @@ defmodule MirrorWeb.WizardPanelTest do
     |> field(0, 0x5A, <<0::little-16, 12::little-16, 0::little-16, 3::little-16, 0::little-16>>)
     |> field(0, 0x64 + 0, <<1>>)
     |> field(0, 0x64 + 13, <<1>>)
-    |> field(0, 0x25A, <<383::little-16, 500::little-16, 0::little-16, 19::little-16>>)
-    |> field(0, 0x264, <<2, 2, 1>>)
+    |> field(
+      0,
+      0x25A,
+      <<383::little-16, 500::little-16, 2500::little-16, 0::little-16, 19::little-16>>
+    )
+    |> field(0, 0x264, <<2, 1, 1>>)
     |> field(0, 0x264 + 40, <<2>>)
     |> field(0, 0x356, <<1234::little-16>>)
     |> field(1, 0x01, String.pad_trailing("Sharee", 20, <<0>>))
@@ -55,7 +59,7 @@ defmodule MirrorWeb.WizardPanelTest do
     assert d.research_left == 383
 
     assert d.spells == [
-             {"Nature", 2},
+             {"Nature", 1},
              {"Sorcery", 1},
              {"Chaos", 0},
              {"Life", 0},
@@ -86,9 +90,11 @@ defmodule MirrorWeb.WizardPanelTest do
   test "wizards/1 lists the named wizards by page number; page_id maps owners" do
     assert WizardPanel.wizards(synthetic()) == [{1, "Jafar"}, {2, "Sharee"}]
     assert WizardPanel.wizards(nil) == []
-    assert WizardPanel.page_id(0) == 1
-    assert WizardPanel.page_id(4) == 5
-    assert WizardPanel.page_id(5) == nil
-    assert WizardPanel.page_id(nil) == nil
+    assert WizardPanel.page_id(0, "Jafar") == 1
+    assert WizardPanel.page_id(4, "Kali") == 5
+    assert WizardPanel.page_id(5, "Neutral") == nil
+    assert WizardPanel.page_id(nil, "Neutral") == nil
+    # a record with no name has no page, so its label stays text
+    assert WizardPanel.page_id(2, "") == nil
   end
 end

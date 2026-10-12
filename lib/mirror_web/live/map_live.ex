@@ -2950,7 +2950,7 @@ defmodule MirrorWeb.MapLive do
 
   # An owner's name: a link to the wizard's page for the five wizards, plain text for neutral.
   defp owner_link(assigns) do
-    assigns = assign(assigns, :page, MirrorWeb.WizardPanel.page_id(assigns.owner))
+    assigns = assign(assigns, :page, MirrorWeb.WizardPanel.page_id(assigns.owner, assigns.name))
 
     ~H"""
     <.link
