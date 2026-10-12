@@ -16,7 +16,8 @@ Lair panels already show "N items" and cannot edit them (STORY-020: "the items (
   roll an item into the record (a Chain Mail and a Sword were seen as rewards, 2026-10-12); the game ships item data
   files that are not in Mirror's manifest (the small `ITEM*` LBX files are on Kevin's Drive, `docs/backlog.md`).
 - **Found (2026-10-12), [wizard-heroes-diplomacy-items.md](../reference/wizard-heroes-diplomacy-items.md):** **the save has an item block of 138 records of 50 bytes at `0x6fb8`**, between the encounters and the cities (the sum checks); every item index in the save points into it. A record has the name, icon, slot, type, cost, eight stat bytes, charges and an ability mask. A hero's three items are at `+0x76 + 28n + 16`, a wizard's four vault items at `+0x120`. Checked on SAVE2: Sir Harold's item and Jafar's vault item read as real items with matching stats. **The "artifact database" is also in the game folder:** `ITEMDATA.LBX` (250 premade items), `ITEMPOW.LBX` (67 item powers) and `ITEMS.LBX`/`ITEMISC.LBX` (the art), which `ITEMMAKE.EXE`, the Create Artifact screen, reads.
-- **Unknown:** what the slot, type and ability codes mean, how a free item slot is marked, how an item is made from powers (the Create Artifact cost and book rules, which `ITEMMAKE.EXE` enforces) and whether the game checks an item on load at all.
+- **Checked in `ITEMMAKE.EXE` (Kevin, 2026-10-12):** its Item #1 is the first `ITEMDATA` record (Black Asp, sword, +1 Attack, Resist Elements, cost 250), so the item record, the type codes (the program's ten tabs in order) and the ability mask (the OR of the powers' masks) are confirmed for that item.
+- **Unknown:** what the slot codes and the other ability bits mean, how a free item slot is marked, how an item is made from powers (the Create Artifact cost and book rules, which `ITEMMAKE.EXE` enforces) and whether the game checks an item on load at all.
 
 ## Stories
 

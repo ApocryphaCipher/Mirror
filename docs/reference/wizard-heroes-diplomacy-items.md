@@ -78,12 +78,22 @@ free is not yet read.
 ## The game's own artifact data
 
 `ITEMMAKE.EXE` is the Create Artifact screen, a separate program the game runs. It reads:
-- **`ITEMDATA.LBX`**: one entry, 250 records of 56 bytes: the 250 **premade items** (name in the first 30 bytes, then
-  numbers). The save has a 250-byte table of "premade items still available" right after the heroes block (kazzmir
+- **`ITEMDATA.LBX`**: one entry, 250 records of 56 bytes: the 250 **premade items**. A record is the save's item record
+  (above) with a 6-byte tail: name (30), icon, slot, type, cost, the eight stat bytes, charges, abilities, then 6 bytes not
+  read. The save has a 250-byte table of "premade items still available" right after the heroes block (kazzmir
   `loadPremadeItems`, *guess:* 0 or 1 each).
-- **`ITEMPOW.LBX`**: one entry, 67 records of 30 bytes: the **item powers** ("+1 Attack" to "Spell Charges"), a name (22
-  bytes) and eight numbers (a kind, a realm for the spell-like ones, an amount, and bit masks that look like the `abilities` bits
-  above). The meaning of each number is not read yet.
+- **`ITEMPOW.LBX`**: one entry, 67 records of 30 bytes: the **item powers** ("+1 Attack" to "Spell Charges"). A record is a name
+  (22 bytes), then a kind (u8), a realm (u8), an amount (u8), a pad, and a **u32 ability mask**. The item's abilities are the OR of
+  its powers' masks.
+
+**Checked against `ITEMMAKE.EXE` itself (Kevin ran it, 2026-10-12, screenshot):** its first screen is "Item #1", **Black Asp**,
+a **Sword**, **+1 Attack** and **Resist Elements**, **Cost: 250**. The first `ITEMDATA` record reads exactly that: name "Black Asp", type 0,
+cost 250, attack 1, abilities `0x200`, and `0x200` is the mask of the Resist Elements power in `ITEMPOW`. So the program is an
+editor for the premade table (*guess:* it saves back to `ITEMDATA.LBX`), the item records above are right, and the
+**type codes follow the program's ten tabs in order: 0 Sword, 1 Mace, 2 Axe, 3 Bow, 4 Staff, 5 Wand, 6 Misc, 7 Shield, 8 Chain, 9 Plate**
+(three data points: Black Asp is type 0, Protection of Ramses is type 7, a mail shirt is type 8; the order between the others is the
+screen's order and unchecked). The power's **realm byte** is 0 Nature, 1 Sorcery, 2 Chaos, 3 Life, 4 Death, which matches every
+named spell power (Resist Elements is 0, Haste 1, Flaming 2, Holy Avenger 3, Vampiric 4).
 - **`ITEMS.LBX`** (116 pictures) and **`ITEMISC.LBX`** (36): the item art.
 
 The 250 premade names and the 67 powers are game data and stay out of the repository; the decoder will read them from
