@@ -159,12 +159,25 @@ defmodule MirrorWeb.WizardPanelTest do
       assert WizardPanel.changes(%{"researching" => "19", "research_left" => "383"}, d) ==
                {:ok, []}
 
-      assert WizardPanel.changes(%{"researching" => "98", "research_left" => "0"}, d) ==
-               {:ok, [researching: 98, research_left: 0]}
+      assert WizardPanel.changes(%{"researching" => "3", "research_left" => "0"}, d) ==
+               {:ok, [researching: 3, research_left: 0]}
 
-      assert WizardPanel.changes(%{"researching" => "0"}, d) == {:ok, [researching: 0]}
+      # 98 is not one of the game's candidates (19, 3, 53): its Research page could not show it
+      assert WizardPanel.changes(%{"researching" => "98"}, d) == {:error, :not_offered}
+      assert WizardPanel.changes(%{"researching" => "0"}, d) == {:error, :not_offered}
+
       assert WizardPanel.changes(%{"researching" => "x"}, d) == {:error, :bad_researching}
       assert WizardPanel.changes(%{"research_left" => "-"}, d) == {:error, :bad_research_left}
+    end
+
+    test "the research picker offers the game's candidates and the spell being researched", %{
+      d: d
+    } do
+      assert d.candidates == [19, 3, 53]
+      assert WizardPanel.research_options(d) == [19, 3, 53]
+      assert WizardPanel.research_options(%{d | researching_number: 98}) == [19, 3, 53, 98]
+      assert WizardPanel.research_options(%{d | researching_number: 0}) == [19, 3, 53]
+      assert WizardPanel.error_message(:not_offered) =~ "research list"
     end
 
     test "a spells value that is not a map is refused", %{d: d} do

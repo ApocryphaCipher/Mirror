@@ -78,6 +78,7 @@ defmodule MirrorWeb.WizardPanel do
       <<portrait, _::binary>> = rec
       <<_::binary-size(0x24), fame::little-16, power_base::little-16, _::binary>> = rec
       <<_::binary-size(0x2A), research, mana_pct, skill_pct, _::binary>> = rec
+      <<_::binary-size(0x34), candidates::binary-size(16), _::binary>> = rec
 
       <<_::binary-size(0x2E), cx::little-signed-16, cy::little-signed-16, cplane::little-16,
         _::binary>> = rec
@@ -129,6 +130,7 @@ defmodule MirrorWeb.WizardPanel do
         researching: spell(researching),
         research_left: research_left,
         researching_number: researching,
+        candidates: for(<<n::little-16 <- candidates>>, n in 1..214//1, do: n),
         library: :binary.bin_to_list(binary_part(library, 0, 214)),
         spells: known_by_realm(library),
         standing: standing(raw, record)
@@ -295,13 +297,29 @@ defmodule MirrorWeb.WizardPanel do
   defp spell_state(2, false), do: 1
   defp spell_state(state, false), do: state
 
+  # Only a spell the game offers for research (its eight candidates, `+0x34`) can be set: a spell that is not
+  # among them is researched and learned, but the game's Research page then shows nothing for it (checked
+  # 2026-10-12, STORY-049), so the page does not offer one. The spell already being researched stays allowed.
   defp research(params, details) do
     with {:ok, spell} <-
            optional_change(params, "researching", details.researching_number, :bad_researching),
+         :ok <- offered(spell, details),
          {:ok, left} <-
            optional_change(params, "research_left", details.research_left, :bad_research_left) do
       {:ok, Enum.reject([researching: spell, research_left: left], &(elem(&1, 1) == :same))}
     end
+  end
+
+  defp offered(:same, _details), do: :ok
+  defp offered(n, details), do: if(n in details.candidates, do: :ok, else: {:error, :not_offered})
+
+  @doc "The spells the research picker offers: the game's candidates, then the spell being researched if it is not one."
+  @spec research_options(map()) :: [pos_integer()]
+  def research_options(details) do
+    Enum.uniq(
+      details.candidates ++
+        if(details.researching_number > 0, do: [details.researching_number], else: [])
+    )
   end
 
   defp optional_change(params, key, current, error) do
@@ -404,6 +422,10 @@ defmodule MirrorWeb.WizardPanel do
     do: "A name is 1 to 19 letters, digits or punctuation (no accents)."
 
   def error_message(:bad_books), do: "Books are whole numbers from 0 to 13."
+
+  def error_message(:not_offered),
+    do: "Research can only be set to one of the spells the game offers (its research list)."
+
   def error_message(:bad_spells), do: "Those spells could not be read."
 
   def error_message(:bad_researching),

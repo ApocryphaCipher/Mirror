@@ -309,22 +309,22 @@ defmodule MirrorWeb.WizardLive do
               class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2"
             >
               <label class="text-sm text-slate-300">
-                Researching
+                Researching (the game's research list)
                 <select
                   form="wizard-form"
                   name="wizard[researching]"
                   class="mt-1 w-full rounded bg-slate-900 px-2 py-1 text-white"
                 >
-                  <option value="0" selected={@details.researching_number == 0}>nothing</option>
-                  <optgroup :for={{realm, rows} <- @spell_rows} label={realm_label(realm)}>
-                    <option
-                      :for={row <- rows}
-                      value={row.number}
-                      selected={row.number == @details.researching_number}
-                    >
-                      {row.name}
-                    </option>
-                  </optgroup>
+                  <option :if={@details.researching_number == 0} value="0" selected>
+                    nothing
+                  </option>
+                  <option
+                    :for={n <- WizardPanel.research_options(@details)}
+                    value={n}
+                    selected={n == @details.researching_number}
+                  >
+                    {spell_name(@spell_table, n)}
+                  </option>
                 </select>
               </label>
               <label class="text-sm text-slate-300">

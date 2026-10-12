@@ -185,13 +185,13 @@ defmodule MirrorWeb.WizardLiveTest do
       submit(view, %{
         "spells_present" => "1",
         "spells" => %{"1" => false, "3" => "on", "41" => "on"},
-        "researching" => "98",
+        "researching" => "3",
         "research_left" => "1"
       })
 
       raw = SessionStore.get(sid).save.raw
       assert binary_part(raw, 0x9E8 + 0x264, 3) == <<1, 1, 2>>
-      assert binary_part(raw, 0x9E8 + 0x262, 2) == <<98::little-16>>
+      assert binary_part(raw, 0x9E8 + 0x262, 2) == <<3::little-16>>
       assert binary_part(raw, 0x9E8 + 0x25A, 2) == <<1::little-16>>
       assert has_element?(view, "#wizard-researching", "1 research points left")
     end
@@ -202,6 +202,17 @@ defmodule MirrorWeb.WizardLiveTest do
       assert has_element?(view, "#wizard-spells-nature", "1 of 40 known")
       refute html =~ "learn-death"
       refute has_element?(view, "#wizard-research-edit")
+    end
+
+    test "a spell the game does not offer is refused, with the reason", %{conn: conn, sid: sid} do
+      load_save(sid)
+      {:ok, view, _} = live(conn, ~p"/wizard/1")
+      view |> element("#wizard-edit-toggle") |> render_click()
+      raw = SessionStore.get(sid).save.raw
+
+      submit(view, %{"researching" => "98"})
+      assert has_element?(view, "#wizard-note", "research list")
+      assert SessionStore.get(sid).save.raw == raw
     end
   end
 end
