@@ -192,14 +192,21 @@ defmodule MirrorWeb.WizardPanel do
   def changes(params, details) when is_map(params) do
     with {:ok, nums} <- numbers(params, details),
          {:ok, books} <- books(params, details),
-         {:ok, retorts} <- retorts(params, details) do
-      name = params |> Map.get("name", details.name) |> String.trim()
+         {:ok, retorts} <- retorts(params, details),
+         {:ok, name} <- name(params, details) do
       changes = nums ++ if(name != details.name, do: [name: name], else: []) ++ books ++ retorts
       {:ok, changes}
     end
   end
 
   def changes(_params, _details), do: {:ok, []}
+
+  defp name(params, details) do
+    case Map.get(params, "name", details.name) do
+      name when is_binary(name) -> {:ok, String.trim(name)}
+      _ -> {:error, :bad_name}
+    end
+  end
 
   defp numbers(params, details) do
     Enum.reduce_while([:gold, :mana, :fame], {:ok, []}, fn field, {:ok, acc} ->
@@ -231,18 +238,24 @@ defmodule MirrorWeb.WizardPanel do
     end
   end
 
+  # A `books` value that is not a map is a bad form, not an omitted field.
+  defp books(%{"books" => _}, _details), do: {:error, :bad_books}
   defp books(_params, _details), do: {:ok, []}
 
   # A checkbox that is not ticked is not sent, so `retorts_present` says the form had them.
   defp retorts(%{"retorts_present" => _} = params, details) do
-    given = Map.get(params, "retorts", %{})
+    case Map.get(params, "retorts", %{}) do
+      given when is_map(given) ->
+        wanted =
+          for i <- 0..(length(details.retort_flags) - 1),
+              do: Map.get(given, Integer.to_string(i)) in ["on", "true"]
 
-    wanted =
-      for i <- 0..(length(details.retort_flags) - 1),
-          do: Map.get(given, Integer.to_string(i)) in ["on", "true"]
+        current = Enum.map(details.retort_flags, &elem(&1, 1))
+        {:ok, if(wanted == current, do: [], else: [retorts: wanted])}
 
-    current = Enum.map(details.retort_flags, &elem(&1, 1))
-    {:ok, if(wanted == current, do: [], else: [retorts: wanted])}
+      _ ->
+        {:error, :bad_retorts}
+    end
   end
 
   defp retorts(_params, _details), do: {:ok, []}

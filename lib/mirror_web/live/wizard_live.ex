@@ -38,17 +38,23 @@ defmodule MirrorWeb.WizardLive do
   def handle_event("wizard_edit", %{"wizard" => params}, socket) do
     case socket.assigns.details do
       nil -> {:noreply, socket}
-      details -> {:noreply, apply_edit(socket, details, params)}
+      %{id: id} -> {:noreply, apply_edit(socket, id, params)}
     end
   end
 
   # One apply is one undo step (`Editor.apply_record/5`); undo and Save as are on the map pages.
-  defp apply_edit(socket, details, params) do
+  #
+  # The wizard is read again from the save inside the update, so the form is compared with what is
+  # there now, not with what the page showed when it was drawn. (A form from a stale page still
+  # submits all of its fields, so another tab's edit to a field this form also shows is put back.)
+  defp apply_edit(socket, id, params) do
     {:ok, _state, result} =
       SessionStore.update(socket.assigns.session_id, fn current ->
-        raw = current.save.raw
+        raw = raw_of(current)
 
-        with {:ok, changes} <- WizardPanel.changes(params, details),
+        with true <- is_binary(raw),
+             %{} = details <- WizardPanel.details(raw, id) || {:error, :no_such_wizard},
+             {:ok, changes} <- WizardPanel.changes(params, details),
              :ok <- if(changes == [], do: {:error, :nothing_changed}, else: :ok),
              {:ok, edited, _} <- Structures.edit_wizard(raw, details.record, changes),
              label = WizardPanel.label(details, changes),

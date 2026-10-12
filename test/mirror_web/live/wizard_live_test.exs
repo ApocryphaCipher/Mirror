@@ -104,5 +104,44 @@ defmodule MirrorWeb.WizardLiveTest do
 
       assert SessionStore.get(sid).save.raw == raw
     end
+
+    test "an apply compares with the save as it is now, not as the page was drawn",
+         %{conn: conn, sid: sid} do
+      load_save(sid)
+      {:ok, view, _} = live(conn, ~p"/wizard/1")
+      view |> element("#wizard-edit-toggle") |> render_click()
+
+      # another tab changes the gold and the name after this page was drawn
+      {:ok, _} =
+        SessionStore.update(sid, fn current ->
+          {:ok, raw, _} =
+            Mirror.SaveFile.Structures.edit_wizard(current.save.raw, 0, gold: 111, name: "Merlin")
+
+          put_in(current.save.raw, raw)
+        end)
+
+      # this form was drawn with gold 1234 and the old name, and only mana is changed on it
+      submit(view, %{"gold" => "111", "name" => "Merlin", "mana" => "9"})
+
+      assert has_element?(view, "#wizard-note", "Edited Merlin: mana 9")
+      refute has_element?(view, "#wizard-note", "gold")
+    end
+
+    test "malformed form values show a note instead of crashing the page", %{conn: conn, sid: sid} do
+      load_save(sid)
+      {:ok, view, _} = live(conn, ~p"/wizard/1")
+      view |> element("#wizard-edit-toggle") |> render_click()
+
+      render_hook(view, "wizard_edit", %{"wizard" => %{"name" => nil}})
+      assert has_element?(view, "#wizard-note", "1 to 19")
+      render_hook(view, "wizard_edit", %{"wizard" => %{"books" => "x"}})
+      assert has_element?(view, "#wizard-note", "Books")
+
+      render_hook(view, "wizard_edit", %{
+        "wizard" => %{"retorts_present" => "1", "retorts" => nil}
+      })
+
+      assert has_element?(view, "#wizard-note", "retorts")
+    end
   end
 end

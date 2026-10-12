@@ -106,6 +106,19 @@ defmodule MirrorWeb.WizardPanelTest do
       assert WizardPanel.changes(%{"books" => %{"0" => "x"}}, d) == {:error, :bad_books}
     end
 
+    test "client-controlled values of the wrong type are refused, not raised", %{d: d} do
+      assert WizardPanel.changes(%{"name" => nil}, d) == {:error, :bad_name}
+      assert WizardPanel.changes(%{"name" => 5}, d) == {:error, :bad_name}
+      assert WizardPanel.changes(%{"books" => nil}, d) == {:error, :bad_books}
+      assert WizardPanel.changes(%{"books" => "x"}, d) == {:error, :bad_books}
+
+      assert WizardPanel.changes(%{"retorts_present" => "1", "retorts" => nil}, d) ==
+               {:error, :bad_retorts}
+
+      assert WizardPanel.changes(%{"retorts_present" => "1", "retorts" => "on"}, d) ==
+               {:error, :bad_retorts}
+    end
+
     test "label and error words", %{d: d} do
       assert WizardPanel.label(d, gold: 5, books: [1, 1, 1, 1, 1]) ==
                "Edited Jafar: gold 5, books"
