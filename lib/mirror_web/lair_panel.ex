@@ -83,9 +83,21 @@ defmodule MirrorWeb.LairPanel do
     end
   end
 
+  # With the marker present, a missing "intact" key is an unticked box (a browser posts nothing for
+  # it) and "on" or "true" is a ticked one; any other value is refused, not read as unticked.
   defp intact_change(%{"intact_present" => _} = params, details) do
-    wanted = Map.get(params, "intact") in ["on", "true"]
-    if wanted == details.intact, do: {:ok, []}, else: {:ok, [intact: wanted]}
+    wanted =
+      case Map.fetch(params, "intact") do
+        :error -> {:ok, false}
+        {:ok, value} when value in ["on", "true"] -> {:ok, true}
+        {:ok, _} -> {:error, :bad_intact}
+      end
+
+    case wanted do
+      {:ok, intact} when intact == details.intact -> {:ok, []}
+      {:ok, intact} -> {:ok, [intact: intact]}
+      error -> error
+    end
   end
 
   defp intact_change(_params, _details), do: {:ok, []}

@@ -65,6 +65,20 @@ defmodule Mirror.SaveFile.EncountersTest do
     assert Encounters.at(raw, {10, 11, 0}) == []
   end
 
+  test "unused slots and records off the map leave no nil in the list" do
+    raw =
+      blank()
+      |> record(5)
+      |> put(@at + 6 * 24, <<200, 3, 0, 1, 4>> <> :binary.copy(<<0>>, 19))
+      |> put(@at + 7 * 24, <<5, 5, 9, 1, 4>> <> :binary.copy(<<0>>, 19))
+
+    all = Encounters.all(raw)
+    assert Enum.all?(all, &is_map/1)
+    assert Enum.map(all, & &1.index) == [5]
+    assert Encounters.get(raw, 0) == nil
+    assert Encounters.get(raw, 101) == nil
+  end
+
   test "names" do
     assert Encounters.kind_name(0) == "Tower of Wizardry"
     assert Encounters.kind_name(7) == "Abandoned keep"

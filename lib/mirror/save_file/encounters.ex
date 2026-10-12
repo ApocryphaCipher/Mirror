@@ -53,6 +53,7 @@ defmodule Mirror.SaveFile.Encounters do
   def all(raw) when is_binary(raw) and byte_size(raw) >= @offset + @records * @size do
     for index <- 0..(@records - 1),
         record = decode(index, binary_part(raw, @offset + index * @size, @size)),
+        record != nil,
         do: record
   end
 

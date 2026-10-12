@@ -55,6 +55,17 @@ defmodule MirrorWeb.LairPanelTest do
              LairPanel.changes(form(%{"guard1_type" => ""}), @details)
   end
 
+  test "a malformed intact value is refused, not read as unticked" do
+    for bad <- ["garbage", "", "off", "1", ["on"], %{"x" => "on"}] do
+      assert {:error, :bad_intact} = LairPanel.changes(form(%{"intact" => bad}), @details),
+             "expected #{inspect(bad)} to be refused"
+    end
+
+    # the documented values, and the missing key, still mean ticked and unticked
+    assert {:ok, []} = LairPanel.changes(form(%{"intact" => "true"}), @details)
+    assert {:ok, [intact: false]} = LairPanel.changes(Map.delete(form(%{}), "intact"), @details)
+  end
+
   test "an empty slot posted as empty is no change, whatever its count box says" do
     assert {:ok, []} =
              LairPanel.changes(form(%{"guard2_type" => "", "guard2_count" => "7"}), @details)
