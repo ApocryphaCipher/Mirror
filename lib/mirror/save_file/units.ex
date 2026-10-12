@@ -88,6 +88,47 @@ defmodule Mirror.SaveFile.Units do
   defp record(_bytes, _index), do: nil
 
   @doc """
+  The units standing on `{x, y, plane}` with every field the unit panel shows (STORY-020), in
+  save order: `%{index, x, y, plane, owner, type, level, experience, damage, hero_slot, moves,
+  max_moves, status, destination, mutations, enchantments}`. Fields beyond the first six are
+  kazzmir's reading of the record (`+12` level, `+14` experience i16, `+17` damage, `+6` hero slot,
+  `+8` moves left, `+4` max moves, `+11` status, `+9`/`+10` go-to target, `+23` mutations,
+  `+24` the enchantment bits) and are checked only where the unit-movement doc says so.
+  Dead units (plane `0xFF`) are not listed.
+  """
+  @spec stack(binary(), {integer(), integer(), 0 | 1}) :: [map()]
+  def stack(raw, {x, y, plane}) when is_binary(raw) do
+    case parse(raw) do
+      {:ok, units} ->
+        for %{x: ^x, y: ^y} = unit <- units, plane_number(unit.plane) == plane do
+          <<_, _, _, _, max_moves, _, hero, _finished, moves, dx, dy, status, level, _,
+            xp::little-signed-16, _, damage, _, _, _::binary-size(2), _, mutations,
+            enchantments::little-32, _::binary>> =
+            binary_part(raw, @offset + unit.index * @record, @record)
+
+          Map.merge(unit, %{
+            level: level,
+            experience: xp,
+            damage: damage,
+            hero_slot: hero,
+            moves: moves,
+            max_moves: max_moves,
+            status: status,
+            destination: {dx, dy},
+            mutations: mutations,
+            enchantments: enchantments
+          })
+        end
+
+      _ ->
+        []
+    end
+  end
+
+  defp plane_number(:arcanus), do: 0
+  defp plane_number(:myrror), do: 1
+
+  @doc """
   Selects the unit on top of a stack sharing the same tile.
 
   *UNVERIFIED GUESS*: The `draw_priority` field (+18) is the candidate field

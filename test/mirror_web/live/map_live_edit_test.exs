@@ -2146,6 +2146,139 @@ defmodule MirrorWeb.MapLiveEditTest do
     end
   end
 
+  describe "Units tool (STORY-020)" do
+    defp unit_record(x, y, plane, owner, type),
+      do: <<x, y, plane, owner, 2, type>> <> :binary.copy(<<0>>, 26)
+
+    # Three Barbarian Spearmen (type 39) of wizard 2 at (10, 10), a Griffin (136) of wizard 2
+    # alone at (20, 20), and one of neutral (5) at (30, 30).
+    defp units_save(dir) do
+      units = [
+        unit_record(10, 10, 0, 2, 39),
+        unit_record(10, 10, 0, 2, 39),
+        unit_record(10, 10, 0, 2, 39),
+        unit_record(20, 20, 0, 2, 136),
+        unit_record(30, 30, 0, 5, 39)
+      ]
+
+      raw =
+        synthetic_save_bytes()
+        |> put_bytes(0x09E2, <<length(units)::little-16>>)
+        |> put_bytes(0xB734, IO.iodata_to_binary(units))
+        # the fixture's landmass layer is all land; make (14, 10) on Arcanus water
+        |> put_bytes(0x4D98 + 10 * 60 + 14, <<0>>)
+
+      path = Path.join(dir, "UNITS.GAM")
+      File.write!(path, raw)
+      path
+    end
+
+    defp upanel(view), do: view |> element("#unit-panel") |> render() |> text_of()
+
+    defp arm_units(view, ids),
+      do: view |> element("#units-form") |> render_submit(%{"units" => %{"picked" => ids}})
+
+    test "a click lists the tile's units; ticking some and clicking elsewhere moves them, undoably",
+         %{
+           conn: conn,
+           dir: dir
+         } do
+      view = editing(conn, units_save(dir), "units")
+      click(view, 10, 10)
+      text = upanel(view)
+      assert text =~ "3 units"
+      assert text =~ "Barbarian Spearmen"
+
+      arm_units(view, ["0", "2"])
+      assert has_element?(view, "#units-note", "Moving 2 units")
+
+      click(view, 14, 10)
+      assert has_element?(view, "#units-note", "Moved 2 units to (14, 10).")
+      assert upanel(view) =~ "2 units"
+      assert changed(view) =~ "1 edited"
+
+      render_click(view, "undo", %{})
+      click(view, 10, 10)
+      assert upanel(view) =~ "3 units"
+      refute changed(view) =~ "edited"
+    end
+
+    test "a refused destination says why and keeps the units picked", %{conn: conn, dir: dir} do
+      view = editing(conn, units_save(dir), "units")
+      click(view, 10, 10)
+      arm_units(view, ["0", "1"])
+
+      # wizard 5's units are on (30, 30); the city at (12, 35) is neutral too
+      click(view, 30, 30)
+      assert has_element?(view, "#units-note", "Another player's units are standing there")
+      click(view, 12, 35)
+      assert has_element?(view, "#units-note", "another player's city")
+      refute changed(view) =~ "edited"
+
+      # still armed: a good tile works
+      click(view, 11, 11)
+      assert has_element?(view, "#units-note", "Moved 2 units to (11, 11)")
+    end
+
+    test "right-click cancels, an empty tile closes the panel, nothing ticked is refused", %{
+      conn: conn,
+      dir: dir
+    } do
+      view = editing(conn, units_save(dir), "units")
+      click(view, 10, 10)
+      arm_units(view, ["1"])
+      click(view, 14, 10, button: 2)
+      assert has_element?(view, "#units-note", "Cancelled")
+      refute changed(view) =~ "edited"
+
+      # a browser posts nothing for unticked boxes
+      render_hook(view, "units_arm", %{})
+      assert has_element?(view, "#units-note", "Tick at least one unit")
+      render_hook(view, "units_arm", %{"units" => %{"picked" => ["x"]}})
+      assert has_element?(view, "#units-note", "not units on this tile")
+      render_hook(view, "units_arm", %{"units" => %{"picked" => ["99"]}})
+      assert has_element?(view, "#units-note", "not units on this tile")
+
+      click(view, 3, 3)
+      refute has_element?(view, "#unit-panel")
+    end
+
+    test "a land unit sent onto water gets a heads-up, a flyer does not", %{conn: conn, dir: dir} do
+      view = editing(conn, units_save(dir), "units")
+      click(view, 10, 10)
+      arm_units(view, ["0"])
+      click(view, 14, 10)
+      assert has_element?(view, "#units-note", "cannot stand on water")
+
+      click(view, 20, 20)
+      arm_units(view, ["3"])
+      click(view, 22, 20)
+      assert has_element?(view, "#units-note", "Moved 1 unit to (22, 20).")
+      refute has_element?(view, "#units-note", "cannot stand on water")
+    end
+
+    test "View mode shows the units read-only, and a city wins over its garrison", %{
+      conn: conn,
+      dir: dir
+    } do
+      {:ok, view, _} = live(conn, ~p"/arcanus")
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => units_save(dir)}})
+
+      pointer(view, "click", 10, 10)
+      assert upanel(view) =~ "3 units"
+      refute has_element?(view, "#units-form input[type=checkbox]")
+      refute has_element?(view, "#units-move")
+
+      pointer(view, "click", 38, 21)
+      assert has_element?(view, "#city-panel")
+      refute has_element?(view, "#unit-panel")
+
+      pointer(view, "click", 3, 3)
+      refute has_element?(view, "#unit-panel")
+      refute has_element?(view, "#city-panel")
+    end
+  end
+
   describe "real-save integration" do
     @tag skip:
            !@has_real_save_and_sprites &&

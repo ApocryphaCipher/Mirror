@@ -20,7 +20,7 @@ defmodule MirrorWeb.MapLive do
   alias Mirror.TileAtlas
   alias Mirror.SaveFile.{Cities, Roads, Sites, Structures, Units, Wizards}
   alias Mirror.Map, as: MirrorMap
-  alias MirrorWeb.{CityPanel, MoveTool, PaintTool, RoadTool}
+  alias MirrorWeb.{CityPanel, MoveTool, PaintTool, RoadTool, UnitPanel}
 
   @layers [
     :terrain,
@@ -93,6 +93,9 @@ defmodule MirrorWeb.MapLive do
       |> assign(:move_note, nil)
       |> assign(:city_sel, nil)
       |> assign(:city_note, nil)
+      |> assign(:unit_sel, nil)
+      |> assign(:unit_armed, nil)
+      |> assign(:unit_note, nil)
       |> assign(:reveal_report, nil)
       |> assign(:discard_armed, false)
       |> assign(:fresh_mount, true)
@@ -224,7 +227,17 @@ defmodule MirrorWeb.MapLive do
   end
 
   def handle_event("set_tool", %{"tool" => tool}, socket)
-      when tool in ["cycle", "paint", "type", "road", "corruption", "special", "move", "city"] do
+      when tool in [
+             "cycle",
+             "paint",
+             "type",
+             "road",
+             "corruption",
+             "special",
+             "move",
+             "city",
+             "units"
+           ] do
     {:noreply,
      socket
      |> assign(:tool, String.to_existing_atom(tool))
@@ -232,7 +245,10 @@ defmodule MirrorWeb.MapLive do
      |> assign(:move_pending, nil)
      |> assign(:move_note, nil)
      |> assign(:city_sel, nil)
-     |> assign(:city_note, nil)}
+     |> assign(:city_note, nil)
+     |> assign(:unit_sel, nil)
+     |> assign(:unit_armed, nil)
+     |> assign(:unit_note, nil)}
   end
 
   # Reveal all (STORY-037): every tile explored, on this plane or on both.
@@ -247,6 +263,30 @@ defmodule MirrorWeb.MapLive do
   def handle_event("reveal_all", _params, socket), do: {:noreply, socket}
 
   # The city panel's form (STORY-020): name and population, one record edit.
+  # The units panel's form (STORY-020): the ticked units are picked up, and the next click on the
+  # map puts them down (`move_units_click/4`).
+  def handle_event("units_arm", params, socket) do
+    %{edit: edit, unit_sel: tile, state: state} = socket.assigns
+
+    if edit && tile && state.save do
+      rows = UnitPanel.rows(state.save.raw, tile)
+
+      case UnitPanel.picked(params["units"], rows) do
+        {:ok, ids} ->
+          {:noreply, assign(socket, unit_armed: ids, unit_note: UnitPanel.armed(length(ids)))}
+
+        {:error, reason} ->
+          {:noreply, assign(socket, :unit_note, UnitPanel.error_message(reason))}
+      end
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("units_close", _params, socket) do
+    {:noreply, assign(socket, unit_sel: nil, unit_armed: nil, unit_note: nil)}
+  end
+
   def handle_event("city_close", _params, socket) do
     {:noreply, assign(socket, city_sel: nil, city_note: nil)}
   end
@@ -602,7 +642,7 @@ defmodule MirrorWeb.MapLive do
             handle_pointer_start(socket, x, y, button, mods)
 
           "click" ->
-            inspect_city(socket, x, y)
+            inspect_tile(socket, x, y)
 
           "drag" ->
             handle_pointer_drag(socket, x, y)
@@ -1662,6 +1702,8 @@ defmodule MirrorWeb.MapLive do
                       {:corruption, "☠️ Corruption", "Click to corrupt a tile or clean it"},
                       {:special, "💎 Special",
                        "Place an ore, gems, crystals, wild game or nightshade"},
+                      {:units, "👥 Units",
+                       "Click a tile to list its units; tick some and move them to another tile"},
                       {:city, "🏙️ City",
                        "Click a city to see its details and change its name or population"},
                       {:move, "🏰 Move",
@@ -1866,6 +1908,9 @@ defmodule MirrorWeb.MapLive do
 
                   :special ->
                     "Click: place the chosen special · right-click or shift-click: remove it · space-drag or middle-drag to pan · Esc to finish"
+
+                  :units ->
+                    "Click a tile with units, tick the ones to move, press Move, then click where they go · right-click: cancel · space-drag or middle-drag to pan · Esc to finish"
 
                   :city ->
                     "Click a city to see its details · change its name or population in the panel · Undo works · space-drag or middle-drag to pan · Esc to finish"
@@ -2086,6 +2131,16 @@ defmodule MirrorWeb.MapLive do
 
           <.surveyor_card :if={@hover && @hover.survey && !@edit} survey={@hover.survey} />
 
+          <.unit_panel
+            :if={(!@edit || @tool == :units) && @unit_sel && @state.save}
+            rows={UnitPanel.rows(@state.save.raw, @unit_sel)}
+            tile={@unit_sel}
+            plane={@plane}
+            note={@unit_note}
+            armed={@unit_armed}
+            editable={@edit == :terrain}
+          />
+
           <.city_panel
             :if={(!@edit || @tool == :city) && @city_sel && @state.save}
             details={CityPanel.details(@state.save.raw, @city_sel)}
@@ -2095,6 +2150,73 @@ defmodule MirrorWeb.MapLive do
         </div>
       <% end %>
     </Layouts.app>
+    """
+  end
+
+  # The units on one tile (STORY-020); in edit mode the ticked ones can be moved. An overlay.
+  attr :rows, :list, required: true
+  attr :tile, :any, required: true
+  attr :plane, :atom, required: true
+  attr :note, :string, default: nil
+  attr :armed, :any, default: nil
+  attr :editable, :boolean, default: false
+
+  defp unit_panel(assigns) do
+    ~H"""
+    <div id="unit-panel" class={city_panel_class()}>
+      <div class="flex items-start justify-between gap-2">
+        <p class="font-semibold text-slate-200">
+          {length(@rows)} {if length(@rows) == 1, do: "unit", else: "units"}
+          <span class="font-normal text-slate-400">
+            · {plane_name(@plane)} ({elem(@tile, 0)}, {elem(@tile, 1)})
+          </span>
+        </p>
+        <button
+          id="units-close"
+          type="button"
+          phx-click="units_close"
+          aria-label="Close"
+          class="text-slate-500 hover:text-white"
+        >
+          ✕
+        </button>
+      </div>
+
+      <.form for={%{}} as={:units} id="units-form" phx-submit="units_arm" class="mt-2">
+        <ul class="max-h-64 space-y-1 overflow-y-auto pr-1">
+          <li :for={row <- @rows} class="flex items-start gap-2">
+            <input
+              :if={@editable}
+              type="checkbox"
+              name="units[picked][]"
+              value={row.index}
+              checked={@armed == nil or row.index in @armed}
+              class="mt-0.5"
+            />
+            <span>
+              <span class="text-slate-200">{row.name}</span>
+              <span class="text-slate-500">· {row.owner_name}</span>
+              <span class="block text-slate-400">
+                level {row.level} · {row.experience} xp{if row.damage > 0,
+                  do: " · damage #{row.damage}"}{if row.orders,
+                  do: " · #{row.orders}"}
+              </span>
+            </span>
+          </li>
+        </ul>
+        <button
+          :if={@editable}
+          id="units-move"
+          type="submit"
+          class="mt-2 rounded-lg bg-emerald-300 px-2.5 py-0.5 font-semibold text-slate-950 hover:bg-emerald-200"
+        >
+          Move ticked units…
+        </button>
+      </.form>
+      <p :if={@note} id="units-note" role="status" aria-live="polite" class="mt-1 text-emerald-200">
+        {@note}
+      </p>
+    </div>
     """
   end
 
@@ -2438,6 +2560,25 @@ defmodule MirrorWeb.MapLive do
   end
 
   defp handle_pointer_start(
+         %{assigns: %{edit: :terrain, tool: :units}} = socket,
+         x,
+         y,
+         button,
+         _mods
+       ) do
+    cond do
+      socket.assigns.unit_armed && button == 2 ->
+        assign(socket, unit_armed: nil, unit_note: "Cancelled.")
+
+      socket.assigns.unit_armed ->
+        move_units_click(socket, x, y)
+
+      true ->
+        select_units(socket, x, y)
+    end
+  end
+
+  defp handle_pointer_start(
          %{assigns: %{edit: :terrain, tool: :city}} = socket,
          x,
          y,
@@ -2773,6 +2914,63 @@ defmodule MirrorWeb.MapLive do
     case CityPanel.details(raw, index) do
       nil -> {:error, :no_such_city}
       details -> {:ok, details}
+    end
+  end
+
+  # View mode: a click opens the city on the tile, else the units standing there (STORY-020).
+  defp inspect_tile(socket, x, y) do
+    socket = inspect_city(socket, x, y)
+
+    if socket.assigns.city_sel do
+      assign(socket, unit_sel: nil)
+    else
+      select_units(socket, x, y)
+    end
+  end
+
+  # The Units tool, and the View-mode inspector: the tile's units, or nothing.
+  defp select_units(socket, x, y) do
+    plane = MoveTool.plane_number(socket.assigns.plane)
+
+    if valid_coord?(x, y) && socket.assigns.state.save &&
+         UnitPanel.rows(socket.assigns.state.save.raw, {x, y, plane}) != [] do
+      assign(socket, unit_sel: {x, y, plane}, unit_note: nil, unit_armed: nil)
+    else
+      assign(socket, unit_sel: nil, unit_armed: nil, unit_note: nil)
+    end
+  end
+
+  defp move_units_click(socket, x, y) do
+    plane = MoveTool.plane_number(socket.assigns.plane)
+    ids = socket.assigns.unit_armed
+    edit_plane = socket.assigns.plane
+
+    {:ok, state, result} =
+      SessionStore.update(socket.assigns.session_id, fn current ->
+        with {:ok, raw, report} <- Structures.move_units(current.save.raw, ids, {x, y, plane}),
+             {next, {:record, _, _}} <-
+               Editor.apply_record(current, edit_plane, "Moved #{length(ids)} units", raw) do
+          {next, {:ok, report}}
+        else
+          {:error, reason} -> {current, {:error, reason}}
+          _ -> {current, {:error, :unchanged}}
+        end
+      end)
+
+    case result do
+      {:ok, report} ->
+        socket
+        |> assign_state(state)
+        |> assign(
+          unit_sel: {x, y, plane},
+          unit_armed: nil,
+          unit_note: UnitPanel.moved(report.count, {x, y}, report.warnings)
+        )
+        |> push_overlay_items()
+        |> push_map_layers()
+
+      {:error, reason} ->
+        assign(socket, :unit_note, UnitPanel.error_message(reason))
     end
   end
 
