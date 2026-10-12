@@ -126,4 +126,105 @@ defmodule MirrorWeb.WizardPanelTest do
       assert WizardPanel.error_message(:bad_gold) =~ "0 to 30000"
     end
   end
+
+  describe "spells and research" do
+    setup do
+      %{d: WizardPanel.details(WizardFixture.synthetic(), 1)}
+    end
+
+    # the fixture: spell 1 known, 2 and 3 knowable, 41 known; researching 19, 383 left
+    test "details carry the library and the researched spell number", %{d: d} do
+      assert Enum.take(d.library, 3) == [2, 1, 1]
+      assert length(d.library) == 214
+      assert d.researching_number == 19
+    end
+
+    test "ticked spells become known; unticking a known one makes it knowable", %{d: d} do
+      params = %{"spells_present" => "1", "spells" => %{"2" => "on", "3" => "on", "41" => "on"}}
+      # 1 was known and is not ticked: knowable again (1); 2 and 3 become known; 41 stays known
+      assert WizardPanel.changes(params, d) == {:ok, [spells: [{1, 1}, {2, 2}, {3, 2}]]}
+    end
+
+    test "without spells_present the spell boxes are not read", %{d: d} do
+      assert WizardPanel.changes(%{"spells" => %{"3" => "on"}}, d) == {:ok, []}
+    end
+
+    test "a spell on the research list stays on it when not ticked", %{d: d} do
+      d = %{d | library: List.replace_at(d.library, 4, 3)}
+      params = %{"spells_present" => "1", "spells" => %{"1" => "on", "41" => "on"}}
+      assert WizardPanel.changes(params, d) == {:ok, []}
+    end
+
+    test "researching and points left are changes only when they differ", %{d: d} do
+      assert WizardPanel.changes(%{"researching" => "19", "research_left" => "383"}, d) ==
+               {:ok, []}
+
+      assert WizardPanel.changes(%{"researching" => "3", "research_left" => "0"}, d) ==
+               {:ok, [researching: 3, research_left: 0]}
+
+      # 98 is not one of the game's candidates (19, 3, 53): its Research page could not show it
+      assert WizardPanel.changes(%{"researching" => "98"}, d) == {:error, :not_offered}
+      assert WizardPanel.changes(%{"researching" => "0"}, d) == {:error, :not_offered}
+
+      assert WizardPanel.changes(%{"researching" => "x"}, d) == {:error, :bad_researching}
+      assert WizardPanel.changes(%{"research_left" => "-"}, d) == {:error, :bad_research_left}
+    end
+
+    test "the research picker offers the game's candidates and the spell being researched", %{
+      d: d
+    } do
+      assert d.candidates == [19, 3, 53]
+      assert WizardPanel.research_options(d) == [19, 3, 53]
+      assert WizardPanel.research_options(%{d | researching_number: 98}) == [19, 3, 53, 98]
+      assert WizardPanel.research_options(%{d | researching_number: 0}) == [19, 3, 53]
+      assert WizardPanel.error_message(:not_offered) =~ "research list"
+    end
+
+    test "a spells value that is not a map is refused", %{d: d} do
+      assert WizardPanel.changes(%{"spells_present" => "1", "spells" => nil}, d) ==
+               {:error, :bad_spells}
+    end
+
+    test "learn_realm lists the realm's spells that are not yet known", %{d: d} do
+      assert {:ok, changes} = {:ok, WizardPanel.learn_realm(d, :nature)}
+      assert [spells: list] = changes
+      assert length(list) == 39
+      assert {1, 2} not in list
+      assert Enum.all?(list, fn {n, s} -> n in 1..40 and s == 2 end)
+
+      # sorcery has spell 41 known already
+      assert [spells: sorcery] = WizardPanel.learn_realm(d, :sorcery)
+      assert length(sorcery) == 39
+
+      assert [spells: arcane] = WizardPanel.learn_realm(d, :arcane)
+      assert Enum.map(arcane, &elem(&1, 0)) == Enum.to_list(201..214)
+
+      assert WizardPanel.learn_realm(d, :nonsense) == []
+      all_known = %{d | library: List.duplicate(2, 214)}
+      assert WizardPanel.learn_realm(all_known, :death) == []
+    end
+
+    test "spell_rows groups by realm with names from the table or numbers without one", %{d: d} do
+      rows = WizardPanel.spell_rows(d, nil)
+      assert Enum.map(rows, &elem(&1, 0)) == [:nature, :sorcery, :chaos, :life, :death, :arcane]
+      assert rows |> Enum.map(fn {_, r} -> length(r) end) == [40, 40, 40, 40, 40, 14]
+      {:nature, [first | _]} = hd(rows)
+      assert %{number: 1, name: "Spell 1", state: 2, cost: nil} = first
+
+      table = %{1 => %{name: "Earth to Mud", cost: 15}}
+      {:nature, [first | _]} = hd(WizardPanel.spell_rows(d, table))
+      assert %{name: "Earth to Mud", cost: 15} = first
+    end
+
+    test "labels and error words for the new fields" do
+      d = %{name: "Jafar"}
+      assert WizardPanel.label(d, spells: [{1, 2}]) == "Edited Jafar: 1 spell"
+
+      assert WizardPanel.label(d, spells: [{1, 2}, {2, 2}], researching: 0) =~
+               "2 spells, no spell researched"
+
+      assert WizardPanel.label(d, research_left: 5) == "Edited Jafar: 5 research points left"
+      assert WizardPanel.error_message(:bad_researching) =~ "1 to 214"
+    end
+  end
 end

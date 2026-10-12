@@ -76,4 +76,50 @@ defmodule Mirror.SaveFile.StructuresWizardTest do
     assert Structures.edit_wizard(raw, -1, gold: 1) == {:error, :no_such_wizard}
     assert Structures.edit_wizard(<<1, 2, 3>>, 0, gold: 1) == {:error, :no_such_wizard}
   end
+
+  test "writes spell states, the spell being researched and the points left" do
+    raw = WizardFixture.synthetic()
+
+    assert {:ok, new, %{changed: [:spells, :researching, :research_left]}} =
+             Structures.edit_wizard(raw, 0,
+               spells: [{1, 0}, {41, 2}, {214, 3}],
+               researching: 98,
+               research_left: 650
+             )
+
+    # spell n is library byte n - 1
+    assert read(new, 0, 0x264, 1) == <<0>>
+    assert read(new, 0, 0x264 + 40, 1) == <<2>>
+    assert read(new, 0, 0x264 + 213, 1) == <<3>>
+    assert read(new, 0, 0x262, 2) == <<98::little-16>>
+    assert read(new, 0, 0x25A, 2) == <<650::little-16>>
+    # spell 2 and mana (+0x25c) are untouched
+    assert read(new, 0, 0x264 + 1, 1) == read(raw, 0, 0x264 + 1, 1)
+    assert read(new, 0, 0x25C, 2) == read(raw, 0, 0x25C, 2)
+  end
+
+  test "researching nothing is spell 0" do
+    {:ok, new, _} = Structures.edit_wizard(WizardFixture.synthetic(), 0, researching: 0)
+    assert read(new, 0, 0x262, 2) == <<0::little-16>>
+  end
+
+  test "refuses bad spells and research values" do
+    raw = WizardFixture.synthetic()
+
+    for {change, reason} <- [
+          {[spells: []], :bad_spells},
+          {[spells: [{0, 2}]], :bad_spells},
+          {[spells: [{215, 2}]], :bad_spells},
+          {[spells: [{5, 4}]], :bad_spells},
+          {[spells: [{5, -1}]], :bad_spells},
+          {[spells: [5]], :bad_spells},
+          {[researching: 215], :bad_researching},
+          {[researching: -1], :bad_researching},
+          {[researching: "98"], :bad_researching},
+          {[research_left: 65_536], :bad_research_left},
+          {[research_left: -1], :bad_research_left}
+        ] do
+      assert Structures.edit_wizard(raw, 0, change) == {:error, reason}, inspect(change)
+    end
+  end
 end

@@ -5,7 +5,7 @@ defmodule MirrorWeb.WizardLive do
   """
   use MirrorWeb, :live_view
 
-  alias Mirror.{Editor, SessionStore}
+  alias Mirror.{Editor, SessionStore, Spells}
   alias Mirror.SaveFile.Structures
   alias MirrorWeb.WizardPanel
 
@@ -36,9 +36,14 @@ defmodule MirrorWeb.WizardLive do
   end
 
   def handle_event("wizard_edit", %{"wizard" => params}, socket) do
-    case socket.assigns.details do
+    {:noreply, apply_edit(socket, &WizardPanel.changes(params, &1))}
+  end
+
+  # "Learn every spell of a realm": the common edit, applied at once.
+  def handle_event("learn_realm", %{"realm" => realm}, socket) do
+    case Enum.find(Spells.realms(), &(Atom.to_string(&1) == realm)) do
       nil -> {:noreply, socket}
-      %{id: id} -> {:noreply, apply_edit(socket, id, params)}
+      realm -> {:noreply, apply_edit(socket, &{:ok, WizardPanel.learn_realm(&1, realm)})}
     end
   end
 
@@ -47,14 +52,17 @@ defmodule MirrorWeb.WizardLive do
   # The wizard is read again from the save inside the update, so the form is compared with what is
   # there now, not with what the page showed when it was drawn. (A form from a stale page still
   # submits all of its fields, so another tab's edit to a field this form also shows is put back.)
-  defp apply_edit(socket, id, params) do
+  # `changes_for` turns the current details into `{:ok, changes}`.
+  defp apply_edit(%{assigns: %{details: nil}} = socket, _changes_for), do: socket
+
+  defp apply_edit(%{assigns: %{details: %{id: id}}} = socket, changes_for) do
     {:ok, _state, result} =
       SessionStore.update(socket.assigns.session_id, fn current ->
         raw = raw_of(current)
 
         with true <- is_binary(raw),
              %{} = details <- WizardPanel.details(raw, id) || {:error, :no_such_wizard},
-             {:ok, changes} <- WizardPanel.changes(params, details),
+             {:ok, changes} <- changes_for.(details),
              :ok <- if(changes == [], do: {:error, :nothing_changed}, else: :ok),
              {:ok, edited, _} <- Structures.edit_wizard(raw, details.record, changes),
              label = WizardPanel.label(details, changes),
@@ -87,7 +95,19 @@ defmodule MirrorWeb.WizardLive do
     |> assign(:loaded?, is_binary(raw))
     |> assign(:details, details)
     |> assign(:wizards, WizardPanel.wizards(raw))
+    |> assign(:spell_table, spell_table())
+    |> assign(:spell_rows, spell_rows(details))
     |> assign(:page_title, if(details, do: details.name, else: "Wizard"))
+  end
+
+  defp spell_rows(nil), do: []
+  defp spell_rows(details), do: WizardPanel.spell_rows(details, spell_table())
+
+  defp spell_table do
+    case Spells.table() do
+      {:ok, table} -> table
+      _ -> nil
+    end
   end
 
   defp raw_of(%{save: %{raw: raw}}) when is_binary(raw), do: raw
@@ -277,17 +297,111 @@ defmodule MirrorWeb.WizardLive do
             </p>
             <p class="text-slate-200">
               Researching: <span :if={!@details.researching} class="text-slate-500">nothing</span>
-              <span :if={@details.researching}>
-                spell {@details.researching.number}{realm_suffix(@details.researching)}, {@details.research_left} research points left
+              <span :if={@details.researching} id="wizard-researching">
+                {spell_name(@spell_table, @details.researching.number)}{realm_suffix(
+                  @details.researching
+                )}, {@details.research_left} research points left
               </span>
             </p>
+            <div
+              :if={@editing}
+              id="wizard-research-edit"
+              class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2"
+            >
+              <label class="text-sm text-slate-300">
+                Researching (the game's research list)
+                <select
+                  form="wizard-form"
+                  name="wizard[researching]"
+                  class="mt-1 w-full rounded bg-slate-900 px-2 py-1 text-white"
+                >
+                  <option :if={@details.researching_number == 0} value="0" selected>
+                    nothing
+                  </option>
+                  <option
+                    :for={n <- WizardPanel.research_options(@details)}
+                    value={n}
+                    selected={n == @details.researching_number}
+                  >
+                    {spell_name(@spell_table, n)}
+                  </option>
+                </select>
+              </label>
+              <label class="text-sm text-slate-300">
+                Research points left (0 to 65535)
+                <input
+                  form="wizard-form"
+                  type="number"
+                  min="0"
+                  max="65535"
+                  name="wizard[research_left]"
+                  value={@details.research_left}
+                  class="mt-1 w-full rounded bg-slate-900 px-2 py-1 text-white"
+                />
+              </label>
+            </div>
           </section>
 
           <section id="wizard-spells" class="rounded-xl border border-white/10 bg-black/30 p-4">
-            <h2 class="mb-2 text-lg font-semibold text-white">Known spells</h2>
-            <p class="text-slate-200">
-              <span :for={{realm, n} <- @details.spells} class="mr-4">{realm} {n}</span>
+            <h2 class="mb-2 text-lg font-semibold text-white">Spells</h2>
+            <p :if={!@spell_table} class="mb-2 text-xs text-amber-200">
+              Spell names need SPELLDAT.LBX in the game folder (run mix mirror.import_game); numbers are shown instead.
             </p>
+            <input
+              :if={@editing}
+              form="wizard-form"
+              type="hidden"
+              name="wizard[spells_present]"
+              value="1"
+            />
+            <div :for={{realm, rows} <- @spell_rows} id={"wizard-spells-#{realm}"} class="mb-3">
+              <div class="flex flex-wrap items-center gap-3">
+                <h3 class="font-semibold text-slate-100">
+                  {realm_label(realm)}
+                  <span class="font-normal text-slate-400">
+                    {Enum.count(rows, &(&1.state == 2))} of {length(rows)} known
+                  </span>
+                </h3>
+                <button
+                  :if={@editing}
+                  id={"learn-#{realm}"}
+                  type="button"
+                  phx-click="learn_realm"
+                  phx-value-realm={realm}
+                  class="rounded border border-emerald-300/40 px-2 py-0.5 text-xs text-emerald-100 hover:border-emerald-200"
+                >
+                  Learn every {realm_label(realm)} spell
+                </button>
+              </div>
+              <p :if={!@editing} class="text-sm text-slate-200">
+                <span :if={Enum.all?(rows, &(&1.state != 2))} class="text-slate-500">none</span>
+                {rows |> Enum.filter(&(&1.state == 2)) |> Enum.map_join(", ", & &1.name)}
+              </p>
+              <div :if={@editing} class="mt-1 grid grid-cols-2 gap-x-3 sm:grid-cols-3">
+                <label
+                  :for={row <- rows}
+                  class="flex items-center gap-2 text-sm text-slate-200"
+                  title={state_title(row.state)}
+                >
+                  <input
+                    form="wizard-form"
+                    type="checkbox"
+                    name={"wizard[spells][#{row.number}]"}
+                    checked={row.state == 2}
+                  />
+                  {row.name}
+                  <span :if={row.state == 3} class="text-xs text-sky-300">(research list)</span>
+                </label>
+              </div>
+            </div>
+            <button
+              :if={@editing}
+              form="wizard-form"
+              type="submit"
+              class="rounded-lg bg-emerald-300 px-4 py-1 text-sm font-semibold text-slate-950 hover:bg-emerald-200"
+            >
+              Apply
+            </button>
           </section>
 
           <section id="wizard-standing" class="rounded-xl border border-white/10 bg-black/30 p-4">
@@ -323,6 +437,16 @@ defmodule MirrorWeb.WizardLive do
 
   defp plane_name(:arcanus), do: "Arcanus"
   defp plane_name(:myrror), do: "Myrror"
+
+  defp spell_name(table, number), do: Spells.name(table, number)
+
+  defp realm_label(realm), do: realm |> Atom.to_string() |> String.capitalize()
+
+  defp state_title(0), do: "not known"
+  defp state_title(1), do: "can be researched later"
+  defp state_title(2), do: "known"
+  defp state_title(3), do: "on the research list"
+  defp state_title(_), do: ""
 
   defp realm_suffix(%{realm: nil}), do: ""
   defp realm_suffix(%{realm: realm}), do: " (#{realm})"

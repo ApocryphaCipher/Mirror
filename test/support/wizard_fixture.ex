@@ -23,6 +23,7 @@ defmodule Mirror.WizardFixture do
     |> field(0, 0x16, <<0>>)
     |> field(0, 0x24, <<10::little-16, 12::little-16>>)
     |> field(0, 0x2A, <<34, 33, 33>>)
+    |> field(0, 0x34, <<19::little-16, 3::little-16, 53::little-16>>)
     |> field(0, 0x2E, <<38::little-16, 21::little-16, 1::little-16>>)
     |> field(0, 0x54, <<5::little-16, 60::little-16, 2::little-16>>)
     |> field(0, 0x5A, <<0::little-16, 12::little-16, 0::little-16, 3::little-16, 0::little-16>>)
