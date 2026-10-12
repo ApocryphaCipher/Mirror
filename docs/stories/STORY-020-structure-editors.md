@@ -93,8 +93,13 @@ and what the codes mean is not decoded), the flags, and the items (ids not decod
 **Real game (slot 5, vault checkpoint 98):** the abandoned keep near Kevin's capital rewritten to 1 Sprite and 2 High Elf Pegasai,
 777 gold and 333 mana loaded with the game's memory identical to the file (guard counts `0x11` and `0x22`). **Kevin attacked
 it:** the guards were two Pegasai and a Sprite, and the reward screen read "Inside you find 777 gold, 333 mana crystals and a
-Create Artifact spell" (checkpoint 98's save; his screenshot). That keep's spell reward code is **1**, so **code 1 is a Create
-Artifact spell** (one case: the codes 2 to 6 are still undecoded).
+Create Artifact spell" (checkpoint 98's save; his screenshot). That keep's spell reward code is **1**, so **code 1 gave a Create
+Artifact spell** (one case).
+**Codes 2 to 6 (a second experiment, same day):** five keeps next to Blackstone, one per code, each with a single Sprite. Only the
+code-5 record gained an item (a Chain Mail): **code 5 is a magic item**. The other four gave a Weakness spell, a Summon Hero
+spell, a Death spell book and nothing, in an order Kevin did not note, so which code is which is open, and so is whether a code
+always gives the same kind of reward or is rolled when the site is cleared (kazzmir's remake does not decode it). A clean re-run
+needs the keeps told apart (different guard counts) and each reward noted. The panel keeps showing the code, not a name.
 
 **Not done:** editing a unit's fields (type, level, experience, damage, owner); decoding the spell reward code and the items.
 **Size:** large (do incrementally)
