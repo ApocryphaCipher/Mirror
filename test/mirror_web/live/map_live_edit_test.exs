@@ -1953,6 +1953,25 @@ defmodule MirrorWeb.MapLiveEditTest do
       refute has_element?(view, ~s|input[name="city[buildings][]"][value="23"][checked]|)
     end
 
+    test "a malformed building list is refused and nothing changes", %{conn: conn, save: save} do
+      view = editing(conn, save, "city")
+      click(view, 38, 21)
+
+      view
+      |> element("#city-form")
+      |> render_submit(%{
+        "city" => %{
+          "name" => "Deventor",
+          "population" => "4",
+          "buildings_present" => "1",
+          "buildings" => ["23", "not-a-building"]
+        }
+      })
+
+      assert has_element?(view, "#city-note", "That is not a list of buildings")
+      refute changed(view) =~ "edited"
+    end
+
     test "a form with no building list leaves the buildings alone", %{conn: conn, save: save} do
       view = editing(conn, save, "city")
       click(view, 38, 21)

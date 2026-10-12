@@ -98,44 +98,50 @@ defmodule MirrorWeb.CityPanel do
   The edit form's params (`%{"name" => ..., "population" => ...}`) as the keyword list
   `Structures.edit_city/3` takes, keeping only what differs from `details`. `{:ok, []}`
   when nothing changed; `{:error, :bad_population}` for a population that is not a whole
-  number.
+  number, `{:error, :bad_buildings}` for a building list that is not a list of whole numbers
+  (nothing is guessed or dropped: a malformed list is refused, not read as "no buildings").
   """
-  @spec changes(map(), details()) :: {:ok, keyword()} | {:error, :bad_population}
+  @spec changes(map(), details()) ::
+          {:ok, keyword()} | {:error, :bad_population | :bad_buildings}
   def changes(params, details) do
     name = params |> Map.get("name", details.name) |> String.trim()
     population = Map.get(params, "population", Integer.to_string(details.population))
 
-    with {:ok, population} <- parse_population(population) do
+    with {:ok, population} <- parse_population(population),
+         {:ok, buildings} <- building_changes(params, details) do
       scalars =
         [name: name, population: population]
         |> Enum.reject(fn {field, value} -> Map.fetch!(details, field) == value end)
 
-      {:ok, scalars ++ building_changes(params, details)}
+      {:ok, scalars ++ buildings}
     end
   end
 
   # The checklist posts the ids of the boxes that are ticked, plus a marker so that
   # "all unticked" is different from "the form had no checklist".
   defp building_changes(%{"buildings_present" => _} = params, details) do
-    wanted =
-      params
-      |> Map.get("buildings", [])
-      |> List.wrap()
-      |> Enum.flat_map(fn id ->
-        case Integer.parse(to_string(id)) do
-          {n, ""} -> [n]
-          _ -> []
-        end
-      end)
-      |> Enum.sort()
-      |> Enum.uniq()
+    with {:ok, ids} <- parse_building_ids(Map.get(params, "buildings", [])) do
+      wanted = ids |> Enum.sort() |> Enum.uniq()
 
-    if wanted == details.building_states |> Map.keys() |> Enum.sort(),
-      do: [],
-      else: [buildings: wanted]
+      if wanted == details.building_states |> Map.keys() |> Enum.sort(),
+        do: {:ok, []},
+        else: {:ok, [buildings: wanted]}
+    end
   end
 
-  defp building_changes(_params, _details), do: []
+  defp building_changes(_params, _details), do: {:ok, []}
+
+  # Every value must be a whole number; a range check is `Structures.edit_city/3`'s job.
+  defp parse_building_ids(values) when is_list(values) do
+    Enum.reduce_while(values, {:ok, []}, fn value, {:ok, acc} ->
+      case is_binary(value) && Integer.parse(value) do
+        {n, ""} -> {:cont, {:ok, [n | acc]}}
+        _ -> {:halt, {:error, :bad_buildings}}
+      end
+    end)
+  end
+
+  defp parse_building_ids(_values), do: {:error, :bad_buildings}
 
   @doc "A short description of what the changes do, for the undo button and the notice."
   @spec label(details(), keyword()) :: String.t()
