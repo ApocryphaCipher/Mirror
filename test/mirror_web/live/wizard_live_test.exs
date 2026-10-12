@@ -11,7 +11,8 @@ defmodule MirrorWeb.WizardLiveTest do
   end
 
   defp load_save(sid) do
-    SessionStore.put(sid, %{save: %{raw: MirrorWeb.WizardPanelTest.synthetic()}})
+    state = Mirror.SaveManager.normalize_state(%{save: %{raw: Mirror.WizardFixture.synthetic()}})
+    SessionStore.put(sid, state)
   end
 
   test "no save loaded says so", %{conn: conn} do
@@ -50,10 +51,58 @@ defmodule MirrorWeb.WizardLiveTest do
     refute has_element?(view, "#wizard-missing")
 
     # the loaded save changes underneath the open page (another tab, an undo, a new load)
-    raw = MirrorWeb.WizardPanelTest.synthetic()
+    raw = Mirror.WizardFixture.synthetic()
     <<head::binary-size(0x9E8 + 0x4C8 + 1), _::binary-size(20), tail::binary>> = raw
     SessionStore.put(sid, %{save: %{raw: head <> :binary.copy(<<0>>, 20) <> tail}})
 
     assert has_element?(view, "#wizard-missing", "There is no wizard 2")
+  end
+
+  describe "editing" do
+    defp submit(view, fields),
+      do: view |> element("#wizard-form") |> render_submit(%{"wizard" => fields})
+
+    test "the form appears in edit mode, an apply is one undo step and shows on the page",
+         %{conn: conn, sid: sid} do
+      load_save(sid)
+      {:ok, view, _} = live(conn, ~p"/wizard/1")
+      refute has_element?(view, "#wizard-form")
+
+      view |> element("#wizard-edit-toggle") |> render_click()
+      assert has_element?(view, "#wizard-form")
+
+      before = SessionStore.get(sid)
+      submit(view, %{"gold" => "5000", "name" => "Jafar the Great", "retorts_present" => "1"})
+
+      assert has_element?(view, "#wizard-note", "Edited Jafar: gold 5000")
+      assert has_element?(view, "#wizard-name", "Jafar the Great")
+      assert render(view) =~ "5000"
+
+      after_state = SessionStore.get(sid)
+      assert Mirror.Editor.changed_record_count(after_state) == 1
+      assert length(after_state.history.arcanus) == length(before.history.arcanus) + 1
+
+      # Undo restores the old bytes
+      {undone, _} = Mirror.Editor.undo(after_state, :arcanus)
+      assert undone.save.raw == before.save.raw
+    end
+
+    test "a bad value is refused with the reason and changes nothing", %{conn: conn, sid: sid} do
+      load_save(sid)
+      {:ok, view, _} = live(conn, ~p"/wizard/1")
+      view |> element("#wizard-edit-toggle") |> render_click()
+      raw = SessionStore.get(sid).save.raw
+
+      submit(view, %{"gold" => "99999"})
+      assert has_element?(view, "#wizard-note", "0 to 30000")
+
+      submit(view, %{"name" => "Zoë"})
+      assert has_element?(view, "#wizard-note", "no accents")
+
+      submit(view, %{"gold" => "1234"})
+      assert has_element?(view, "#wizard-note", "Nothing to change")
+
+      assert SessionStore.get(sid).save.raw == raw
+    end
   end
 end

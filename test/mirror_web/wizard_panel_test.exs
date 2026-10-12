@@ -2,48 +2,10 @@ defmodule MirrorWeb.WizardPanelTest do
   use ExUnit.Case, async: true
 
   alias MirrorWeb.WizardPanel
-
-  @offset 0x9E8
-  @record 0x4C8
-
-  defp put(raw, at, bytes) do
-    size = byte_size(bytes)
-    <<head::binary-size(^at), _::binary-size(^size), tail::binary>> = raw
-    head <> bytes <> tail
-  end
-
-  defp field(raw, record, at, bytes), do: put(raw, @offset + record * @record + at, bytes)
-
-  # A zeroed save with Jafar (record 0, blue) and a rival (record 1, red).
-  def synthetic do
-    # Unused node records are 0xFF, as in the game (a zeroed one is a node owned by wizard 0).
-    raw = put(:binary.copy(<<0>>, 123_300), 0x6058, :binary.copy(<<0xFF>>, 30 * 48))
-
-    raw
-    |> field(0, 0x00, <<7>>)
-    |> field(0, 0x01, String.pad_trailing("Jafar", 20, <<0>>))
-    |> field(0, 0x16, <<0>>)
-    |> field(0, 0x24, <<10::little-16, 12::little-16>>)
-    |> field(0, 0x2A, <<34, 33, 33>>)
-    |> field(0, 0x2E, <<38::little-16, 21::little-16, 1::little-16>>)
-    |> field(0, 0x54, <<5::little-16, 60::little-16, 2::little-16>>)
-    |> field(0, 0x5A, <<0::little-16, 12::little-16, 0::little-16, 3::little-16, 0::little-16>>)
-    |> field(0, 0x64 + 0, <<1>>)
-    |> field(0, 0x64 + 13, <<1>>)
-    |> field(
-      0,
-      0x25A,
-      <<383::little-16, 500::little-16, 2500::little-16, 0::little-16, 19::little-16>>
-    )
-    |> field(0, 0x264, <<2, 1, 1>>)
-    |> field(0, 0x264 + 40, <<2>>)
-    |> field(0, 0x356, <<1234::little-16>>)
-    |> field(1, 0x01, String.pad_trailing("Sharee", 20, <<0>>))
-    |> field(1, 0x16, <<3>>)
-  end
+  alias Mirror.WizardFixture
 
   test "reads the fields of wizard 1 as the page shows them" do
-    d = WizardPanel.details(synthetic(), 1)
+    d = WizardPanel.details(WizardFixture.synthetic(), 1)
 
     assert d.name == "Jafar"
     assert d.id == 1 and d.record == 0
@@ -71,14 +33,14 @@ defmodule MirrorWeb.WizardPanelTest do
   end
 
   test "a rival is wizard 2; its banner picks the colour" do
-    d = WizardPanel.details(synthetic(), 2)
+    d = WizardPanel.details(WizardFixture.synthetic(), 2)
     assert d.name == "Sharee"
     assert d.banner == :red
     assert d.colour == WizardPanel.colour(:red)
   end
 
   test "no such wizard: nameless record, neutral player, out of range, wrong type" do
-    raw = synthetic()
+    raw = WizardFixture.synthetic()
     assert WizardPanel.details(raw, 3) == nil
     assert WizardPanel.details(raw, 6) == nil
     assert WizardPanel.details(raw, 0) == nil
@@ -88,7 +50,7 @@ defmodule MirrorWeb.WizardPanelTest do
   end
 
   test "wizards/1 lists the named wizards by page number; page_id maps owners" do
-    assert WizardPanel.wizards(synthetic()) == [{1, "Jafar"}, {2, "Sharee"}]
+    assert WizardPanel.wizards(WizardFixture.synthetic()) == [{1, "Jafar"}, {2, "Sharee"}]
     assert WizardPanel.wizards(nil) == []
     assert WizardPanel.page_id(0, "Jafar") == 1
     assert WizardPanel.page_id(4, "Kali") == 5
@@ -96,5 +58,59 @@ defmodule MirrorWeb.WizardPanelTest do
     assert WizardPanel.page_id(nil, "Neutral") == nil
     # a record with no name has no page, so its label stays text
     assert WizardPanel.page_id(2, "") == nil
+  end
+
+  describe "changes/2 (the edit form)" do
+    setup do
+      %{d: WizardPanel.details(WizardFixture.synthetic(), 1)}
+    end
+
+    test "keeps only what differs", %{d: d} do
+      params = %{
+        "name" => "Jafar",
+        "gold" => "1234",
+        "mana" => "900",
+        "fame" => "10",
+        "books" => %{"0" => "0", "1" => "12", "2" => "0", "3" => "3", "4" => "0"},
+        "retorts_present" => "1",
+        "retorts" => %{"0" => "on", "13" => "on"}
+      }
+
+      assert WizardPanel.changes(params, d) == {:ok, [mana: 900]}
+    end
+
+    test "name, books and retorts become changes; unticked boxes are false", %{d: d} do
+      params = %{
+        "name" => "  Merlin ",
+        "books" => %{"0" => "5", "1" => "12", "2" => "0", "3" => "3", "4" => "0"},
+        "retorts_present" => "1",
+        "retorts" => %{"13" => "on", "17" => "on"}
+      }
+
+      assert {:ok, [name: "Merlin", books: [5, 12, 0, 3, 0], retorts: retorts]} =
+               WizardPanel.changes(params, d)
+
+      assert Enum.with_index(retorts) |> Enum.filter(&elem(&1, 0)) |> Enum.map(&elem(&1, 1)) == [
+               13,
+               17
+             ]
+    end
+
+    test "a form without the retort box sends no retort change", %{d: d} do
+      assert WizardPanel.changes(%{"gold" => "5"}, d) == {:ok, [gold: 5]}
+    end
+
+    test "a value that is not a number names its field", %{d: d} do
+      assert WizardPanel.changes(%{"gold" => "lots"}, d) == {:error, :bad_gold}
+      assert WizardPanel.changes(%{"fame" => "1.5"}, d) == {:error, :bad_fame}
+      assert WizardPanel.changes(%{"books" => %{"0" => "x"}}, d) == {:error, :bad_books}
+    end
+
+    test "label and error words", %{d: d} do
+      assert WizardPanel.label(d, gold: 5, books: [1, 1, 1, 1, 1]) ==
+               "Edited Jafar: gold 5, books"
+
+      assert WizardPanel.error_message(:bad_gold) =~ "0 to 30000"
+    end
   end
 end

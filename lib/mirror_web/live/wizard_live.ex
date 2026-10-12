@@ -5,7 +5,8 @@ defmodule MirrorWeb.WizardLive do
   """
   use MirrorWeb, :live_view
 
-  alias Mirror.SessionStore
+  alias Mirror.{Editor, SessionStore}
+  alias Mirror.SaveFile.Structures
   alias MirrorWeb.WizardPanel
 
   @impl true
@@ -13,7 +14,13 @@ defmodule MirrorWeb.WizardLive do
     session_id = session["mirror_session_id"] || "local"
     if connected?(socket), do: SessionStore.subscribe(session_id)
 
-    {:ok, socket |> assign(:session_id, session_id) |> assign(:id_param, id) |> load()}
+    {:ok,
+     socket
+     |> assign(:session_id, session_id)
+     |> assign(:id_param, id)
+     |> assign(:editing, false)
+     |> assign(:note, nil)
+     |> load()}
   end
 
   @impl true
@@ -21,6 +28,42 @@ defmodule MirrorWeb.WizardLive do
     if session_id == socket.assigns.session_id,
       do: {:noreply, load(socket)},
       else: {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("toggle_edit", _params, socket) do
+    {:noreply, socket |> assign(:editing, !socket.assigns.editing) |> assign(:note, nil)}
+  end
+
+  def handle_event("wizard_edit", %{"wizard" => params}, socket) do
+    case socket.assigns.details do
+      nil -> {:noreply, socket}
+      details -> {:noreply, apply_edit(socket, details, params)}
+    end
+  end
+
+  # One apply is one undo step (`Editor.apply_record/5`); undo and Save as are on the map pages.
+  defp apply_edit(socket, details, params) do
+    {:ok, _state, result} =
+      SessionStore.update(socket.assigns.session_id, fn current ->
+        raw = current.save.raw
+
+        with {:ok, changes} <- WizardPanel.changes(params, details),
+             :ok <- if(changes == [], do: {:error, :nothing_changed}, else: :ok),
+             {:ok, edited, _} <- Structures.edit_wizard(raw, details.record, changes),
+             label = WizardPanel.label(details, changes),
+             {next, {:record, _, _}} <- Editor.apply_record(current, :arcanus, label, edited) do
+          {next, {:ok, label}}
+        else
+          {:error, reason} -> {current, {:error, reason}}
+          _ -> {current, {:error, :unchanged}}
+        end
+      end)
+
+    case result do
+      {:ok, label} -> socket |> assign(:note, {:ok, label}) |> load()
+      {:error, reason} -> assign(socket, :note, {:error, WizardPanel.error_message(reason)})
+    end
   end
 
   defp load(socket) do
@@ -79,12 +122,116 @@ defmodule MirrorWeb.WizardLive do
         </div>
 
         <div :if={@details} class="space-y-6">
-          <header>
-            <p class="text-xs uppercase tracking-[0.3em] text-slate-300">
-              Wizard {@details.id} · {@details.banner} banner
-            </p>
-            <h1 id="wizard-name" class="text-4xl font-semibold text-white">{@details.name}</h1>
+          <header class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p class="text-xs uppercase tracking-[0.3em] text-slate-300">
+                Wizard {@details.id} · {@details.banner} banner
+              </p>
+              <h1 id="wizard-name" class="text-4xl font-semibold text-white">{@details.name}</h1>
+            </div>
+            <button
+              id="wizard-edit-toggle"
+              type="button"
+              phx-click="toggle_edit"
+              class={[
+                "rounded-lg px-3 py-1 text-sm font-semibold transition",
+                @editing && "bg-emerald-300 text-slate-950 hover:bg-emerald-200",
+                !@editing && "border border-emerald-300/50 text-emerald-100 hover:border-emerald-200"
+              ]}
+            >
+              {if @editing, do: "Done", else: "✎ Edit"}
+            </button>
           </header>
+
+          <p
+            :if={@note}
+            id="wizard-note"
+            class={[
+              "text-sm",
+              elem(@note, 0) == :ok && "text-emerald-200",
+              elem(@note, 0) == :error && "text-rose-300"
+            ]}
+          >
+            {elem(@note, 1)}
+          </p>
+
+          <.form
+            :if={@editing}
+            for={%{}}
+            as={:wizard}
+            id="wizard-form"
+            phx-submit="wizard_edit"
+            class="space-y-4 rounded-xl border border-emerald-300/30 bg-black/40 p-4"
+          >
+            <input type="hidden" name="wizard[retorts_present]" value="1" />
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <label class="text-sm text-slate-300">
+                Name
+                <input
+                  type="text"
+                  name="wizard[name]"
+                  value={@details.name}
+                  maxlength="19"
+                  class="mt-1 w-full rounded bg-slate-900 px-2 py-1 text-white"
+                />
+              </label>
+              <label
+                :for={
+                  {field, value} <- [gold: @details.gold, mana: @details.mana, fame: @details.fame]
+                }
+                class="text-sm text-slate-300"
+              >
+                {String.capitalize(to_string(field))} (0 to 30000)
+                <input
+                  type="number"
+                  min="0"
+                  max="30000"
+                  name={"wizard[#{field}]"}
+                  value={value}
+                  class="mt-1 w-full rounded bg-slate-900 px-2 py-1 text-white"
+                />
+              </label>
+            </div>
+            <div class="grid grid-cols-5 gap-3">
+              <label
+                :for={{{realm, n}, i} <- Enum.with_index(@details.book_counts)}
+                class="text-sm text-slate-300"
+              >
+                {realm} books
+                <input
+                  type="number"
+                  min="0"
+                  max="13"
+                  name={"wizard[books][#{i}]"}
+                  value={n}
+                  class="mt-1 w-full rounded bg-slate-900 px-2 py-1 text-white"
+                />
+              </label>
+            </div>
+            <fieldset>
+              <legend class="mb-1 text-sm text-slate-300">Retorts</legend>
+              <div class="grid grid-cols-2 gap-1 sm:grid-cols-3">
+                <label
+                  :for={{{name, on}, i} <- Enum.with_index(@details.retort_flags)}
+                  class="flex items-center gap-2 text-sm text-slate-200"
+                >
+                  <input type="checkbox" name={"wizard[retorts][#{i}]"} checked={on} />
+                  {name}
+                </label>
+              </div>
+            </fieldset>
+            <p class="text-xs text-slate-400">
+              Power base, casting skill and the research list are worked out again by the game.
+              Undo and Save as are on the map pages.
+            </p>
+            <button
+              type="submit"
+              id="wizard-apply"
+              class="rounded-lg bg-emerald-300 px-4 py-1 text-sm font-semibold text-slate-950 hover:bg-emerald-200"
+            >
+              Apply
+            </button>
+          </.form>
 
           <section id="wizard-header" class="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <.stat label="Fame" value={@details.fame} />
