@@ -59,7 +59,22 @@ enchantment's colour follows the caster, and the game names Flying Fortress "Fly
 Effects are the game's to derive; the editor does not check who may cast what, or whether a city has the walls
 a Wall of Fire needs.
 
-**Not done:** editing owner or race; lairs and units (the other panels in this story).
+**Race and owner (2026-10-11).** The panel has a select for each (`Structures.edit_city/3`, `race:` and `owner:`).
+Race is the byte at `+14`, 0 to 13. Owner is the byte at `+18`, a wizard record 0 to 4 or 5 for neutral,
+and **the units standing in the city that belong to the old owner change hands with it**, so a garrison is
+never left inside a city that is not theirs. **A wizard's capital is refused** (`:capital`): a city holding a
+fortress record (`0x65F8`) or a wizard's summoning circle, since the wizard record would still point at a city
+he no longer owns. On Kevin's played save this refuses exactly the five capitals (Dover, Darkmoor, Braxus,
+Myrean and Blackstone, which became Jafar's capital when he moved his fortress). The selects always carry
+the city's current value, even an unnamed wizard record, so Apply cannot change it by accident.
+**Real game (slot 8, vault checkpoint 94, Kevin at the keyboard):** Hialanth, a neutral Halfling city with 5
+units, given to Freya as a Dwarf city, loaded with its banner green, "Dwarf" on its screen, all 5 units
+Freya's (the game's memory shows owner 1, race 4 and units owned only by 1 on its tile), and no unrest;
+Ashwall, one of Jafar's, made neutral showed no owner and no units. The memory matched the file for both.
+**Not checked:** a city whose owner is changed having enchantments cast by the old owner (they keep their
+casters); the capital's race (the wizard record also has a "capital race" byte at `+0x15`).
+
+**Not done:** lairs and units (the other panels in this story).
 **Size:** large (do incrementally)
 
 ## What to do
