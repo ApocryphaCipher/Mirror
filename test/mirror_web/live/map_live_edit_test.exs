@@ -2295,14 +2295,11 @@ defmodule MirrorWeb.MapLiveEditTest do
       view = editing(conn, units_save(dir), "units")
       click(view, 20, 20)
 
+      # the unit's name and owner (the fixture's wizards have no names, so the owner part is empty)
       assert has_element?(
                view,
-               ~s|#units-form input[type=checkbox][aria-label="Nomad Griffins, Wizard 3"]|
-             ) or
-               has_element?(
-                 view,
-                 ~s|#units-form input[type=checkbox][aria-label^="Nomad Griffins"]|
-               )
+               ~s|#units-form input[type=checkbox][aria-label^="Nomad Griffins"]|
+             )
     end
 
     test "View mode shows the units read-only, and a city wins over its garrison", %{
