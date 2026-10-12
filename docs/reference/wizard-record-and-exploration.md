@@ -27,7 +27,7 @@ shows, and "kazzmir" means the offset comes from kazzmir's read order.
 | `+0x16` | banner: 0 blue, 1 green, 2 purple, 3 red, 4 yellow | game (yellow flag, STORY-032); live RAM + Cartographer: red (Sharee, 3), blue (Jafar, 0), green (Merlin, 1) and yellow (Freya, 4) city dots each sit on their owner's city; purple (Tlaloc, 2): his capital Bloodrock flies a purple flag. **All five checked** |
 | `+0x18` / `+0x1a` | personality / objective (u16, AI) | kazzmir |
 | `+0x22` | mastery research (u16) | kazzmir |
-| `+0x24` | fame (u16) | game: 10 in SAVE1, which the Famous retort grants; live RAM: 10 → 11 on "You have gained 1 fame" |
+| `+0x24` | fame (u16; the Info screen shows the field plus 13 in our test saves: 90 for 77, 30013 for 30000, 2026-10-12, STORY-048; the 13 is a guess, perhaps the hero Sir Harold) | game: 10 in SAVE1, which the Famous retort grants; live RAM: 10 → 11 on "You have gained 1 fame" |
 | `+0x26` | power base (u16) | kazzmir + game: 12, Magic screen "Power Base: 12" (live RAM) |
 | `+0x2a..+0x2c` | research / mana / skill ratio (u8; 34/33/33 in SAVE1) | kazzmir; they sum to 100. `+0x2c` = skill checked: 72 after Kevin moved the Skill slider (9 SP of 12). `+0x2a`/`+0x2b` were both 14, so their order is still kazzmir's |
 | `+0x2e` / `+0x30` / `+0x32` | summoning circle x / y / plane (i16) | game: (38, 21, Arcanus), the capital Norport; moved to (42, 16, 0) when Kevin cast Summoning Circle on Rostock (2026-09-24, [save-to-ram-map.md](save-to-ram-map.md)) |

@@ -115,6 +115,16 @@ defmodule MirrorWeb.WizardPanel do
             do: {realm, n}
           ),
         retorts: for({name, 1} <- Enum.zip(@retorts, :binary.bin_to_list(retorts)), do: name),
+        retort_flags:
+          for(
+            {name, byte} <- Enum.zip(@retorts, :binary.bin_to_list(retorts)),
+            do: {name, byte == 1}
+          ),
+        book_counts:
+          for(
+            {realm, <<n::little-signed-16>>} <- Enum.zip(@realms, chunks(books, 2)),
+            do: {realm, n}
+          ),
         researching: spell(researching),
         research_left: research_left,
         spells: known_by_realm(library),
@@ -172,4 +182,124 @@ defmodule MirrorWeb.WizardPanel do
 
   defp count({:ok, list}, record), do: Enum.count(list, &(&1.owner == record))
   defp count(_error, _record), do: 0
+
+  @doc """
+  The edit form's values (`params`) turned into `Mirror.SaveFile.Structures.edit_wizard/3` changes,
+  keeping only what differs from `details`, or `{:error, reason}` for a value that is not a number or text
+  of the right kind (the same reasons `edit_wizard/3` refuses with).
+  """
+  @spec changes(map(), map()) :: {:ok, keyword()} | {:error, atom()}
+  def changes(params, details) when is_map(params) do
+    with {:ok, nums} <- numbers(params, details),
+         {:ok, books} <- books(params, details),
+         {:ok, retorts} <- retorts(params, details),
+         {:ok, name} <- name(params, details) do
+      changes = nums ++ if(name != details.name, do: [name: name], else: []) ++ books ++ retorts
+      {:ok, changes}
+    end
+  end
+
+  def changes(_params, _details), do: {:ok, []}
+
+  defp name(params, details) do
+    case Map.get(params, "name", details.name) do
+      name when is_binary(name) -> {:ok, String.trim(name)}
+      _ -> {:error, :bad_name}
+    end
+  end
+
+  defp numbers(params, details) do
+    Enum.reduce_while([:gold, :mana, :fame], {:ok, []}, fn field, {:ok, acc} ->
+      case number(Map.get(params, Atom.to_string(field))) do
+        :skip -> {:cont, {:ok, acc}}
+        {:ok, n} when n == :erlang.map_get(field, details) -> {:cont, {:ok, acc}}
+        {:ok, n} -> {:cont, {:ok, acc ++ [{field, n}]}}
+        :error -> {:halt, {:error, :"bad_#{field}"}}
+      end
+    end)
+  end
+
+  defp books(%{"books" => given}, details) when is_map(given) do
+    current = Enum.map(details.book_counts, &elem(&1, 1))
+
+    wanted =
+      for i <- 0..4 do
+        case number(Map.get(given, Integer.to_string(i))) do
+          :skip -> {:ok, Enum.at(current, i)}
+          other -> other
+        end
+      end
+
+    if Enum.all?(wanted, &match?({:ok, _}, &1)) do
+      wanted = Enum.map(wanted, &elem(&1, 1))
+      {:ok, if(wanted == current, do: [], else: [books: wanted])}
+    else
+      {:error, :bad_books}
+    end
+  end
+
+  # A `books` value that is not a map is a bad form, not an omitted field.
+  defp books(%{"books" => _}, _details), do: {:error, :bad_books}
+  defp books(_params, _details), do: {:ok, []}
+
+  # A checkbox that is not ticked is not sent, so `retorts_present` says the form had them.
+  defp retorts(%{"retorts_present" => _} = params, details) do
+    case Map.get(params, "retorts", %{}) do
+      given when is_map(given) ->
+        wanted =
+          for i <- 0..(length(details.retort_flags) - 1),
+              do: Map.get(given, Integer.to_string(i)) in ["on", "true"]
+
+        current = Enum.map(details.retort_flags, &elem(&1, 1))
+        {:ok, if(wanted == current, do: [], else: [retorts: wanted])}
+
+      _ ->
+        {:error, :bad_retorts}
+    end
+  end
+
+  defp retorts(_params, _details), do: {:ok, []}
+
+  defp number(nil), do: :skip
+  defp number(""), do: :skip
+
+  defp number(value) when is_binary(value) do
+    case Integer.parse(String.trim(value)) do
+      {n, ""} -> {:ok, n}
+      _ -> :error
+    end
+  end
+
+  defp number(_), do: :error
+
+  @doc "A short description of an edit, for the notice and the undo list."
+  @spec label(map(), keyword()) :: String.t()
+  def label(details, changes) do
+    parts =
+      Enum.map(changes, fn
+        {:gold, n} -> "gold #{n}"
+        {:mana, n} -> "mana #{n}"
+        {:fame, n} -> "fame #{n}"
+        {:name, n} -> "name #{n}"
+        {:books, _} -> "books"
+        {:retorts, _} -> "retorts"
+      end)
+
+    "Edited #{details.name}: #{Enum.join(parts, ", ")}"
+  end
+
+  @doc "The words for a refused edit."
+  @spec error_message(term()) :: String.t()
+  def error_message(:bad_gold), do: "Gold is a whole number from 0 to 30000."
+  def error_message(:bad_mana), do: "Mana is a whole number from 0 to 30000."
+  def error_message(:bad_fame), do: "Fame is a whole number from 0 to 30000."
+
+  def error_message(:bad_name),
+    do: "A name is 1 to 19 letters, digits or punctuation (no accents)."
+
+  def error_message(:bad_books), do: "Books are whole numbers from 0 to 13."
+  def error_message(:bad_retorts), do: "Those retorts could not be read."
+  def error_message(:no_such_wizard), do: "That wizard is no longer in the save."
+  def error_message(:nothing_changed), do: "Nothing to change."
+  def error_message(_other), do: "The wizard could not be changed."
 end

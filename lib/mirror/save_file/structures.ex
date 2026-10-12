@@ -1059,6 +1059,101 @@ defmodule Mirror.SaveFile.Structures do
     end
   end
 
+  @wizard_offset 0x9E8
+  @wizard_record 0x4C8
+  @max_wizard_value 30_000
+  @max_books 13
+  @retort_count 18
+
+  @doc """
+  Edits wizard `record` (0 is the player, 0 to 4 the wizards) with `changes`, a keyword list:
+
+    * `:gold`, `:mana`, `:fame` (0 to #{@max_wizard_value}: the game's own cap on gold and mana, and the same
+      limit for fame, *guess* until tried in the game)
+    * `:name` (printable ASCII, 1 to 19 characters, written NUL-padded to 20 bytes)
+    * `:books` (five numbers 0 to #{@max_books}, in the order Nature, Sorcery, Chaos, Life, Death; *guess* on the top)
+    * `:retorts` (#{@retort_count} booleans, in the save's byte order)
+
+  Refused: a record with no name (`:no_such_wizard`), a bad value (`:bad_gold`, `:bad_mana`, `:bad_fame`,
+  `:bad_name`, `:bad_books`, `:bad_retorts`) or an unknown field. The power base, casting skill and the
+  research candidates are worked out again by the game, so they are not touched.
+  """
+  @spec edit_wizard(binary(), non_neg_integer(), keyword()) :: result()
+  def edit_wizard(raw, record, changes) when is_list(changes) do
+    at = @wizard_offset + record * @wizard_record
+
+    with true <- record in 0..4//1 and byte_size(raw) >= @wizard_offset + 5 * @wizard_record,
+         true <- :binary.at(raw, at + 1) != 0,
+         {:ok, edits} <- wizard_edits(changes) do
+      raw =
+        Enum.reduce(edits, raw, fn
+          {:gold, v}, acc ->
+            put(acc, at + 0x356, <<v::little-16>>)
+
+          {:mana, v}, acc ->
+            put(acc, at + 0x25C, <<v::little-16>>)
+
+          {:fame, v}, acc ->
+            put(acc, at + 0x24, <<v::little-16>>)
+
+          {:name, v}, acc ->
+            put(acc, at + 1, String.pad_trailing(v, 20, <<0>>))
+
+          {:books, v}, acc ->
+            put(acc, at + 0x5A, for(n <- v, into: <<>>, do: <<n::little-16>>))
+
+          {:retorts, v}, acc ->
+            put(acc, at + 0x64, for(on <- v, into: <<>>, do: <<bool_byte(on)>>))
+        end)
+
+      {:ok, raw, %{changed: Keyword.keys(edits)}}
+    else
+      {:error, _} = error -> error
+      _ -> {:error, :no_such_wizard}
+    end
+  end
+
+  defp bool_byte(true), do: 1
+  defp bool_byte(false), do: 0
+
+  defp wizard_edits(changes) do
+    Enum.reduce_while(changes, {:ok, []}, fn {field, value}, {:ok, acc} ->
+      case wizard_value(field, value) do
+        :ok -> {:cont, {:ok, acc ++ [{field, value}]}}
+        {:error, _} = error -> {:halt, error}
+      end
+    end)
+  end
+
+  defp wizard_value(field, v)
+       when field in [:gold, :mana, :fame] and is_integer(v) and v in 0..@max_wizard_value//1,
+       do: :ok
+
+  defp wizard_value(field, _) when field in [:gold, :mana, :fame], do: {:error, :"bad_#{field}"}
+
+  defp wizard_value(:name, v) when is_binary(v) and byte_size(v) in 1..19//1 do
+    if String.match?(v, ~r/\A[\x20-\x7E]+\z/) and String.trim(v) != "",
+      do: :ok,
+      else: {:error, :bad_name}
+  end
+
+  defp wizard_value(:name, _), do: {:error, :bad_name}
+
+  defp wizard_value(:books, v) when is_list(v) and length(v) == 5 do
+    if Enum.all?(v, &(is_integer(&1) and &1 in 0..@max_books//1)),
+      do: :ok,
+      else: {:error, :bad_books}
+  end
+
+  defp wizard_value(:books, _), do: {:error, :bad_books}
+
+  defp wizard_value(:retorts, v) when is_list(v) and length(v) == @retort_count do
+    if Enum.all?(v, &is_boolean/1), do: :ok, else: {:error, :bad_retorts}
+  end
+
+  defp wizard_value(:retorts, _), do: {:error, :bad_retorts}
+  defp wizard_value(other, _), do: {:error, {:unknown_field, other}}
+
   defp set_bit(flags, bit, true), do: Bitwise.bor(flags, bit)
   defp set_bit(flags, bit, false), do: Bitwise.band(flags, Bitwise.bnot(bit))
 
