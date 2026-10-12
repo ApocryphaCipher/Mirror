@@ -36,6 +36,8 @@ defmodule MirrorWeb.NodePanelTest do
     assert {:ok, []} = NodePanel.changes(%{"owner" => ""}, %{@details | warped: true})
     assert {:error, :bad_owner} = NodePanel.changes(form(%{"owner" => "x"}), @details)
     assert {:error, :bad_owner} = NodePanel.changes(form(%{"owner" => "7"}), @details)
+    assert {:error, :bad_flag} = NodePanel.changes(form(%{"warped" => "maybe"}), @details)
+    assert {:error, :bad_flag} = NodePanel.changes(form(%{"spirit_meld" => ""}), @details)
   end
 
   test "the owner select keeps an unnamed current owner" do

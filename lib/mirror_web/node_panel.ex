@@ -79,13 +79,14 @@ defmodule MirrorWeb.NodePanel do
   @doc """
   The form's params (`"owner"`: `""` for none or a wizard record number, and `"warped"` and
   `"spirit_meld"` with a `"flags_present"` marker) as the keyword list `Structures.edit_node/3`
-  takes, keeping only what differs from `details`. An unreadable owner is `:bad_owner`; a form
+  takes, keeping only what differs from `details`. An unreadable owner is `:bad_owner`, a flag value other than `"on"` or `"true"` is `:bad_flag`; a form
   with none of the fields changes nothing.
   """
-  @spec changes(map(), details()) :: {:ok, keyword()} | {:error, :bad_owner}
+  @spec changes(map(), details()) :: {:ok, keyword()} | {:error, :bad_owner | :bad_flag}
   def changes(params, details) do
-    with {:ok, owner} <- owner_change(params, details) do
-      {:ok, owner ++ flag_changes(params, details)}
+    with {:ok, owner} <- owner_change(params, details),
+         {:ok, flags} <- flag_changes(params, details) do
+      {:ok, owner ++ flags}
     end
   end
 
@@ -109,15 +110,23 @@ defmodule MirrorWeb.NodePanel do
     end
   end
 
-  # With the marker, a missing key is an unticked box, as a browser posts nothing for one.
+  # With the marker, a missing key is an unticked box, as a browser posts nothing for one. A
+  # value that is present but is not what a ticked box posts is refused, not read as unticked.
   defp flag_changes(%{"flags_present" => _} = params, details) do
-    for {key, field} <- [{"warped", :warped}, {"spirit_meld", :spirit_meld}],
-        wanted <- [Map.get(params, key) in ["on", "true"]],
-        wanted != Map.fetch!(details, field),
-        do: {field, wanted}
+    Enum.reduce_while([{"warped", :warped}, {"spirit_meld", :spirit_meld}], {:ok, []}, fn
+      {key, field}, {:ok, acc} ->
+        case Map.fetch(params, key) do
+          :error -> {:cont, {:ok, add_flag(acc, field, false, details)}}
+          {:ok, v} when v in ["on", "true"] -> {:cont, {:ok, add_flag(acc, field, true, details)}}
+          {:ok, _} -> {:halt, {:error, :bad_flag}}
+        end
+    end)
   end
 
-  defp flag_changes(_params, _details), do: []
+  defp flag_changes(_params, _details), do: {:ok, []}
+
+  defp add_flag(acc, field, wanted, details),
+    do: if(wanted == Map.fetch!(details, field), do: acc, else: acc ++ [{field, wanted}])
 
   @doc """
   True when applying `changes` gives an owner to a node whose guardians are still alive: melding
