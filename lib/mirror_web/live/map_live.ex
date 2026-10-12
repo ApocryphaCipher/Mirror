@@ -2404,7 +2404,10 @@ defmodule MirrorWeb.MapLive do
         </button>
       </div>
       <p class="text-slate-400">
-        {if @details.owner, do: "Melded by #{@details.owner_name}", else: "Not melded"}
+        <span :if={!@details.owner}>Not melded</span>
+        <span :if={@details.owner}>
+          Melded by <.owner_link owner={@details.owner} name={@details.owner_name} />
+        </span>
       </p>
 
       <.form for={%{}} as={:node} id="node-form" phx-submit="node_edit" class="mt-2">
@@ -2521,7 +2524,9 @@ defmodule MirrorWeb.MapLive do
             />
             <span>
               <span class="text-slate-200">{row.name}</span>
-              <span class="text-slate-500">· {row.owner_name}</span>
+              <span class="text-slate-500">
+                · <.owner_link owner={row.owner} name={row.owner_name} />
+              </span>
               <span class="block text-slate-400">
                 level {row.level} · {row.experience} xp{if row.damage > 0,
                   do: " · damage #{row.damage}"}{if row.orders,
@@ -2640,7 +2645,7 @@ defmodule MirrorWeb.MapLive do
       </div>
       <p class="text-slate-400">
         {plane_name(@details.plane)} ({@details.x}, {@details.y}) ·
-        <span class="text-amber-200">{@details.owner_name}</span>
+        <.owner_link owner={@details.owner} name={@details.owner_name} class="text-amber-200" />
         ({@details.banner})
       </p>
 
@@ -2938,6 +2943,24 @@ defmodule MirrorWeb.MapLive do
     do: "0x" <> String.pad_leading(Integer.to_string(value, 16), 3, "0")
 
   defp overlay_layers, do: @overlay_layers
+
+  attr :owner, :any, required: true
+  attr :name, :string, required: true
+  attr :class, :string, default: nil
+
+  # An owner's name: a link to the wizard's page for the five wizards, plain text for neutral.
+  defp owner_link(assigns) do
+    assigns = assign(assigns, :page, MirrorWeb.WizardPanel.page_id(assigns.owner, assigns.name))
+
+    ~H"""
+    <.link
+      :if={@page}
+      navigate={~p"/wizard/#{@page}"}
+      class={[@class, "underline decoration-dotted"]}
+      phx-no-format
+    >{@name}</.link><span :if={!@page} class={@class} phx-no-format>{@name}</span>
+    """
+  end
 
   defp plane_name(:arcanus), do: "Arcanus"
   defp plane_name(:myrror), do: "Myrror"

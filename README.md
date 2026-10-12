@@ -82,6 +82,8 @@ Visit `localhost:4000`:
   the Surveyor readout, and toggle layers (cities, settleable sites, fog of war).
   Load a save with the path field in the header (it defaults to
   `$MIRROR_MOM_PATH/SAVE1.GAM`), then ✎ Edit. **Paint type** paints water or a land type (dropdown, brush 1×1 to 5×5, fill; right-click picks the terrain under the pointer) and re-tiles the coast and edges around it; **Paint tile** writes one exact tile number (with a quick pick of plain tiles) and leaves neighbours alone; **Cycle** steps a tile to the next picture. **Road** steps a tile none, road, enchanted road; **Corruption** switches it on or off; **Special** places an ore, gems, crystals, wild game or nightshade. **Reveal** marks every tile of this plane, or both, as explored. **🏰 Move** picks up a city, tower, lair or node and puts it down on another tile; **👥 Units** lists a tile's units and moves or edits the ticked ones; **🏙️ City**, **🏚️ Lair** and **🔮 Node** open a panel for the structure you click. In view mode a click on a city, a stack or a site opens the same panel read-only. Undo and redo cover everything, including the landmass layer and every structure edit.
+- `/wizard/1` to `/wizard/5`: one wizard of the loaded save, read-only (fame, gold, mana, books, retorts, research, standing),
+  on a gradient of their banner colour; reached from the owner names in the map panels.
 - `/lab/arcanus`, `/lab/myrror`: the research workbench. Raw layers,
   value/bit labelling, histograms, the raw-value painter.
 - `/tile-probe`: the LBX explorer. Browse any LBX file's entries by name,

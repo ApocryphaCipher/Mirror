@@ -2716,6 +2716,7 @@ defmodule MirrorWeb.MapLiveEditTest do
              )
 
       assert npanel(view) =~ "Melded by Freya"
+      assert has_element?(view, "#node-panel a[href='/wizard/2']", "Freya")
       assert npanel(view) =~ "Guardians cleared"
       refute has_element?(view, "#node-clear-guardians")
       assert changed(view) =~ "1 edited"
