@@ -80,6 +80,59 @@ defmodule MirrorWeb.UnitPanel do
     end
   end
 
+  @doc """
+  The edit fields of the units form (`"level"`, `"experience"`, `"damage"`, `"owner"`: a whole
+  number, or empty to leave it) as the keyword list `Structures.edit_units/3` takes. Unreadable
+  text is refused (`:bad_level` and so on), not skipped. `:bad_owner` is a wizard record 0 to 5.
+  """
+  @spec changes(map() | nil) :: {:ok, keyword()} | {:error, atom()}
+  def changes(params) when is_map(params) do
+    Enum.reduce_while(
+      [level: "level", experience: "experience", damage: "damage", owner: "owner"],
+      {:ok, []},
+      fn {field, key}, {:ok, acc} ->
+        case number(Map.get(params, key)) do
+          :skip -> {:cont, {:ok, acc}}
+          {:ok, n} -> {:cont, {:ok, acc ++ [{field, n}]}}
+          :error -> {:halt, {:error, :"bad_#{field}"}}
+        end
+      end
+    )
+  end
+
+  def changes(_params), do: {:ok, []}
+
+  defp number(nil), do: :skip
+  defp number(""), do: :skip
+
+  defp number(value) when is_binary(value) do
+    case Integer.parse(String.trim(value)) do
+      {n, ""} -> {:ok, n}
+      _ -> :error
+    end
+  end
+
+  defp number(_), do: :error
+
+  @doc "The owner select's wizards: the named ones, as `{record number, name}` (neutral is added by the page)."
+  @spec owner_options(binary()) :: [{non_neg_integer(), String.t()}]
+  def owner_options(raw),
+    do: for({id, name} <- Enum.sort(Wizards.names(raw)), id in 0..4, name != "", do: {id, name})
+
+  @doc "A short description of an edit of `count` units, for the notice and undo."
+  @spec label(non_neg_integer(), keyword(), %{non_neg_integer() => String.t()}) :: String.t()
+  def label(count, changes, names) do
+    parts =
+      Enum.map(changes, fn
+        {:level, n} -> "level #{n}"
+        {:experience, n} -> "#{n} xp"
+        {:damage, n} -> "damage #{n}"
+        {:owner, n} -> "owner #{Map.get(names, n, "Neutral")}"
+      end)
+
+    "Edited #{count} #{unit_word(count)}: #{Enum.join(parts, ", ")}"
+  end
+
   @doc "The notice for the units that are picked up and waiting for a destination."
   def armed(count),
     do: "Moving #{count} #{unit_word(count)}: click where they should go. Right-click to cancel."
@@ -117,6 +170,21 @@ defmodule MirrorWeb.UnitPanel do
   def error_message(:foreign_units_at_destination),
     do: "Another player's units are standing there."
 
+  def error_message(:bad_level), do: "Level is a whole number from 0 to 9."
+  def error_message(:bad_experience), do: "Experience is a whole number from 0 to 30000."
+  def error_message(:bad_damage), do: "Damage is a whole number from 0 to 255."
+  def error_message(:bad_owner), do: "The owner is a wizard from 1 to 5, or neutral."
+
+  def error_message(:hero_owner),
+    do: "A hero cannot change owner here: he is in his wizard's hero list."
+
+  def error_message(:foreign_city_here),
+    do: "That tile holds another player's city; change its owner first."
+
+  def error_message(:foreign_units_here),
+    do: "Other units stay behind on that tile; tick the whole stack to change its owner."
+
+  def error_message(:nothing_changed), do: "Nothing to change: fill in a field."
   def error_message(:stack_full), do: "A tile holds at most 9 units."
   def error_message(_other), do: "The units could not be moved there."
 end

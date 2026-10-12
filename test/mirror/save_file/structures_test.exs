@@ -915,6 +915,80 @@ defmodule Mirror.SaveFile.StructuresTest do
     end
   end
 
+  describe "edit_units/3" do
+    defp unit_fields(raw, i) do
+      <<_::binary-size(3), owner, _::binary-size(8), level, _, xp::little-signed-16, _, damage,
+        _::binary>> = binary_part(raw, @units + i * 32, 32)
+
+      %{owner: owner, level: level, experience: xp, damage: damage}
+    end
+
+    test "level, experience and damage are written to their own bytes only" do
+      raw = blank() |> unit(0, 5, 5, 0, 1) |> unit(1, 5, 5, 0, 1)
+
+      assert {:ok, edited, %{changed: [:level, :experience, :damage], units: 1}} =
+               Structures.edit_unit(raw, 1, level: 3, experience: 150, damage: 4)
+
+      assert %{level: 3, experience: 150, damage: 4, owner: 1} = unit_fields(edited, 1)
+      assert unit_fields(edited, 0) == unit_fields(raw, 0)
+
+      diff =
+        for {{a, b}, i} <-
+              Enum.with_index(Enum.zip(:binary.bin_to_list(raw), :binary.bin_to_list(edited))),
+            a != b,
+            do: i - @units - 32
+
+      assert diff == [12, 14, 17]
+    end
+
+    test "values out of range or the wrong kind are refused" do
+      raw = blank() |> unit(0, 5, 5, 0, 1)
+
+      assert {:error, :bad_level} = Structures.edit_unit(raw, 0, level: 10)
+      assert {:error, :bad_experience} = Structures.edit_unit(raw, 0, experience: -1)
+      assert {:error, :bad_experience} = Structures.edit_unit(raw, 0, experience: 30_001)
+      assert {:error, :bad_damage} = Structures.edit_unit(raw, 0, damage: 256)
+      assert {:error, :bad_owner} = Structures.edit_unit(raw, 0, owner: 6)
+      assert {:error, :bad_level} = Structures.edit_unit(raw, 0, level: "3")
+      assert {:error, {:unknown_field, :type}} = Structures.edit_unit(raw, 0, type: 1)
+      assert {:error, :no_such_unit} = Structures.edit_unit(raw, 5, level: 1)
+      assert {:error, :no_units} = Structures.edit_units(raw, [], level: 1)
+    end
+
+    test "a new owner clears a go-to order and keeps sentry" do
+      raw =
+        blank()
+        |> unit(0, 5, 5, 0, 1)
+        |> unit(1, 20, 5, 0, 1)
+        |> put(@units + 9, <<12, 13, 3>>)
+        |> put(@units + 32 + 11, <<1>>)
+
+      assert {:ok, edited, _} = Structures.edit_units(raw, [0, 1], owner: 2)
+      assert binary_part(edited, @units + 9, 3) == <<0, 0, 0>>
+      assert binary_part(edited, @units + 32 + 11, 1) == <<1>>
+      assert %{owner: 2} = unit_fields(edited, 0)
+    end
+
+    test "a stack changes hands together, but not unit by unit" do
+      raw = blank() |> unit(0, 5, 5, 0, 1) |> unit(1, 5, 5, 0, 1)
+
+      assert {:error, :foreign_units_here} = Structures.edit_unit(raw, 0, owner: 2)
+      assert {:ok, edited, %{units: 2}} = Structures.edit_units(raw, [0, 1], owner: 2)
+      assert [2, 2] == for(i <- 0..1, do: unit_fields(edited, i).owner)
+    end
+
+    test "not into a city of another owner, and not a hero" do
+      raw = blank() |> city(0, "Norport", 5, 5, 0, 1) |> unit(0, 5, 5, 0, 1)
+
+      assert {:error, :foreign_city_here} = Structures.edit_unit(raw, 0, owner: 2)
+      assert {:ok, _, _} = Structures.edit_unit(raw, 0, level: 2)
+
+      hero = blank() |> unit(0, 5, 5, 0, 1) |> put(@units + 5, <<12>>)
+      assert {:error, :hero_owner} = Structures.edit_unit(hero, 0, owner: 2)
+      assert {:ok, _, _} = Structures.edit_unit(hero, 0, damage: 3, owner: 1)
+    end
+  end
+
   describe "edit_encounter/3" do
     defp enc(raw, i), do: Mirror.SaveFile.Encounters.get(raw, i)
 

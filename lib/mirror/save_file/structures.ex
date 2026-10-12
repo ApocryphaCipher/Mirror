@@ -631,6 +631,122 @@ defmodule Mirror.SaveFile.Structures do
     end
   end
 
+  @max_level 9
+  @max_experience 30_000
+  @hero_types 0..34
+
+  @doc """
+  Edits live units' own fields, the same change for each of `indexes`: `level:` (`+12`, 0 to
+  #{@max_level}), `experience:` (`+14`, i16, 0 to #{@max_experience}), `damage:` (`+17`, 0 to 255)
+  and `owner:` (`+3`, 0 to 5, 5 being neutral). Only those bytes change, except that a new owner
+  also **clears a go-to order**, as moving a unit does. Refused: a bad value (`:bad_level`,
+  `:bad_experience`, `:bad_damage`, `:bad_owner`), an empty list (`:no_units`), a unit that is not
+  live (`:no_such_unit`), and a new owner for **a hero** (`:hero_owner`: a hero is also an entry in
+  his wizard's hero list, which this does not edit), for units on a tile where **another owner's
+  city** (`:foreign_city_here`) or **other units that stay behind** (`:foreign_units_here`) are, since
+  the game keeps one owner to a tile.
+
+  Level and experience are written as given. The game shows the level byte as it is on load, but
+  works it out from the experience again at End Turn (and caps a normal unit's experience at 120),
+  so a lasting level is made with experience.
+  """
+  @spec edit_units(binary(), [non_neg_integer()], keyword()) :: result()
+  def edit_units(_raw, [], _changes), do: {:error, :no_units}
+
+  def edit_units(raw, indexes, changes) when is_list(indexes) and is_list(changes) do
+    with {:ok, all} <- Units.parse(raw),
+         {:ok, picked} <- pick_units(all, indexes),
+         {:ok, edits} <- unit_edits(changes),
+         :ok <- check_unit_owner(raw, all, picked, edits[:owner]) do
+      {base, _} = Units.block_range()
+
+      raw =
+        Enum.reduce(indexes, raw, fn index, acc ->
+          at = base + index * @unit_record
+
+          Enum.reduce(edits, acc, fn
+            {:level, v}, acc -> put(acc, at + 12, <<v>>)
+            {:experience, v}, acc -> put(acc, at + 14, <<v::little-signed-16>>)
+            {:damage, v}, acc -> put(acc, at + 17, <<v>>)
+            {:owner, v}, acc -> acc |> put(at + 3, <<v>>) |> clear_goto(at)
+          end)
+        end)
+
+      {:ok, raw, %{changed: Keyword.keys(edits), units: length(indexes)}}
+    end
+  end
+
+  @doc "One unit's fields; see `edit_units/3`."
+  @spec edit_unit(binary(), non_neg_integer(), keyword()) :: result()
+  def edit_unit(raw, index, changes), do: edit_units(raw, [index], changes)
+
+  defp clear_goto(raw, at) do
+    <<_::binary-size(9), dx, dy, status, _::binary>> = binary_part(raw, at, 12)
+
+    if status == @goto_status or ((dx != 0 or dy != 0) and status == 0),
+      do: put(raw, at + 9, <<0, 0, 0>>),
+      else: raw
+  end
+
+  defp unit_edits(changes) do
+    changes
+    |> Enum.reduce_while({:ok, []}, fn {field, value}, {:ok, acc} ->
+      case unit_value(field, value) do
+        :ok -> {:cont, {:ok, [{field, value} | acc]}}
+        {:error, _} = error -> {:halt, error}
+      end
+    end)
+    |> then(fn
+      {:ok, edits} -> {:ok, Enum.reverse(edits)}
+      error -> error
+    end)
+  end
+
+  defp unit_value(:level, v) when is_integer(v) and v in 0..@max_level//1, do: :ok
+  defp unit_value(:level, _), do: {:error, :bad_level}
+  defp unit_value(:experience, v) when is_integer(v) and v in 0..@max_experience//1, do: :ok
+  defp unit_value(:experience, _), do: {:error, :bad_experience}
+  defp unit_value(:damage, v) when is_integer(v) and v in 0..255//1, do: :ok
+  defp unit_value(:damage, _), do: {:error, :bad_damage}
+  defp unit_value(:owner, v) when is_integer(v) and v in 0..5//1, do: :ok
+  defp unit_value(:owner, _), do: {:error, :bad_owner}
+  defp unit_value(other, _), do: {:error, {:unknown_field, other}}
+
+  defp check_unit_owner(_raw, _all, _picked, nil), do: :ok
+
+  defp check_unit_owner(raw, all, picked, owner) do
+    changing = Enum.reject(picked, &(&1.owner == owner))
+    batch = MapSet.new(picked, & &1.index)
+    tiles = changing |> Enum.map(&{&1.x, &1.y, plane_index(&1.plane)}) |> Enum.uniq()
+
+    cond do
+      Enum.any?(changing, &(&1.type in @hero_types)) ->
+        {:error, :hero_owner}
+
+      Enum.any?(all, fn u ->
+        u.owner != owner and not MapSet.member?(batch, u.index) and
+            {u.x, u.y, plane_index(u.plane)} in tiles
+      end) ->
+        {:error, :foreign_units_here}
+
+      foreign_city_on?(raw, tiles, owner) ->
+        {:error, :foreign_city_here}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp foreign_city_on?(raw, tiles, owner) do
+    case Cities.parse(raw) do
+      {:ok, cities} ->
+        Enum.any?(cities, &({&1.x, &1.y, plane_index(&1.plane)} in tiles and &1.owner != owner))
+
+      _ ->
+        false
+    end
+  end
+
   defp pick_units(_all, []), do: {:error, :no_units}
 
   defp pick_units(all, indexes) do

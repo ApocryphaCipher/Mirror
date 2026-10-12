@@ -283,7 +283,11 @@ defmodule MirrorWeb.MapLive do
 
       case UnitPanel.picked(params["units"], rows) do
         {:ok, ids} ->
-          {:noreply, assign(socket, unit_armed: ids, unit_note: UnitPanel.armed(length(ids)))}
+          if params["units"]["op"] == "edit" do
+            {:noreply, edit_units(socket, ids, params["units"])}
+          else
+            {:noreply, assign(socket, unit_armed: ids, unit_note: UnitPanel.armed(length(ids)))}
+          end
 
         {:error, reason} ->
           {:noreply, assign(socket, :unit_note, UnitPanel.error_message(reason))}
@@ -2221,6 +2225,7 @@ defmodule MirrorWeb.MapLive do
             plane={@plane}
             note={@unit_note}
             armed={@unit_armed}
+            owners={UnitPanel.owner_options(@state.save.raw)}
             editable={@edit == :terrain}
           />
 
@@ -2478,6 +2483,7 @@ defmodule MirrorWeb.MapLive do
   attr :plane, :atom, required: true
   attr :note, :string, default: nil
   attr :armed, :any, default: nil
+  attr :owners, :list, default: []
   attr :editable, :boolean, default: false
 
   defp unit_panel(assigns) do
@@ -2532,6 +2538,66 @@ defmodule MirrorWeb.MapLive do
         >
           Move ticked units…
         </button>
+
+        <fieldset :if={@editable} id="units-edit" class="mt-3 border-t border-white/10 pt-2">
+          <legend class="text-slate-500">Change the ticked units (empty = leave)</legend>
+          <div class="grid grid-cols-2 gap-1.5">
+            <label class="text-slate-400">
+              Level
+              <input
+                type="number"
+                name="units[level]"
+                min="0"
+                max="9"
+                class="mt-0.5 block w-full rounded border border-white/15 bg-slate-950 px-1 py-0.5 text-slate-100"
+              />
+            </label>
+            <label class="text-slate-400">
+              Experience
+              <input
+                type="number"
+                name="units[experience]"
+                min="0"
+                max="30000"
+                class="mt-0.5 block w-full rounded border border-white/15 bg-slate-950 px-1 py-0.5 text-slate-100"
+              />
+            </label>
+            <label class="text-slate-400">
+              Damage
+              <input
+                type="number"
+                name="units[damage]"
+                min="0"
+                max="255"
+                class="mt-0.5 block w-full rounded border border-white/15 bg-slate-950 px-1 py-0.5 text-slate-100"
+              />
+            </label>
+            <label class="text-slate-400">
+              Owner
+              <select
+                name="units[owner]"
+                class="mt-0.5 block w-full rounded border border-white/15 bg-slate-950 px-1 py-0.5 text-slate-100"
+              >
+                <option value="">leave</option>
+                <option :for={{id, name} <- @owners} value={id}>{name}</option>
+                <option value="5">Neutral</option>
+              </select>
+            </label>
+          </div>
+          <p class="mt-1 text-slate-500">
+            The game works the level out from experience again at End Turn, so set experience for a
+            lasting change (a normal unit tops out at 120); level only holds until then.
+          </p>
+          <button
+            id="units-edit-apply"
+            type="submit"
+            name="units[op]"
+            value="edit"
+            class="mt-2 rounded-lg bg-emerald-300 px-2.5 py-0.5 font-semibold text-slate-950 hover:bg-emerald-200"
+          >
+            Apply to ticked units
+          </button>
+        </fieldset>
       </.form>
       <p :if={@note} id="units-note" role="status" aria-live="polite" class="mt-1 text-emerald-200">
         {@note}
@@ -3427,6 +3493,39 @@ defmodule MirrorWeb.MapLive do
     else
       {:error, reason} -> {:error, reason}
       _ -> {:error, :unchanged}
+    end
+  end
+
+  # The units panel's edit fields applied to the ticked units: one undo step (STORY-020).
+  defp edit_units(socket, ids, params) do
+    plane = socket.assigns.plane
+
+    {:ok, state, result} =
+      SessionStore.update(socket.assigns.session_id, fn current ->
+        raw = current.save.raw
+
+        with {:ok, changes} <- UnitPanel.changes(params),
+             :ok <- if(changes == [], do: {:error, :nothing_changed}, else: :ok),
+             {:ok, edited, _} <- Structures.edit_units(raw, ids, changes),
+             label = UnitPanel.label(length(ids), changes, Wizards.names(raw)),
+             {next, {:record, _, _}} <- Editor.apply_record(current, plane, label, edited) do
+          {next, {:ok, label}}
+        else
+          {:error, reason} -> {current, {:error, reason}}
+          _ -> {current, {:error, :unchanged}}
+        end
+      end)
+
+    case result do
+      {:ok, label} ->
+        socket
+        |> assign_state(state)
+        |> assign(unit_armed: nil, unit_note: label)
+        |> push_overlay_items()
+        |> push_map_layers()
+
+      {:error, reason} ->
+        assign(socket, :unit_note, UnitPanel.error_message(reason))
     end
   end
 
