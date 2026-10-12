@@ -2331,8 +2331,8 @@ defmodule MirrorWeb.MapLive do
         {@note}
       </p>
       <p class="mt-2 text-slate-500">
-        Spell reward code {@details.spell_code}{if @details.item_count > 0,
-          do: " · #{@details.item_count} #{if @details.item_count == 1, do: "item", else: "items"}"} (not editable: what the codes and item ids mean is not decoded)
+        Treasure code {@details.spell_code}{if @details.item_count > 0,
+          do: " · #{@details.item_count} #{if @details.item_count == 1, do: "item", else: "items"}"} (not editable, and it does not decide the reward: spells, spell books and items are rolled when the site is cleared)
       </p>
     </div>
     """

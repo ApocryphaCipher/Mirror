@@ -5,7 +5,7 @@ defmodule MirrorWeb.LairPanel do
   turned into `Mirror.SaveFile.Structures.edit_encounter/3` changes. Pure; the page
   (`MirrorWeb.MapLive`) draws it.
 
-  The spell reward code, flags and items are shown, not edited: what the codes and ids mean is
+  The treasure code, flags and items are shown, not edited: what the code means is
   not decoded.
   """
 
