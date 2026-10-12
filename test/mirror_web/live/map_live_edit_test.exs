@@ -2615,6 +2615,123 @@ defmodule MirrorWeb.MapLiveEditTest do
     end
   end
 
+  describe "Node tool (STORY-020)" do
+    # The fixture's Sorcery node at (42, 10) made unowned, with two Sprites guarding it (a kind 3
+    # encounter), Jafar and Freya named, and the node's spirit-meld flag on (the fixture's own).
+    defp nodes_save(dir) do
+      raw = synthetic_save_bytes()
+      node = binary_part(raw, 0x6058, 48)
+
+      raw =
+        raw
+        |> put_bytes(0x6058, binary_part(node, 0, 3) <> <<0xFF>> <> binary_part(node, 4, 44))
+        |> put_bytes(0x09E8 + 1, "Jafar" <> <<0>>)
+        |> put_bytes(0x09E8 + 0x4C8 + 1, "Freya" <> <<0>>)
+        |> put_bytes(
+          0x6628 + 30 * 24,
+          <<42, 10, 0, 1, 3, 195, 0x22, 0, 0, 0, 0::16, 0::16, 4, 0, 0, 0, 0::16, 0::16, 0::16>>
+        )
+
+      path = Path.join(dir, "NODES.GAM")
+      File.write!(path, raw)
+      path
+    end
+
+    defp npanel(view), do: view |> element("#node-panel") |> render() |> text_of()
+
+    defp node_of(path), do: Mirror.SaveFile.Structures.node_info(File.read!(path), 0)
+
+    defp guardian_of(path),
+      do: Mirror.SaveFile.Encounters.get(File.read!(path), 30)
+
+    defp node_form(view, fields) do
+      base = %{"owner" => "", "flags_present" => "1", "spirit_meld" => "on"}
+      view |> element("#node-form") |> render_submit(%{"node" => Map.merge(base, fields)})
+    end
+
+    test "a click shows the node; giving it an owner clears the guardians in one undo step",
+         %{conn: conn, dir: dir} do
+      view = editing(conn, nodes_save(dir), "node")
+      click(view, 42, 10)
+      assert npanel(view) =~ "Sorcery node"
+      assert npanel(view) =~ "Not melded"
+      assert npanel(view) =~ "2 × "
+      assert has_element?(view, "#node-clear-guardians")
+
+      node_form(view, %{"owner" => "1"})
+
+      assert has_element?(
+               view,
+               "#node-note",
+               "Gave the Sorcery node to Freya and cleared its guardians"
+             )
+
+      assert npanel(view) =~ "Melded by Freya"
+      assert npanel(view) =~ "Guardians cleared"
+      refute has_element?(view, "#node-clear-guardians")
+      assert changed(view) =~ "1 edited"
+
+      target = Path.join(dir, "SAVE5.GAM")
+      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+      assert %{owner: 1} = node_of(target)
+      assert %{intact: false, guards: [%{type: 195, left: 2}]} = guardian_of(target)
+
+      render_click(view, "undo", %{})
+      assert npanel(view) =~ "Not melded"
+      assert has_element?(view, "#node-clear-guardians")
+    end
+
+    test "Clear guardians alone leaves the owner", %{conn: conn, dir: dir} do
+      view = editing(conn, nodes_save(dir), "node")
+      click(view, 42, 10)
+
+      view |> element("#node-clear-guardians") |> render_click()
+      assert has_element?(view, "#node-note", "Cleared the guardians")
+      assert npanel(view) =~ "Not melded"
+      assert npanel(view) =~ "Guardians cleared"
+
+      refute has_element?(view, "#node-clear-guardians")
+    end
+
+    test "the flags and taking the owner away; nothing to change is said", %{
+      conn: conn,
+      dir: dir
+    } do
+      view = editing(conn, nodes_save(dir), "node")
+      click(view, 42, 10)
+
+      node_form(view, %{})
+      assert has_element?(view, "#node-note", "Nothing to change")
+
+      node_form(view, %{"warped" => "on"})
+      assert has_element?(view, "#node-note", "Warped the Sorcery node")
+
+      node_form(view, %{"owner" => "0", "warped" => "on"})
+      assert has_element?(view, "#node-note", "Gave the Sorcery node to Jafar")
+
+      render_hook(view, "node_edit", %{"node" => %{"owner" => "", "flags_present" => "1"}})
+      assert npanel(view) =~ "Not melded"
+      refute has_element?(view, "#node-panel input[name='node[warped]'][checked]")
+    end
+
+    test "the panel is edit-only and a click elsewhere closes it", %{conn: conn, dir: dir} do
+      view = editing(conn, nodes_save(dir), "node")
+      click(view, 42, 10)
+      assert has_element?(view, "#node-panel")
+      click(view, 3, 3)
+      refute has_element?(view, "#node-panel")
+
+      click(view, 42, 10)
+      view |> element("#node-close") |> render_click()
+      refute has_element?(view, "#node-panel")
+
+      path = nodes_save(dir)
+      click(view, 42, 10)
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => path}})
+      refute has_element?(view, "#node-panel")
+    end
+  end
+
   describe "real-save integration" do
     @tag skip:
            !@has_real_save_and_sprites &&

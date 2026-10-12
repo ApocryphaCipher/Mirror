@@ -861,6 +861,60 @@ defmodule Mirror.SaveFile.StructuresTest do
     end
   end
 
+  describe "edit_node/3 and node_info/2" do
+    test "node_info reads owner (none is nil) and the two flags" do
+      raw =
+        blank()
+        |> magic_node(0, 20, 10, 0, 255, 5, 1)
+        |> magic_node(1, 30, 12, 1, 2, 5, 2)
+        |> put(0x6058 + 48 + 0x2E, <<3>>)
+
+      assert %{owner: nil, warped: false, spirit_meld: false, type: 1, power: 5} =
+               Structures.node_info(raw, 0)
+
+      assert %{owner: 2, warped: true, spirit_meld: true, plane: 1, type: 2} =
+               Structures.node_info(raw, 1)
+
+      assert Structures.node_info(raw, 30) == nil
+    end
+
+    test "owner and flags change only their own bytes" do
+      raw = blank() |> magic_node(4, 20, 10, 0, 255, 5, 0)
+
+      assert {:ok, edited, %{changed: [:owner, :warped]}} =
+               Structures.edit_node(raw, 4, owner: 3, warped: true)
+
+      base = 0x6058 + 4 * 48
+
+      diff =
+        for {{a, b}, i} <-
+              Enum.with_index(Enum.zip(:binary.bin_to_list(raw), :binary.bin_to_list(edited))),
+            a != b,
+            do: i
+
+      assert diff == [base + 3, base + 0x2E]
+      assert %{owner: 3, warped: true, spirit_meld: false} = Structures.node_info(edited, 4)
+    end
+
+    test "a flag is cleared without touching the other, and none is written 0xFF" do
+      raw = blank() |> magic_node(0, 20, 10, 0, 1, 5, 0) |> put(0x6058 + 0x2E, <<3>>)
+
+      assert {:ok, edited, _} = Structures.edit_node(raw, 0, spirit_meld: false, owner: nil)
+
+      assert %{owner: nil, warped: true, spirit_meld: false} = Structures.node_info(edited, 0)
+      assert binary_part(edited, 0x6058 + 3, 1) == <<0xFF>>
+    end
+
+    test "refuses a bad owner, a bad flag, an unknown field and a missing node" do
+      raw = blank() |> magic_node(0, 20, 10, 0, 255, 5, 0)
+
+      assert {:error, :bad_owner} = Structures.edit_node(raw, 0, owner: 5)
+      assert {:error, :bad_flag} = Structures.edit_node(raw, 0, warped: 1)
+      assert {:error, {:unknown_field, :power}} = Structures.edit_node(raw, 0, power: 3)
+      assert {:error, _} = Structures.edit_node(raw, 29, owner: 1)
+    end
+  end
+
   describe "edit_encounter/3" do
     defp enc(raw, i), do: Mirror.SaveFile.Encounters.get(raw, i)
 

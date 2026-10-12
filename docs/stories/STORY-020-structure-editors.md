@@ -101,6 +101,16 @@ rewards (code 1: a Create Artifact spell once, nothing once; code 5: a Chain Mai
 Disjunction, Weakness), a spell book, or an item (the cleared record's item count goes 0 to 1). Gold and mana are the record's own fields.
 kazzmir's remake does the same kind of roll, from a budget. What the code itself means is unknown; the panel shows it and does not edit it.
 
+**Nodes (2026-10-12).** The **🔮 Node** tool opens a panel for the magic node on a tile (`Structures.edit_node/3`, `MirrorWeb.NodePanel`):
+its type, plane, power, owner (the melder, a wizard record 0 to 4 or none = 0xFF at `+3`), the **warped** (`+0x2E` bit 1) and **Guardian Spirit meld**
+(bit 2) flags, and its guardians (the kind 1 to 3 encounter on its tile). Giving a node an owner also **clears its guardians** in the same undo
+step, because in every save here an owned node has its guardians cleared (42 of 42) and an unowned one still has them (120 of 120); a
+**Clear guardians** button does it alone. Clearing is what the game leaves after a player clears a node: the record stays with its units
+and only "not cleared" goes. Owners are not tied to a Guardian Spirit unit (37 owned nodes have none on the tile), so the editor adds none.
+**Real game (slot 6, vault checkpoint 102, Kevin at the keyboard, one End Turn):** a Nature node given to Freya with no spirit on it showed
+her aura and stayed hers (memory owner 1); a node made neutral with its guardians restored showed no aura and stayed neutral (owner 0xFF,
+guards 3 and 2 intact); the warped flag loaded and survived the turn, and the warped node's tile showed a **distortion animation**.
+
 **Not done:** editing a unit's fields (type, level, experience, damage, owner); what the treasure code means (it does not decide the reward) and the item ids.
 **Size:** large (do incrementally)
 
