@@ -247,6 +247,10 @@ defmodule MirrorWeb.MapLive do
   def handle_event("reveal_all", _params, socket), do: {:noreply, socket}
 
   # The city panel's form (STORY-020): name and population, one record edit.
+  def handle_event("city_close", _params, socket) do
+    {:noreply, assign(socket, city_sel: nil, city_note: nil)}
+  end
+
   def handle_event("city_edit", %{"city" => params}, socket) do
     index = socket.assigns.city_sel
     plane = socket.assigns.plane
@@ -596,6 +600,9 @@ defmodule MirrorWeb.MapLive do
 
           "start" ->
             handle_pointer_start(socket, x, y, button, mods)
+
+          "click" ->
+            inspect_city(socket, x, y)
 
           "drag" ->
             handle_pointer_drag(socket, x, y)
@@ -2080,9 +2087,10 @@ defmodule MirrorWeb.MapLive do
           <.surveyor_card :if={@hover && @hover.survey && !@edit} survey={@hover.survey} />
 
           <.city_panel
-            :if={@edit && @tool == :city && @city_sel && @state.save}
+            :if={(!@edit || @tool == :city) && @city_sel && @state.save}
             details={CityPanel.details(@state.save.raw, @city_sel)}
             note={@city_note}
+            editable={@edit == :terrain}
           />
         </div>
       <% end %>
@@ -2094,6 +2102,7 @@ defmodule MirrorWeb.MapLive do
   # editable. An overlay, so it never shifts the map under the pointer.
   attr :details, :map, required: true
   attr :note, :string, default: nil
+  attr :editable, :boolean, default: false
 
   defp city_panel(%{details: nil} = assigns) do
     ~H"""
@@ -2106,17 +2115,33 @@ defmodule MirrorWeb.MapLive do
   defp city_panel(assigns) do
     ~H"""
     <div id="city-panel" class={city_panel_class()}>
-      <p class="font-semibold text-slate-200">
-        {@details.name}
-        <span class="font-normal text-slate-400">· {@details.size}, {@details.race}</span>
-      </p>
+      <div class="flex items-start justify-between gap-2">
+        <p class="font-semibold text-slate-200">
+          {@details.name}
+          <span class="font-normal text-slate-400">· {@details.size}, {@details.race}</span>
+        </p>
+        <button
+          id="city-close"
+          type="button"
+          phx-click="city_close"
+          aria-label="Close"
+          class="text-slate-500 hover:text-white"
+        >
+          ✕
+        </button>
+      </div>
       <p class="text-slate-400">
         {plane_name(@details.plane)} ({@details.x}, {@details.y}) ·
         <span class="text-amber-200">{@details.owner_name}</span>
         ({@details.banner})
       </p>
 
+      <p :if={!@editable} id="city-readout" class="mt-2 text-slate-300">
+        Population {@details.population} · Edit mode changes the name and population
+      </p>
+
       <.form
+        :if={@editable}
         for={%{}}
         as={:city}
         id="city-form"
@@ -2366,16 +2391,8 @@ defmodule MirrorWeb.MapLive do
          y,
          _button,
          _mods
-       ) do
-    picked =
-      valid_coord?(x, y) &&
-        MoveTool.pick_at(socket.assigns.state.save.raw, socket.assigns.plane, x, y)
-
-    case picked do
-      %{kind: :city, index: index} -> assign(socket, city_sel: index, city_note: nil)
-      _ -> assign(socket, city_sel: nil, city_note: nil)
-    end
-  end
+       ),
+       do: inspect_city(socket, x, y)
 
   defp handle_pointer_start(
          %{assigns: %{edit: :terrain, tool: :move}} = socket,
@@ -2712,6 +2729,19 @@ defmodule MirrorWeb.MapLive do
       {{:ok, name}, :error} -> "Renamed #{details.name} to #{name}"
       {:error, {:ok, n}} -> "Set #{details.name}'s population to #{n}"
       _ -> "Edited #{details.name}"
+    end
+  end
+
+  # Select the city on a tile for the city panel (STORY-020), or close the panel when
+  # the tile has none. The View-mode inspector and the City tool share this.
+  defp inspect_city(socket, x, y) do
+    picked =
+      valid_coord?(x, y) && socket.assigns.state.save &&
+        MoveTool.pick_at(socket.assigns.state.save.raw, socket.assigns.plane, x, y)
+
+    case picked do
+      %{kind: :city, index: index} -> assign(socket, city_sel: index, city_note: nil)
+      _ -> assign(socket, city_sel: nil, city_note: nil)
     end
   end
 
@@ -3741,6 +3771,7 @@ defmodule MirrorWeb.MapLive do
       socket.assigns.lab? -> true
       action == "hover" -> true
       socket.assigns.edit -> action in ["start", "drag", "end"]
+      action == "click" -> true
       true -> false
     end
   end

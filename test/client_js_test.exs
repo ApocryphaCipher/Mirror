@@ -40,4 +40,12 @@ defmodule Mirror.ClientJsTest do
     # the Lab keeps its own phase control
     assert source =~ ~s|this.interaction !== "lab"|
   end
+
+  test "the viewport reports a view-mode click through the tile helper" do
+    source = File.read!("assets/js/map_viewport.js")
+
+    assert source =~ ~s|from "./view_click.mjs"|
+    # only a click that did not pan, and not while editing
+    assert source =~ "!this.drag.moved && !this.editing"
+  end
 end
