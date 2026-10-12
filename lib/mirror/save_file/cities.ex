@@ -52,6 +52,68 @@ defmodule Mirror.SaveFile.Cities do
 
   @size_names %{0 => "Outpost", 1 => "Hamlet", 2 => "Village"}
 
+  # Race ids (`+14`), in the game's order. Checked against the game's own city
+  # screens and saves: Lizardmen (10, a city Kevin changed to Lizardmen), Halfling
+  # (6, Hialanth's screen), Dwarf (4, Fire Keep and Raug Wall).
+  @race_names [
+    "Barbarian",
+    "Beastmen",
+    "Dark Elf",
+    "Draconian",
+    "Dwarf",
+    "Gnoll",
+    "Halfling",
+    "High Elf",
+    "High Men",
+    "Klackon",
+    "Lizardman",
+    "Nomad",
+    "Orc",
+    "Troll"
+  ]
+
+  # Building ids, the byte `+31 + id` of a city record. 26 Marketplace, 29 Granary and
+  # 35 City Walls were checked in the game (STORY-032); the rest follow the same order,
+  # which is kazzmir's building list shifted by two (his list has no Trade Goods and
+  # Housing at the front), and match what Kevin's cities have built.
+  @building_names %{
+    1 => "Trade Goods",
+    2 => "Housing",
+    3 => "Barracks",
+    4 => "Armory",
+    5 => "Fighters' Guild",
+    6 => "Armorers' Guild",
+    7 => "War College",
+    8 => "Smithy",
+    9 => "Stables",
+    10 => "Animists' Guild",
+    11 => "Fantastic Stable",
+    12 => "Shipwrights' Guild",
+    13 => "Ship Yard",
+    14 => "Maritime Guild",
+    15 => "Sawmill",
+    16 => "Library",
+    17 => "Sages' Guild",
+    18 => "Oracle",
+    19 => "Alchemists' Guild",
+    20 => "University",
+    21 => "Wizards' Guild",
+    22 => "Shrine",
+    23 => "Temple",
+    24 => "Parthenon",
+    25 => "Cathedral",
+    26 => "Marketplace",
+    27 => "Bank",
+    28 => "Merchants' Guild",
+    29 => "Granary",
+    30 => "Farmers' Market",
+    31 => "Foresters' Guild",
+    32 => "Builders' Hall",
+    33 => "Mechanicians' Guild",
+    34 => "Miners' Guild",
+    35 => "City Walls"
+  }
+
   @type city :: %{
           index: non_neg_integer(),
           name: String.t(),
@@ -145,4 +207,15 @@ defmodule Mirror.SaveFile.Cities do
   """
   @spec size_name(non_neg_integer()) :: String.t()
   def size_name(size), do: Map.get(@size_names, size, "size #{size}")
+
+  @doc "The race's name, or `\"race N\"` for an id outside the game's 14."
+  @spec race_name(non_neg_integer()) :: String.t()
+  def race_name(race), do: Enum.at(@race_names, race) || "race #{race}"
+
+  @doc "The building's name, or `\"building N\"`."
+  @spec building_name(non_neg_integer()) :: String.t()
+  def building_name(id), do: Map.get(@building_names, id, "building #{id}")
+
+  @doc "The city enchantment slots' names, in slot order."
+  def enchantment_names, do: @enchantments
 end

@@ -1707,18 +1707,18 @@ defmodule MirrorWeb.MapLiveEditTest do
       assert note(view) =~ "Moved Deventor to (40, 23)"
       assert note(view) =~ "Laid a road under it"
       assert city_xy(latest_cities(view), "Deventor") == {40, 23}
-      # the game keeps a road under every city, so the new tile got one: a tile and a move
-      assert changed(view) =~ "1 tile changed · 1 moved"
+      # the game keeps a road under every city, so the new tile got one: a tile and an edit
+      assert changed(view) =~ "1 tile changed · 1 edited"
 
       render_click(view, "undo", %{})
       assert note(view) =~ "Undid: Moved Deventor"
       assert city_xy(latest_cities(view), "Deventor") == {38, 21}
       assert changed(view) =~ "0 tiles changed"
-      refute changed(view) =~ "moved"
+      refute changed(view) =~ "edited"
 
       render_click(view, "redo", %{})
       assert city_xy(latest_cities(view), "Deventor") == {40, 23}
-      assert changed(view) =~ "1 tile changed · 1 moved"
+      assert changed(view) =~ "1 tile changed · 1 edited"
     end
 
     test "a moved city gets a road under it, unless the tile has one already", %{
@@ -1758,11 +1758,11 @@ defmodule MirrorWeb.MapLiveEditTest do
 
       click(view, 40, 23)
       click(view, 42, 25)
-      assert changed(view) =~ "1 moved"
+      assert changed(view) =~ "1 edited"
       render_click(view, "arm_discard", %{})
       render_click(view, "discard_edits", %{})
       assert city_xy(latest_cities(view), "Deventor") == {40, 23}
-      refute changed(view) =~ "moved"
+      refute changed(view) =~ "edited"
     end
 
     test "an empty tile picks nothing up, and right-click cancels a pick", %{
@@ -1779,7 +1779,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       click(view, 40, 23)
       assert note(view) =~ "Click a city, tower or lair to pick it up"
       assert changed(view) =~ "0 tiles changed"
-      refute changed(view) =~ "moved"
+      refute changed(view) =~ "edited"
     end
 
     defp latest_sites(view, last \\ nil) do
@@ -1816,7 +1816,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       sites = latest_sites(view)
       assert Enum.any?(sites, &match?(%{x: 50, y: 30}, &1))
       refute Enum.any?(sites, &match?(%{x: 48, y: 28}, &1))
-      assert changed(view) =~ "1 moved"
+      assert changed(view) =~ "1 edited"
 
       render_click(view, "undo", %{})
       assert Enum.any?(latest_sites(view), &match?(%{x: 48, y: 28}, &1))
@@ -1850,7 +1850,79 @@ defmodule MirrorWeb.MapLiveEditTest do
       click(view, 38, 21)
       click(view, 12, 35)
       assert note(view) =~ "Moving City1"
-      refute changed(view) =~ "moved"
+      refute changed(view) =~ "edited"
+    end
+  end
+
+  describe "City panel (STORY-020)" do
+    defp panel(view), do: view |> element("#city-panel") |> render() |> text_of()
+
+    defp edit_city_form(view, name, population) do
+      view
+      |> element("#city-form")
+      |> render_submit(%{"city" => %{"name" => name, "population" => "#{population}"}})
+    end
+
+    test "clicking a city shows its decoded fields; empty ground closes the panel", %{
+      conn: conn,
+      save: save
+    } do
+      view = editing(conn, save, "city")
+      refute has_element?(view, "#city-panel")
+
+      click(view, 38, 21)
+      text = panel(view)
+      assert text =~ "Deventor"
+      assert text =~ "Hamlet, Gnoll"
+      assert text =~ "Arcanus (38, 21)"
+      assert text =~ "0 units here"
+      assert has_element?(view, "#city-name[value=Deventor]")
+      assert has_element?(view, "#city-population[value=\"4\"]")
+
+      click(view, 5, 5)
+      refute has_element?(view, "#city-panel")
+    end
+
+    test "renaming and changing population are one undoable edit each, and survive Save as", %{
+      conn: conn,
+      dir: dir,
+      save: save
+    } do
+      view = editing(conn, save, "city")
+      click(view, 38, 21)
+
+      edit_city_form(view, "Nar", 4)
+      assert has_element?(view, "#city-note", "Renamed Deventor to Nar")
+      assert city_xy(latest_cities(view), "Nar") == {38, 21}
+      assert changed(view) =~ "0 tiles changed · 1 edited"
+
+      edit_city_form(view, "Nar", 9)
+      assert has_element?(view, "#city-note", "Set Nar's population to 9")
+      assert changed(view) =~ "2 edited"
+
+      target = Path.join(dir, "SAVE6.GAM")
+      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+      assert {:ok, cities} = Mirror.SaveFile.Cities.parse(File.read!(target))
+      assert %{name: "Nar", population: 9} = Enum.find(cities, &(&1.x == 38 and &1.y == 21))
+
+      render_click(view, "undo", %{})
+      render_click(view, "undo", %{})
+      assert city_xy(latest_cities(view), "Deventor") == {38, 21}
+      # undone past the save: that is an unsaved change again
+      assert changed(view) =~ "1 edited"
+    end
+
+    test "a refused value says why and changes nothing", %{conn: conn, save: save} do
+      view = editing(conn, save, "city")
+      click(view, 38, 21)
+
+      edit_city_form(view, "", 4)
+      assert has_element?(view, "#city-note", "A name is 1 to 13 characters")
+      edit_city_form(view, "Deventor", 99)
+      assert has_element?(view, "#city-note", "whole number from 1 to 25")
+      edit_city_form(view, "Deventor", 4)
+      assert has_element?(view, "#city-note", "Nothing to change")
+      refute changed(view) =~ "edited"
     end
   end
 

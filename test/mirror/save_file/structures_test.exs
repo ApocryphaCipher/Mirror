@@ -161,6 +161,60 @@ defmodule Mirror.SaveFile.StructuresTest do
     end
   end
 
+  describe "edit_city/3" do
+    test "renames the city and fills the whole field, leaving no tail of the old name" do
+      raw = blank() |> city(0, "Hialanthxxxxx", 11, 15, 0, 5)
+
+      assert {:ok, edited, %{changed: [:name]}} = Structures.edit_city(raw, 0, name: "Nar")
+      assert %{name: "Nar", x: 11, y: 15, owner: 5, population: 4} = city_at(edited, 0)
+      assert binary_part(edited, 0x8AAC, 14) == "Nar" <> :binary.copy(<<0>>, 11)
+    end
+
+    test "sets the population byte and nothing else" do
+      raw = blank() |> city(0, "Deventor", 38, 21, 0, 0)
+
+      assert {:ok, edited, %{changed: [:population]}} =
+               Structures.edit_city(raw, 0, population: 9)
+
+      assert %{population: 9, name: "Deventor", size: 1} = city_at(edited, 0)
+
+      diff =
+        for {a, b} <- Enum.zip(:binary.bin_to_list(raw), :binary.bin_to_list(edited)),
+            a != b,
+            do: 1
+
+      assert length(diff) == 1
+    end
+
+    test "name and population together; the name is trimmed" do
+      raw = blank() |> city(0, "A", 1, 1, 0, 0)
+
+      assert {:ok, edited, %{changed: [:name, :population]}} =
+               Structures.edit_city(raw, 0, name: "  Zurich 2 ", population: 12)
+
+      assert %{name: "Zurich 2", population: 12} = city_at(edited, 0)
+    end
+
+    test "refuses bad values and writes nothing" do
+      raw = blank() |> city(0, "A", 1, 1, 0, 0)
+
+      assert {:error, :bad_name} = Structures.edit_city(raw, 0, name: "")
+      assert {:error, :bad_name} = Structures.edit_city(raw, 0, name: "    ")
+      assert {:error, :bad_name} = Structures.edit_city(raw, 0, name: "Fourteen chars")
+      assert {:error, :bad_name} = Structures.edit_city(raw, 0, name: "Tab\there")
+      assert {:error, :bad_name} = Structures.edit_city(raw, 0, name: "Λ")
+      # the game's font has no u-umlaut: "Zürich" showed as "Zrich" in the game
+      assert {:error, :bad_name} = Structures.edit_city(raw, 0, name: "Zürich")
+      assert {:error, :bad_population} = Structures.edit_city(raw, 0, population: 0)
+      assert {:error, :bad_population} = Structures.edit_city(raw, 0, population: 26)
+      assert {:error, :bad_population} = Structures.edit_city(raw, 0, population: "5")
+      assert {:error, {:unknown_field, :owner}} = Structures.edit_city(raw, 0, owner: 1)
+      # a good field next to a bad one: nothing is applied
+      assert {:error, :bad_name} = Structures.edit_city(raw, 0, population: 5, name: "")
+      assert {:error, :no_such_city} = Structures.edit_city(raw, 7, name: "X")
+    end
+  end
+
   describe "move_tower/3" do
     test "moves the tower, both of its sides, and units on its tile on either plane" do
       raw =
