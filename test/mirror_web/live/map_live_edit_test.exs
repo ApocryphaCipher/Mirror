@@ -2304,6 +2304,60 @@ defmodule MirrorWeb.MapLiveEditTest do
       refute has_element?(view, "#units-note", "cannot stand on water")
     end
 
+    test "a node moves with its terrain: the old tile takes the destination's tile, one undo step",
+         %{
+           conn: conn,
+           dir: dir,
+           save: save
+         } do
+      view = editing(conn, save, "move")
+      assert tile_at(view, 44, 12) == 163
+
+      click(view, 42, 10)
+      assert note(view) =~ "Moving the Sorcery node"
+
+      click(view, 44, 12)
+      assert note(view) =~ "Moved the Sorcery node to (44, 12)"
+      # the fixture's node tile is plain forest like its destination, so only the new node tile
+      # differs; in a real save the old tile (a node tile) changes too
+      assert changed(view) =~ "1 tile changed · 1 edited"
+      assert tile_at(view, 44, 12) == 168
+      assert tile_at(view, 42, 10) == 163
+
+      auras = latest_overlay(view, "auras")
+      assert Enum.any?(auras, &match?(%{x: 44, y: 12}, &1))
+      refute Enum.any?(auras, &match?(%{x: 42, y: 10}, &1))
+
+      target = Path.join(dir, "SAVE5.GAM")
+      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+      assert {:ok, saved} = Mirror.SaveFile.load(target)
+      assert {:ok, %{nodes: nodes}} = Mirror.SaveFile.Sites.parse(saved.raw)
+      assert Enum.any?(nodes, &match?(%{x: 44, y: 12, type: :sorcery}, &1))
+      refute Enum.any?(nodes, &match?(%{x: 42, y: 10}, &1))
+      assert Mirror.Map.get_tile_u16_le(saved.planes.arcanus.terrain, 44, 12) == 168
+
+      render_click(view, "undo", %{})
+      assert tile_at(view, 44, 12) == 163
+      assert tile_at(view, 42, 10) == 163
+      # undone past the save: that is an unsaved change again
+      assert changed(view) =~ "1 tile changed · 1 edited"
+    end
+
+    test "a node will not move onto water, a city or another node, and says why", %{
+      conn: conn,
+      save: save
+    } do
+      view = editing(conn, save, "move")
+      click(view, 42, 10)
+
+      click(view, 5, 5)
+      assert note(view) =~ "grassland, forest or swamp"
+
+      click(view, 38, 21)
+      assert note(view) =~ "Moving Deventor"
+      refute changed(view) =~ "edited"
+    end
+
     test "loading another save drops armed units instead of moving whatever has those indexes", %{
       conn: conn,
       dir: dir

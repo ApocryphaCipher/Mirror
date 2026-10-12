@@ -3283,10 +3283,14 @@ defmodule MirrorWeb.MapLive do
         flags = Editor.tile_value(current, plane, :terrain_flags, x, y)
         tile_edits = MoveTool.road_edits(pending, flags, x, y)
 
-        with {:ok, raw, report} <- MoveTool.move(current.save.raw, pending, plane, x, y),
+        terrain_at = fn {tx, ty} -> Editor.tile_value(current, plane, :terrain, tx, ty) end
+
+        with {:ok, raw, report} <-
+               MoveTool.move(current.save.raw, pending, plane, x, y, terrain_at),
+             tile_edits = tile_edits ++ MoveTool.terrain_edits(report),
              {next, {:record, _label, parts}} <-
                Editor.apply_record(current, plane, "Moved #{pending.name}", raw, tile_edits) do
-          {next, {:ok, report, parts, tile_edits != []}}
+          {next, {:ok, report, parts, MoveTool.road_edits(pending, flags, x, y) != []}}
         else
           {:error, reason} -> {current, {:error, reason}}
           {_unchanged, :none} -> {current, {:error, :unchanged}}

@@ -623,6 +623,133 @@ defmodule Mirror.SaveFile.StructuresTest do
     end
   end
 
+  describe "move_node/4" do
+    @nodes 0x6058
+
+    defp magic_node(raw, i, x, y, plane, owner, power, type) do
+      xs = for k <- 0..19, into: <<>>, do: <<if(k < power, do: x + rem(k, 3) - 1, else: 0)>>
+      ys = for k <- 0..19, into: <<>>, do: <<if(k < power, do: y + div(k, 3) - 1, else: 0)>>
+      put(raw, @nodes + i * 48, <<x, y, plane, owner, power>> <> xs <> ys <> <<type, 0, 0>>)
+    end
+
+    # Grass (tile 1) everywhere, except the node's own tile, which is the node (168 + type).
+    defp terrain(overrides \\ %{}) do
+      fn pos -> Map.get(overrides, pos, 1) end
+    end
+
+    defp node_at(raw, i), do: binary_part(raw, @nodes + i * 48, 48)
+
+    test "moves the record, the aura squares together, the guardians and the units on it" do
+      raw =
+        blank()
+        |> magic_node(3, 20, 10, 0, 0, 5, 0)
+        |> encounter(7, 20, 10, 0, 3)
+        |> encounter(8, 33, 7, 0, 8)
+        |> unit(0, 20, 10, 0, 0)
+        |> unit(1, 21, 10, 0, 0)
+
+      assert {:ok, moved, report} =
+               Structures.move_node(raw, 3, {23, 12}, terrain(%{{20, 10} => 168}))
+
+      <<x, y, plane, owner, power, ax::binary-size(20), ay::binary-size(20), type, _::binary>> =
+        node_at(moved, 3)
+
+      assert {x, y, plane, owner, power, type} == {23, 12, 0, 0, 5, 0}
+      # the first five aura squares moved by (+3, +2); the unused slots stayed zero
+      assert binary_part(ax, 0, 5) == <<22, 23, 24, 22, 23>>
+      assert binary_part(ay, 0, 5) == <<11, 11, 11, 12, 12>>
+      assert binary_part(ax, 5, 15) == :binary.copy(<<0>>, 15)
+
+      assert %{moved: :node, from: {20, 10}, to: {23, 12}, guardians: 1, units: 1} = report
+      assert Mirror.SaveFile.Encounters.get(moved, 7) |> then(&{&1.x, &1.y}) == {23, 12}
+      assert Mirror.SaveFile.Encounters.get(moved, 8) |> then(&{&1.x, &1.y}) == {33, 7}
+      assert {:ok, [moved_unit, other]} = Units.parse(moved)
+      assert {moved_unit.x, moved_unit.y} == {23, 12}
+      assert {other.x, other.y} == {21, 10}
+
+      # old tile takes the destination's old tile, new tile becomes the node
+      assert report.terrain == [{{20, 10}, 1}, {{23, 12}, 168}]
+    end
+
+    test "the new tile is the node of its type: 168 Sorcery, 169 Nature, 170 Chaos" do
+      for {type, tile} <- [{0, 168}, {1, 169}, {2, 170}] do
+        raw = blank() |> magic_node(0, 20, 10, 0, 5, 3, type)
+
+        # the caller's terrain has plain grass under it (not yet the node tile): the type byte decides
+        assert {:ok, _, %{terrain: [_, {{22, 10}, ^tile}]}} =
+                 Structures.move_node(raw, 0, {22, 10}, terrain())
+      end
+    end
+
+    test "only grassland, forest and swamp are accepted as the destination" do
+      raw = blank() |> magic_node(0, 20, 10, 0, 5, 3, 1)
+
+      for {name, tile} <- [grass: 1, forest: 163, swamp: 166] do
+        assert {:ok, _, _} = Structures.move_node(raw, 0, {22, 10}, terrain(%{{22, 10} => tile})),
+               "#{name} should do"
+      end
+
+      for {name, tile} <- [
+            ocean: 0,
+            desert: 165,
+            hill: 171,
+            mountain: 164,
+            river: 185,
+            lake: 18,
+            volcano: 179,
+            node: 169,
+            coast: 2
+          ] do
+        assert {:error, :not_plain_land} =
+                 Structures.move_node(raw, 0, {22, 10}, terrain(%{{22, 10} => tile})),
+               "#{name} should be refused"
+      end
+    end
+
+    test "refuses what it cannot do, and writes nothing" do
+      raw =
+        blank()
+        |> magic_node(0, 20, 10, 0, 5, 3, 1)
+        |> magic_node(1, 30, 10, 0, 5, 3, 2)
+        |> magic_node(2, 1, 10, 0, 5, 9, 0)
+        |> city(0, "Town", 25, 10, 0, 1)
+        |> city(1, "Other", 35, 20, 1, 1)
+        |> tower(0, 26, 10)
+        |> encounter(30, 27, 10, 0, 8)
+        |> unit(0, 20, 10, 0, 0)
+        |> unit(1, 28, 10, 0, 3)
+
+      t = terrain()
+      assert {:error, :no_such_node} = Structures.move_node(raw, 9, {22, 10}, t)
+      assert {:error, :no_such_node} = Structures.move_node(raw, 30, {22, 10}, t)
+      assert {:error, :off_map} = Structures.move_node(raw, 0, {60, 10}, t)
+      assert {:error, :same_tile} = Structures.move_node(raw, 0, {20, 10}, t)
+      assert {:error, :city_at_destination} = Structures.move_node(raw, 0, {25, 10}, t)
+      assert {:error, :tower_at_destination} = Structures.move_node(raw, 0, {26, 10}, t)
+      assert {:error, :encounter_at_destination} = Structures.move_node(raw, 0, {27, 10}, t)
+      assert {:error, :node_at_destination} = Structures.move_node(raw, 0, {30, 10}, t)
+      assert {:error, :foreign_units_at_destination} = Structures.move_node(raw, 0, {28, 10}, t)
+
+      # a city on the other plane is another tile; a node's own guardians do not block its destination
+      assert {:ok, _, _} = Structures.move_node(raw, 0, {35, 20}, t)
+      # moving the aura off the map is refused: this node's squares reach x = 0
+      assert {:error, :aura_off_map} = Structures.move_node(raw, 2, {0, 10}, t)
+    end
+
+    test "a stack of nine on the destination leaves no room" do
+      raw =
+        Enum.reduce(
+          0..8,
+          blank() |> magic_node(0, 20, 10, 0, 0, 5, 0),
+          &unit(&2, &1, 30, 10, 0, 0)
+        )
+        |> unit(9, 20, 10, 0, 0)
+
+      assert {:error, :stack_full} = Structures.move_node(raw, 0, {30, 10}, terrain())
+      assert {:ok, _, _} = Structures.move_node(raw, 0, {31, 10}, terrain())
+    end
+  end
+
   describe "move_tower/3" do
     test "moves the tower, both of its sides, and units on its tile on either plane" do
       raw =

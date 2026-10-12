@@ -31,7 +31,20 @@ defmodule MirrorWeb.MoveTool do
   """
   @spec pick_at(binary(), :arcanus | :myrror, integer(), integer()) :: pending() | nil
   def pick_at(raw, plane, x, y) do
-    city_at(raw, plane, x, y) || tower_at(raw, x, y) || lair_at(raw, plane, x, y)
+    city_at(raw, plane, x, y) || tower_at(raw, x, y) || lair_at(raw, plane, x, y) ||
+      node_at(raw, plane, x, y)
+  end
+
+  @node_names %{0 => "Sorcery", 1 => "Nature", 2 => "Chaos"}
+
+  defp node_at(raw, plane, x, y) do
+    case Structures.node_at(raw, x, y, plane_number(plane)) do
+      %{index: index, type: type} ->
+        %{kind: :node, index: index, name: "the #{Map.fetch!(@node_names, type)} node"}
+
+      nil ->
+        nil
+    end
   end
 
   defp city_at(raw, plane, x, y) do
@@ -72,14 +85,32 @@ defmodule MirrorWeb.MoveTool do
   @doc "Moves the picked structure; wraps the `Structures` move for its kind."
   @spec move(binary(), pending(), :arcanus | :myrror, integer(), integer()) ::
           {:ok, binary(), map()} | {:error, term()}
-  def move(raw, %{kind: :city, index: index}, plane, x, y),
+  def move(raw, pending, plane, x, y, terrain_at \\ nil)
+
+  def move(raw, %{kind: :city, index: index}, plane, x, y, _terrain_at),
     do: Structures.move_city(raw, index, {x, y, plane_number(plane)})
 
-  def move(raw, %{kind: :tower, index: index}, _plane, x, y),
+  def move(raw, %{kind: :tower, index: index}, _plane, x, y, _terrain_at),
     do: Structures.move_tower(raw, index, {x, y})
 
-  def move(raw, %{kind: :lair, index: index}, plane, x, y),
+  def move(raw, %{kind: :lair, index: index}, plane, x, y, _terrain_at),
     do: Structures.move_encounter(raw, index, {x, y, plane_number(plane)})
+
+  # A node is its terrain tile: the caller says what tile is where (`terrain_at`), and gets the
+  # two tile changes back in the report to apply as map edits (see `terrain_edits/1`).
+  def move(raw, %{kind: :node, index: index}, _plane, x, y, terrain_at)
+      when is_function(terrain_at, 1),
+      do: Structures.move_node(raw, index, {x, y}, terrain_at)
+
+  @doc """
+  The terrain edits that go with a moved node (the `terrain` of its report), in the form
+  `Editor.apply_record/5` takes; none for anything else.
+  """
+  @spec terrain_edits(map()) :: [tuple()]
+  def terrain_edits(%{terrain: [_ | _] = changes}),
+    do: [{:terrain, for({{x, y}, value} <- changes, do: {x, y, value})}]
+
+  def terrain_edits(_report), do: []
 
   @road 0x08
   @road_bits 0x18
@@ -117,9 +148,18 @@ defmodule MirrorWeb.MoveTool do
     if parts == [], do: "", else: " with its " <> Enum.join(parts, " and ")
   end
 
+  defp followed(%{moved: :node, guardians: g, units: u}) do
+    parts = Enum.reject([count(g, "guardian record", "guardian records"), garrison(u)], &is_nil/1)
+    if parts == [], do: "", else: " with its " <> Enum.join(parts, " and ")
+  end
+
   defp followed(%{garrison: 0}), do: ""
   defp followed(%{garrison: n}), do: " with " <> garrison(n)
   defp followed(_report), do: ""
+
+  defp count(0, _one, _many), do: nil
+  defp count(1, one, _many), do: "1 #{one}"
+  defp count(n, _one, many), do: "#{n} #{many}"
 
   defp garrison(0), do: nil
   defp garrison(1), do: "unit"
@@ -144,6 +184,17 @@ defmodule MirrorWeb.MoveTool do
   def error_message(:off_map), do: "That is off the map."
   def error_message(:city_at_destination), do: "There is already a city there."
   def error_message(:tower_at_destination), do: "There is already a tower there."
+  def error_message(:node_at_destination), do: "There is already a node there."
+  def error_message(:same_tile), do: "That is where it already is."
+  def error_message(:aura_off_map), do: "The node's aura would run off the map there."
+
+  def error_message(:not_plain_land),
+    do:
+      "A node can only move onto grassland, forest or swamp, so the tiles around it stay as they are."
+
+  def error_message(:stack_full),
+    do: "A tile holds at most 9 units, and the node's units would not fit there."
+
   def error_message(:encounter_at_destination), do: "There is already a lair there."
 
   def error_message(:foreign_units_at_destination),

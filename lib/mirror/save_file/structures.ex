@@ -729,6 +729,187 @@ defmodule Mirror.SaveFile.Structures do
     value
   end
 
+  @node_record 48
+  @node_tiles %{0 => 168, 1 => 169, 2 => 170}
+  @plain_land [:grass, :forest, :swamp]
+
+  @doc """
+  Moves magic node `index` (its record in the nodes block, 0..29) to `{x, y}` on its own plane
+  (STORY-019). `terrain_at` is a function from `{x, y}` to the node plane's terrain tile there
+  (the caller has the editor's planes; the raw bytes may be behind them).
+
+  A node is its terrain tile, so the move is a record edit *and* a terrain swap. Written to
+  the raw bytes: the node's x and y; its aura squares (the first `power` of them, all shifted by the
+  same step); its guardians' encounter record (kinds 1 to 3 at the old tile); and the units
+  standing on the node (a melded node holds a spirit), which go with it. The result's `terrain`
+  lists the two tile changes for the caller to apply as map edits: the old tile takes the
+  destination's old tile, the new tile becomes the node (168 Sorcery, 169 Nature, 170 Chaos, on
+  both planes). Swapping keeps the land as it was.
+
+  The destination must be **grassland, forest or swamp**: those tiles are the same wherever they
+  stand, so the tile left behind is consistent with its neighbours. Others (desert, hills,
+  coasts, rivers...) change with their neighbours, and moving a node onto one would leave a
+  wrong-looking tile. Also refused: off the map (the aura squares included), the node's own tile, a
+  tile holding a city, a tower (on either plane), an encounter, another node, units of another
+  owner, or more than #{@max_stack} units in all.
+
+  Returns `{:ok, raw, report}` or `{:error, reason}` (`:no_such_node`, `:off_map`, `:same_tile`,
+  `:aura_off_map`, `:not_plain_land`, `:city_at_destination`, `:tower_at_destination`,
+  `:encounter_at_destination`, `:node_at_destination`, `:foreign_units_at_destination`,
+  `:stack_full`).
+  """
+  @spec move_node(binary(), non_neg_integer(), {integer(), integer()}, ({integer(), integer()} ->
+                                                                          integer())) ::
+          result()
+  def move_node(raw, index, {x, y} = to, terrain_at) when is_function(terrain_at, 1) do
+    with {:ok, node} <- fetch_node(raw, index),
+         :ok <- check_position({x, y, node.plane}),
+         :ok <- if(to == {node.x, node.y}, do: {:error, :same_tile}, else: :ok),
+         {dx, dy} = {x - node.x, y - node.y},
+         {:ok, aura} <- shifted_aura(node, dx, dy),
+         :ok <- check_plain_land(terrain_at.(to)),
+         {:ok, cities} <- Cities.parse(raw),
+         {:ok, units} <- Units.parse(raw),
+         :ok <- check_node_destination(raw, cities, units, node, to) do
+      here = {node.x, node.y, node.plane}
+      moving = for u <- units, {u.x, u.y, plane_index(u.plane)} == here, do: u
+      from_tile = terrain_at.({node.x, node.y})
+      base = elem(Sites.nodes_range(), 0) + index * @node_record
+
+      guardians =
+        for e <- Encounters.all(raw),
+            e.kind in @node_guardian_kinds,
+            {e.x, e.y, e.plane} == here,
+            do: e.index
+
+      raw =
+        raw
+        |> put(base, <<x, y>>)
+        |> put(base + 5, aura.x)
+        |> put(base + 25, aura.y)
+        |> then(fn r -> Enum.reduce(guardians, r, &put_encounter_xy(&2, &1, x, y)) end)
+        |> relocate_units(Enum.map(moving, & &1.index), {x, y, node.plane})
+
+      {:ok, raw,
+       %{
+         moved: :node,
+         from: {node.x, node.y},
+         to: to,
+         guardians: length(guardians),
+         units: length(moving),
+         terrain: [{{node.x, node.y}, terrain_at.(to)}, {to, node_tile(node.type, from_tile)}]
+       }}
+    end
+  end
+
+  # The node's own tile value says what kind it is, if the caller's terrain agrees; otherwise its type byte.
+  defp node_tile(_type, current) when current in [168, 169, 170], do: current
+  defp node_tile(type, _current), do: Map.fetch!(@node_tiles, type)
+
+  defp fetch_node(raw, index) do
+    {base, _} = Sites.nodes_range()
+
+    with true <- index in 0..29//1,
+         <<x, y, plane, _owner, power, aura_x::binary-size(20), aura_y::binary-size(20), type,
+           _::binary>> <-
+           binary_part(raw, base + index * @node_record, @node_record),
+         true <-
+           x < @width and y < @height and plane in [0, 1] and type in 0..2 and power in 1..20 do
+      {:ok,
+       %{
+         index: index,
+         x: x,
+         y: y,
+         plane: plane,
+         power: min(power, 20),
+         aura_x: aura_x,
+         aura_y: aura_y,
+         type: type
+       }}
+    else
+      _ -> {:error, :no_such_node}
+    end
+  end
+
+  # The first `power` aura squares move by the same step; the rest of the 20 slots are left alone.
+  defp shifted_aura(node, dx, dy) do
+    pairs = Enum.zip(:binary.bin_to_list(node.aura_x), :binary.bin_to_list(node.aura_y))
+
+    shifted =
+      pairs
+      |> Enum.with_index()
+      |> Enum.map(fn {{ax, ay}, i} ->
+        if i < node.power, do: {ax + dx, ay + dy}, else: {ax, ay}
+      end)
+
+    if Enum.all?(Enum.take(shifted, node.power), fn {ax, ay} ->
+         ax in 0..(@width - 1)//1 and ay in 0..(@height - 1)//1
+       end) do
+      {:ok,
+       %{
+         x: for({ax, _} <- shifted, into: <<>>, do: <<ax>>),
+         y: for({_, ay} <- shifted, into: <<>>, do: <<ay>>)
+       }}
+    else
+      {:error, :aura_off_map}
+    end
+  end
+
+  defp check_plain_land(tile) do
+    if Mirror.TerrainType.terrain_type(tile) in @plain_land,
+      do: :ok,
+      else: {:error, :not_plain_land}
+  end
+
+  defp check_node_destination(raw, cities, units, node, {x, y}) do
+    plane = node.plane
+    nodes = for i <- 0..29, i != node.index, {:ok, n} <- [fetch_node(raw, i)], do: n
+    here = {node.x, node.y, plane}
+    moving = for u <- units, {u.x, u.y, plane_index(u.plane)} == here, do: u
+    there = for u <- units, {u.x, u.y, plane_index(u.plane)} == {x, y, plane}, do: u
+    owners = moving |> Enum.map(& &1.owner) |> Enum.uniq()
+
+    cond do
+      Enum.any?(cities, &({&1.x, &1.y, plane_index(&1.plane)} == {x, y, plane})) ->
+        {:error, :city_at_destination}
+
+      tower_at(raw, x, y) != nil ->
+        {:error, :tower_at_destination}
+
+      Enum.any?(
+        Encounters.all(raw),
+        &({&1.x, &1.y, &1.plane} == {x, y, plane} and &1.kind not in @node_guardian_kinds)
+      ) ->
+        {:error, :encounter_at_destination}
+
+      Enum.any?(nodes, &({&1.x, &1.y, &1.plane} == {x, y, plane})) ->
+        {:error, :node_at_destination}
+
+      moving != [] and Enum.any?(there, &(&1.owner not in owners)) ->
+        {:error, :foreign_units_at_destination}
+
+      length(there) + length(moving) > @max_stack ->
+        {:error, :stack_full}
+
+      true ->
+        :ok
+    end
+  end
+
+  @doc """
+  The magic node on `{x, y}` of `plane` (0 or 1), as `%{index, x, y, plane, type}`, or `nil`.
+  `type` is 0 Sorcery, 1 Nature, 2 Chaos.
+  """
+  @spec node_at(binary(), integer(), integer(), 0 | 1) :: map() | nil
+  def node_at(raw, x, y, plane) do
+    Enum.find_value(0..29, fn i ->
+      case fetch_node(raw, i) do
+        {:ok, %{x: ^x, y: ^y, plane: ^plane} = node} -> node
+        _ -> nil
+      end
+    end)
+  end
+
   @doc """
   The tower standing on `{x, y}` (towers stand on both planes), as
   `%{index, x, y}`, or `nil`.
