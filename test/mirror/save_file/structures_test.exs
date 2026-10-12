@@ -215,6 +215,118 @@ defmodule Mirror.SaveFile.StructuresTest do
     end
   end
 
+  describe "edit_city/3 buildings" do
+    # building ids: 22 Shrine, 23 Temple, 24 Parthenon, 32 Builders Hall, 35 City Walls
+    @shrine 22
+    @temple 23
+
+    defp with_buildings(raw, index, built) do
+      bytes =
+        for id <- 0..35, into: <<>> do
+          case Map.get(built, id) do
+            nil -> <<if(id == 0, do: 0, else: 0xFF)>>
+            :built -> <<1>>
+            :replaced -> <<0>>
+          end
+        end
+
+      put(raw, 0x8AAC + index * 114 + 31, bytes)
+    end
+
+    defp building_state(raw, index, id), do: :binary.at(raw, 0x8AAC + index * 114 + 31 + id)
+
+    test "adding a building marks the one it replaces as replaced, as the game does" do
+      raw = blank() |> city(0, "A", 1, 1, 0, 0) |> with_buildings(0, %{@shrine => :built})
+
+      assert {:ok, edited, %{changed: [:buildings]}} =
+               Structures.edit_city(raw, 0, buildings: [@shrine, @temple])
+
+      assert building_state(edited, 0, @temple) == 1
+      assert building_state(edited, 0, @shrine) == 0
+      assert %{buildings: %{@temple => :built, @shrine => :replaced}} = city_at(edited, 0)
+    end
+
+    test "a building whose predecessor is absent is just built; needs are not enforced" do
+      raw = blank() |> city(0, "A", 1, 1, 0, 0) |> with_buildings(0, %{})
+
+      assert {:ok, edited, _} = Structures.edit_city(raw, 0, buildings: [@temple])
+      assert building_state(edited, 0, @temple) == 1
+      assert building_state(edited, 0, @shrine) == 0xFF
+      assert building_state(edited, 0, 32) == 0xFF
+    end
+
+    test "removing the replacing building brings the replaced one back" do
+      raw =
+        blank()
+        |> city(0, "A", 1, 1, 0, 0)
+        |> with_buildings(0, %{@shrine => :replaced, @temple => :built})
+
+      assert {:ok, edited, _} = Structures.edit_city(raw, 0, buildings: [@shrine])
+      assert building_state(edited, 0, @temple) == 0xFF
+      assert building_state(edited, 0, @shrine) == 1
+    end
+
+    test "removing a replaced building leaves it gone; swapping in one call works" do
+      raw =
+        blank()
+        |> city(0, "A", 1, 1, 0, 0)
+        |> with_buildings(0, %{@shrine => :replaced, @temple => :built, 35 => :built})
+
+      assert {:ok, edited, _} = Structures.edit_city(raw, 0, buildings: [@temple, 35])
+      assert building_state(edited, 0, @shrine) == 0xFF
+      assert building_state(edited, 0, @temple) == 1
+
+      # drop the Temple and take a Parthenon in one edit: the Temple goes, the Parthenon replaces nothing
+      assert {:ok, swapped, _} = Structures.edit_city(raw, 0, buildings: [@shrine, 24, 35])
+      assert building_state(swapped, 0, @temple) == 0xFF
+      assert building_state(swapped, 0, 24) == 1
+      assert city_at(swapped, 0).walled
+    end
+
+    test "unticking everything leaves nothing behind, replaced buildings included" do
+      raw =
+        blank()
+        |> city(0, "A", 1, 1, 0, 0)
+        |> with_buildings(0, %{
+          22 => :replaced,
+          23 => :replaced,
+          24 => :built,
+          26 => :built,
+          35 => :built
+        })
+
+      assert {:ok, edited, _} = Structures.edit_city(raw, 0, buildings: [])
+      assert city_at(edited, 0).buildings == %{}
+
+      # dropping the top of a chain brings back only what was asked for
+      assert {:ok, partial, _} = Structures.edit_city(raw, 0, buildings: [23, 26, 35])
+      assert building_state(partial, 0, 22) == 0xFF
+      assert building_state(partial, 0, 23) == 1
+      assert building_state(partial, 0, 24) == 0xFF
+    end
+
+    test "only the building bytes change, and byte 0 stays 0" do
+      raw = blank() |> city(0, "A", 1, 1, 0, 0) |> with_buildings(0, %{35 => :built})
+      assert {:ok, edited, _} = Structures.edit_city(raw, 0, buildings: [35, 26])
+
+      diff =
+        for {{a, b}, i} <-
+              Enum.with_index(Enum.zip(:binary.bin_to_list(raw), :binary.bin_to_list(edited))),
+            a != b,
+            do: i
+
+      assert diff == [0x8AAC + 31 + 26]
+      assert building_state(edited, 0, 0) == 0
+    end
+
+    test "refuses ids outside 3..35" do
+      raw = blank() |> city(0, "A", 1, 1, 0, 0)
+      assert {:error, :bad_buildings} = Structures.edit_city(raw, 0, buildings: [2])
+      assert {:error, :bad_buildings} = Structures.edit_city(raw, 0, buildings: [36])
+      assert {:error, :bad_buildings} = Structures.edit_city(raw, 0, buildings: :all)
+    end
+  end
+
   describe "move_tower/3" do
     test "moves the tower, both of its sides, and units on its tile on either plane" do
       raw =

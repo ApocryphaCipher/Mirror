@@ -2178,6 +2178,28 @@ defmodule MirrorWeb.MapLive do
         >
           Apply
         </button>
+
+        <fieldset id="city-buildings-form" class="mt-1 w-full">
+          <legend class="text-slate-500">
+            Buildings (tick to have; a replaced one shows as ticked)
+          </legend>
+          <input type="hidden" name="city[buildings_present]" value="1" />
+          <div class="mt-1 grid max-h-52 grid-cols-2 gap-x-3 gap-y-0.5 overflow-y-auto pr-1">
+            <label
+              :for={row <- CityPanel.building_rows(@details)}
+              class={["flex items-center gap-1", row.state == :replaced && "text-slate-500"]}
+              title={if row.missing != [], do: "Needs " <> Enum.join(row.missing, ", ")}
+            >
+              <input
+                type="checkbox"
+                name="city[buildings][]"
+                value={row.id}
+                checked={row.state != nil}
+              />
+              {row.name}{if row.state == :replaced, do: " (replaced)"}{if row.missing != [], do: " ⚠"}
+            </label>
+          </div>
+        </fieldset>
       </.form>
       <p :if={@note} id="city-note" role="status" aria-live="polite" class="mt-1 text-emerald-200">
         {@note}
@@ -2187,11 +2209,15 @@ defmodule MirrorWeb.MapLive do
         {@details.garrison} {if @details.garrison == 1, do: "unit", else: "units"} here{if @details.walled,
           do: " · walled"}
       </p>
-      <p :if={@details.buildings != []} id="city-buildings" class="mt-1 text-slate-300">
+      <p
+        :if={!@editable && @details.buildings != []}
+        id="city-buildings"
+        class="mt-1 text-slate-300"
+      >
         <span class="text-slate-500">Buildings:</span>
         {Enum.join(@details.buildings, ", ")}
       </p>
-      <p :if={@details.replaced != []} class="mt-1 text-slate-500">
+      <p :if={!@editable && @details.replaced != []} class="mt-1 text-slate-500">
         Replaced: {Enum.join(@details.replaced, ", ")}
       </p>
       <p :if={@details.enchantments != []} class="mt-1 text-slate-300">
@@ -2708,7 +2734,7 @@ defmodule MirrorWeb.MapLive do
          {:ok, changes} <- CityPanel.changes(params, details),
          :ok <- if(changes == [], do: {:error, :nothing_changed}, else: :ok),
          {:ok, edited, _} <- Structures.edit_city(raw, index, changes),
-         label = city_edit_label(details, changes),
+         label = CityPanel.label(details, changes),
          {next, {:record, _label, _parts}} <- Editor.apply_record(current, plane, label, edited) do
       {:ok, next, label}
     else
@@ -2721,14 +2747,6 @@ defmodule MirrorWeb.MapLive do
     case CityPanel.details(raw, index) do
       nil -> {:error, :no_such_city}
       details -> {:ok, details}
-    end
-  end
-
-  defp city_edit_label(details, changes) do
-    case {Keyword.fetch(changes, :name), Keyword.fetch(changes, :population)} do
-      {{:ok, name}, :error} -> "Renamed #{details.name} to #{name}"
-      {:error, {:ok, n}} -> "Set #{details.name}'s population to #{n}"
-      _ -> "Edited #{details.name}"
     end
   end
 

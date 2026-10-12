@@ -1912,6 +1912,73 @@ defmodule MirrorWeb.MapLiveEditTest do
       assert changed(view) =~ "1 edited"
     end
 
+    test "ticking a building adds it, one undoable edit, and Save as writes it", %{
+      conn: conn,
+      dir: dir,
+      save: save
+    } do
+      view = editing(conn, save, "city")
+      click(view, 38, 21)
+      assert has_element?(view, ~s|input[name="city[buildings][]"][value="23"]|)
+      refute has_element?(view, ~s|input[name="city[buildings][]"][value="23"][checked]|)
+
+      view
+      |> element("#city-form")
+      |> render_submit(%{
+        "city" => %{
+          "name" => "Deventor",
+          "population" => "4",
+          "buildings_present" => "1",
+          "buildings" => ["23", "26"]
+        }
+      })
+
+      assert has_element?(
+               view,
+               "#city-note",
+               "Changed Deventor's buildings (+Temple, +Marketplace)"
+             )
+
+      assert has_element?(view, ~s|input[name="city[buildings][]"][value="23"][checked]|)
+      assert changed(view) =~ "1 edited"
+
+      target = Path.join(dir, "SAVE7.GAM")
+      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+      assert {:ok, cities} = Mirror.SaveFile.Cities.parse(File.read!(target))
+
+      assert %{buildings: %{23 => :built, 26 => :built}} =
+               Enum.find(cities, &(&1.name == "Deventor"))
+
+      render_click(view, "undo", %{})
+      refute has_element?(view, ~s|input[name="city[buildings][]"][value="23"][checked]|)
+    end
+
+    test "a malformed building list is refused and nothing changes", %{conn: conn, save: save} do
+      view = editing(conn, save, "city")
+      click(view, 38, 21)
+
+      view
+      |> element("#city-form")
+      |> render_submit(%{
+        "city" => %{
+          "name" => "Deventor",
+          "population" => "4",
+          "buildings_present" => "1",
+          "buildings" => ["23", "not-a-building"]
+        }
+      })
+
+      assert has_element?(view, "#city-note", "That is not a list of buildings")
+      refute changed(view) =~ "edited"
+    end
+
+    test "a form with no building list leaves the buildings alone", %{conn: conn, save: save} do
+      view = editing(conn, save, "city")
+      click(view, 38, 21)
+      edit_city_form(view, "Nar", 4)
+      assert has_element?(view, "#city-note", "Renamed Deventor to Nar")
+    end
+
     test "a refused value says why and changes nothing", %{conn: conn, save: save} do
       view = editing(conn, save, "city")
       click(view, 38, 21)

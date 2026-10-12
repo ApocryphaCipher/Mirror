@@ -175,20 +175,29 @@ defmodule Mirror.SaveFile.Structures do
   @max_population 25
 
   @doc """
-  Changes a city's `name` and/or `population` (STORY-020), as a keyword list:
-  `edit_city(raw, index, name: "Hialanth", population: 6)`.
+  Changes a city's `name`, `population` and/or `buildings` (STORY-020), as a keyword list:
+  `edit_city(raw, index, name: "Hialanth", population: 6, buildings: [16, 23])`.
 
-  The name is trimmed, must be 1 to #{@name_bytes} printable ASCII characters (the field is
-  14 bytes with a NUL), and fills the whole field, so no tail of the old name is left
-  behind. Nothing beyond ASCII: the game's font has no "ü", and a name saved with one
-  showed as "Zrich" (checked in the game, 2026-10-11). Population is the byte at `+20`, in thousands, 1 to
-  #{@max_population} (*guess* for the upper end: the largest city seen is 25). The size
-  class (`+19`) is left alone: the game does not recompute it from the population, on
-  load or after a turn (checked 2026-10-11: pop 12 and 20 stayed Village), and across the
-  saves here the classes overlap in population, so it is not a function of it.
+  * `name`: trimmed, 1 to #{@name_bytes} printable ASCII characters (the field is 14 bytes with a
+    NUL), and it fills the whole field, so no tail of the old name is left behind. Nothing beyond
+    ASCII: the game's font has no "ü", and a name saved with one showed as "Zrich" (checked in
+    the game, 2026-10-11).
+  * `population`: the byte at `+20`, in thousands, 1 to #{@max_population} (*guess* for the upper
+    end: the largest city seen is 25). The size class (`+19`) is left alone: the game does not
+    recompute it from the population, on load or after a turn (checked 2026-10-11: pop 12 and 20
+    stayed Village), and across the saves here the classes overlap in population, so it is not a
+    function of it.
+  * `buildings`: a list of building ids (3 to 35, see `Mirror.SaveFile.Cities.building_name/1`);
+    the city ends up with exactly those, built or replaced. The game's own rule is followed, from
+    `BUILDDAT.LBX`: buildings that are no longer wanted go first, and one that had replaced another
+    (a Temple over a Shrine) brings it back as built; then each added building marks the one it
+    replaces as replaced (`0`), when that one is there. A building whose predecessor is absent is
+    just built. Needs (a Shrine wants a Builders' Hall) are **not** enforced: neutral cities in
+    saves break them. Ids outside 3..35 give `{:error, :bad_buildings}`.
 
-  Returns `{:ok, raw, %{changed: [...]}}` or `{:error, reason}`; nothing is written if
-  any value is refused.
+  Returns `{:ok, raw, %{changed: [...]}}` or `{:error, reason}` (`:bad_name`, `:bad_population`,
+  `:bad_buildings`, `:no_such_city` or `{:unknown_field, field}`); nothing is written if any
+  value is refused.
   """
   @spec edit_city(binary(), non_neg_integer(), keyword()) :: result()
   def edit_city(raw, index, changes) when is_list(changes) do
@@ -199,8 +208,14 @@ defmodule Mirror.SaveFile.Structures do
 
       raw =
         Enum.reduce(edits, raw, fn
-          {:name, bytes}, acc -> put(acc, base, bytes)
-          {:population, n}, acc -> put(acc, base + 20, <<n>>)
+          {:name, bytes}, acc ->
+            put(acc, base, bytes)
+
+          {:population, n}, acc ->
+            put(acc, base + 20, <<n>>)
+
+          {:buildings, ids}, acc ->
+            put(acc, base + 31, set_buildings(binary_part(acc, base + 31, 36), ids))
         end)
 
       {:ok, raw, %{changed: Keyword.keys(edits)}}
@@ -221,6 +236,11 @@ defmodule Mirror.SaveFile.Structures do
       {:population, _}, _acc ->
         {:halt, {:error, :bad_population}}
 
+      {:buildings, ids}, {:ok, acc} ->
+        if is_list(ids) and Enum.all?(ids, &(&1 in 3..35//1)),
+          do: {:cont, {:ok, [{:buildings, Enum.uniq(ids)} | acc]}},
+          else: {:halt, {:error, :bad_buildings}}
+
       {other, _}, _acc ->
         {:halt, {:error, {:unknown_field, other}}}
     end)
@@ -228,6 +248,63 @@ defmodule Mirror.SaveFile.Structures do
       {:ok, edits} -> {:ok, Enum.reverse(edits)}
       error -> error
     end)
+  end
+
+  # The city's 36 building bytes (`+31..+66`: 1 built, 0 replaced, 0xFF none) after making
+  # exactly `wanted` present.
+  defp set_buildings(bytes, wanted) do
+    state = for {b, id} <- Enum.with_index(:binary.bin_to_list(bytes)), into: %{}, do: {id, b}
+    present? = fn st, id -> id > 0 and Map.fetch!(st, id) in [0, 1] end
+
+    current = for id <- 3..35, present?.(state, id), do: id
+    wanted = MapSet.new(wanted)
+
+    state =
+      current
+      |> Enum.reject(&MapSet.member?(wanted, &1))
+      |> Enum.reduce(state, fn id, st ->
+        st = Map.put(st, id, 0xFF)
+
+        case Cities.building_replaces(id) do
+          nil -> st
+          replaced -> restore_replaced(st, replaced, wanted)
+        end
+      end)
+
+    state =
+      wanted
+      |> Enum.sort()
+      |> Enum.reduce(state, fn id, st ->
+        if present?.(st, id) do
+          st
+        else
+          st = Map.put(st, id, 1)
+
+          case Cities.building_replaces(id) do
+            replaced when is_integer(replaced) ->
+              if present?.(st, replaced), do: Map.put(st, replaced, 0), else: st
+
+            nil ->
+              st
+          end
+        end
+      end)
+
+    for id <- 0..35, into: <<>>, do: <<Map.fetch!(state, id)>>
+  end
+
+  # A replaced building comes back as built when nothing present still replaces it, and the
+  # caller asked for it: one that is not in `wanted` stays gone, whatever order they are handled in.
+  defp restore_replaced(state, replaced, wanted) do
+    still_replaced? =
+      Enum.any?(3..35, fn id ->
+        Cities.building_replaces(id) == replaced and Map.fetch!(state, id) in [0, 1]
+      end)
+
+    if MapSet.member?(wanted, replaced) and Map.fetch!(state, replaced) == 0 and
+         not still_replaced?,
+       do: Map.put(state, replaced, 1),
+       else: state
   end
 
   defp city_name_bytes(name) when is_binary(name) do

@@ -29,7 +29,26 @@ click (`assets/js/view_click.mjs` maps the point to a tile through the zoom and 
 server shares the City tool's selection. Checked in the browser on a real save at the fit zoom: Sawtooth
 and Hialanth open with their details, no form, close on empty ground and on ✕.
 
-**Not done:** editing owner, race, buildings or enchantments; lairs and units (the other panels in this story).
+**Buildings (2026-10-11).** In edit mode the panel has a checklist of the 33 buildings a city can have (ids 3 to 35;
+1 and 2 are production items): ticked means built or replaced. Applying it is one undo step
+(`Structures.edit_city/3`, `buildings:`). The rule is the game's own, from `BUILDDAT.LBX`:
+adding a building marks the one it replaces as replaced (Temple replaces Shrine, Bank replaces Marketplace,
+Farmers' Market replaces Granary, and so on); removing it brings the replaced one back; a building whose
+predecessor is absent is just built. **Prerequisites are a hint, not enforced** (a ⚠ and a tooltip):
+real saves break them, since neutral cities have Shrines without a Builders' Hall.
+- **Source:** `BUILDDAT.LBX` (Kevin's install) lists each building's name, up to two prerequisites and what it
+  replaces, in the save's building order, so its entry index *is* the save id: a second source for every id
+  (before, only 26, 29 and 35 were checked in the game). Codes of 100 or more in its prerequisite fields are
+  terrain (forest, water, minerals), not buildings.
+- **Checked against the saves:** 44 distinct building sets across every save on this machine: every id and every
+  "replaced" fits; prerequisites are broken in about 35 places, which is why they stay a hint.
+- **Real game (checkpoint 92):** a save with Wizards' Guild, Parthenon and Bank added to Sawtooth and its
+  Marketplace marked replaced loaded with the game's memory identical to the file. Per Kevin, each building is
+  not checked one by one in the game: the table is documented game data.
+- **Not modelled:** race restrictions, terrain needs (a Sawmill wants forest, a Shipwrights' Guild water, a
+  Miners' Guild minerals), and what a building does to the city's output (the game derives that).
+
+**Not done:** editing owner, race or enchantments; lairs and units (the other panels in this story).
 **Size:** large (do incrementally)
 
 ## What to do
