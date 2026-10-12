@@ -91,19 +91,21 @@ off to its old target.
 **Nodes (2026-10-12).** The 🏰 Move tool now picks up a magic node (`Structures.move_node/4`, `MoveTool`). A node is its terrain
 tile, so one move is: the node record's x and y; its aura squares (the first `power` of them, shifted by the same step); its
 guardians' encounter record (kinds 1 to 3 at the old tile); the units standing on it (a melded node holds a Guardian Spirit);
-and a **terrain swap**: the old tile takes the destination's tile and the new tile becomes the node (168 Sorcery, 169 Nature,
-170 Chaos, the same on both planes). The swap is made as map edits, in the same undo step. **The destination must be grassland,
-forest or swamp**: those are the only terrain types whose tile does not depend on its neighbours (`priv/kazzmir_terrain_table.json`:
-grass 5 tiles, forest 3, swamp 3; the rest have hundreds of neighbour-dependent variants), so the tile left behind matches
-what is around it. Also refused: off the map or an aura that would run off it, the node's own tile, a city, a tower, an
-encounter, another node, another player's units, or a stack over 9. Same plane only. The landmass layer is untouched (a swap
-of two land tiles).
-**Real game (slot 6, vault checkpoint 100):** two of Kevin's melded nodes moved, a Sorcery node holding a Guardian Spirit and a
-Nature node without one: both loaded with the game's memory identical to the file (node records, the swapped tiles, the
-guardian records, the spirit on the new tile), the sparkling auras in his colour at the new spots, ordinary land at the old
-ones, Power Base unchanged (952 before and after), and an End Turn with nothing odd.
-**Not done:** moving a node to another plane; onto tiles other than grass, forest and swamp; what the unit status value 1
-means (sentry is a guess), and the demon-wings case (mutation bit 8, unit-tested, never seen in a save), are unchecked in the game.
+and the **terrain**, made as map edits in the same undo step by `Mirror.NodeTerrain`: the new tile becomes the node (168 Sorcery,
+169 Nature, 170 Chaos, the same on both planes), the old tile becomes land again, **the same type the node moved onto** with the
+variant `Mirror.TerrainPaint` picks for its own neighbours (plain grass if nothing fits), and the destination's neighbours are
+**not** re-tiled (the game never does). Any land will do: grass, forest, swamp, desert, tundra, hills or mountains. Water, rivers, lakes,
+volcanoes, other nodes and the polar rows are refused. **Roads on the destination tile are removed.** Also refused: off the map or an
+aura that would run off it, the node's own tile, a city, a tower, an encounter, another node, another player's units *joining the
+node's own units*, or a stack over 9. Same plane only. The landmass layer is untouched (land to land). A first version accepted only
+grass, forest and swamp, because it swapped the two tiles; Kevin's suggestion (repaint the old tile, remove roads) replaced it.
+**Real game, two rounds (vault checkpoints 100 and 101, Kevin at the keyboard):** two melded nodes (a Sorcery node holding a Guardian
+Spirit, a Nature node without one) moved onto plain land: memory identical to the file, the spirit with the node, auras in his colour
+at the new spots, ordinary land at the old ones, Power Base unchanged (952), End Turn normal. Then the Sorcery node onto **desert** and
+the Nature node onto a **forest tile with a road** (the road gone): memory identical to the file, and Kevin saw the old spots blend
+in (desert and forest), the nodes with their auras at the new spots, nothing odd near Dover, and nothing odd after End Turn.
+**Not done:** moving a node to another plane. What the unit status value 1 means (sentry is a guess), and the demon-wings
+case (mutation bit 8, unit-tested, never seen in a save), are unchecked in the game.
 **Size:** medium–large
 
 ## What to do

@@ -10,7 +10,7 @@ defmodule MirrorWeb.MoveTool do
 
   alias Mirror.SaveFile.{Cities, Structures}
 
-  @type kind :: :city | :tower | :lair
+  @type kind :: :city | :tower | :lair | :node
   @type pending :: %{kind: kind(), index: non_neg_integer(), name: String.t()}
 
   # Encounter kinds that can be moved on their own, named as in
@@ -82,9 +82,19 @@ defmodule MirrorWeb.MoveTool do
   def plane_number(:arcanus), do: 0
   def plane_number(:myrror), do: 1
 
-  @doc "Moves the picked structure; wraps the `Structures` move for its kind."
-  @spec move(binary(), pending(), :arcanus | :myrror, integer(), integer()) ::
-          {:ok, binary(), map()} | {:error, term()}
+  @doc """
+  Moves the picked structure; wraps the `Structures` move for its kind. A node needs
+  `terrain_at`, a function from `{x, y}` to the plane's terrain tile there (`Structures.move_node/4`);
+  the others ignore it.
+  """
+  @spec move(
+          binary(),
+          pending(),
+          :arcanus | :myrror,
+          integer(),
+          integer(),
+          ({integer(), integer()} -> integer()) | nil
+        ) :: {:ok, binary(), map()} | {:error, term()}
   def move(raw, pending, plane, x, y, terrain_at \\ nil)
 
   def move(raw, %{kind: :city, index: index}, plane, x, y, _terrain_at),
@@ -102,15 +112,25 @@ defmodule MirrorWeb.MoveTool do
       when is_function(terrain_at, 1),
       do: Structures.move_node(raw, index, {x, y}, terrain_at)
 
-  @doc """
-  The terrain edits that go with a moved node (the `terrain` of its report), in the form
-  `Editor.apply_record/5` takes; none for anything else.
-  """
-  @spec terrain_edits(map()) :: [tuple()]
-  def terrain_edits(%{terrain: [_ | _] = changes}),
-    do: [{:terrain, for({{x, y}, value} <- changes, do: {x, y, value})}]
+  # (the same bits as `road_edits/4` below: a plain road 0x08 and an enchanted one 0x10)
+  @node_road_bits 0x18
 
-  def terrain_edits(_report), do: []
+  @doc """
+  The map edits that go with a moved node, in the form `Editor.apply_record/5` takes (none for
+  anything else): the terrain (`Mirror.NodeTerrain.edits/4`: the old tile back to land, the new
+  tile the node) and the roads on the tile it lands on, which are removed. `terrain` is the plane's
+  terrain bytes and `flags` the destination's `terrain_flags` byte.
+  """
+  @spec terrain_edits(map(), binary(), integer() | nil) :: [tuple()]
+  def terrain_edits(%{moved: :node, from: from, to: {x, y} = to, node_tile: tile}, terrain, flags) do
+    terrain_edit = {:terrain, Mirror.NodeTerrain.edits(terrain, from, to, tile)}
+
+    if is_integer(flags) and (flags &&& @node_road_bits) != 0,
+      do: [terrain_edit, {:terrain_flags, [{x, y, flags &&& bnot(@node_road_bits)}]}],
+      else: [terrain_edit]
+  end
+
+  def terrain_edits(_report, _terrain, _flags), do: []
 
   @road 0x08
   @road_bits 0x18
@@ -134,10 +154,12 @@ defmodule MirrorWeb.MoveTool do
     do: "Moving #{name}: click where it should go. Right-click, or click it again, to cancel."
 
   @doc "The notice after a move."
-  def moved(%{name: name}, {x, y}, report, road? \\ false) do
+  def moved(%{name: name}, {x, y}, report, road? \\ false, road_removed? \\ false) do
     "Moved #{name} to (#{x}, #{y})" <>
       followed(report) <>
-      "." <> if(road?, do: " Laid a road under it.", else: "") <> warnings(report)
+      "." <>
+      if(road?, do: " Laid a road under it.", else: "") <>
+      if(road_removed?, do: " Removed the road that was there.", else: "") <> warnings(report)
   end
 
   defp followed(%{garrison: n, followed: followed}) do
@@ -188,9 +210,9 @@ defmodule MirrorWeb.MoveTool do
   def error_message(:same_tile), do: "That is where it already is."
   def error_message(:aura_off_map), do: "The node's aura would run off the map there."
 
-  def error_message(:not_plain_land),
+  def error_message(:bad_terrain),
     do:
-      "A node can only move onto grassland, forest or swamp, so the tiles around it stay as they are."
+      "A node can go on land (grass, forest, swamp, desert, tundra, hills or mountains), not on water, a river, a lake, a volcano or the polar rows."
 
   def error_message(:stack_full),
     do: "A tile holds at most 9 units, and the node's units would not fit there."

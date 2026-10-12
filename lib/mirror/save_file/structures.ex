@@ -22,9 +22,9 @@ defmodule Mirror.SaveFile.Structures do
 
   Not done yet, on purpose:
 
-    * **Nodes.** A node is its terrain tile, so moving one means moving
-      terrain too, and its aura tiles and guardian record. That is a map
-      edit, not a record edit.
+    * **A node's terrain.** `move_node/4` writes the node's records (position, aura squares,
+      guardians, the units on it) and says which tile the new spot becomes; the map edits are
+      `Mirror.NodeTerrain`'s, made where the editor's planes are. Nodes move on their own plane only.
     * **City road links** (`+101`) are left as they are: the game rebuilds them
       from the roads and the city positions when it loads a save (checked
       2026-10-11: a save with stale links came out of the load with none, while
@@ -731,30 +731,31 @@ defmodule Mirror.SaveFile.Structures do
 
   @node_record 48
   @node_tiles %{0 => 168, 1 => 169, 2 => 170}
-  @plain_land [:grass, :forest, :swamp]
 
   @doc """
   Moves magic node `index` (its record in the nodes block, 0..29) to `{x, y}` on its own plane
   (STORY-019). `terrain_at` is a function from `{x, y}` to the node plane's terrain tile there
   (the caller has the editor's planes; the raw bytes may be behind them).
 
-  A node is its terrain tile, so the move is a record edit *and* a terrain swap. Written to
+  A node is its terrain tile, so the move is a record edit *and* a terrain edit. Written to
   the raw bytes: the node's x and y; its aura squares (the first `power` of them, all shifted by the
   same step); its guardians' encounter record (kinds 1 to 3 at the old tile); and the units
-  standing on the node (a melded node holds a spirit), which go with it. The result's `terrain`
-  lists the two tile changes for the caller to apply as map edits: the old tile takes the
-  destination's old tile, the new tile becomes the node (168 Sorcery, 169 Nature, 170 Chaos, on
-  both planes). Swapping keeps the land as it was.
+  standing on the node (a melded node holds a spirit), which go with it. The terrain is the
+  caller's, since it has the editor's planes: the result's `node_tile` is the tile value the new
+  spot becomes (168 Sorcery, 169 Nature, 170 Chaos, on both planes), and
+  `Mirror.NodeTerrain.edits/4` makes the map edits, including turning the old tile back into land.
 
-  The destination must be **grassland, forest or swamp**: those tiles are the same wherever they
-  stand, so the tile left behind is consistent with its neighbours. Others (desert, hills,
-  coasts, rivers...) change with their neighbours, and moving a node onto one would leave a
-  wrong-looking tile. Also refused: off the map (the aura squares included), the node's own tile, a
-  tile holding a city, a tower (on either plane), an encounter, another node, units of another
-  owner, or more than #{@max_stack} units in all.
+  The destination must be land a node can sit on: grassland, forest, swamp, desert, tundra, hills or
+  mountains, outside the polar rows (`Mirror.NodeTerrain.can_land?/2`). Water, a river, a lake, a
+  volcano and another node are refused. Also refused: off the map (the aura squares included), the
+  node's own tile, a tile holding a city, a tower (on either plane), an encounter, another node,
+  units of another owner **joining the node's own units** (a node with no units to bring does not
+  care who stands at the destination), or more than #{@max_stack} units in all. A node record counts only
+  with a position on the map, a type 0 to 2 and a power of 1 to 20 (every node in every save here has
+  5 to 20), so a zeroed slot or a truncated save is `:no_such_node`, not a node at (0, 0).
 
   Returns `{:ok, raw, report}` or `{:error, reason}` (`:no_such_node`, `:off_map`, `:same_tile`,
-  `:aura_off_map`, `:not_plain_land`, `:city_at_destination`, `:tower_at_destination`,
+  `:aura_off_map`, `:bad_terrain`, `:city_at_destination`, `:tower_at_destination`,
   `:encounter_at_destination`, `:node_at_destination`, `:foreign_units_at_destination`,
   `:stack_full`).
   """
@@ -767,13 +768,12 @@ defmodule Mirror.SaveFile.Structures do
          :ok <- if(to == {node.x, node.y}, do: {:error, :same_tile}, else: :ok),
          {dx, dy} = {x - node.x, y - node.y},
          {:ok, aura} <- shifted_aura(node, dx, dy),
-         :ok <- check_plain_land(terrain_at.(to)),
+         :ok <- check_node_land(terrain_at.(to), y),
          {:ok, cities} <- Cities.parse(raw),
          {:ok, units} <- Units.parse(raw),
          :ok <- check_node_destination(raw, cities, units, node, to) do
       here = {node.x, node.y, node.plane}
       moving = for u <- units, {u.x, u.y, plane_index(u.plane)} == here, do: u
-      from_tile = terrain_at.({node.x, node.y})
       base = elem(Sites.nodes_range(), 0) + index * @node_record
 
       guardians =
@@ -797,19 +797,15 @@ defmodule Mirror.SaveFile.Structures do
          to: to,
          guardians: length(guardians),
          units: length(moving),
-         terrain: [{{node.x, node.y}, terrain_at.(to)}, {to, node_tile(node.type, from_tile)}]
+         node_tile: Map.fetch!(@node_tiles, node.type)
        }}
     end
   end
 
-  # The node's own tile value says what kind it is, if the caller's terrain agrees; otherwise its type byte.
-  defp node_tile(_type, current) when current in [168, 169, 170], do: current
-  defp node_tile(type, _current), do: Map.fetch!(@node_tiles, type)
-
   defp fetch_node(raw, index) do
     {base, _} = Sites.nodes_range()
 
-    with true <- index in 0..29//1,
+    with true <- index in 0..29//1 and byte_size(raw) >= base + 30 * @node_record,
          <<x, y, plane, _owner, power, aura_x::binary-size(20), aura_y::binary-size(20), type,
            _::binary>> <-
            binary_part(raw, base + index * @node_record, @node_record),
@@ -855,10 +851,8 @@ defmodule Mirror.SaveFile.Structures do
     end
   end
 
-  defp check_plain_land(tile) do
-    if Mirror.TerrainType.terrain_type(tile) in @plain_land,
-      do: :ok,
-      else: {:error, :not_plain_land}
+  defp check_node_land(tile, y) do
+    if Mirror.NodeTerrain.can_land?(tile, y), do: :ok, else: {:error, :bad_terrain}
   end
 
   defp check_node_destination(raw, cities, units, node, {x, y}) do
