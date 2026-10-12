@@ -16,8 +16,8 @@
 - [STORY-016](STORY-016-edit-mode-shell.md): edit mode shell (EPIC-006) **Done**
 - [STORY-017](STORY-017-terrain-editing-autotile.md): terrain editing with auto-tiling via `TERRTYPE.LBX` (EPIC-006)
 - [STORY-018](STORY-018-roads-specials-editing.md): roads, corruption, resource editing (EPIC-006) **Done** (checked in the real game; bridges untried)
-- [STORY-019](STORY-019-move-structures.md): select and move cities, towers, lairs, magic nodes and unit stacks (EPIC-006) **Done** except moving a node to the other plane; checked in the real game
-- [STORY-020](STORY-020-structure-editors.md): structure detail editors: city (name, population, buildings, enchantments, race, owner), lair, node and unit panels (EPIC-006) **Mostly done**; unit type and enchantments, hero owner left
+- [STORY-019](STORY-019-move-structures.md): select and move cities, towers, lairs, magic nodes and unit stacks (EPIC-006) **Done** except moving a node to the other plane and a look at a moved lair on screen (it was read back from memory only)
+- [STORY-020](STORY-020-structure-editors.md): structure detail editors: city (name, population, buildings, enchantments, race, owner), lair, node and unit panels (EPIC-006) **Mostly done**; a unit's type, enchantments and max moves, a hero's owner and the meaning of the lair treasure code left
 - [STORY-021](STORY-021-save-round-trip-safety.md): save round-trip safety (EPIC-006) **Done**
 - [STORY-022](STORY-022-bug-raw-value-paint-artifacts.md): **bug**: stray raw-value paint shows up as map artifacts (EPIC-006) **Partially fixed**
 - [STORY-023](STORY-023-bug-edit-paint-no-live-redraw.md): **bug**: painting in edit mode doesn't redraw the tile until reload (EPIC-006) **Fixed**

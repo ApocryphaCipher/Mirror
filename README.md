@@ -17,8 +17,7 @@ it off). The map pages have a view mode (zoom, pan, a hover readout with the ful
 Surveyor card, and a toggle for each layer) and an edit mode: paint a terrain type
 with auto-tiling, cycle or paint raw tiles, set roads, enchanted roads, corruption
 and specials, reveal the whole map, move cities, towers, lairs, magic nodes and unit stacks,
-edit a city (name, population, buildings, enchantments, race, owner), a lair's guards and
-treasure, a node's owner and guardians and a unit's level, experience, damage and owner,
+edit a city (name, population, buildings, enchantments, race, owner), a lair's cleared state, guards, gold and mana, a node's owner and guardians and a unit's level, experience, damage and owner,
 undo/redo, and Save as. Note on editing:
 **Paint type** keeps the landmass/continent IDs consistent; the raw tools (Cycle,
 Paint tile) update terrain tiles and the recomputed adjacency mask only and do

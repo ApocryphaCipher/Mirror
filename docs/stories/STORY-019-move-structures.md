@@ -1,9 +1,11 @@
 # STORY-019: Select and move structures and unit stacks
 
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
-**Status:** done for cities, towers, lairs, magic nodes and unit stacks (2026-10-12): each kind was loaded in the
-real game and its memory read back (see the results below). Left: moving a node to the other plane, and the
-checker for impossible placements (STORY-029).
+**Status:** done for cities, towers, magic nodes and unit stacks (2026-10-12): each was loaded in the real game, its
+memory read back and the result looked at (see the results below). **Lairs are done except the look:** a moved keep was
+read back from memory (slot 7, checkpoint 79) and never looked at on screen; the keeps Kevin attacked and cleared on screen
+were rewritten in place by the lair panel (STORY-020), not moved. Left: that look, moving a node to the other plane, and
+the checker for impossible placements (STORY-029).
 
 **Progress (2026-10-10), slice 1: the record layer, not yet in the UI and not yet seen in the game.**
 `Mirror.SaveFile.Structures` (`lib/mirror/save_file/structures.ex`, pure raw-in raw-out) has

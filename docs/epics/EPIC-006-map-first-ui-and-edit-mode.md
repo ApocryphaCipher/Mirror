@@ -66,7 +66,7 @@ STORY-017 → then the rest as their EPIC-004 data stories land.
 - [STORY-016](../stories/STORY-016-edit-mode-shell.md): edit mode shell (toggle, pick-a-layer, tools, undo/redo, Save as) **Done**
 - [STORY-017](../stories/STORY-017-terrain-editing-autotile.md): terrain editing with auto-tiling (paint types; game picks the picture)
 - [STORY-018](../stories/STORY-018-roads-specials-editing.md): roads, corruption and resource editing **Done** (checked in the real game; roads on ocean, "bridges", untried)
-- [STORY-019](../stories/STORY-019-move-structures.md): select and move structures and unit stacks **Done** (cities, towers, lairs, nodes, unit stacks; node to another plane left)
+- [STORY-019](../stories/STORY-019-move-structures.md): select and move structures and unit stacks **Done** (cities, towers, nodes, unit stacks; a moved lair was read back from memory but not looked at; node to another plane left)
 - [STORY-020](../stories/STORY-020-structure-editors.md): structure detail editors (city / lair / node / unit) **Mostly done**
 - [STORY-021](../stories/STORY-021-save-round-trip-safety.md): save round-trip safety (byte-exact, and loads in the real game) **Done**
 - [STORY-022](../stories/STORY-022-bug-raw-value-paint-artifacts.md): **bug**: stray raw-value paint (wheel silently changes the brush; bare click paints) shows up as map artifacts **Partially fixed**
