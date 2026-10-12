@@ -114,8 +114,17 @@ defmodule MirrorWeb.CityPanel do
     end
   end
 
-  @doc "The race select's options, `{id, name}`."
-  def race_options, do: Cities.races()
+  @doc """
+  The race select's options, `{id, name}`: the game's 14, and the city's current race too if it
+  is none of them (a corrupted or modded save), so applying the form never changes it by
+  accident. `changes/2` still refuses to *set* an id outside the 14.
+  """
+  @spec race_options(details()) :: [{non_neg_integer(), String.t()}]
+  def race_options(details) do
+    if Enum.any?(Cities.races(), fn {id, _} -> id == details.race_id end),
+      do: Cities.races(),
+      else: Cities.races() ++ [{details.race_id, Cities.race_name(details.race_id)}]
+  end
 
   @doc """
   The owner select's options: the wizards, neutral, and the city's current owner too if it is
@@ -177,8 +186,12 @@ defmodule MirrorWeb.CityPanel do
 
       {:ok, value} when is_binary(value) ->
         case Integer.parse(value) do
+          # posting back what the city already has is no change, even if it is outside the range
+          {n, ""} when n == :erlang.map_get(detail_key, details) ->
+            {:ok, []}
+
           {n, ""} when n in 0..max//1 ->
-            {:ok, if(n == Map.fetch!(details, detail_key), do: [], else: [{field, n}])}
+            {:ok, [{field, n}]}
 
           _ ->
             {:error, error}

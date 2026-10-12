@@ -401,12 +401,33 @@ defmodule Mirror.SaveFile.StructuresTest do
       capital = blank() |> city(0, "Cap", 9, 9, 0, 0) |> fortress(0, 9, 9, 0)
       assert {:error, :capital} = Structures.edit_city(capital, 0, owner: 2)
 
-      circle = blank() |> city(0, "Cap", 9, 9, 0, 1) |> wizard_circle(1, 9, 9, 0)
+      circle =
+        blank()
+        |> city(0, "Cap", 9, 9, 0, 1)
+        |> put(0x9E8 + 0x4C8 + 1, "Freya" <> <<0>>)
+        |> wizard_circle(1, 9, 9, 0)
+
       assert {:error, :capital} = Structures.edit_city(circle, 0, owner: 2)
 
       # the same tile on the other plane is another city
       other_plane = blank() |> city(0, "Cap", 9, 9, 1, 0) |> fortress(0, 9, 9, 0)
       assert {:ok, _, _} = Structures.edit_city(other_plane, 0, owner: 2)
+
+      # an inactive fortress record or an unnamed wizard's zeroed circle is not a capital
+      inactive = blank() |> city(0, "Corner", 0, 0, 0, 0) |> put(0x65F8, <<0, 0, 0, 0>>)
+      assert {:ok, _, _} = Structures.edit_city(inactive, 0, owner: 2)
+
+      # no wizard has a name here, so every circle is a zeroed one
+      unnamed = blank() |> city(0, "Corner", 0, 0, 0, 0)
+      assert {:ok, _, _} = Structures.edit_city(unnamed, 0, owner: 2)
+
+      # a named wizard whose circle really is at (0, 0) does count
+      named = unnamed |> put(0x9E8 + 1, "Jafar" <> <<0>>)
+      assert {:error, :capital} = Structures.edit_city(named, 0, owner: 2)
+
+      # but a real one at (0, 0) still counts
+      real = blank() |> city(0, "Corner", 0, 0, 0, 0) |> fortress(0, 0, 0, 0)
+      assert {:error, :capital} = Structures.edit_city(real, 0, owner: 2)
 
       # and race and the rest still work on a capital
       assert {:ok, _, %{changed: [:race]}} = Structures.edit_city(capital, 0, race: 3)

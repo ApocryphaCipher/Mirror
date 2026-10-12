@@ -151,6 +151,19 @@ defmodule MirrorWeb.CityPanelTest do
       assert {:error, :bad_race} = CityPanel.changes(form(%{"race" => ["4"]}), @details_ro)
     end
 
+    test "the race select offers the game's 14 and keeps an out-of-range current race" do
+      assert length(CityPanel.race_options(@details_ro)) == 14
+      odd = Map.put(@details_ro, :race_id, 14)
+      assert List.last(CityPanel.race_options(odd)) == {14, "race 14"}
+      assert length(CityPanel.race_options(odd)) == 15
+
+      # keeping it selected posts it back unchanged, which is no change; setting any other id outside
+      # the 14 is still refused
+      assert {:ok, []} = CityPanel.changes(form(%{"race" => "14"}), odd)
+      assert {:error, :bad_race} = CityPanel.changes(form(%{"race" => "15"}), odd)
+      assert {:ok, [race: 3]} = CityPanel.changes(form(%{"race" => "3"}), odd)
+    end
+
     test "the owner select always offers the current owner" do
       assert CityPanel.owner_options(@details_ro) == @details_ro.owners
       unnamed = %{@details_ro | owner: 3}

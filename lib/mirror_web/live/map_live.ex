@@ -2167,7 +2167,7 @@ defmodule MirrorWeb.MapLive do
             class="mt-0.5 block rounded border border-white/15 bg-slate-950 px-1 py-0.5 text-slate-100"
           >
             <option
-              :for={{id, name} <- CityPanel.race_options()}
+              :for={{id, name} <- CityPanel.race_options(@details)}
               value={id}
               selected={id == @details.race_id}
             >

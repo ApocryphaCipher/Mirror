@@ -302,7 +302,8 @@ defmodule Mirror.SaveFile.Structures do
   end
 
   # A wizard's fortress and summoning circle name the city they are in; changing hands would
-  # leave the wizard record pointing at a city that is not his.
+  # leave the wizard record pointing at a city that is not his. Only an active fortress record and
+  # a named wizard count: zeroed records for unused slots are not a capital at (0, 0).
   defp check_owner_change(raw, city, edits) do
     cond do
       not Keyword.has_key?(edits, :owner) -> :ok
@@ -317,14 +318,18 @@ defmodule Mirror.SaveFile.Structures do
 
     fortress? =
       Enum.any?(0..(@fortress_records - 1), fn i ->
-        <<x, y, plane, _active>> = binary_part(raw, @fortress_offset + i * 4, 4)
-        {x, y, plane} == here
+        <<x, y, plane, active>> = binary_part(raw, @fortress_offset + i * 4, 4)
+        active != 0 and {x, y, plane} == here
       end)
 
     circle? =
       Enum.any?(0..(@wizards - 2), fn owner ->
         at = wizards + owner * @wizard_record
-        {i16(raw, at + @circle_x), i16(raw, at + @circle_y), i16(raw, at + @circle_plane)} == here
+
+        # an unused wizard record (no name) has a zeroed circle, which is not a city at (0, 0)
+        :binary.at(raw, at + 1) != 0 and
+          {i16(raw, at + @circle_x), i16(raw, at + @circle_y), i16(raw, at + @circle_plane)} ==
+            here
       end)
 
     fortress? or circle?
