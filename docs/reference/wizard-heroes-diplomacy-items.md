@@ -82,6 +82,12 @@ free is not yet read.
   (above) with a 6-byte tail: name (30), icon, slot, type, cost, the eight stat bytes, charges, abilities, then 6 bytes not
   read. The save has a 250-byte table of "premade items still available" right after the heroes block (kazzmir
   `loadPremadeItems`, *guess:* 0 or 1 each).
+- **Which copy of `ITEMDATA.LBX`:** ITEMMAKE.EXE **saves its edits straight back to `ITEMDATA.LBX`** (2026-10-12: Kevin browsing
+  it changed the file in `~/DOS/MAGIC`; there is no way to leave the program without saving). The 2026-10-12 checks used a
+  file that differed from the original GOG copy in 3 records (items 1, 51 and 75; item 75 had its type changed from shield to misc and
+  its tail bytes moved with it, which shows the tail depends on the type). None of the 14 checked items is one of the three. The
+  community patch's copy and the old CD install's copy differ from the GOG original in about 25 records or more (the patch rebalances
+  items), so "the premade items" depends on which game files a save was made with.
 - **`ITEMPOW.LBX`**: one entry, 67 records of 30 bytes: the **item powers** ("+1 Attack" to "Spell Charges"). A record is a name
   (22 bytes), then a kind (u8), a realm (u8), an amount (u8), a pad, and a **u32 ability mask**. The item's abilities are the OR of
   its powers' masks.
