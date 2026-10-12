@@ -7,7 +7,7 @@
 
 ## What to do
 
-A LiveView at `/wizard/:id` (1 = the player, 2 to 5 the rivals; see the epic for the numbering) that shows what the
+A LiveView at `/wizard/:id` (1 = the player, 2 to 5 the rivals, 6 the neutral player if it has anything to show; see the epic for the numbering) that shows what the
 save holds for that wizard, using only fields that are already decoded:
 
 - **Header:** name, portrait id (`+0x00`; the portraits are in the game's files, *guess* until checked), banner colour,
@@ -20,11 +20,11 @@ save holds for that wizard, using only fields that are already decoded:
 - **Background:** a gradient from the wizard's banner colour at the top, fading to black down the screen. Use the
   same banner colours the map's city flags and unit plaques use (blue, green, purple, red, yellow; neutral is
   brown), so the page and the map agree. Check it on a phone-width screen and in dark and light themes.
-- Reached from the header (a wizard switcher), and from the map panels' owner names (city, node, unit, lair).
+- Reached from the header (a wizard switcher), and from the map panels' owner names (city, node and unit; a lair has no owner, its record is not assigned to a wizard).
 
 A wizard that does not exist (no name, or an id out of range) is a 404 with a note. **First question:** does
-record 5, the neutral player, hold anything worth showing? Read it in a few saves before deciding; if it does, show
-it read-only with the brown gradient.
+record 5, the neutral player (`/wizard/6`), hold anything worth showing? Read it in a few saves before deciding; if it does, show
+it read-only with the brown gradient, and if not `/wizard/6` stays a 404.
 
 ## Definition of done
 

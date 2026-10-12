@@ -9,8 +9,10 @@
 
 In edit mode the wizard page gets a form for the fields whose offsets are already checked:
 
-- **Gold** (`+0x356`, u16) and **mana** (`+0x25c`, u16): whole numbers, limits from the type (0 to 65535); check what
-  the game does with a very large value before settling.
+- **Gold** (`+0x356`, u16) and **mana** (`+0x25c`, u16): whole numbers from 0 to **30000**, the game's own cap
+  ([uge-mom-model.md](../reference/uge-mom-model.md); in [live-ram-map.md](../reference/live-ram-map.md) a value above it went back to
+  30000 by the next screen). 65535 is only the u16 storage range: check what the game does with a value between 30001 and 65535
+  in a loaded save before allowing it.
 - **Fame** (`+0x24`, u16).
 - **Name** (`+0x01`, 20 bytes NUL-padded): printable ASCII only, as for city names (the game's font has no accented
   letters, 2026-10-11); length limit 19 plus the NUL (*check*; city names are 13).

@@ -16,11 +16,12 @@ of their own, reached from those names and from the header.
 
 ## Addresses
 
-`/wizard/1` is the player, `/wizard/2` to `/wizard/4` are the AI wizards, up to `/wizard/5` in a full game. The
+`/wizard/1` is the player, `/wizard/2` to `/wizard/5` are the AI wizards in a full game, and **`/wizard/6` is reserved for the neutral
+player** (the save's record 5), which is a 404 unless STORY-047 finds something worth showing there. The
 number is the **save's wizard record plus one** (record 0 is the player, which is what the rest of Mirror calls
 "wizard 0"; the page uses the human numbering). A small world has fewer wizards: a record with no name is "no such
 wizard" (404). The save holds a **sixth record, number 5, for the neutral player** (the brown banner: neutral cities,
-nodes' guardians and lairs); whether it carries anything worth showing is STORY-047's first question, and it is
+nodes' guardians and lairs), reached at `/wizard/6`; whether it carries anything worth showing is STORY-047's first question, and it is
 read-only if it does.
 
 The page reads the **current session's save**, like the map pages, and in edit mode changes it as one undo step
