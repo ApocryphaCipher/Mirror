@@ -21,6 +21,13 @@ defmodule Mirror.SaveFile.UnitMovementTest do
     assert UnitMovement.can_be_on_water?(39, 0x10000)
   end
 
+  test "demon wings (mutation bit 8) fly" do
+    refute UnitMovement.can_be_on_water?(39, 0, 0)
+    refute UnitMovement.can_be_on_water?(39, 0, 0x20)
+    assert UnitMovement.can_be_on_water?(39, 0, 8)
+    assert UnitMovement.can_be_on_water?(39, 0, 8 + 32)
+  end
+
   test "spirits and phantoms are non-corporeal" do
     for type <- [154, 170, 176, 191, 192] do
       assert UnitMovement.non_corporeal?(type)

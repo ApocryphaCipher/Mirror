@@ -29,7 +29,8 @@ defmodule Mirror.SaveFile.Structures do
       from the roads and the city positions when it loads a save (checked
       2026-10-11: a save with stale links came out of the load with none, while
       the untouched save kept its real ones; STORY-019).
-    * **Units' own go-to targets**, if the record has any, are not known.
+    * **Units' status and go-to target** are cleared only by `move_units/3` (a go-to order);
+      `docs/reference/unit-movement.md` has the bytes, and what status 1 means is a guess.
 
   Each kind of move was loaded in the real game (STORY-019 has the results);
   `docs/reference/real-game-acceptance.md` says how to check one.
@@ -82,7 +83,7 @@ defmodule Mirror.SaveFile.Structures do
       raw =
         raw
         |> put(base + index * @city_record + 15, <<x, y, plane>>)
-        |> move_units(garrison, to)
+        |> relocate_units(garrison, to)
 
       {raw, followed} = follow_wizard(raw, from, to, city.owner)
 
@@ -450,6 +451,159 @@ defmodule Mirror.SaveFile.Structures do
 
   defp city_name_bytes(_name), do: {:error, :bad_name}
 
+  @max_stack 9
+  @goto_status 3
+
+  @doc """
+  Moves the units `indexes` (record indexes in the units block, as in `Units.stack/2`) to
+  `{x, y, plane}` (STORY-019, units).
+
+  They must be live units of one owner. Refused: a destination off the map; a city of another
+  owner there; units of another owner there; a stack that would hold more than #{@max_stack} units
+  (the game's limit, and the most seen in any save). Only x, y and plane are written, plus the
+  go-to order: a unit with a go-to target (status #{@goto_status}, always with a target in the saves, or a
+  target on a status 0 unit) gets status 0 and no target, so it does not walk off again. Other
+  statuses (1 sentry, 4 idle after a turn) are left alone. Checked in the game: a spirit with such
+  an order stayed where it was put after an End Turn.
+
+  The result's `warnings` lists units that cannot stand there by themselves
+  (`{:cannot_be_on_water, types}` for a land unit on a water tile, `{:boat_on_land, types}` for
+  a boat on land outside a city), judged from `Mirror.SaveFile.UnitMovement`. A land unit riding
+  a boat in the destination stack is fine and is not warned about. Water is a landmass id of 0
+  outside the polar rows; it is a warning, not a refusal, since the game loads such saves.
+  """
+  @spec move_units(binary(), [non_neg_integer()], position()) :: result()
+  def move_units(raw, indexes, {x, y, plane} = to) when is_list(indexes) do
+    with :ok <- check_position(to),
+         {:ok, all} <- Units.parse(raw),
+         {:ok, moving} <- pick_units(all, indexes),
+         {:ok, owner} <- single_owner(moving),
+         {:ok, cities} <- Cities.parse(raw),
+         :ok <- check_no_foreign_city(cities, owner, to),
+         :ok <- check_no_foreign_units(all, indexes, owner, to),
+         :ok <- check_stack_room(all, indexes, to) do
+      {base, _} = Units.block_range()
+
+      raw =
+        Enum.reduce(indexes, raw, fn index, acc ->
+          at = base + index * @unit_record
+          <<_::binary-size(9), dx, dy, status, _::binary>> = binary_part(acc, at, 12)
+          acc = put(acc, at, <<x, y, plane>>)
+
+          if status == @goto_status or ((dx != 0 or dy != 0) and status == 0),
+            do: put(acc, at + 9, <<0, 0, 0>>),
+            else: acc
+        end)
+
+      {:ok, raw,
+       %{
+         moved: :units,
+         count: length(indexes),
+         from: moving |> Enum.map(&{&1.x, &1.y, plane_index(&1.plane)}) |> Enum.uniq(),
+         to: to,
+         warnings: unit_warnings(raw, all, moving, to, cities)
+       }}
+    end
+  end
+
+  defp pick_units(_all, []), do: {:error, :no_units}
+
+  defp pick_units(all, indexes) do
+    by_index = Map.new(all, &{&1.index, &1})
+
+    if Enum.all?(indexes, &Map.has_key?(by_index, &1)) and indexes == Enum.uniq(indexes),
+      do: {:ok, Enum.map(indexes, &Map.fetch!(by_index, &1))},
+      else: {:error, :no_such_unit}
+  end
+
+  defp single_owner(moving) do
+    case moving |> Enum.map(& &1.owner) |> Enum.uniq() do
+      [owner] -> {:ok, owner}
+      _ -> {:error, :mixed_owners}
+    end
+  end
+
+  defp check_no_foreign_city(cities, owner, {x, y, plane}) do
+    if Enum.any?(
+         cities,
+         &({&1.x, &1.y, plane_index(&1.plane)} == {x, y, plane} and &1.owner != owner)
+       ),
+       do: {:error, :foreign_city_at_destination},
+       else: :ok
+  end
+
+  defp check_no_foreign_units(all, indexes, owner, {x, y, plane}) do
+    if Enum.any?(
+         all,
+         &(&1.index not in indexes and {&1.x, &1.y, plane_index(&1.plane)} == {x, y, plane} and
+             &1.owner != owner)
+       ),
+       do: {:error, :foreign_units_at_destination},
+       else: :ok
+  end
+
+  defp check_stack_room(all, indexes, {x, y, plane}) do
+    staying =
+      Enum.count(
+        all,
+        &(&1.index not in indexes and {&1.x, &1.y, plane_index(&1.plane)} == {x, y, plane})
+      )
+
+    if staying + length(indexes) > @max_stack, do: {:error, :stack_full}, else: :ok
+  end
+
+  @polar_rows [0, 1, 38, 39]
+
+  defp unit_warnings(raw, all, moving, {x, y, plane}, cities) do
+    land? = fn ->
+      byte_size(raw) < @landmass + 2 * @plane_tiles or
+        y in @polar_rows or
+        :binary.at(raw, @landmass + plane * @plane_tiles + y * @width + x) != 0
+    end
+
+    city_here? = Enum.any?(cities, &({&1.x, &1.y, plane_index(&1.plane)} == {x, y, plane}))
+    ids = Enum.map(moving, & &1.index)
+
+    boat_in_stack? =
+      Enum.any?(all, fn u ->
+        {u.x, u.y, plane_index(u.plane)} == {x, y, plane} and u.index not in ids and
+          Mirror.SaveFile.UnitMovement.sails?(u.type)
+      end) or Enum.any?(moving, &Mirror.SaveFile.UnitMovement.sails?(&1.type))
+
+    stuck =
+      for u <- moving,
+          not Mirror.SaveFile.UnitMovement.can_be_on_water?(
+            u.type,
+            enchantments(raw, u.index),
+            mutations(raw, u.index)
+          ),
+          do: u.type
+
+    boats = for u <- moving, Mirror.SaveFile.UnitMovement.sails?(u.type), do: u.type
+
+    cond do
+      land?.() and not city_here? and boats != [] ->
+        [{:boat_on_land, Enum.uniq(boats)}]
+
+      not land?.() and not boat_in_stack? and stuck != [] ->
+        [{:cannot_be_on_water, Enum.uniq(stuck)}]
+
+      true ->
+        []
+    end
+  end
+
+  defp mutations(raw, index) do
+    {base, _} = Units.block_range()
+    :binary.at(raw, base + index * @unit_record + 23)
+  end
+
+  defp enchantments(raw, index) do
+    {base, _} = Units.block_range()
+    <<value::little-32>> = binary_part(raw, base + index * @unit_record + 24, 4)
+    value
+  end
+
   @doc """
   The tower standing on `{x, y}` (towers stand on both planes), as
   `%{index, x, y}`, or `nil`.
@@ -571,7 +725,7 @@ defmodule Mirror.SaveFile.Structures do
 
   # -- writes -------------------------------------------------------------
 
-  defp move_units(raw, indexes, {x, y, plane}) do
+  defp relocate_units(raw, indexes, {x, y, plane}) do
     {base, _} = Units.block_range()
     Enum.reduce(indexes, raw, &put(&2, base + &1 * @unit_record, <<x, y, plane>>))
   end

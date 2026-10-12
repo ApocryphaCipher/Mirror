@@ -75,9 +75,22 @@ under each city, links are built from that network on load, and a city without o
 tool now lays a plain road under a moved city when its new tile has none, in the same undo step
 (`Editor.apply_record/5`); the old tile keeps its road. Towers and lairs get nothing.
 
+**Units on their own (2026-10-11).** `Structures.move_units/3` moves any live units of one owner to a tile:
+refused off the map, onto another player's city or units, and past 9 units on a tile (the game's limit, and the
+most seen in any save). It writes x, y and plane, and **clears orders**: a unit with a go-to target or doing work
+gets status 0 and no target (status 3 always had a target in the saves, status 0 never did). Sentry (1) and the
+"idle after a turn" 4 are kept: the game gives a no-orders unit a 4 when a turn resolves (units I moved with
+status 0 were 4 after the End Turn), so 4 is not an order. It warns, without refusing, about a land unit left on water and a boat left on land outside a city, judged
+from `UnitMovement`. In the UI this is the **👥 Units** tool: click a tile to list its units (type names from
+`UnitTypes`, owner, level, experience, damage, orders), tick some, press Move, click the destination; one undo step.
+**Real game (slot 6, vault checkpoints 95 and 96):** a Guardian Spirit with a go-to order, three of six Sky
+Drakes and a hero leaving his capital's garrison all loaded in place (memory identical to the file), the spirit's
+order was gone (status 0, no target), and after an End Turn it **stayed where it was put** instead of walking
+off to its old target.
+
 **Not done:** nodes (a node is its terrain tile, so moving one needs a terrain move too, plus its aura
-tiles and guardian record) and units on their own (stack moves; a unit record also has a go-to target at
-`+9`/`+10`, see [../reference/unit-movement.md](../reference/unit-movement.md)), in the code and the UI.
+tiles and guardian record), in the code and the UI. What the unit status values 1 means (sentry is a guess) and
+the demon-wings case (mutation bit 8, covered by a unit test, never seen in a save) are unchecked in the game.
 **Size:** medium–large
 
 ## What to do

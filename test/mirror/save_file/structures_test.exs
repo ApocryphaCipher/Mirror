@@ -497,6 +497,132 @@ defmodule Mirror.SaveFile.StructuresTest do
     end
   end
 
+  describe "move_units/3" do
+    @landmass 0x4D98
+
+    defp unit_type(raw, i, type), do: put(raw, 0xB734 + i * 32 + 5, <<type>>)
+
+    defp unit_orders(raw, i, dx, dy, status),
+      do: put(raw, 0xB734 + i * 32 + 9, <<dx, dy, status>>)
+
+    defp land(raw, plane, x, y), do: put(raw, @landmass + plane * 2400 + y * 60 + x, <<1>>)
+    defp unit_at(raw, i), do: binary_part(raw, 0xB734 + i * 32, 12)
+
+    test "moves the chosen units only; an idle unit changes in x, y and plane and nothing else" do
+      raw =
+        blank()
+        |> unit(0, 5, 5, 0, 2)
+        |> unit(1, 5, 5, 0, 2)
+        |> unit(2, 5, 5, 0, 2)
+        |> land(0, 7, 6)
+
+      assert {:ok, moved, %{count: 2, from: [{5, 5, 0}], to: {7, 6, 1}}} =
+               Structures.move_units(raw, [0, 2], {7, 6, 1})
+
+      assert {:ok, [a, b, c]} = Units.parse(moved)
+      assert {a.x, a.y, a.plane} == {7, 6, :myrror}
+      assert {b.x, b.y, b.plane} == {5, 5, :arcanus}
+      assert {c.x, c.y, c.plane} == {7, 6, :myrror}
+
+      diff =
+        for {{x, y}, i} <-
+              Enum.with_index(Enum.zip(:binary.bin_to_list(raw), :binary.bin_to_list(moved))),
+            x != y,
+            do: i
+
+      assert length(diff) == 6
+    end
+
+    test "a go-to order is cleared; sentry and idle-after-a-turn are kept" do
+      raw =
+        blank()
+        |> unit(0, 5, 5, 0, 2)
+        |> unit(1, 5, 5, 0, 2)
+        |> unit(2, 5, 5, 0, 2)
+        |> unit(3, 5, 5, 0, 2)
+        |> unit_orders(0, 20, 20, 3)
+        |> unit_orders(1, 0, 0, 1)
+        |> unit_orders(2, 0, 0, 4)
+        |> unit_orders(3, 9, 9, 0)
+
+      assert {:ok, moved, _} = Structures.move_units(raw, [0, 1, 2, 3], {6, 6, 0})
+      assert binary_part(unit_at(moved, 0), 9, 3) == <<0, 0, 0>>
+      assert binary_part(unit_at(moved, 1), 9, 3) == <<0, 0, 1>>
+      assert binary_part(unit_at(moved, 2), 9, 3) == <<0, 0, 4>>
+      assert binary_part(unit_at(moved, 3), 9, 3) == <<0, 0, 0>>
+    end
+
+    test "refuses what it cannot do, and writes nothing" do
+      raw =
+        blank()
+        |> city(0, "Mine", 9, 9, 0, 2)
+        |> city(1, "Theirs", 12, 12, 0, 3)
+        |> unit(0, 5, 5, 0, 2)
+        |> unit(1, 6, 6, 0, 3)
+        |> unit(2, 20, 20, 0, 3)
+
+      assert {:error, :off_map} = Structures.move_units(raw, [0], {60, 5, 0})
+      assert {:error, :no_units} = Structures.move_units(raw, [], {7, 7, 0})
+      assert {:error, :no_such_unit} = Structures.move_units(raw, [9], {7, 7, 0})
+      assert {:error, :no_such_unit} = Structures.move_units(raw, [0, 0], {7, 7, 0})
+      assert {:error, :mixed_owners} = Structures.move_units(raw, [0, 1], {7, 7, 0})
+      assert {:error, :foreign_city_at_destination} = Structures.move_units(raw, [0], {12, 12, 0})
+      assert {:error, :foreign_units_at_destination} = Structures.move_units(raw, [0], {6, 6, 0})
+      assert {:ok, _, _} = Structures.move_units(raw, [0], {9, 9, 0})
+    end
+
+    test "a stack holds at most nine" do
+      raw =
+        Enum.reduce(0..8, blank(), &unit(&2, &1, 5, 5, 0, 2))
+        |> unit(9, 8, 8, 0, 2)
+        |> unit(10, 8, 8, 0, 2)
+
+      assert {:error, :stack_full} = Structures.move_units(raw, [9], {5, 5, 0})
+      assert {:ok, _, _} = Structures.move_units(raw, [0, 1], {8, 8, 0})
+      # units already on the tile do not count twice when they are the ones moving
+      assert {:ok, _, _} = Structures.move_units(raw, Enum.to_list(0..8), {5, 5, 0})
+    end
+
+    test "warns about a land unit on water, a boat on land, and not about a boat's passengers or flyers" do
+      base = blank() |> unit(0, 5, 5, 0, 2) |> land(0, 7, 7)
+
+      # the blank save has no land anywhere: (8, 8) is water
+      assert {:ok, _, %{warnings: [cannot_be_on_water: [39]]}} =
+               Structures.move_units(base, [0], {8, 8, 0})
+
+      assert {:ok, _, %{warnings: []}} = Structures.move_units(base, [0], {7, 7, 0})
+
+      flyer = base |> unit_type(0, 136)
+      assert {:ok, _, %{warnings: []}} = Structures.move_units(flyer, [0], {8, 8, 0})
+
+      boat = base |> unit_type(0, 35)
+
+      assert {:ok, _, %{warnings: [boat_on_land: [35]]}} =
+               Structures.move_units(boat, [0], {7, 7, 0})
+
+      assert {:ok, _, %{warnings: []}} = Structures.move_units(boat, [0], {8, 8, 0})
+
+      # demon wings (mutation bit 8, record +23) fly, whatever the type
+      winged = put(base, 0xB734 + 23, <<8>>)
+      assert {:ok, _, %{warnings: []}} = Structures.move_units(winged, [0], {8, 8, 0})
+      wingless = put(base, 0xB734 + 23, <<32>>)
+
+      assert {:ok, _, %{warnings: [cannot_be_on_water: [39]]}} =
+               Structures.move_units(wingless, [0], {8, 8, 0})
+
+      # a land unit joining a boat on the water is aboard it
+      aboard = base |> unit(1, 8, 8, 0, 2) |> unit_type(1, 36)
+      assert {:ok, _, %{warnings: []}} = Structures.move_units(aboard, [0], {8, 8, 0})
+
+      # a boat in a city is fine
+      port = boat |> city(0, "Port", 7, 7, 0, 2)
+      assert {:ok, _, %{warnings: []}} = Structures.move_units(port, [0], {7, 7, 0})
+
+      # the polar rows have no landmass id and are land
+      assert {:ok, _, %{warnings: []}} = Structures.move_units(base, [0], {8, 0, 0})
+    end
+  end
+
   describe "move_tower/3" do
     test "moves the tower, both of its sides, and units on its tile on either plane" do
       raw =
