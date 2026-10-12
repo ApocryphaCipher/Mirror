@@ -49,7 +49,8 @@ From kazzmir's `UnitData` (`load/load.go`); `+0..+5` and `+18` are already read 
 | `+5` | unit type (0..197) |
 | `+6` | hero slot |
 | `+8` | moves left |
-| `+9` `+10` | **go-to destination x, y** (so a stack with orders carries a target; STORY-019's unit moves will need it) |
+| `+9` `+10` | **go-to destination x, y**: `0, 0` when there is no order; with status 3 it is always set (49 of 49 units in the saves). Clearing it and the status stopped a moved unit walking off (checked in the game, STORY-019) |
+| `+11` | status: 0 idle (627 units, never with a target), 1 sentry (*guess*), 3 go-to (always with a target), 4 some work (*guess*: 14 units, no target; Kevin's Sky Drakes carry it) |
 | `+12` | level |
 | `+14` `+15` | experience (i16) |
 | `+17` | damage |

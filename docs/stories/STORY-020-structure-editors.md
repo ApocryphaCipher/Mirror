@@ -59,7 +59,12 @@ enchantment's colour follows the caster, and the game names Flying Fortress "Fly
 Effects are the game's to derive; the editor does not check who may cast what, or whether a city has the walls
 a Wall of Fire needs.
 
-**Not done:** editing owner or race; lairs and units (the other panels in this story).
+**Units (2026-10-11).** The **👥 Units** tool and a View-mode click on a tile without a city list the tile's units
+(`Units.stack/2`, `UnitTypes.display_name/1`) with owner, level, experience, damage and orders; in edit mode the ticked
+ones can be moved (STORY-019 has the rules and the game check). Editing a unit's own fields is not done.
+
+**Not done:** the lair panel; editing a unit's fields (type, level, experience, damage, owner). (Owner and race
+of a city are in PR 103.)
 **Size:** large (do incrementally)
 
 ## What to do
