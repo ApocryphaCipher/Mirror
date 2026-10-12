@@ -60,6 +60,10 @@ Unsorted, not yet promoted to a story.
 - ~~App renders with no CSS at all~~ — same root cause as above, fixed.
 - Draw tiles at native 20×18 aspect instead of stretched into square cells
   (canvas geometry change; see `Canvas_Geometry_Invariants` in codex-notes).
+- **Open unknowns from STORY-019/020** (2026-10-12, none blocks anything): what unit status 1 means (sentry is a guess); the
+  demon-wings case (mutation bit 8, unit-tested, never seen in a save); what the lair treasure code (`+14`) means
+  (it does not decide the reward); the name of unit type 131 (guessed "Nomad Magicians"); the capital's race byte
+  (`+0x15`) after a city changes owner; heroes' level table, and a hero's owner (the wizard's hero list is not decoded).
 - **Very low priority:** decode how the game draws partly explored fog.
   The explored map's values 1–14 are probably four edge bits drawn with
   `MAPBACK` masks `#0–#13` (*guess*). Confirm by setting one tile to 1, 2,

@@ -41,7 +41,7 @@ Use his *layouts and tables*; check his *pictures* against DOSBox.
 | `+5..+24` | aura tile x's (20 bytes) | **checked:** the first entry is the node's own tile; the tiles that sparkle in the game are exactly the first `+4` pairs (SAVE4: 8, 10 and 5 tiles, all seen sparkling) |
 | `+25..+44` | aura tile y's (20 bytes) | same |
 | `+45` | type: **0 Sorcery, 1 Nature, 2 Chaos** | **checked:** type 0/1/2 nodes stand on terrain tiles 168/169/170 (`0xA8`/`0xA9`/`0xAA`), which kazzmir's terrain table names Sorcery/Nature/Chaos node. 10 of each |
-| `+46` | flags (*kazzmir:* warped etc.) | kazzmir |
+| `+46` | flags: **bit 1 warped, bit 2 Guardian Spirit meld** (*bit 1 checked 2026-10-12:* a node given the flag loaded with it, kept it through End Turn, and its tile showed a distortion animation; *bit 2:* seen set on 2 owned nodes in Kevin's saves, its meaning is kazzmir's) | the Node panel (STORY-020), checkpoint 102 |
 | `+47` | unknown | — |
 
 **Drawing:** a node shows aura sparkles **only when melded**. **checked
@@ -50,7 +50,7 @@ Kevin melded it; then its 5 aura tiles, (42, 10) (43, 10) (41, 9)
 (42, 11) (41, 10), sparkled ([live-ram-map.md](live-ram-map.md)).
 **checked in the game** (2026-10-07): a meld changes only the owner byte, and
 nothing else in the node record (there is no separate "melded" flag); the node's
-guardian encounter is cleared separately (`intact` 1 → 0, guard count low nibble 0).
+guardian encounter is cleared separately (`intact` 1 → 0, guard count low nibble 0). **In every save here an owned node has its guardians cleared (42 of 42) and an unowned one still has them (120 of 120)**, and 37 owned nodes have no Guardian Spirit unit on their tile. A cleared record keeps its guard slots, with `intact` 0; the Node panel does the same. **Checked in the game (2026-10-12):** a node given an owner with no spirit unit kept it through End Turn, and a node made unowned with its guardians restored stayed neutral.
 kazzmir: The sparkle is `MAPBACK #(63 + banner)` of
 the owner, drawn on each aura tile. That fits our catalog's sparkle
 entries. An unmelded node is just its terrain tile.
@@ -171,7 +171,7 @@ that `#71` "mound" is a cave or lair.
 | `+8` | moves left |
 | `+9` `+10` | destination x, y |
 | `+11` | status |
-| `+12` | level |
+| `+12` | level (**the game shows this byte as it is on load, and works it out from experience again at End Turn**, 2026-10-12: level 3 with 0 xp showed Elite, then became level 1 after a turn; xp above 120 was capped to 120 on a normal unit) |
 | `+13` | unknown |
 | `+14` | experience (i16) |
 | `+16` | move failed |
@@ -179,9 +179,10 @@ that `#71` "mound" is a cave or lair.
 | `+18` | draw priority |
 | `+19` | in tower (i16) |
 | `+21` | sight range |
-| `+22` | mutations |
-| `+23` | enchantments (u32 bitmask) |
-| `+27` `+28` `+29` | road building: turns, x, y |
+| `+22` | unknown (kazzmir's remake numbers the next two one lower, `+22` and `+23`) |
+| `+23` | mutations (8 = demon wings, 32 = undead), see [unit-movement.md](unit-movement.md) |
+| `+24..+27` | enchantments (u32 bitmask), see [unit-movement.md](unit-movement.md) |
+| `+28` `+29` `+30` | road building: turns, x, y (*guess:* kazzmir's offsets plus one, like the two above; never read) |
 
 **Checked in SAVE1:**
 - 42 units: 2 per wizard, 32 neutral city garrisons.

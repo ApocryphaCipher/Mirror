@@ -1,10 +1,10 @@
 # STORY-020: Structure detail editors (city / lair / unit)
 
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
-**Status:** later (2026-10-07). The records for the first slice are decoded for reading (cities:
-name, owner, race, population; units: type, owner; sites: kind, guards, rewards, see
-[kazzmir-save-layouts.md](../reference/kazzmir-save-layouts.md)); what it needs next is each
-editable field checked in the real game, one at a time.
+**Status:** mostly done (2026-10-12). Built and checked in the real game: the city panel (name, population,
+buildings, enchantments, race, owner), the lair panel, the node panel and unit editing (level, experience, damage,
+owner); see each section below. Left: a unit's type, enchantments and max moves, a hero's owner, and the meaning of
+the lair treasure code.
 **Progress (2026-10-11), first slice built: the 🏙️ City tool.** Click a city in edit mode: a panel shows its
 name, size, race, owner (wizard name and banner), plane and position, garrison count, walls, buildings
 (and replaced ones), enchantments with their casters, and road links; name and population can be edited in

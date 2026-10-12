@@ -1,10 +1,9 @@
 # STORY-019: Select and move structures and unit stacks
 
 **Parent:** [EPIC-006](../epics/EPIC-006-map-first-ui-and-edit-mode.md)
-**Status:** open, no longer blocked (2026-10-07): the decode stories (010 cities, 011 sites,
-012 units, 008 nodes) are Done, so the records can be read. What is still unproven is
-writing them: each moved structure's x/y and every cross-reference has to load cleanly in the
-real game, one kind at a time.
+**Status:** done for cities, towers, lairs, magic nodes and unit stacks (2026-10-12): each kind was loaded in the
+real game and its memory read back (see the results below). Left: moving a node to the other plane, and the
+checker for impossible placements (STORY-029).
 
 **Progress (2026-10-10), slice 1: the record layer, not yet in the UI and not yet seen in the game.**
 `Mirror.SaveFile.Structures` (`lib/mirror/save_file/structures.ex`, pure raw-in raw-out) has

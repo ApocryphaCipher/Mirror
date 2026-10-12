@@ -66,8 +66,8 @@ STORY-017 → then the rest as their EPIC-004 data stories land.
 - [STORY-016](../stories/STORY-016-edit-mode-shell.md): edit mode shell (toggle, pick-a-layer, tools, undo/redo, Save as) **Done**
 - [STORY-017](../stories/STORY-017-terrain-editing-autotile.md): terrain editing with auto-tiling (paint types; game picks the picture)
 - [STORY-018](../stories/STORY-018-roads-specials-editing.md): roads, corruption and resource editing **Done** (checked in the real game; roads on ocean, "bridges", untried)
-- [STORY-019](../stories/STORY-019-move-structures.md): select and move structures and unit stacks
-- [STORY-020](../stories/STORY-020-structure-editors.md): structure detail editors (city / lair / unit)
+- [STORY-019](../stories/STORY-019-move-structures.md): select and move structures and unit stacks **Done** (cities, towers, lairs, nodes, unit stacks; node to another plane left)
+- [STORY-020](../stories/STORY-020-structure-editors.md): structure detail editors (city / lair / node / unit) **Mostly done**
 - [STORY-021](../stories/STORY-021-save-round-trip-safety.md): save round-trip safety (byte-exact, and loads in the real game) **Done**
 - [STORY-022](../stories/STORY-022-bug-raw-value-paint-artifacts.md): **bug**: stray raw-value paint (wheel silently changes the brush; bare click paints) shows up as map artifacts **Partially fixed**
 - [STORY-023](../stories/STORY-023-bug-edit-paint-no-live-redraw.md): **bug**: painting in edit mode doesn't redraw the tile until reload **Fixed**
@@ -82,8 +82,6 @@ STORY-017 → then the rest as their EPIC-004 data stories land.
 - [STORY-036](../stories/STORY-036-fog-of-war-layer.md): fog-of-war layer, off by default (nice-to-have) **Done**
 - [STORY-037](../stories/STORY-037-reveal-all.md): Reveal all: edit the save so every tile is explored (nice-to-have) **Done**
 
-Dependencies (2026-10-07): the EPIC-004 decode stories (013 roads/minerals, 010
-cities, 011 sites, 012 units) and STORY-008 (nodes) are all Done, so 019 and 020 are
-no longer blocked on reading the records; what they still need is every *written*
-field checked in the real game. 017's lookup is done (kazzmir's terrain table; see the
+Dependencies (2026-10-12): the EPIC-004 decode stories are Done, and 019 and 020 have written and checked in the real game
+every field they edit. What is left in the epic: 029 (safe editing), 017's leftovers and the nice-to-haves 024, 025 and 028. 017's lookup is done (kazzmir's terrain table; see the
 story for what is left).
