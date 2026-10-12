@@ -806,8 +806,8 @@ defmodule Mirror.SaveFile.Structures do
     {base, _} = Sites.nodes_range()
 
     with true <- index in 0..29//1 and byte_size(raw) >= base + 30 * @node_record,
-         <<x, y, plane, _owner, power, aura_x::binary-size(20), aura_y::binary-size(20), type,
-           _::binary>> <-
+         <<x, y, plane, owner::signed, power, aura_x::binary-size(20), aura_y::binary-size(20),
+           type, flags, _::binary>> <-
            binary_part(raw, base + index * @node_record, @node_record),
          true <-
            x < @width and y < @height and plane in [0, 1] and type in 0..2 and power in 1..20 do
@@ -817,6 +817,8 @@ defmodule Mirror.SaveFile.Structures do
          x: x,
          y: y,
          plane: plane,
+         owner: if(owner < 0, do: nil, else: owner),
+         flags: flags,
          power: min(power, 20),
          aura_x: aura_x,
          aura_y: aura_y,
@@ -887,6 +889,95 @@ defmodule Mirror.SaveFile.Structures do
 
       true ->
         :ok
+    end
+  end
+
+  @warped 0x01
+  @spirit_meld 0x02
+
+  @doc """
+  Changes a magic node's melder and flags (STORY-020), as a keyword list:
+  `edit_node(raw, index, owner: 1, warped: false, spirit_meld: true)`.
+
+  * `owner`: `nil` (no one: byte `0xFF`) or a wizard record 0 to 4 (the byte at `+3`; it picks the
+    colour of the node's aura squares).
+  * `warped` and `spirit_meld`: flag bits of the byte at `+0x2E` (1 warped, 2 melded by a
+    Guardian Spirit); the other bits are kept.
+
+  The node's guardians are a separate record (see `edit_encounter/3`): in every save here all 42 owned
+  nodes have theirs cleared and all 120 unowned ones still have them, but this does not touch them.
+
+  Returns `{:ok, raw, %{changed: [...]}}` or `{:error, reason}` (`:no_such_node`, `:bad_owner`,
+  `:bad_flag` or `{:unknown_field, field}`).
+  """
+  @spec edit_node(binary(), non_neg_integer(), keyword()) :: result()
+  def edit_node(raw, index, changes) when is_list(changes) do
+    with {:ok, node} <- fetch_node(raw, index),
+         {:ok, edits} <- node_edits(changes) do
+      base = elem(Sites.nodes_range(), 0) + index * @node_record
+
+      {raw, _flags} =
+        Enum.reduce(edits, {raw, node.flags}, fn
+          {:owner, owner}, {acc, flags} ->
+            {put(acc, base + 3, <<if(owner, do: owner, else: 0xFF)>>), flags}
+
+          {:warped, on}, {acc, flags} ->
+            flags = set_bit(flags, @warped, on)
+            {put(acc, base + 0x2E, <<flags>>), flags}
+
+          {:spirit_meld, on}, {acc, flags} ->
+            flags = set_bit(flags, @spirit_meld, on)
+            {put(acc, base + 0x2E, <<flags>>), flags}
+        end)
+
+      {:ok, raw, %{changed: Keyword.keys(edits)}}
+    end
+  end
+
+  defp set_bit(flags, bit, true), do: Bitwise.bor(flags, bit)
+  defp set_bit(flags, bit, false), do: Bitwise.band(flags, Bitwise.bnot(bit))
+
+  defp node_edits(changes) do
+    changes
+    |> Enum.reduce_while({:ok, []}, fn
+      {:owner, owner}, {:ok, acc} when is_nil(owner) or owner in 0..4//1 ->
+        {:cont, {:ok, [{:owner, owner} | acc]}}
+
+      {:owner, _}, _ ->
+        {:halt, {:error, :bad_owner}}
+
+      {flag, on}, {:ok, acc} when flag in [:warped, :spirit_meld] and is_boolean(on) ->
+        {:cont, {:ok, [{flag, on} | acc]}}
+
+      {flag, _}, _ when flag in [:warped, :spirit_meld] ->
+        {:halt, {:error, :bad_flag}}
+
+      {other, _}, _ ->
+        {:halt, {:error, {:unknown_field, other}}}
+    end)
+    |> then(fn
+      {:ok, edits} -> {:ok, Enum.reverse(edits)}
+      error -> error
+    end)
+  end
+
+  @doc """
+  Magic node `index` as `%{index, x, y, plane, type, owner, power, warped, spirit_meld}` (plane 0
+  or 1, type 0 Sorcery, 1 Nature, 2 Chaos, owner `nil` or 0..4), or `nil`.
+  """
+  @spec node_info(binary(), non_neg_integer()) :: map() | nil
+  def node_info(raw, index) do
+    case fetch_node(raw, index) do
+      {:ok, node} ->
+        node
+        |> Map.take([:index, :x, :y, :plane, :type, :owner, :power])
+        |> Map.merge(%{
+          warped: Bitwise.band(node.flags, @warped) != 0,
+          spirit_meld: Bitwise.band(node.flags, @spirit_meld) != 0
+        })
+
+      _ ->
+        nil
     end
   end
 

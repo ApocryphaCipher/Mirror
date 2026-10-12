@@ -20,7 +20,7 @@ defmodule MirrorWeb.MapLive do
   alias Mirror.TileAtlas
   alias Mirror.SaveFile.{Cities, Encounters, Roads, Sites, Structures, Units, Wizards}
   alias Mirror.Map, as: MirrorMap
-  alias MirrorWeb.{CityPanel, LairPanel, MoveTool, PaintTool, RoadTool, UnitPanel}
+  alias MirrorWeb.{CityPanel, LairPanel, MoveTool, NodePanel, PaintTool, RoadTool, UnitPanel}
 
   @layers [
     :terrain,
@@ -98,6 +98,8 @@ defmodule MirrorWeb.MapLive do
       |> assign(:unit_note, nil)
       |> assign(:lair_sel, nil)
       |> assign(:lair_note, nil)
+      |> assign(:node_sel, nil)
+      |> assign(:node_note, nil)
       |> assign(:reveal_report, nil)
       |> assign(:discard_armed, false)
       |> assign(:fresh_mount, true)
@@ -239,7 +241,8 @@ defmodule MirrorWeb.MapLive do
              "move",
              "city",
              "units",
-             "lair"
+             "lair",
+             "node"
            ] do
     {:noreply,
      socket
@@ -253,7 +256,9 @@ defmodule MirrorWeb.MapLive do
      |> assign(:unit_armed, nil)
      |> assign(:unit_note, nil)
      |> assign(:lair_sel, nil)
-     |> assign(:lair_note, nil)}
+     |> assign(:lair_note, nil)
+     |> assign(:node_sel, nil)
+     |> assign(:node_note, nil)}
   end
 
   # Reveal all (STORY-037): every tile explored, on this plane or on both.
@@ -324,6 +329,18 @@ defmodule MirrorWeb.MapLive do
       {:noreply, socket}
     end
   end
+
+  def handle_event("node_close", _params, socket) do
+    {:noreply, assign(socket, node_sel: nil, node_note: nil)}
+  end
+
+  # The node panel's form (STORY-020): the melder and the two flags. Giving a node an owner also
+  # clears its guardians, in the same undo step.
+  def handle_event("node_edit", %{"node" => params}, socket),
+    do: {:noreply, node_update(socket, &edit_node_form(&1, &2, &3, params))}
+
+  def handle_event("node_clear_guardians", _params, socket),
+    do: {:noreply, node_update(socket, &clear_node_guardians/3)}
 
   def handle_event("units_close", _params, socket) do
     {:noreply, assign(socket, unit_sel: nil, unit_armed: nil, unit_note: nil)}
@@ -1747,6 +1764,8 @@ defmodule MirrorWeb.MapLive do
                        "Place an ore, gems, crystals, wild game or nightshade"},
                       {:lair, "🏚️ Lair",
                        "Click a lair, temple, ruin, keep, node or tower to see and change its guards and treasure"},
+                      {:node, "🔮 Node",
+                       "Click a magic node to change its owner and flags, or clear its guardians"},
                       {:units, "👥 Units",
                        "Click a tile to list its units; tick some and move them to another tile"},
                       {:city, "🏙️ City",
@@ -1956,6 +1975,9 @@ defmodule MirrorWeb.MapLive do
 
                   :lair ->
                     "Click a lair, cave, temple, ruin, keep, node or tower · change its guards, gold and mana in the panel · Undo works · space-drag or middle-drag to pan · Esc to finish"
+
+                  :node ->
+                    "Click a magic node · set its owner, flags or clear its guardians in the panel · Undo works · space-drag or middle-drag to pan · Esc to finish"
 
                   :units ->
                     "Click a tile with units, tick the ones to move, press Move, then click where they go · right-click: cancel · space-drag or middle-drag to pan · Esc to finish"
@@ -2186,6 +2208,12 @@ defmodule MirrorWeb.MapLive do
             editable={@edit == :terrain}
           />
 
+          <.node_panel
+            :if={@edit && @tool == :node && @node_sel && @state.save}
+            details={NodePanel.details(@state.save.raw, @node_sel)}
+            note={@node_note}
+          />
+
           <.unit_panel
             :if={(!@edit || @tool == :units) && @unit_sel && @state.save}
             rows={UnitPanel.rows(@state.save.raw, @unit_sel)}
@@ -2333,6 +2361,112 @@ defmodule MirrorWeb.MapLive do
       <p class="mt-2 text-slate-500">
         Treasure code {@details.spell_code}{if @details.item_count > 0,
           do: " · #{@details.item_count} #{if @details.item_count == 1, do: "item", else: "items"}"} (not editable, and it does not decide the reward: spells, spell books and items are rolled when the site is cleared)
+      </p>
+    </div>
+    """
+  end
+
+  # One magic node (STORY-020): owner, flags and guardians.
+  attr :details, :map, required: true
+  attr :note, :string, default: nil
+
+  defp node_panel(%{details: nil} = assigns) do
+    ~H"""
+    <div id="node-panel" class={city_panel_class()}>
+      <p class="text-slate-400">That node is no longer in the save.</p>
+    </div>
+    """
+  end
+
+  defp node_panel(assigns) do
+    ~H"""
+    <div id="node-panel" class={city_panel_class()}>
+      <div class="flex items-start justify-between gap-2">
+        <p class="font-semibold text-slate-200">
+          {@details.type_name} node
+          <span class="font-normal text-slate-400">
+            · {plane_name(@details.plane)} ({@details.x}, {@details.y}) · power {@details.power}
+          </span>
+        </p>
+        <button
+          id="node-close"
+          type="button"
+          phx-click="node_close"
+          aria-label="Close"
+          class="text-slate-500 hover:text-white"
+        >
+          ✕
+        </button>
+      </div>
+      <p class="text-slate-400">
+        {if @details.owner, do: "Melded by #{@details.owner_name}", else: "Not melded"}
+      </p>
+
+      <.form for={%{}} as={:node} id="node-form" phx-submit="node_edit" class="mt-2">
+        <input type="hidden" name="node[flags_present]" value="1" />
+        <label class="text-slate-400">
+          Owner
+          <select
+            name="node[owner]"
+            class="mt-0.5 block w-full rounded border border-white/15 bg-slate-950 px-1 py-0.5 text-slate-100"
+          >
+            <option value="" selected={@details.owner == nil}>nobody</option>
+            <option
+              :for={{id, name} <- NodePanel.owner_options(@details)}
+              value={id}
+              selected={id == @details.owner}
+            >
+              {name}
+            </option>
+          </select>
+        </label>
+        <label class="mt-1 flex items-center gap-1.5 text-slate-300">
+          <input type="checkbox" name="node[warped]" value="on" checked={@details.warped} /> Warped
+        </label>
+        <label class="flex items-center gap-1.5 text-slate-300">
+          <input
+            type="checkbox"
+            name="node[spirit_meld]"
+            value="on"
+            checked={@details.spirit_meld}
+          /> Guardian Spirit meld
+        </label>
+        <button
+          id="node-apply"
+          type="submit"
+          class="mt-2 rounded-lg bg-emerald-300 px-2.5 py-0.5 font-semibold text-slate-950 hover:bg-emerald-200"
+        >
+          Apply
+        </button>
+      </.form>
+
+      <div class="mt-2 border-t border-white/10 pt-2">
+        <p class="text-slate-400">
+          <%= cond do %>
+            <% @details.guardian_record == nil -> %>
+              No guardians recorded
+            <% @details.guardians_alive -> %>
+              Guardians: {Enum.map_join(@details.guards, ", ", &"#{&1.left} × #{&1.name}")}
+            <% true -> %>
+              Guardians cleared
+          <% end %>
+        </p>
+        <p :if={@details.owner && @details.guardians_alive} class="text-amber-300">
+          Owned, but the guardians are still there; a melded node has none.
+        </p>
+        <button
+          :if={@details.guardians_alive}
+          id="node-clear-guardians"
+          type="button"
+          phx-click="node_clear_guardians"
+          class="mt-1 rounded-lg border border-white/20 px-2 py-0.5 text-slate-100 hover:bg-white/10"
+        >
+          Clear guardians
+        </button>
+      </div>
+
+      <p :if={@note} id="node-note" role="status" aria-live="polite" class="mt-1 text-emerald-200">
+        {@note}
       </p>
     </div>
     """
@@ -2787,6 +2921,15 @@ defmodule MirrorWeb.MapLive do
        do: select_site(socket, x, y)
 
   defp handle_pointer_start(
+         %{assigns: %{edit: :terrain, tool: :node}} = socket,
+         x,
+         y,
+         _button,
+         _mods
+       ),
+       do: select_node(socket, x, y)
+
+  defp handle_pointer_start(
          %{assigns: %{edit: :terrain, tool: :units}} = socket,
          x,
          y,
@@ -3172,6 +3315,104 @@ defmodule MirrorWeb.MapLive do
       _ -> assign(socket, lair_sel: nil, lair_note: nil)
     end
   end
+
+  # The Node tool: the magic node on a tile.
+  defp select_node(socket, x, y) do
+    plane = MoveTool.plane_number(socket.assigns.plane)
+
+    found =
+      valid_coord?(x, y) && socket.assigns.state.save &&
+        Structures.node_at(socket.assigns.state.save.raw, x, y, plane)
+
+    case found do
+      %{index: index} -> assign(socket, node_sel: index, node_note: nil)
+      _ -> assign(socket, node_sel: nil, node_note: nil)
+    end
+  end
+
+  # Runs one node edit as a session update and shows the result, as `lair_edit` does.
+  defp node_update(socket, fun) do
+    index = socket.assigns.node_sel
+    plane = socket.assigns.plane
+
+    if socket.assigns.edit && socket.assigns.state.save && index do
+      {:ok, state, result} =
+        SessionStore.update(socket.assigns.session_id, fn current ->
+          case fun.(current, plane, index) do
+            {:ok, next, label} -> {next, {:ok, label}}
+            {:error, reason} -> {current, {:error, reason}}
+          end
+        end)
+
+      case result do
+        {:ok, label} ->
+          socket
+          |> assign_state(state)
+          |> assign(:node_note, label)
+          |> push_overlay_items()
+          |> push_map_layers()
+
+        {:error, reason} ->
+          assign(socket, :node_note, NodePanel.error_message(reason))
+      end
+    else
+      socket
+    end
+  end
+
+  defp edit_node_form(current, plane, index, params) do
+    raw = current.save.raw
+
+    with %{} = details <- NodePanel.details(raw, index) || {:error, :no_such_node},
+         {:ok, changes} <- NodePanel.changes(params, details),
+         :ok <- if(changes == [], do: {:error, :nothing_changed}, else: :ok),
+         {:ok, edited, _} <- Structures.edit_node(raw, index, changes),
+         {:ok, edited} <- maybe_clear_guardians(edited, details, changes),
+         label = NodePanel.label(details, changes) <> guardian_suffix(details, changes),
+         {next, {:record, _, _}} <- Editor.apply_record(current, plane, label, edited) do
+      {:ok, next, label}
+    else
+      {:error, reason} -> {:error, reason}
+      _ -> {:error, :unchanged}
+    end
+  end
+
+  defp clear_node_guardians(current, plane, index) do
+    raw = current.save.raw
+
+    with %{guardians_alive: true} = details <-
+           NodePanel.details(raw, index) || {:error, :no_such_node},
+         {:ok, edited} <- clear_guardians(raw, details),
+         label = "Cleared the guardians of the #{details.type_name} node",
+         {next, {:record, _, _}} <- Editor.apply_record(current, plane, label, edited) do
+      {:ok, next, label}
+    else
+      {:error, reason} -> {:error, reason}
+      %{guardians_alive: false} -> {:error, :nothing_changed}
+      _ -> {:error, :unchanged}
+    end
+  end
+
+  defp maybe_clear_guardians(raw, details, changes) do
+    if NodePanel.melding_clears_guardians?(details, changes),
+      do: clear_guardians(raw, details),
+      else: {:ok, raw}
+  end
+
+  defp clear_guardians(raw, details) do
+    # as the game does when the player clears a node: the record stays, only "not cleared" goes
+    case Structures.edit_encounter(raw, details.guardian_record, intact: false) do
+      {:ok, edited, _} -> {:ok, edited}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp guardian_suffix(details, changes),
+    do:
+      if(NodePanel.melding_clears_guardians?(details, changes),
+        do: " and cleared its guardians",
+        else: ""
+      )
 
   defp edit_lair(current, plane, index, params) do
     raw = current.save.raw
@@ -4119,6 +4360,8 @@ defmodule MirrorWeb.MapLive do
       unit_note: nil,
       lair_sel: nil,
       lair_note: nil,
+      node_sel: nil,
+      node_note: nil,
       move_pending: nil,
       move_note: nil
     )
