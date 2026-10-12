@@ -280,6 +280,39 @@ defmodule Mirror.SaveFile.Cities do
   @spec building_name(non_neg_integer()) :: String.t()
   def building_name(id), do: Map.get(@building_names, id, "building #{id}")
 
-  @doc "The city enchantment slots' names, in slot order."
+  @doc "The city enchantment slots, in slot order (`+67 + n`)."
   def enchantment_names, do: @enchantments
+
+  @enchantment_titles %{
+    wall_of_fire: "Wall of Fire",
+    chaos_rift: "Chaos Rift",
+    dark_rituals: "Dark Rituals",
+    evil_presence: "Evil Presence",
+    cursed_lands: "Cursed Lands",
+    pestilence: "Pestilence",
+    cloud_of_shadow: "Cloud of Shadow",
+    famine: "Famine",
+    flying_fortress: "Flying Fortress",
+    nature_ward: "Nature Ward",
+    sorcery_ward: "Sorcery Ward",
+    chaos_ward: "Chaos Ward",
+    life_ward: "Life Ward",
+    death_ward: "Death Ward",
+    natures_eye: "Nature's Eye",
+    earth_gate: "Earth Gate",
+    stream_of_life: "Stream of Life",
+    gaias_blessing: "Gaia's Blessing",
+    inspirations: "Inspirations",
+    prosperity: "Prosperity",
+    astral_gate: "Astral Gate",
+    heavenly_light: "Heavenly Light",
+    consecration: "Consecration",
+    wall_of_darkness: "Wall of Darkness",
+    altar_of_battle: "Altar of Battle",
+    nightshade: "Nightshade"
+  }
+
+  @doc "The spell's name for a city enchantment."
+  @spec enchantment_title(atom()) :: String.t()
+  def enchantment_title(name), do: Map.fetch!(@enchantment_titles, name)
 end

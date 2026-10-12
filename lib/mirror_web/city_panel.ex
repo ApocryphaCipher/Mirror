@@ -34,6 +34,8 @@ defmodule MirrorWeb.CityPanel do
         garrison: garrison(raw, city),
         buildings: buildings(city, :built),
         building_states: city.buildings,
+        enchantment_casters: city.enchantments,
+        owners: for(owner <- 0..4, name = Map.get(names, owner), name != "", do: {owner, name}),
         replaced: buildings(city, :replaced),
         enchantments: enchantments(city, names),
         road_links:
@@ -95,6 +97,21 @@ defmodule MirrorWeb.CityPanel do
   end
 
   @doc """
+  One row per city enchantment, for the form: `%{name, title, caster}` where `caster` is a
+  wizard index or `nil`.
+  """
+  @spec enchantment_rows(details()) :: [map()]
+  def enchantment_rows(details) do
+    for name <- Cities.enchantment_names() do
+      %{
+        name: name,
+        title: Cities.enchantment_title(name),
+        caster: Map.get(details.enchantment_casters, name)
+      }
+    end
+  end
+
+  @doc """
   The edit form's params (`%{"name" => ..., "population" => ...}`) as the keyword list
   `Structures.edit_city/3` takes, keeping only what differs from `details`. `{:ok, []}`
   when nothing changed; `{:error, :bad_population}` for a population that is not a whole
@@ -110,7 +127,7 @@ defmodule MirrorWeb.CityPanel do
         [name: name, population: population]
         |> Enum.reject(fn {field, value} -> Map.fetch!(details, field) == value end)
 
-      {:ok, scalars ++ building_changes(params, details)}
+      {:ok, scalars ++ building_changes(params, details) ++ enchantment_changes(params, details)}
     end
   end
 
@@ -137,6 +154,35 @@ defmodule MirrorWeb.CityPanel do
 
   defp building_changes(_params, _details), do: []
 
+  # One select per enchantment ("" for none, else the caster's wizard index); only the ones
+  # that differ from the city are changes.
+  defp enchantment_changes(%{"enchantments_present" => _, "enchantments" => chosen}, details)
+       when is_map(chosen) do
+    changed =
+      for name <- Cities.enchantment_names(),
+          {:ok, caster} <- [parse_caster(Map.get(chosen, Atom.to_string(name)))],
+          caster != Map.get(details.enchantment_casters, name),
+          into: %{},
+          do: {name, caster}
+
+    if changed == %{}, do: [], else: [enchantments: changed]
+  end
+
+  defp enchantment_changes(_params, _details), do: []
+
+  # `{:ok, nil}` for "none", `{:ok, wizard_index}`, or `:error` (a field that was not posted
+  # or is not a wizard index is left as it is).
+  defp parse_caster(""), do: {:ok, nil}
+
+  defp parse_caster(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {n, ""} when n in 0..5 -> {:ok, n}
+      _ -> :error
+    end
+  end
+
+  defp parse_caster(_value), do: :error
+
   @doc "A short description of what the changes do, for the undo button and the notice."
   @spec label(details(), keyword()) :: String.t()
   def label(details, changes) do
@@ -150,9 +196,27 @@ defmodule MirrorWeb.CityPanel do
       [:buildings] ->
         "Changed #{details.name}'s buildings" <> building_delta(details, changes[:buildings])
 
+      [:enchantments] ->
+        "Changed #{details.name}'s enchantments" <>
+          enchantment_delta(details, changes[:enchantments])
+
       _ ->
         "Edited #{details.name}"
     end
+  end
+
+  defp enchantment_delta(details, wanted) do
+    owners = Map.new(details.owners)
+
+    parts =
+      for {name, caster} <- Enum.sort(wanted) do
+        case caster do
+          nil -> "-" <> Cities.enchantment_title(name)
+          n -> "+" <> Cities.enchantment_title(name) <> " (" <> Map.get(owners, n, "?") <> ")"
+        end
+      end
+
+    if parts == [], do: "", else: " (" <> Enum.join(parts, ", ") <> ")"
   end
 
   defp building_delta(details, wanted) do
@@ -181,6 +245,7 @@ defmodule MirrorWeb.CityPanel do
 
   def error_message(:bad_population), do: "Population is a whole number from 1 to 25."
   def error_message(:bad_buildings), do: "That is not a list of buildings."
+  def error_message(:bad_enchantments), do: "That is not a valid enchantment or caster."
   def error_message(:no_such_city), do: "That city is no longer in the save."
   def error_message(_other), do: "The city could not be changed."
 end

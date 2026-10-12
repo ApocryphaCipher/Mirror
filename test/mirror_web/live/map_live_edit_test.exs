@@ -1953,6 +1953,69 @@ defmodule MirrorWeb.MapLiveEditTest do
       refute has_element?(view, ~s|input[name="city[buildings][]"][value="23"][checked]|)
     end
 
+    test "choosing who cast an enchantment sets it, and 'none' clears it, undoably", %{
+      conn: conn,
+      dir: dir
+    } do
+      named = Path.join(dir, "NAMED.GAM")
+      File.write!(named, put_bytes(synthetic_save_bytes(), 0x09E8 + 1, "Jafar" <> <<0>>))
+
+      view = editing(conn, named, "city")
+      click(view, 38, 21)
+
+      assert has_element?(
+               view,
+               ~s|select[name="city[enchantments][natures_eye]"] option[value="0"]|,
+               "Jafar"
+             )
+
+      view
+      |> element("#city-form")
+      |> render_submit(%{
+        "city" => %{
+          "name" => "Deventor",
+          "population" => "4",
+          "enchantments_present" => "1",
+          "enchantments" => %{"natures_eye" => "0", "famine" => ""}
+        }
+      })
+
+      assert has_element?(
+               view,
+               "#city-note",
+               "Changed Deventor's enchantments (+Nature's Eye (Jafar))"
+             )
+
+      assert has_element?(
+               view,
+               ~s|select[name="city[enchantments][natures_eye]"] option[value="0"][selected]|
+             )
+
+      target = Path.join(dir, "SAVE8.GAM")
+      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+      assert {:ok, cities} = Mirror.SaveFile.Cities.parse(File.read!(target))
+      assert %{enchantments: %{natures_eye: 0}} = Enum.find(cities, &(&1.name == "Deventor"))
+
+      view
+      |> element("#city-form")
+      |> render_submit(%{
+        "city" => %{
+          "name" => "Deventor",
+          "population" => "4",
+          "enchantments_present" => "1",
+          "enchantments" => %{"natures_eye" => ""}
+        }
+      })
+
+      assert has_element?(view, "#city-note", "Changed Deventor's enchantments (-Nature's Eye)")
+      render_click(view, "undo", %{})
+
+      assert has_element?(
+               view,
+               ~s|select[name="city[enchantments][natures_eye]"] option[value="0"][selected]|
+             )
+    end
+
     test "a form with no building list leaves the buildings alone", %{conn: conn, save: save} do
       view = editing(conn, save, "city")
       click(view, 38, 21)
