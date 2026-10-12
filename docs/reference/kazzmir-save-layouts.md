@@ -79,7 +79,7 @@ SAVE1. The 4th byte varies (0, 78, 39): *unknown*.
 | `+7` `+8` | guard 2: unit type, count byte |
 | `+9` | unknown |
 | `+10` / `+12` | gold / mana reward (i16) |
-| `+14` | spell reward **code**: 0 to 6 in every save, so not a spell id; what the codes mean is not decoded (kazzmir calls it `SpellSpecial`) |
+| `+14` | spell reward **code**: 0 to 6 in every save, so not a spell id; what the codes mean is mostly not decoded (kazzmir calls it `SpellSpecial`). **Code 1 is a Create Artifact spell**: Kevin cleared an abandoned keep with code 1 and the reward screen listed "a Create Artifact spell" (2026-10-12); 2 to 6 are unchecked |
 | `+15` | flags: *guess:* who has explored the site (see below) |
 | `+16` | item count |
 | `+17` | unknown |

@@ -91,8 +91,10 @@ A tower is two records (an Arcanus and a Myrror side) with the same guards, and 
 edited on **both**. Not editable: the **spell reward code** (`+14`: it is 0 to 6 in every save, so it is a code, not a spell id,
 and what the codes mean is not decoded), the flags, and the items (ids not decoded).
 **Real game (slot 5, vault checkpoint 98):** the abandoned keep near Kevin's capital rewritten to 1 Sprite and 2 High Elf Pegasai,
-777 gold and 333 mana loaded with the game's memory identical to the file (guard counts `0x11` and `0x22`). *Not yet seen:* the
-battle and the reward screen after winning.
+777 gold and 333 mana loaded with the game's memory identical to the file (guard counts `0x11` and `0x22`). **Kevin attacked
+it:** the guards were two Pegasai and a Sprite, and the reward screen read "Inside you find 777 gold, 333 mana crystals and a
+Create Artifact spell" (checkpoint 98's save; his screenshot). That keep's spell reward code is **1**, so **code 1 is a Create
+Artifact spell** (one case: the codes 2 to 6 are still undecoded).
 
 **Not done:** editing a unit's fields (type, level, experience, damage, owner); decoding the spell reward code and the items.
 **Size:** large (do incrementally)
