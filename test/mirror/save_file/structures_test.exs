@@ -208,7 +208,7 @@ defmodule Mirror.SaveFile.StructuresTest do
       assert {:error, :bad_population} = Structures.edit_city(raw, 0, population: 0)
       assert {:error, :bad_population} = Structures.edit_city(raw, 0, population: 26)
       assert {:error, :bad_population} = Structures.edit_city(raw, 0, population: "5")
-      assert {:error, {:unknown_field, :owner}} = Structures.edit_city(raw, 0, owner: 1)
+      assert {:error, {:unknown_field, :fame}} = Structures.edit_city(raw, 0, fame: 1)
       # a good field next to a bad one: nothing is applied
       assert {:error, :bad_name} = Structures.edit_city(raw, 0, population: 5, name: "")
       assert {:error, :no_such_city} = Structures.edit_city(raw, 7, name: "X")
@@ -324,6 +324,67 @@ defmodule Mirror.SaveFile.StructuresTest do
       assert {:error, :bad_buildings} = Structures.edit_city(raw, 0, buildings: [2])
       assert {:error, :bad_buildings} = Structures.edit_city(raw, 0, buildings: [36])
       assert {:error, :bad_buildings} = Structures.edit_city(raw, 0, buildings: :all)
+    end
+  end
+
+  describe "edit_city/3 race and owner" do
+    test "race is the byte at +14 and nothing else changes" do
+      raw = blank() |> city(0, "A", 1, 1, 0, 0)
+      assert {:ok, edited, %{changed: [:race]}} = Structures.edit_city(raw, 0, race: 4)
+      assert %{race: 4} = city_at(edited, 0)
+
+      diff =
+        for {{a, b}, i} <-
+              Enum.with_index(Enum.zip(:binary.bin_to_list(raw), :binary.bin_to_list(edited))),
+            a != b,
+            do: i
+
+      assert diff == [0x8AAC + 14]
+
+      assert {:error, :bad_race} = Structures.edit_city(raw, 0, race: 14)
+      assert {:error, :bad_race} = Structures.edit_city(raw, 0, race: -1)
+      assert {:error, :bad_race} = Structures.edit_city(raw, 0, race: "4")
+    end
+
+    test "a new owner takes the units standing in the city, and only those" do
+      raw =
+        blank()
+        |> city(0, "A", 5, 5, 0, 2)
+        |> unit(0, 5, 5, 0, 2)
+        |> unit(1, 5, 5, 0, 2)
+        |> unit(2, 6, 5, 0, 2)
+        |> unit(3, 5, 5, 1, 2)
+
+      assert {:ok, edited, %{changed: [:owner], units_handed_over: 2}} =
+               Structures.edit_city(raw, 0, owner: 4)
+
+      assert %{owner: 4} = city_at(edited, 0)
+      {:ok, units} = Units.parse(edited)
+      assert Enum.map(units, & &1.owner) == [4, 4, 2, 2]
+    end
+
+    test "to neutral and back; a bad owner is refused" do
+      raw = blank() |> city(0, "A", 5, 5, 0, 1) |> unit(0, 5, 5, 0, 1)
+      assert {:ok, neutral, _} = Structures.edit_city(raw, 0, owner: 5)
+      assert %{owner: 5} = city_at(neutral, 0)
+      assert {:ok, [%{owner: 5}]} = Units.parse(neutral)
+      assert {:error, :bad_owner} = Structures.edit_city(raw, 0, owner: 6)
+      assert {:error, :bad_owner} = Structures.edit_city(raw, 0, owner: nil)
+    end
+
+    test "a wizard's capital cannot change hands: fortress or summoning circle" do
+      capital = blank() |> city(0, "Cap", 9, 9, 0, 0) |> fortress(0, 9, 9, 0)
+      assert {:error, :capital} = Structures.edit_city(capital, 0, owner: 2)
+
+      circle = blank() |> city(0, "Cap", 9, 9, 0, 1) |> wizard_circle(1, 9, 9, 0)
+      assert {:error, :capital} = Structures.edit_city(circle, 0, owner: 2)
+
+      # the same tile on the other plane is another city
+      other_plane = blank() |> city(0, "Cap", 9, 9, 1, 0) |> fortress(0, 9, 9, 0)
+      assert {:ok, _, _} = Structures.edit_city(other_plane, 0, owner: 2)
+
+      # and race and the rest still work on a capital
+      assert {:ok, _, %{changed: [:race]}} = Structures.edit_city(capital, 0, race: 3)
     end
   end
 

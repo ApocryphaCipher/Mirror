@@ -194,6 +194,13 @@ defmodule Mirror.SaveFile.Structures do
     replaces as replaced (`0`), when that one is there. A building whose predecessor is absent is
     just built. Needs (a Shrine wants a Builders' Hall) are **not** enforced: neutral cities in
     saves break them. Ids outside 3..35 give `{:error, :bad_buildings}`.
+  * `race`: the byte at `+14`, 0 to 13 (`Mirror.SaveFile.Cities.races/0`). Anything else the game
+    derives from it (what the city can build, how its screen looks) is not touched.
+  * `owner`: the byte at `+18`, a wizard record 0 to 4 or 5 for neutral. The units standing on
+    the city's tile that belong to the old owner change hands with it, so a garrison is never
+    left inside a city that is not theirs (the result's `units_handed_over` counts them). A city
+    that is a wizard's fortress or summoning circle is refused with `{:error, :capital}`: the
+    wizard record would still point at a city he no longer owns.
   * `enchantments`: a map `%{name => caster | nil}` over the city enchantment names of
     `Mirror.SaveFile.Cities.enchantment_names/0`; `nil` clears one, a caster `0..5` (the wizard
     record, 5 being the neutral one) sets it. The byte (`+67 + slot`) is the caster's index plus
@@ -201,15 +208,18 @@ defmodule Mirror.SaveFile.Structures do
     `0..5` gives `{:error, :bad_enchantments}`.
 
   Returns `{:ok, raw, %{changed: [...]}}` or `{:error, reason}` (`:bad_name`, `:bad_population`,
-  `:bad_buildings`, `:bad_enchantments`, `:no_such_city` or `{:unknown_field, field}`); nothing is written if any
+  `:bad_buildings`, `:bad_enchantments`, `:bad_race`, `:bad_owner`, `:capital`,
+  `:no_such_city` or `{:unknown_field, field}`); nothing is written if any
   value is refused.
   """
   @spec edit_city(binary(), non_neg_integer(), keyword()) :: result()
   def edit_city(raw, index, changes) when is_list(changes) do
     with {:ok, cities} <- Cities.parse(raw),
-         {:ok, _city} <- fetch(cities, index, :no_such_city),
-         {:ok, edits} <- city_edits(changes) do
+         {:ok, city} <- fetch(cities, index, :no_such_city),
+         {:ok, edits} <- city_edits(changes),
+         :ok <- check_owner_change(raw, city, edits) do
       base = elem(Cities.block_range(), 0) + index * @city_record
+      original = raw
 
       raw =
         Enum.reduce(edits, raw, fn
@@ -218,6 +228,12 @@ defmodule Mirror.SaveFile.Structures do
 
           {:population, n}, acc ->
             put(acc, base + 20, <<n>>)
+
+          {:race, race}, acc ->
+            put(acc, base + 14, <<race>>)
+
+          {:owner, owner}, acc ->
+            acc |> put(base + 18, <<owner>>) |> hand_over_units(city, owner)
 
           {:buildings, ids}, acc ->
             put(acc, base + 31, set_buildings(binary_part(acc, base + 31, 36), ids))
@@ -229,8 +245,64 @@ defmodule Mirror.SaveFile.Structures do
             end)
         end)
 
-      {:ok, raw, %{changed: Keyword.keys(edits)}}
+      handed =
+        if Keyword.has_key?(edits, :owner), do: garrison_indexes(units(original), city), else: []
+
+      {:ok, raw, %{changed: Keyword.keys(edits), units_handed_over: length(handed)}}
     end
+  end
+
+  defp units(raw) do
+    case Units.parse(raw) do
+      {:ok, units} -> units
+      _ -> []
+    end
+  end
+
+  # The units standing on the city's tile that belong to its current owner.
+  defp garrison_indexes(units, city) do
+    for u <- units,
+        {u.x, u.y, plane_index(u.plane)} == {city.x, city.y, plane_index(city.plane)},
+        u.owner == city.owner,
+        do: u.index
+  end
+
+  defp hand_over_units(raw, city, owner) do
+    {base, _} = Units.block_range()
+
+    raw
+    |> units()
+    |> garrison_indexes(city)
+    |> Enum.reduce(raw, &put(&2, base + &1 * @unit_record + 3, <<owner>>))
+  end
+
+  # A wizard's fortress and summoning circle name the city they are in; changing hands would
+  # leave the wizard record pointing at a city that is not his.
+  defp check_owner_change(raw, city, edits) do
+    cond do
+      not Keyword.has_key?(edits, :owner) -> :ok
+      capital?(raw, city) -> {:error, :capital}
+      true -> :ok
+    end
+  end
+
+  defp capital?(raw, city) do
+    here = {city.x, city.y, plane_index(city.plane)}
+    {wizards, _} = Wizards.block_range()
+
+    fortress? =
+      Enum.any?(0..(@fortress_records - 1), fn i ->
+        <<x, y, plane, _active>> = binary_part(raw, @fortress_offset + i * 4, 4)
+        {x, y, plane} == here
+      end)
+
+    circle? =
+      Enum.any?(0..(@wizards - 2), fn owner ->
+        at = wizards + owner * @wizard_record
+        {i16(raw, at + @circle_x), i16(raw, at + @circle_y), i16(raw, at + @circle_plane)} == here
+      end)
+
+    fortress? or circle?
   end
 
   defp city_edits(changes) do
@@ -246,6 +318,16 @@ defmodule Mirror.SaveFile.Structures do
 
       {:population, _}, _acc ->
         {:halt, {:error, :bad_population}}
+
+      {:race, race}, {:ok, acc} ->
+        if race in 0..13//1,
+          do: {:cont, {:ok, [{:race, race} | acc]}},
+          else: {:halt, {:error, :bad_race}}
+
+      {:owner, owner}, {:ok, acc} ->
+        if owner in 0..5//1,
+          do: {:cont, {:ok, [{:owner, owner} | acc]}},
+          else: {:halt, {:error, :bad_owner}}
 
       {:enchantments, wanted}, {:ok, acc} ->
         if is_map(wanted) and

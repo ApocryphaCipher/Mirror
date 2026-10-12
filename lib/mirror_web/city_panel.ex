@@ -28,6 +28,7 @@ defmodule MirrorWeb.CityPanel do
         owner_name: Map.get(names, city.owner, "Neutral"),
         banner: Map.get(banners, city.owner, :neutral),
         race: Cities.race_name(city.race),
+        race_id: city.race,
         size: Cities.size_name(city.size),
         population: city.population,
         walled: city.walled,
@@ -113,6 +114,20 @@ defmodule MirrorWeb.CityPanel do
     end
   end
 
+  @doc "The race select's options, `{id, name}`."
+  def race_options, do: Cities.races()
+
+  @doc """
+  The owner select's options: the wizards, neutral, and the city's current owner too if it is
+  none of those, so that applying the form never changes it by accident.
+  """
+  @spec owner_options(details()) :: [{non_neg_integer(), String.t()}]
+  def owner_options(details) do
+    if Enum.any?(details.owners, fn {index, _} -> index == details.owner end),
+      do: details.owners,
+      else: details.owners ++ [{details.owner, "Wizard #{details.owner + 1}"}]
+  end
+
   @doc """
   The options of one enchantment's caster select: the wizards, the neutral record, and the
   current caster too if it is none of those (a record without a name), so that applying the
@@ -133,19 +148,44 @@ defmodule MirrorWeb.CityPanel do
   (nothing is guessed or dropped: a malformed list is refused, not read as "no buildings").
   """
   @spec changes(map(), details()) ::
-          {:ok, keyword()} | {:error, :bad_population | :bad_buildings | :bad_enchantments}
+          {:ok, keyword()}
+          | {:error,
+             :bad_population | :bad_race | :bad_owner | :bad_buildings | :bad_enchantments}
   def changes(params, details) do
     name = params |> Map.get("name", details.name) |> String.trim()
     population = Map.get(params, "population", Integer.to_string(details.population))
 
     with {:ok, population} <- parse_population(population),
+         {:ok, race} <- choice_change(params, details, "race", :race_id, :race, :bad_race, 13),
+         {:ok, owner} <- choice_change(params, details, "owner", :owner, :owner, :bad_owner, 5),
          {:ok, buildings} <- building_changes(params, details),
          {:ok, enchantments} <- enchantment_changes(params, details) do
       scalars =
         [name: name, population: population]
         |> Enum.reject(fn {field, value} -> Map.fetch!(details, field) == value end)
 
-      {:ok, scalars ++ buildings ++ enchantments}
+      {:ok, scalars ++ race ++ owner ++ buildings ++ enchantments}
+    end
+  end
+
+  # A select that posts a whole number 0..max (race, owner); no field in the form is no change,
+  # an unreadable one is refused.
+  defp choice_change(params, details, key, detail_key, field, error, max) do
+    case Map.fetch(params, key) do
+      :error ->
+        {:ok, []}
+
+      {:ok, value} when is_binary(value) ->
+        case Integer.parse(value) do
+          {n, ""} when n in 0..max//1 ->
+            {:ok, if(n == Map.fetch!(details, detail_key), do: [], else: [{field, n}])}
+
+          _ ->
+            {:error, error}
+        end
+
+      {:ok, _} ->
+        {:error, error}
     end
   end
 
@@ -231,6 +271,12 @@ defmodule MirrorWeb.CityPanel do
       [:buildings] ->
         "Changed #{details.name}'s buildings" <> building_delta(details, changes[:buildings])
 
+      [:race] ->
+        "Changed #{details.name}'s race to #{Cities.race_name(changes[:race])}"
+
+      [:owner] ->
+        "Gave #{details.name} to #{owner_name(details, changes[:owner])}"
+
       [:enchantments] ->
         "Changed #{details.name}'s enchantments" <>
           enchantment_delta(details, changes[:enchantments])
@@ -238,6 +284,10 @@ defmodule MirrorWeb.CityPanel do
       _ ->
         "Edited #{details.name}"
     end
+  end
+
+  defp owner_name(details, owner) do
+    details |> owner_options() |> Map.new() |> Map.get(owner, "wizard #{owner + 1}")
   end
 
   defp enchantment_delta(details, wanted) do
@@ -281,6 +331,13 @@ defmodule MirrorWeb.CityPanel do
   def error_message(:bad_population), do: "Population is a whole number from 1 to 25."
   def error_message(:bad_buildings), do: "That is not a list of buildings."
   def error_message(:bad_enchantments), do: "That is not a valid enchantment or caster."
+  def error_message(:bad_race), do: "That is not one of the game's races."
+  def error_message(:bad_owner), do: "That is not a wizard or the neutral player."
+
+  def error_message(:capital),
+    do:
+      "That city is a wizard's capital (his fortress or summoning circle is in it), so it cannot change hands here."
+
   def error_message(:no_such_city), do: "That city is no longer in the save."
   def error_message(_other), do: "The city could not be changed."
 end

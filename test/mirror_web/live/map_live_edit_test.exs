@@ -2054,6 +2054,53 @@ defmodule MirrorWeb.MapLiveEditTest do
       refute changed(view) =~ "edited"
     end
 
+    test "race and owner are set from the panel; a capital's owner is refused", %{
+      conn: conn,
+      dir: dir
+    } do
+      named = Path.join(dir, "OWNERS.GAM")
+
+      raw =
+        synthetic_save_bytes()
+        |> put_bytes(0x09E8 + 1, "Jafar" <> <<0>>)
+        |> put_bytes(0x09E8 + 0x4C8 + 1, "Freya" <> <<0>>)
+
+      File.write!(named, raw)
+      view = editing(conn, named, "city")
+      click(view, 38, 21)
+
+      assert has_element?(
+               view,
+               ~s|select[name="city[race]"] option[value="5"][selected]|,
+               "Gnoll"
+             )
+
+      assert has_element?(
+               view,
+               ~s|select[name="city[owner]"] option[value="0"][selected]|,
+               "Jafar"
+             )
+
+      submit = fn fields ->
+        view
+        |> element("#city-form")
+        |> render_submit(%{
+          "city" => Map.merge(%{"name" => "Deventor", "population" => "4"}, fields)
+        })
+      end
+
+      submit.(%{"race" => "4", "owner" => "1"})
+      assert has_element?(view, "#city-note", "Edited Deventor")
+      assert has_element?(view, ~s|select[name="city[race]"] option[value="4"][selected]|)
+      assert has_element?(view, ~s|select[name="city[owner]"] option[value="1"][selected]|)
+
+      submit.(%{"race" => "99"})
+      assert has_element?(view, "#city-note", "not one of the game's races")
+
+      render_click(view, "undo", %{})
+      assert has_element?(view, ~s|select[name="city[owner]"] option[value="0"][selected]|)
+    end
+
     test "a form with no building list leaves the buildings alone", %{conn: conn, save: save} do
       view = editing(conn, save, "city")
       click(view, 38, 21)
