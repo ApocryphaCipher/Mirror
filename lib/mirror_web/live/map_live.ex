@@ -2284,6 +2284,38 @@ defmodule MirrorWeb.MapLive do
           />
         </label>
         <label class="text-slate-400">
+          Race
+          <select
+            id="city-race"
+            name="city[race]"
+            class="mt-0.5 block rounded border border-white/15 bg-slate-950 px-1 py-0.5 text-slate-100"
+          >
+            <option
+              :for={{id, name} <- CityPanel.race_options(@details)}
+              value={id}
+              selected={id == @details.race_id}
+            >
+              {name}
+            </option>
+          </select>
+        </label>
+        <label class="text-slate-400">
+          Owner
+          <select
+            id="city-owner"
+            name="city[owner]"
+            class="mt-0.5 block rounded border border-white/15 bg-slate-950 px-1 py-0.5 text-slate-100"
+          >
+            <option
+              :for={{id, name} <- CityPanel.owner_options(@details)}
+              value={id}
+              selected={id == @details.owner}
+            >
+              {name}
+            </option>
+          </select>
+        </label>
+        <label class="text-slate-400">
           Population
           <input
             id="city-population"
