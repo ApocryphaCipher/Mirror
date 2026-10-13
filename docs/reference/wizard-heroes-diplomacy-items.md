@@ -98,13 +98,14 @@ Sharee +50 with status 2; Jafar and Tauron -90 with status 3. Ten bytes differed
 - **One End Turn:** the alliance and the relations were kept; allies and pact partners drifted up a few points (Jafar-Sharee 50 to 52, Freya-Sharee 14 to 18, Freya-Tauron 18 to 20);
   a relation with no treaty (Jafar-Freya 70) did not move.
 
-### Finding, 2026-10-13: the defeated flag (STORY-050)
+### Finding, 2026-10-13: the banished flag (STORY-050)
 
-Kevin: "there is probably a defeated status". `JAFAR-PLAYED.GAM` has a wizard (Freya) with no cities, no units, no heroes (slots 255), 0 gold, still named, and **fortress record 1 = (23, 25, Arcanus, active 0)**,
+Kevin: "there is probably a defeated status" (it turned out to be *banished*, below). `JAFAR-PLAYED.GAM` has a wizard (Freya) with no cities, no units, no heroes (slots 255), 0 gold, still named, and **fortress record 1 = (23, 25, Arcanus, active 0)**,
 where every living wizard's active byte is 1. Loaded in the game (slot 6), her Magic-screen portrait is a **cracked stone frame** with no attitude label (an unmet wizard is a plain grey gem).
 Two one-byte tests, `0x65FF` (the fourth byte of record 1): set to 1 on the dead save and her frame is a plain gem again, set to 0 on a living Freya (the advanced SAVE2, two cities) and the frame is cracked.
-So the game decides "defeated" from the **fortress active byte** (`0x65F8 + 4 × wizard + 3`), not from the city count. The conqueror's `+0x354` (a u16 between the spell library and the gold, kazzmir's `DefeatedWizards`) is 2 in that save and 0 in the others
-(*guess:* a count of wizards he has defeated). *Not seen:* what a turn does to a wizard whose flag was cleared by hand, or what the Diplomacy screen offers for a defeated wizard.
+So the game decides "banished" from the **fortress active byte** (`0x65F8 + 4 × wizard + 3`), not from the city count. The conqueror's `+0x354` (a u16 between the spell library and the gold, kazzmir's `DefeatedWizards`) is 2 in that save and 0 in the others
+(*guess:* a count of wizards he has defeated). **Banished is not dead.** The 1995 editor's manual (`MMOMS.TXT` section 5.3, "Losing Your Fortress") says a wizard who loses his fortress "will automatically begin casting Spell of Return, whether you had any cities left or not", and is only resigned if he has no cities the following turn. That fits both observations: a living Freya with two cities was cracked by the one byte (banished), and the Freya in `JAFAR-PLAYED` had it cleared and nothing left (banished and eliminated). Spell of Return is spell 214 in `SPELLDAT.LBX` (Arcane). The page and the docs say **banished**.
+*Not seen:* what a turn does to a wizard whose flag was cleared by hand, or what the Diplomacy screen offers for a defeated wizard.
 
 ## The item block: `0x6fb8`, 138 × 50 bytes
 

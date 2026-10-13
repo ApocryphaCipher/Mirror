@@ -292,21 +292,21 @@ defmodule MirrorWeb.WizardLiveTest do
       assert SessionStore.get(sid).save.raw == raw
     end
 
-    test "a defeated wizard is tagged on his own page and in the others' tables, with no edit controls",
+    test "a banished wizard is tagged on his own page and in the others' tables, with no edit controls",
          %{conn: conn, sid: sid} do
       state =
         Mirror.SaveManager.normalize_state(%{
-          save: %{raw: Mirror.WizardFixture.synthetic() |> Mirror.WizardFixture.defeat(1)}
+          save: %{raw: Mirror.WizardFixture.synthetic() |> Mirror.WizardFixture.banish(1)}
         })
 
       SessionStore.put(sid, state)
 
       {:ok, rival, _} = live(conn, ~p"/wizard/2")
-      assert has_element?(rival, "#wizard-defeated", "Defeated")
+      assert has_element?(rival, "#wizard-banished", "Banished")
 
       {:ok, view, _} = live(conn, ~p"/wizard/1")
-      refute has_element?(view, "#wizard-defeated")
-      assert has_element?(view, "#wizard-relation-1", "defeated")
+      refute has_element?(view, "#wizard-banished")
+      assert has_element?(view, "#wizard-relation-1", "banished")
       view |> element("#wizard-edit-toggle") |> render_click()
       refute has_element?(view, "select[name='wizard[relations][1][status]']")
     end

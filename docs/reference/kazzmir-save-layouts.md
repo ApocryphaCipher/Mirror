@@ -62,7 +62,7 @@ wizards' capitals in SAVE1: Freya (38, 21, Arcanus), Capua (11, 26),
 Bloodrock (54, 23, Myrror), Sidon (55, 29), Cremona (15, 11). Record 5
 (43, 7, active) is *unexplained*, maybe a slot for the neutral player.
 
-**The `active` byte is the defeated flag (checked in the real game 2026-10-13, STORY-050):** a wizard whose byte is 0 is drawn as a cracked stone frame on the Magic screen. Clearing it on a living wizard (slot 7) cracked his frame, and setting it on a defeated one (slot 6) removed the cracking, each with one byte changed. A defeated wizard in `JAFAR-PLAYED.GAM` also has no cities, units or heroes and 0 gold, and the conqueror's `+0x354` (kazzmir's `DefeatedWizards`, a u16 before the gold) reads 2 in that save.
+**The `active` byte is the banished flag** (checked in the real game 2026-10-13, STORY-050; the wizard has lost his fortress but is not necessarily dead: [the finding](wizard-heroes-diplomacy-items.md#finding-2026-10-13-the-banished-flag-story-050)): a wizard whose byte is 0 is drawn as a cracked stone frame on the Magic screen. Clearing it on a living wizard (slot 7) cracked his frame, and setting it on a banished one (slot 6) removed the cracking, each with one byte changed. An eliminated wizard (banished and with nothing left) in `JAFAR-PLAYED.GAM` also has no cities, units or heroes and 0 gold, and the conqueror's `+0x354` (kazzmir's `DefeatedWizards`, a u16 before the gold) reads 2 in that save.
 
 ## Towers of Wizardry: `0x006610`, 6 × 4 bytes (STORY-011)
 
