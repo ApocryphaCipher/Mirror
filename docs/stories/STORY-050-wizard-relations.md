@@ -1,7 +1,7 @@
 # STORY-050: Relations between wizards: peace, war, attitude
 
 **Parent:** [EPIC-009](../epics/EPIC-009-wizard-editing.md)
-**Status:** open (2026-10-12). **Decode largely done** (see the findings in the reference doc): visible relations, pact status, interest values and threat flags confirmed in the real game; war (3) and alliance (2) not yet changed. Showing and editing are not started.
+**Status:** built (2026-10-13): shown and editable on the wizard page, checked in the real game (checkpoint 109). *Original note:* **Decode largely done** (see the findings in the reference doc): visible relations, pact status, interest values and threat flags confirmed in the real game; war (3) and alliance (2) not yet changed. Showing and editing are not started.
 **Size:** large (the decode decides)
 **Raised by:** [Kevin](https://github.com/KevinAsbury), 2026-10-12 ("a relationship editor", "peace/war tags")
 
@@ -40,3 +40,18 @@ with interest left high may be broken at once). The tags to show: None, Pact, Al
 **Built (2026-10-13):** (a) the relations table (name linked to the wizard's page, standing, relation, met) on each wizard's page, read-only; a standing whose meaning is unchecked (alliance, war) carries a "?". *To do for this part:* compare the table with the game's own Diplomacy screen for Jafar. **Suggested next steps:** (b) one edit test: set a pact and
 a relation on a copy of the advanced SAVE2, load it, read the Diplomacy screen, End Turn once; (c) set a status 3 (war) and 2 (alliance) the same way, which
 also settles their meaning.
+
+## Outcome (2026-10-13)
+
+Built: `Structures.edit_wizard/3` takes `:relations` (a list of `{other wizard 0..4, relation -100..100 or nil, status 0..4 or nil}`) and writes the pair on **both** wizards' records;
+the wizard page's Relations table has, in edit mode, a number box (-100 to 100) and a standing select (None, Wizard pact, Alliance, War) on each row except the neutral
+player's, one Apply, one undo step, a label "relations with ..." and a refusal that says why. Only fields that differ from the save are written.
+
+**Real game (slot 7, checkpoint 109):** all four statuses are now confirmed by the game's icons and menus (details in the [reference doc](../reference/wizard-heroes-diplomacy-items.md)):
+0 none (which is also what peace is), 1 wizard pact, 2 alliance, 3 war. The hand-written values loaded as written, the Diplomacy menu followed the status, a peace treaty with the wizard at
+war (even at -90) was accepted and set 3 back to 0 with +40, and one End Turn kept the alliance and the relations. *Untried:* status 4; the neutral player's row; whether the AI later
+breaks a hand-made alliance when its other relations disagree (it did not in one turn); writing the interest values (left alone).
+
+**Defeated wizards (2026-10-13):** a wizard whose fortress "active" byte (`0x65F8 + 4 × wizard + 3`) is 0 is defeated: the game draws his Magic-screen frame cracked (see the reference doc; two one-byte tests, in both directions).
+The wizard page now shows a "Defeated" tag on that wizard's own page and in the others' Relations tables, and does not offer controls on a defeated wizard's row. *Not built, deliberately:* a way to defeat or revive a wizard; what the next turn
+does to a hand-defeated wizard's cities and units is unknown.

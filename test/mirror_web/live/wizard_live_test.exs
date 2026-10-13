@@ -44,8 +44,9 @@ defmodule MirrorWeb.WizardLiveTest do
     assert has_element?(view, "#wizard-relation-5", "Neutral")
     assert has_element?(view, "#wizard-relation-5", "-81")
     refute has_element?(view, "#wizard-relation-5", "not met")
-    # War is not confirmed in the game yet: marked
-    assert has_element?(view, "#wizard-relation-5", "War?")
+    # war and the pact are both confirmed in the game: no "?"
+    assert has_element?(view, "#wizard-relation-5", "War")
+    refute has_element?(view, "#wizard-relation-5", "War?")
     refute has_element?(view, "#wizard-relation-1", "Wizard pact?")
 
     assert has_element?(view, "#wizard-globals", "Aura of Majesty")
@@ -236,6 +237,78 @@ defmodule MirrorWeb.WizardLiveTest do
       submit(view, %{"researching" => "98"})
       assert has_element?(view, "#wizard-note", "research list")
       assert SessionStore.get(sid).save.raw == raw
+    end
+
+    defp rel_bytes(sid, owner, other) do
+      raw = SessionStore.get(sid).save.raw
+      block = 0x9E8 + owner * 0x4C8 + 0x128
+      <<r::signed>> = binary_part(raw, block + 42 + other, 1)
+      {r, :binary.at(raw, block + 48 + other)}
+    end
+
+    test "the relation rows are edited in edit mode and written on both wizards", %{
+      conn: conn,
+      sid: sid
+    } do
+      load_save(sid)
+      {:ok, view, _} = live(conn, ~p"/wizard/1")
+      refute has_element?(view, "select[name='wizard[relations][1][status]']")
+      view |> element("#wizard-edit-toggle") |> render_click()
+      assert has_element?(view, "select[name='wizard[relations][1][status]']")
+      refute has_element?(view, "select[name='wizard[relations][5][status]']")
+
+      submit(view, %{
+        "relations_present" => "1",
+        "relations" => %{"1" => %{"relation" => "-60", "status" => "3"}}
+      })
+
+      assert {-60, 3} == rel_bytes(sid, 0, 1)
+      assert {-60, 3} == rel_bytes(sid, 1, 0)
+      assert has_element?(view, "#wizard-note", "Edited Jafar: relations with Sharee")
+      # still in edit mode, so the row shows the inputs with the new values
+      assert has_element?(
+               view,
+               "input[name='wizard[relations][1][relation]'][value='-60']"
+             )
+
+      assert has_element?(
+               view,
+               "select[name='wizard[relations][1][status]'] option[value='3'][selected]"
+             )
+    end
+
+    test "an out-of-range relation is refused and nothing is written", %{conn: conn, sid: sid} do
+      load_save(sid)
+      {:ok, view, _} = live(conn, ~p"/wizard/1")
+      view |> element("#wizard-edit-toggle") |> render_click()
+      raw = SessionStore.get(sid).save.raw
+
+      submit(view, %{
+        "relations_present" => "1",
+        "relations" => %{"1" => %{"relation" => "500", "status" => "1"}}
+      })
+
+      assert has_element?(view, "#wizard-note", "-100 to 100")
+      assert SessionStore.get(sid).save.raw == raw
+    end
+
+    test "a defeated wizard is tagged on his own page and in the others' tables, with no edit controls",
+         %{conn: conn, sid: sid} do
+      state =
+        Mirror.SaveManager.normalize_state(%{
+          save: %{raw: Mirror.WizardFixture.synthetic() |> Mirror.WizardFixture.defeat(1)}
+        })
+
+      SessionStore.put(sid, state)
+
+      {:ok, rival, _} = live(conn, ~p"/wizard/2")
+      assert has_element?(rival, "#wizard-defeated", "Defeated")
+
+      {:ok, view, _} = live(conn, ~p"/wizard/1")
+      refute has_element?(view, "#wizard-defeated")
+      assert has_element?(view, "#wizard-relation-1", "defeated")
+      view |> element("#wizard-edit-toggle") |> render_click()
+      refute has_element?(view, "select[name='wizard[relations][1][status]']")
     end
   end
 end

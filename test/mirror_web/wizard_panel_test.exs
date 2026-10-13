@@ -255,11 +255,81 @@ defmodule MirrorWeb.WizardPanelTest do
                hd(d.relations)
     end
 
-    test "only the confirmed status words are unmarked" do
-      assert WizardPanel.status_checked?(0)
-      assert WizardPanel.status_checked?(1)
-      refute WizardPanel.status_checked?(2)
-      refute WizardPanel.status_checked?(3)
+    test "statuses 0 to 3 are confirmed in the game (2026-10-13); 4 is not" do
+      for s <- 0..3, do: assert(WizardPanel.status_checked?(s))
+      refute WizardPanel.status_checked?(4)
+
+      assert WizardPanel.status_options(1) |> Enum.map(&elem(&1, 1)) == [
+               "None",
+               "Wizard pact",
+               "Alliance",
+               "War"
+             ]
+
+      assert List.last(WizardPanel.status_options(4)) == {4, "Final war?"}
+    end
+
+    test "the edit form's relation rows become one change, only for what differs" do
+      d = WizardPanel.details(WizardFixture.synthetic(), 1)
+      # fixture: Sharee (other 1) relation 25, status 1; neutral (5) -81, status 3
+
+      same = %{
+        "relations_present" => "1",
+        "relations" => %{"1" => %{"relation" => "25", "status" => "1"}}
+      }
+
+      assert WizardPanel.changes(same, d) == {:ok, []}
+
+      both = %{
+        "relations_present" => "1",
+        "relations" => %{"1" => %{"relation" => "-40", "status" => "3"}}
+      }
+
+      assert WizardPanel.changes(both, d) == {:ok, [relations: [{1, -40, 3}]]}
+
+      only_status = %{
+        "relations_present" => "1",
+        "relations" => %{"1" => %{"relation" => "25", "status" => "2"}}
+      }
+
+      assert WizardPanel.changes(only_status, d) == {:ok, [relations: [{1, nil, 2}]]}
+
+      # the neutral player's row is not editable: ignored
+      neutral = %{
+        "relations_present" => "1",
+        "relations" => %{"5" => %{"relation" => "0", "status" => "0"}}
+      }
+
+      assert WizardPanel.changes(neutral, d) == {:ok, []}
+
+      # without relations_present the rows are not read
+      assert WizardPanel.changes(%{"relations" => %{"1" => %{"relation" => "9"}}}, d) == {:ok, []}
+    end
+
+    test "bad relation values are refused" do
+      d = WizardPanel.details(WizardFixture.synthetic(), 1)
+      bad = &%{"relations_present" => "1", "relations" => &1}
+
+      assert WizardPanel.changes(bad.(%{"1" => %{"relation" => "x"}}), d) ==
+               {:error, :bad_relations}
+
+      assert WizardPanel.changes(bad.(%{"1" => %{"status" => "1.5"}}), d) ==
+               {:error, :bad_relations}
+
+      assert WizardPanel.changes(bad.(%{"1" => "nope"}), d) == {:error, :bad_relations}
+      assert WizardPanel.changes(bad.(nil), d) == {:error, :bad_relations}
+      # in range here: Structures refuses 101 and the page says so
+      assert {:ok, [relations: [{1, 101, nil}]]} =
+               WizardPanel.changes(bad.(%{"1" => %{"relation" => "101"}}), d)
+    end
+
+    test "the label names the wizards" do
+      d = WizardPanel.details(WizardFixture.synthetic(), 1)
+
+      assert WizardPanel.label(d, relations: [{1, 5, nil}]) ==
+               "Edited Jafar: relations with Sharee"
+
+      assert WizardPanel.error_message(:bad_relations) =~ "-100 to 100"
     end
 
     test "active globals are the bytes that are not zero, by name, in the save's order" do
@@ -269,6 +339,41 @@ defmodule MirrorWeb.WizardPanelTest do
       assert length(WizardPanel.global_names()) == 24
       assert Enum.at(WizardPanel.global_names(), 3) == "Aura of Majesty"
       assert Enum.at(WizardPanel.global_names(), 18) == "Just Cause"
+    end
+  end
+
+  describe "defeated wizards" do
+    test "a wizard whose fortress is inactive is defeated, and so is his row on the others' pages" do
+      raw = WizardFixture.synthetic()
+      refute WizardPanel.details(raw, 1).defeated
+      refute WizardPanel.details(raw, 2).defeated
+
+      dead = WizardFixture.defeat(raw, 1)
+      assert WizardPanel.details(dead, 2).defeated
+      refute WizardPanel.details(dead, 1).defeated
+
+      assert %{defeated: true} =
+               Enum.find(WizardPanel.details(dead, 1).relations, &(&1.other == 1))
+
+      assert %{defeated: false} =
+               Enum.find(WizardPanel.details(dead, 1).relations, &(&1.other == 5))
+    end
+
+    test "a defeated wizard's relation row is not editable" do
+      dead = WizardFixture.defeat(WizardFixture.synthetic(), 1)
+      d = WizardPanel.details(dead, 1)
+
+      params = %{
+        "relations_present" => "1",
+        "relations" => %{"1" => %{"relation" => "-40", "status" => "3"}}
+      }
+
+      assert WizardPanel.changes(params, d) == {:ok, []}
+    end
+
+    test "a save with no fortress block is not read as defeated" do
+      raw = WizardFixture.synthetic()
+      refute WizardPanel.details(binary_part(raw, 0, 0x9E8 + 6 * 0x4C8), 1).defeated
     end
   end
 end
