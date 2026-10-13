@@ -37,6 +37,6 @@ Checked by a real-game session (vault checkpoint 108; [findings](../reference/wi
 or undone at the next turn (test: set a pact, End Turn); whether the interest values need to follow (they are the AI's willingness, so a pact
 with interest left high may be broken at once). The tags to show: None, Pact, Alliance (*guess*), War (*guess*).
 
-**Suggested next steps:** (a) show the table of relations and status on each wizard's page, read-only (no new game test); (b) one edit test: set a pact and
+**Built (2026-10-13):** (a) the relations table (name linked to the wizard's page, standing, relation, met) on each wizard's page, read-only; a standing whose meaning is unchecked (alliance, war) carries a "?". *To do for this part:* compare the table with the game's own Diplomacy screen for Jafar. **Suggested next steps:** (b) one edit test: set a pact and
 a relation on a copy of the advanced SAVE2, load it, read the Diplomacy screen, End Turn once; (c) set a status 3 (war) and 2 (alliance) the same way, which
 also settles their meaning.
