@@ -30,7 +30,7 @@ Offsets are from the start of a wizard record, `0x9e8 + n × 0x4c8`; continues
 | `+0x35a` | astrology: magic power, spell research, army strength (3 × i16, the Astrology screen's three bars) | kazzmir; *guess:* values not read |
 | `+0x360` | population (u16) | **SAVE2:** 4, 0, 0, 0, 1 for the five wizards: fits a count the game keeps, *meaning unchecked* |
 | `+0x362` | "historian" series, 288 bytes (the Historian screen's graph) | kazzmir |
-| `+0x482` | **global enchantments: 24 bytes**, one per global spell, the active ones non-zero (*guess:* 0/1; the caster is the record they sit in) | **order from `MMOMS.TXT` appendix A.3:** the same 24, Eternal Night first. **SAVE2 has none active**, so the encoding has not been seen non-zero |
+| `+0x482` | **global enchantments: 24 bytes**, one per global spell, **1 when active**, in the record of the caster | **checked in the real game 2026-10-12** ([findings below](#findings-2026-10-12-aura-of-majesty-just-cause-gold-a-pact-and-threats)): casting Aura of Majesty set byte 3 and Just Cause byte 18, each to 1, and nothing else; the order is `MMOMS.TXT` appendix A.3 (which spells index 3 "Aura of Mastery"; it is Aura of Majesty). The other 22 are the same order, *not yet seen set* |
 | `+0x49a` | magic strategy (u16), unknown (u16), then 6 × u16 "hostility" | kazzmir; *guess:* AI hostility toward each player; SAVE2 values are small (Jafar's are 0,0,0,0,2,3) |
 
 ### Diplomacy block (306 bytes at `+0x128`), field offsets inside it
@@ -42,19 +42,45 @@ Each entry is by *other player* 0 to 5 (the record owner's own slot is 0 or unus
 | `+0` | contacted | 6 × i8 |
 | `+6` | treaty interest, `+18` peace interest, `+30` trade interest | 6 × i16 each |
 | `+42` | **visible relations** (the figure the Diplomacy screen shows) | 6 × i8 |
-| `+48` | **diplomacy status** (*guess, ReMoM's names:* 0 none, 1 wizard pact, 2 alliance, 3 war, 4 final war) | 6 × i8 |
-| `+54` | strength | 6 × i16 |
+| `+48` | **diplomacy status**: 0 none, **1 wizard pact (checked: accepting a pact set it on both sides)**, 2 alliance and 3 war (*guess*, the saved values fit; not yet changed in the game), 4 final war (*guess*, ReMoM's names) | 6 × i8 |
+| `+54` | *guess:* a running count of threats (went to −1 and −4 after threatening Tauron and Sharee; was named "strength" in kazzmir) | 6 × i16 |
 | `+66` | action, `+72` spell (i16 × 6), `+84` city | |
 | `+90` | **default relations** | 6 × i8 |
 | `+96` | contact progress, `+102` broken treaty | 6 × i8 |
 | `+108` | unknown | 6 × i16 |
 | `+120` | **hidden relations** | 6 × i8 |
-| `+126` | unknown (24), `+150` tribute spell (6 × i8), `+156` unknown (90), `+246` tribute gold (6 × i16), `+258` unknown (30), `+288` and `+294` unknown (6 each), `+300` warning progress (6 × i8) | |
+| `+126` | unknown (24), `+150` tribute spell (6 × i8), `+156` unknown (90), `+246` tribute gold (6 × i16), `+258` unknown (30), `+288` unknown (6), **`+294` per-wizard flags set to 1 by a threat** (byte `294 + the wizard's number`), `+300` warning progress (6 × i8) | |
 
 **SAVE2:** the values are small signed numbers in the range seen in the game (relations from −81 to +15), the contact flags
 match who has met whom, and the status byte is 2 for Freya toward Sharee and Tauron (and Sharee's and Tauron's toward Freya), and 3 for Jafar and for
 Tauron toward the neutral side (war with the raiders is the natural reading). That fits the names above, but **no status has been changed in the game
 yet**, so the code's meaning is a *guess*.
+
+### Findings, 2026-10-12: Aura of Majesty, Just Cause, gold, a pact and threats
+
+STORY-050 and STORY-051. Test save: the advanced SAVE2 with Jafar given Subversion and Just Cause (slot 7); RAM read with
+`scripts/live_session.sh` and a snapshot script that diffs every wizard's diplomacy block and globals between steps. Vault checkpoint
+108 (`diplomacy-globals-test`, collection `mom-live-2026-10-12`). Relations below are the visible figures (`+42`), in i8, as the
+Diplomacy screen shows them. Kevin's pointer: **a spell is cast at End Turn**, not when it is chosen.
+
+| Step | What changed |
+| --- | --- |
+| Cast **Aura of Majesty** (400 mana; End Turn) | global byte **3** 0 to 1; visible relations with every wizard in contact set to **20** (Freya 0, Sharee and Tauron -20 before); Sss'ra, not in contact, unchanged; the three interest values rose (treaty 100 to 120..140, peace 100 to 110..120, trade 100 to 120..140); mana fell 140, not 400 (*guess:* the cost is paid over turns) |
+| Cast **Just Cause** (End Turn) | global byte **18** 0 to 1; relations 20 to **22** (*the second turn of Aura of Majesty: +2 a turn*); fame stayed at its cap, so the +10 was not seen |
+| **50 gold to Freya** | gold moves 1:1; relation 22 to **25** on both sides; nothing else changed |
+| **50 gold to Sharee** | relation 22 to **26** (+4 for the same gift) |
+| **100 gold to Tauron** | relation 22 to **28** (+6). *Guess:* about the gift ÷ 16, with some variation |
+| **Alliance** proposed to Freya, **declined** | nothing changed anywhere |
+| **Wizard pact** with Freya, **accepted** | status byte for the other wizard **0 to 1 on both records** (Jafar's `+49`, Freya's `+48`); Jafar's interest values toward Freya fell (treaty 120 to 67, peace 101 to 91, trade 122 to 112); the visible relation did not move |
+| **Threat** to Tauron | relation 28 to **23** (-5) on both sides; Jafar's interest values toward Tauron fell (treaty to -220, peace to 1, trade to 42); `+54` entry -1; flag byte `+298` 0 to 1; Tauron's record changed only in the relation |
+| **Threat** to Sharee (screen: "Do not make such threats idly, Jafar. The wrath of Sharee is terrible to behold.") | relation 26 to **18** (-8); interest values toward Sharee to -220, -99, -58; `+54` entry -4; flag byte `+297` 0 to 1 |
+
+Peace was greyed out with Freya (no war), and declaring war was refused until relations were bad enough, so **status 3 (war) is still
+unproven by a change**. Tauron's next answers were curt ("you have tried my patience") after the threat; the screen text gives the
+reaction, the bytes only the relation.
+
+The saved SAVE2 already shows the same codes (Freya toward Sharee 2, toward Tauron 1, now seen with 1 = pact checked), so 2 as an alliance is
+the natural reading, *guess* until one is made.
 
 ## The item block: `0x6fb8`, 138 × 50 bytes
 

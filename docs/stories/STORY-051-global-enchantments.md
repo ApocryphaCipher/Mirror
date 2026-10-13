@@ -1,7 +1,7 @@
 # STORY-051: Global enchantments: see, add, remove
 
 **Parent:** [EPIC-009](../epics/EPIC-009-wizard-editing.md)
-**Status:** open (2026-10-12). The layout is located (see below); the non-zero encoding is unseen.
+**Status:** open (2026-10-12). **Decoded in the real game:** an active global is a **1** in its byte (checked for Aura of Majesty, byte 3, and Just Cause, byte 18). Showing, adding and removing are not started.
 **Size:** medium to large (the decode decides)
 **Raised by:** [Kevin](https://github.com/KevinAsbury), 2026-10-12
 
@@ -21,3 +21,14 @@
 
 A documented layout with two sources, and one enchantment added and one removed, loaded in the real game and visible in
 its own screen (the Magic screen's active-spells list), surviving one End Turn.
+
+## Decode results (2026-10-12)
+
+Casting two globals in the real game (vault checkpoint 108) set exactly one byte each of the caster's 24, to 1: **byte 3 for Aura of Majesty** (the manual's list names
+index 3 "Aura of Mastery"; it is the same spell) and **byte 18 for Just Cause**. So the list order of `MMOMS.TXT` appendix A.3 is the byte order, and the encoding is 0/1.
+Spells are cast at End Turn, so the flag appeared then. The effects follow from the flag (Aura of Majesty raised relations each turn, with no other byte written for the spell
+itself; the relations are the diplomacy block's job). *Not yet seen:* the other 22 bytes, what the game does with a flag set by hand (does the effect start; is the upkeep
+charged; does the spell show in the Magic screen's list), and removing one (does it stop at once).
+
+**Suggested next step:** one edit test on a copy of the advanced SAVE2: set Nature Awareness (byte 7, cheap) by hand, load it, look at the Magic screen's list and the map,
+End Turn once and see the upkeep; then clear it and check that it goes away.
