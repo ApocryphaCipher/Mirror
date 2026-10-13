@@ -227,4 +227,48 @@ defmodule MirrorWeb.WizardPanelTest do
       assert WizardPanel.error_message(:bad_researching) =~ "1 to 214"
     end
   end
+
+  describe "relations and global enchantments" do
+    test "the relations list is every other named wizard plus the neutral player" do
+      d = WizardPanel.details(WizardFixture.synthetic(), 1)
+      assert Enum.map(d.relations, & &1.other) == [1, 5]
+
+      assert %{
+               name: "Sharee",
+               page: 2,
+               contacted: true,
+               relation: 25,
+               status: 1,
+               tag: "Wizard pact"
+             } =
+               Enum.at(d.relations, 0)
+
+      assert %{name: "Neutral", page: nil, contacted: false, relation: -81, status: 3, tag: "War"} =
+               Enum.at(d.relations, 1)
+    end
+
+    test "a rival's list has the player and the neutral player, with a negative relation" do
+      d = WizardPanel.details(WizardFixture.synthetic(), 2)
+      assert Enum.map(d.relations, & &1.other) == [0, 5]
+
+      assert %{name: "Jafar", page: 1, relation: -20, contacted: true, tag: "None"} =
+               hd(d.relations)
+    end
+
+    test "only the confirmed status words are unmarked" do
+      assert WizardPanel.status_checked?(0)
+      assert WizardPanel.status_checked?(1)
+      refute WizardPanel.status_checked?(2)
+      refute WizardPanel.status_checked?(3)
+    end
+
+    test "active globals are the bytes that are not zero, by name, in the save's order" do
+      d = WizardPanel.details(WizardFixture.synthetic(), 1)
+      assert d.globals == ["Aura of Majesty", "Just Cause"]
+      assert WizardPanel.details(WizardFixture.synthetic(), 2).globals == []
+      assert length(WizardPanel.global_names()) == 24
+      assert Enum.at(WizardPanel.global_names(), 3) == "Aura of Majesty"
+      assert Enum.at(WizardPanel.global_names(), 18) == "Just Cause"
+    end
+  end
 end

@@ -404,6 +404,75 @@ defmodule MirrorWeb.WizardLive do
             </button>
           </section>
 
+          <section id="wizard-relations" class="rounded-xl border border-white/10 bg-black/30 p-4">
+            <h2 class="mb-2 text-lg font-semibold text-white">Relations</h2>
+            <table class="w-full text-left text-sm text-slate-200">
+              <thead class="text-xs text-slate-400">
+                <tr>
+                  <th class="pb-1 font-normal">Wizard</th>
+                  <th class="pb-1 font-normal">Standing</th>
+                  <th class="pb-1 text-right font-normal">Relation</th>
+                  <th class="pb-1 pl-4 font-normal">Contact</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  :for={r <- @details.relations}
+                  id={"wizard-relation-#{r.other}"}
+                  class="border-t border-white/5"
+                >
+                  <td class="py-1">
+                    <.link
+                      :if={r.page}
+                      navigate={~p"/wizard/#{r.page}"}
+                      class="underline decoration-dotted"
+                    >
+                      {r.name}
+                    </.link>
+                    <span :if={!r.page}>{r.name}</span>
+                  </td>
+                  <td
+                    class="py-1"
+                    title={
+                      if WizardPanel.status_checked?(r.status),
+                        do: nil,
+                        else: "This code's meaning has not been confirmed in the game yet"
+                    }
+                  >
+                    {r.tag}{if !WizardPanel.status_checked?(r.status), do: "?"}
+                  </td>
+                  <td class={["py-1 text-right tabular-nums", relation_class(r.relation)]}>
+                    {if r.relation > 0, do: "+"}{r.relation}
+                  </td>
+                  <td class="py-1 pl-4 text-slate-400">
+                    {cond do
+                      r.other == 5 -> "–"
+                      r.contacted -> "met"
+                      true -> "not met"
+                    end}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <p class="mt-2 text-xs text-slate-400">
+              The relation is the figure the game's Diplomacy screen shows. A "?" after a standing means the
+              code's meaning has not been checked in the game yet.
+            </p>
+          </section>
+
+          <section id="wizard-globals" class="rounded-xl border border-white/10 bg-black/30 p-4">
+            <h2 class="mb-2 text-lg font-semibold text-white">Global enchantments</h2>
+            <p :if={@details.globals == []} class="text-slate-500">none cast by this wizard</p>
+            <ul :if={@details.globals != []} class="flex flex-wrap gap-2">
+              <li
+                :for={name <- @details.globals}
+                class="rounded-full border border-white/20 px-3 py-1 text-sm text-slate-100"
+              >
+                {name}
+              </li>
+            </ul>
+          </section>
+
           <section id="wizard-standing" class="rounded-xl border border-white/10 bg-black/30 p-4">
             <h2 class="mb-2 text-lg font-semibold text-white">Standing</h2>
             <p class="text-slate-200">
@@ -437,6 +506,10 @@ defmodule MirrorWeb.WizardLive do
 
   defp plane_name(:arcanus), do: "Arcanus"
   defp plane_name(:myrror), do: "Myrror"
+
+  defp relation_class(r) when r >= 10, do: "text-emerald-300"
+  defp relation_class(r) when r <= -10, do: "text-rose-300"
+  defp relation_class(_), do: "text-slate-200"
 
   defp spell_name(table, number), do: Spells.name(table, number)
 

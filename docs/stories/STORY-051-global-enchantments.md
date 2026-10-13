@@ -30,5 +30,5 @@ Spells are cast at End Turn, so the flag appeared then. The effects follow from 
 itself; the relations are the diplomacy block's job). *Not yet seen:* the other 22 bytes, what the game does with a flag set by hand (does the effect start; is the upkeep
 charged; does the spell show in the Magic screen's list), and removing one (does it stop at once).
 
-**Suggested next step:** one edit test on a copy of the advanced SAVE2: set Nature Awareness (byte 7, cheap) by hand, load it, look at the Magic screen's list and the map,
+**Built (2026-10-13):** the wizard page lists the caster's active globals by name (read-only; only byte 3 and 18 have been seen set, the other names are the book's order). **Suggested next step:** one edit test on a copy of the advanced SAVE2: set Nature Awareness (byte 7, cheap) by hand, load it, look at the Magic screen's list and the map,
 End Turn once and see the upkeep; then clear it and check that it goes away.

@@ -24,6 +24,36 @@ defmodule MirrorWeb.WizardPanel do
              ["Mana Focusing", "Node Mastery", "Famous", "Runemaster", "Conjurer"] ++
              ["Charismatic", "Artificer"]
 
+  # The 24 global enchantments in the save's byte order (`MMOMS.TXT` appendix A.3; its "Aura of
+  # Mastery" at 3 is Aura of Majesty: casting that spell set byte 3, checked 2026-10-12). Byte 3 and 18 (Just
+  # Cause) were seen set in the real game; the names of the others are the book's order, *not yet seen set*.
+  @globals [
+    "Eternal Night",
+    "Evil Omens",
+    "Zombie Mastery",
+    "Aura of Majesty",
+    "Wind Mastery",
+    "Suppress Magic",
+    "Time Stop",
+    "Nature Awareness",
+    "Nature's Wrath",
+    "Herb Mastery",
+    "Chaos Surge",
+    "Doom Mastery",
+    "Great Wasting",
+    "Meteor Storm",
+    "Armageddon",
+    "Tranquility",
+    "Life Force",
+    "Crusade",
+    "Just Cause",
+    "Holy Arms",
+    "Planar Seal",
+    "Charm of Life",
+    "Detect Magic",
+    "Awareness"
+  ]
+
   @realms ["Nature", "Sorcery", "Chaos", "Life", "Death"]
   @realms_atoms [:nature, :sorcery, :chaos, :life, :death]
 
@@ -93,6 +123,8 @@ defmodule MirrorWeb.WizardPanel do
         researching::little-16, library::binary-size(240), _::binary>> = rec
 
       <<_::binary-size(0x356), gold::little-16, _::binary>> = rec
+      <<_::binary-size(0x128), diplomacy::binary-size(306), _::binary>> = rec
+      <<_::binary-size(0x482), globals::binary-size(24), _::binary>> = rec
 
       %{
         id: id,
@@ -130,6 +162,12 @@ defmodule MirrorWeb.WizardPanel do
         researching: spell(researching),
         research_left: research_left,
         researching_number: researching,
+        relations: relations(record, names, diplomacy),
+        globals:
+          for(
+            {name, value} when value != 0 <- Enum.zip(@globals, :binary.bin_to_list(globals)),
+            do: name
+          ),
         candidates: for(<<n::little-16 <- candidates>>, n in 1..214//1, do: n),
         library: :binary.bin_to_list(binary_part(library, 0, 214)),
         spells: known_by_realm(library),
@@ -141,6 +179,43 @@ defmodule MirrorWeb.WizardPanel do
   end
 
   def details(_raw, _id), do: nil
+
+  # The diplomacy block's arrays (`+0` contacted, `+42` visible relations, `+48` status), by the other player
+  # 0 to 5 (5 is the neutral player). The tag words: 0 none and 1 pact are checked in the real game
+  # (2026-10-12); 2 alliance and 3 war are the saved values' natural reading, *not yet changed in the game*.
+  defp relations(record, names, diplomacy) do
+    <<contacted::binary-size(6), _::binary-size(36), relations::binary-size(6),
+      status::binary-size(6), _::binary>> = diplomacy
+
+    for other <- 0..5, other != record, other == 5 or Map.get(names, other, "") != "" do
+      <<relation::signed>> = binary_part(relations, other, 1)
+
+      %{
+        other: other,
+        name: if(other == 5, do: "Neutral", else: Map.fetch!(names, other)),
+        page: page_id(other, if(other == 5, do: "", else: Map.fetch!(names, other))),
+        contacted: :binary.at(contacted, other) != 0,
+        relation: relation,
+        status: :binary.at(status, other),
+        tag: status_tag(:binary.at(status, other))
+      }
+    end
+  end
+
+  defp status_tag(0), do: "None"
+  defp status_tag(1), do: "Wizard pact"
+  defp status_tag(2), do: "Alliance"
+  defp status_tag(3), do: "War"
+  defp status_tag(4), do: "Final war"
+  defp status_tag(n), do: "Status #{n}"
+
+  @doc "Whether a status tag's meaning has been checked in the real game (None and Wizard pact have)."
+  @spec status_checked?(non_neg_integer()) :: boolean()
+  def status_checked?(status), do: status in [0, 1]
+
+  @doc "The global enchantment names in the save's byte order."
+  @spec global_names() :: [String.t()]
+  def global_names, do: @globals
 
   defp chunks(bin, size), do: for(<<c::binary-size(^size) <- bin>>, do: c)
 
