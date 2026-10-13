@@ -17,7 +17,7 @@ defmodule Mirror.WizardFixture do
     # Unused node records are 0xFF, as in the game (a zeroed one is a node owned by wizard 0).
     raw = put(:binary.copy(<<0>>, 123_300), 0x6058, :binary.copy(<<0xFF>>, 30 * 48))
 
-    # Both wizards' fortresses are active (x, y, plane, active); an inactive one is a defeated wizard.
+    # Both wizards' fortresses are active (x, y, plane, active); an inactive one is a banished wizard.
     raw
     |> put(0x65F8, <<7, 17, 0, 1, 23, 25, 0, 1>>)
     |> field(0, 0x00, <<7>>)
@@ -52,6 +52,6 @@ defmodule Mirror.WizardFixture do
 
   def put_bytes(raw, at, bytes), do: put(raw, at, bytes)
 
-  @doc "Marks wizard `record`'s fortress inactive: the game then treats him as defeated."
-  def defeat(raw, record), do: put(raw, 0x65F8 + record * 4 + 3, <<0>>)
+  @doc "Marks wizard `record`'s fortress inactive: the game then treats him as banished."
+  def banish(raw, record), do: put(raw, 0x65F8 + record * 4 + 3, <<0>>)
 end

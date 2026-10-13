@@ -83,4 +83,4 @@ Unsorted, not yet promoted to a story.
 - ~~**Enchanted roads should animate**~~ (found 2026-10-07 while doing STORY-008): done in
   [stories/STORY-045-enchanted-road-shimmer.md](stories/STORY-045-enchanted-road-shimmer.md). The game shows one frame
   across the whole road, not a per-tile offset like the node sparkles.
-- **Defeat / revive a wizard** (found 2026-10-13, STORY-050): clearing a wizard's fortress active byte makes the game draw him defeated (checked on the Magic screen); an editor control would need one End Turn test on a copy to see what the game does with his cities and units, and whether the conqueror's `DefeatedWizards` count (`+0x354`) must follow.
+- **Banish / lift a wizard** (found 2026-10-13, STORY-050): clearing a wizard's fortress active byte makes the game draw him banished (checked on the Magic screen); an editor control would need one End Turn test on a copy to see what the game does with his cities and units, and whether the conqueror's `DefeatedWizards` count (`+0x354`) must follow.
