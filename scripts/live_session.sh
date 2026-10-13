@@ -18,7 +18,9 @@ case "${1:-}" in
     mkdir -p "$LOG_DIR"
     # Mounts ~/DOS as C:. Then in DOSBox: cd MAGIC, then magic
     cd "$HOME/DOS"
+    # 6500 cycles: the config's default of 3000 is painfully slow for the game (Kevin, 2026-10-13).
     exec "$DOSBOX" \
+      --set cpu_cycles=6500 \
       --set webserver_enabled=true \
       --set webserver_file_log="$LOG_DIR/files-$(date +%Y%m%d-%H%M).jsonl" \
       .
