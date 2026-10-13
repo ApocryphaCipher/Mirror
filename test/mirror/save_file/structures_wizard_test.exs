@@ -122,4 +122,67 @@ defmodule Mirror.SaveFile.StructuresWizardTest do
       assert Structures.edit_wizard(raw, 0, change) == {:error, reason}, inspect(change)
     end
   end
+
+  describe "relations" do
+    # fixture: Jafar (0) and Sharee (1) are named; Jafar sees Sharee at 25 with a pact (status 1)
+    defp rel(raw, owner, other) do
+      <<r::signed>> = read(raw, owner, 0x128 + 42 + other, 1)
+      r
+    end
+
+    defp status(raw, owner, other), do: :binary.at(read(raw, owner, 0x128 + 48 + other, 1), 0)
+
+    test "a relation and a status are written on both records" do
+      raw = WizardFixture.synthetic()
+
+      assert {:ok, new, %{changed: [:relations]}} =
+               Structures.edit_wizard(raw, 0, relations: [{1, -40, 3}])
+
+      assert {rel(new, 0, 1), status(new, 0, 1)} == {-40, 3}
+      assert {rel(new, 1, 0), status(new, 1, 0)} == {-40, 3}
+    end
+
+    test "nil leaves the relation or the status as it is" do
+      raw = WizardFixture.synthetic()
+      {:ok, only_status, _} = Structures.edit_wizard(raw, 0, relations: [{1, nil, 2}])
+      assert {rel(only_status, 0, 1), status(only_status, 0, 1)} == {25, 2}
+
+      {:ok, only_relation, _} = Structures.edit_wizard(raw, 1, relations: [{0, 60, nil}])
+      assert {rel(only_relation, 0, 1), status(only_relation, 0, 1)} == {60, 1}
+      # the fixture's other side has no pact; a nil status leaves whatever it holds
+      assert {rel(only_relation, 1, 0), status(only_relation, 1, 0)} == {60, status(raw, 1, 0)}
+    end
+
+    test "other entries of both blocks and the interest values are untouched" do
+      raw = WizardFixture.synthetic()
+      {:ok, new, _} = Structures.edit_wizard(raw, 0, relations: [{1, 7, 0}])
+
+      differing =
+        for i <- 0..(byte_size(raw) - 1), :binary.at(raw, i) != :binary.at(new, i), do: i
+
+      block0 = 0x9E8 + 0x128
+      block1 = 0x9E8 + @size + 0x128
+      assert differing -- [block0 + 43, block0 + 49, block1 + 42, block1 + 48] == []
+    end
+
+    test "refuses itself, an unnamed wizard, the neutral player, and bad values" do
+      raw = WizardFixture.synthetic()
+
+      for {rels, _} <- [
+            {[{0, 10, 1}], :self},
+            {[{2, 10, 1}], :unnamed},
+            {[{5, 10, 1}], :neutral},
+            {[{1, 101, 1}], :high},
+            {[{1, -101, 1}], :low},
+            {[{1, 10, 5}], :status},
+            {[{1, nil, nil}], :nothing},
+            {[{1, "10", 1}], :type},
+            {[], :empty},
+            {[:x], :shape}
+          ] do
+        assert Structures.edit_wizard(raw, 0, relations: rels) == {:error, :bad_relations},
+               inspect(rels)
+      end
+    end
+  end
 end

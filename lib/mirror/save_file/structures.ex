@@ -1076,11 +1076,15 @@ defmodule Mirror.SaveFile.Structures do
     * `:retorts` (#{@retort_count} booleans, in the save's byte order)
     * `:spells` (a list of `{spell number 1..#{@spell_count}, state}`; state 0 unknown, 1 knowable, 2 known, 3 on the research list;
       only the listed spells are written)
+    * `:relations` (a list of `{other wizard 0..4, relation, status}`; `relation` -100..100 or `nil` to leave it, `status` 0..4 or `nil`):
+      the figure the Diplomacy screen shows (`+0x128 + 42`) and the treaty code (`+0x128 + 48`), written on **both**
+      wizards' records, since the game keeps each pair in both. Status 0 none, 1 wizard pact are checked in the game; 2 alliance, 3 war
+      and 4 final war are *guesses* (2026-10-12). The AI's interest values are left alone.
     * `:researching` (the spell being researched, 0 for none, or a spell number 1..#{@spell_count}) and `:research_left` (research
       points left, 0 to 65535)
 
   Refused: a record with no name (`:no_such_wizard`), a bad value (`:bad_gold`, `:bad_mana`, `:bad_fame`,
-  `:bad_name`, `:bad_books`, `:bad_retorts`, `:bad_spells`, `:bad_researching`, `:bad_research_left`) or an unknown field. The power base, casting skill and the
+  `:bad_name`, `:bad_books`, `:bad_retorts`, `:bad_spells`, `:bad_researching`, `:bad_research_left`, `:bad_relations`) or an unknown field. The power base, casting skill and the
   research candidates are worked out again by the game, so they are not touched.
   """
   @spec edit_wizard(binary(), non_neg_integer(), keyword()) :: result()
@@ -1089,7 +1093,8 @@ defmodule Mirror.SaveFile.Structures do
 
     with true <- record in 0..4//1 and byte_size(raw) >= @wizard_offset + 5 * @wizard_record,
          true <- :binary.at(raw, at + 1) != 0,
-         {:ok, edits} <- wizard_edits(changes) do
+         {:ok, edits} <- wizard_edits(changes),
+         :ok <- check_relation_targets(raw, record, edits[:relations]) do
       raw =
         Enum.reduce(edits, raw, fn
           {:gold, v}, acc ->
@@ -1110,6 +1115,13 @@ defmodule Mirror.SaveFile.Structures do
           {:spells, v}, acc ->
             Enum.reduce(v, acc, fn {n, state}, acc -> put(acc, at + 0x264 + n - 1, <<state>>) end)
 
+          {:relations, v}, acc ->
+            Enum.reduce(v, acc, fn {other, relation, status}, acc ->
+              acc
+              |> put_relation(record, other, relation, status)
+              |> put_relation(other, record, relation, status)
+            end)
+
           {:researching, v}, acc ->
             put(acc, at + 0x262, <<v::little-16>>)
 
@@ -1125,6 +1137,36 @@ defmodule Mirror.SaveFile.Structures do
       {:error, _} = error -> error
       _ -> {:error, :no_such_wizard}
     end
+  end
+
+  # Wizard `owner`'s view of `other`: the relation at `+42` and the status at `+48` of its diplomacy block.
+  defp put_relation(raw, owner, other, relation, status) do
+    block = @wizard_offset + owner * @wizard_record + 0x128
+
+    raw
+    |> then(&if(relation, do: put(&1, block + 42 + other, <<relation::signed>>), else: &1))
+    |> then(&if(status, do: put(&1, block + 48 + other, <<status>>), else: &1))
+  end
+
+  defp valid_relation?({other, relation, status}),
+    do:
+      is_integer(other) and other in 0..4//1 and
+        (is_nil(relation) or (is_integer(relation) and relation in -100..100//1)) and
+        (is_nil(status) or (is_integer(status) and status in 0..4//1)) and
+        not (is_nil(relation) and is_nil(status))
+
+  defp valid_relation?(_), do: false
+
+  # A pair needs two wizards: not the wizard itself, and the other one must have a name.
+  defp check_relation_targets(_raw, _record, nil), do: :ok
+
+  defp check_relation_targets(raw, record, relations) do
+    ok? =
+      Enum.all?(relations, fn {other, _, _} ->
+        other != record and :binary.at(raw, @wizard_offset + other * @wizard_record + 1) != 0
+      end)
+
+    if ok?, do: :ok, else: {:error, :bad_relations}
   end
 
   defp bool_byte(true), do: 1
@@ -1174,6 +1216,12 @@ defmodule Mirror.SaveFile.Structures do
   end
 
   defp wizard_value(:spells, _), do: {:error, :bad_spells}
+
+  defp wizard_value(:relations, v) when is_list(v) and v != [] do
+    if Enum.all?(v, &valid_relation?/1), do: :ok, else: {:error, :bad_relations}
+  end
+
+  defp wizard_value(:relations, _), do: {:error, :bad_relations}
 
   defp wizard_value(:researching, v) when is_integer(v) and v in 0..@spell_count//1, do: :ok
   defp wizard_value(:researching, _), do: {:error, :bad_researching}

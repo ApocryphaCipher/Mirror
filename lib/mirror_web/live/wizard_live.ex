@@ -406,6 +406,13 @@ defmodule MirrorWeb.WizardLive do
 
           <section id="wizard-relations" class="rounded-xl border border-white/10 bg-black/30 p-4">
             <h2 class="mb-2 text-lg font-semibold text-white">Relations</h2>
+            <input
+              :if={@editing}
+              form="wizard-form"
+              type="hidden"
+              name="wizard[relations_present]"
+              value="1"
+            />
             <table class="w-full text-left text-sm text-slate-200">
               <thead class="text-xs text-slate-400">
                 <tr>
@@ -439,10 +446,38 @@ defmodule MirrorWeb.WizardLive do
                         else: "This code's meaning has not been confirmed in the game yet"
                     }
                   >
-                    {r.tag}{if !WizardPanel.status_checked?(r.status), do: "?"}
+                    <select
+                      :if={@editing and r.other < 5}
+                      form="wizard-form"
+                      name={"wizard[relations][#{r.other}][status]"}
+                      class="rounded bg-slate-900 px-1 py-0.5 text-white"
+                    >
+                      <option
+                        :for={{value, label} <- WizardPanel.status_options(r.status)}
+                        value={value}
+                        selected={value == r.status}
+                      >
+                        {label}
+                      </option>
+                    </select>
+                    <span :if={!(@editing and r.other < 5)}>
+                      {r.tag}{if !WizardPanel.status_checked?(r.status), do: "?"}
+                    </span>
                   </td>
                   <td class={["py-1 text-right tabular-nums", relation_class(r.relation)]}>
-                    {if r.relation > 0, do: "+"}{r.relation}
+                    <input
+                      :if={@editing and r.other < 5}
+                      form="wizard-form"
+                      type="number"
+                      min="-100"
+                      max="100"
+                      name={"wizard[relations][#{r.other}][relation]"}
+                      value={r.relation}
+                      class="w-20 rounded bg-slate-900 px-1 py-0.5 text-right text-white"
+                    />
+                    <span :if={!(@editing and r.other < 5)}>
+                      {if r.relation > 0, do: "+"}{r.relation}
+                    </span>
                   </td>
                   <td class="py-1 pl-4 text-slate-400">
                     {cond do
@@ -458,6 +493,18 @@ defmodule MirrorWeb.WizardLive do
               The relation is the figure the game's Diplomacy screen shows. A "?" after a standing means the
               code's meaning has not been checked in the game yet.
             </p>
+            <p :if={@editing} class="mt-1 text-xs text-slate-400">
+              A change is written to both wizards. The treaty codes are what the game keeps; it
+              does not check them, so an alliance with someone at war with your ally is yours to sort out.
+            </p>
+            <button
+              :if={@editing}
+              form="wizard-form"
+              type="submit"
+              class="mt-2 rounded-lg bg-emerald-300 px-4 py-1 text-sm font-semibold text-slate-950 hover:bg-emerald-200"
+            >
+              Apply
+            </button>
           </section>
 
           <section id="wizard-globals" class="rounded-xl border border-white/10 bg-black/30 p-4">

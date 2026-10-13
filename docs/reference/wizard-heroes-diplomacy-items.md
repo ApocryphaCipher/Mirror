@@ -42,7 +42,7 @@ Each entry is by *other player* 0 to 5 (the record owner's own slot is 0 or unus
 | `+0` | contacted | 6 × i8 |
 | `+6` | treaty interest, `+18` peace interest, `+30` trade interest | 6 × i16 each |
 | `+42` | **visible relations** (the figure the Diplomacy screen shows) | 6 × i8 |
-| `+48` | **diplomacy status**: 0 none, **1 wizard pact (checked: accepting a pact set it on both sides)**, 2 alliance and 3 war (*guess*, the saved values fit; not yet changed in the game), 4 final war (*guess*, ReMoM's names) | 6 × i8 |
+| `+48` | **diplomacy status**, all four **checked in the real game**: **0 none** (peace is just this: a peace treaty with a wizard at war sets 3 back to 0), **1 wizard pact**, **2 alliance**, **3 war**; 4 final war is ReMoM's name, never seen | 6 × i8 |
 | `+54` | *guess:* a running count of threats (went to −1 and −4 after threatening Tauron and Sharee; was named "strength" in kazzmir) | 6 × i16 |
 | `+66` | action, `+72` spell (i16 × 6), `+84` city | |
 | `+90` | **default relations** | 6 × i8 |
@@ -81,6 +81,22 @@ reaction, the bytes only the relation.
 
 The saved SAVE2 already shows the same codes (Freya toward Sharee 2, toward Tauron 1, now seen with 1 = pact checked), so 2 as an alliance is
 the natural reading, *guess* until one is made.
+
+### Findings, 2026-10-13: writing relations and statuses by hand (STORY-050)
+
+Test save (slot 7): the advanced SAVE2 with, written by `Structures.edit_wizard/3` on both wizards' records: Jafar and Freya relation 70; Jafar and
+Sharee +50 with status 2; Jafar and Tauron -90 with status 3. Ten bytes differed. Vault checkpoint 109 (`relations-edit-test`).
+
+- **The game takes them as written:** RAM equals the file on load. The Magic screen's icons by each portrait match: **crossed swords** for 3 (blue, by Tauron),
+  a **round peace symbol** for 2 (blue by Sharee for Jafar, green by Sharee for Freya), a **rectangle** for 1 (the Freya-Tauron pact). The icon's colour is the
+  other wizard's banner. The attitude words by the portraits: 70 "Peaceful", +50 "Calm", 0 "Neutral", -20 "Uneasy", -90 "Hate".
+- **The Diplomacy menu follows the status:** at 3 (war) *Peace Treaty* is offered and Wizard Pact, Alliance and the other proposals are greyed; at 2 (alliance) Wizard Pact,
+  Alliance and Peace Treaty are greyed and *Break Alliance With Another Wizard* and *Declaration of War on Another Wizard* are offered; at 0, *Threaten/Break Treaty*
+  and *Exchange Spells* are available (they are greyed at war). Tauron still greeted Jafar politely at -90.
+- **Peace:** Tauron **accepted a peace treaty at relation -90**; status 3 became **0** on both records and the relation rose to -50 (+40), with the interest
+  values toward him spent (treaty 100 to 34, peace 101 to 71, trade 104 to 74).
+- **One End Turn:** the alliance and the relations were kept; allies and pact partners drifted up a few points (Jafar-Sharee 50 to 52, Freya-Sharee 14 to 18, Freya-Tauron 18 to 20);
+  a relation with no treaty (Jafar-Freya 70) did not move.
 
 ## The item block: `0x6fb8`, 138 × 50 bytes
 

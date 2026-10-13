@@ -47,7 +47,7 @@
 - [STORY-047](STORY-047-wizard-page-read-only.md): the `/wizard/:id` page, read-only, with the flag-colour gradient (EPIC-009) **Built, PR open; the game-screen check is pending**
 - [STORY-048](STORY-048-wizard-basics-editing.md): edit a wizard's gold, mana, fame, name, books and retorts (EPIC-009) **Built, checked in the real game; PR open**
 - [STORY-049](STORY-049-wizard-spells-and-research.md): the spell library and what is being researched (EPIC-009) **Built, checked in the real game; PR open**
-- [STORY-050](STORY-050-wizard-relations.md): relations between wizards, peace/war/attitude (EPIC-009) **Decode mostly done (real game, 2026-10-12); read-only table built, edit open**
+- [STORY-050](STORY-050-wizard-relations.md): relations between wizards, peace/war/attitude (EPIC-009) **Built and checked in the real game (2026-10-13); PR open**
 - [STORY-051](STORY-051-global-enchantments.md): global enchantments, see/add/remove (EPIC-009) **Decoded (real game, 2026-10-12); read-only list built, edit open**
 - [STORY-052](STORY-052-hero-list-decode-and-view.md): decode the hero list; show a wizard's heroes (EPIC-010) **Proposed**
 - [STORY-053](STORY-053-hero-editing.md): edit a hero: name, experience, owner, dismiss (EPIC-010) **Proposed**

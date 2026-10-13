@@ -202,6 +202,13 @@ defmodule MirrorWeb.WizardPanel do
     end
   end
 
+  @doc "The standings the editor offers, as `{code, label}`; a code outside them (4, or an unknown one) is kept as the current choice."
+  @spec status_options(non_neg_integer()) :: [{non_neg_integer(), String.t()}]
+  def status_options(current) do
+    base = [{0, "None"}, {1, "Wizard pact"}, {2, "Alliance"}, {3, "War"}]
+    if current in 0..3, do: base, else: base ++ [{current, status_tag(current) <> "?"}]
+  end
+
   defp status_tag(0), do: "None"
   defp status_tag(1), do: "Wizard pact"
   defp status_tag(2), do: "Alliance"
@@ -209,9 +216,9 @@ defmodule MirrorWeb.WizardPanel do
   defp status_tag(4), do: "Final war"
   defp status_tag(n), do: "Status #{n}"
 
-  @doc "Whether a status tag's meaning has been checked in the real game (None and Wizard pact have)."
+  @doc "Whether a status tag's meaning has been checked in the real game (0 to 3 have; 4 has not been seen)."
   @spec status_checked?(non_neg_integer()) :: boolean()
-  def status_checked?(status), do: status in [0, 1]
+  def status_checked?(status), do: status in 0..3
 
   @doc "The global enchantment names in the save's byte order."
   @spec global_names() :: [String.t()]
@@ -275,11 +282,12 @@ defmodule MirrorWeb.WizardPanel do
          {:ok, retorts} <- retorts(params, details),
          {:ok, spells} <- spells(params, details),
          {:ok, research} <- research(params, details),
+         {:ok, relations} <- relations_changes(params, details),
          {:ok, name} <- name(params, details) do
       changes =
         nums ++
           if(name != details.name, do: [name: name], else: []) ++
-          books ++ retorts ++ spells ++ research
+          books ++ retorts ++ spells ++ research ++ relations
 
       {:ok, changes}
     end
@@ -385,6 +393,57 @@ defmodule MirrorWeb.WizardPanel do
     end
   end
 
+  # The Relations rows (`relations[N][relation]` and `relations[N][status]`, N the other wizard's record 0..4;
+  # `relations_present` says the form had them). Only fields that differ from the save become changes; the neutral
+  # player's row is not editable. The save keeps each pair on both wizards' records and `edit_wizard/3` writes both.
+  defp relations_changes(%{"relations_present" => _} = params, details) do
+    case Map.get(params, "relations", %{}) do
+      given when is_map(given) -> relation_rows(given, details)
+      _ -> {:error, :bad_relations}
+    end
+  end
+
+  defp relations_changes(_params, _details), do: {:ok, []}
+
+  defp relation_rows(given, details) do
+    editable = Enum.filter(details.relations, &(&1.other < 5))
+
+    editable
+    |> Enum.reduce_while({:ok, []}, fn row, {:ok, acc} ->
+      case Map.get(given, Integer.to_string(row.other)) do
+        nil -> {:cont, {:ok, acc}}
+        fields when is_map(fields) -> relation_row(row, fields, acc)
+        _ -> {:halt, {:error, :bad_relations}}
+      end
+    end)
+    |> then(fn
+      {:ok, []} -> {:ok, []}
+      {:ok, rows} -> {:ok, [relations: rows]}
+      error -> error
+    end)
+  end
+
+  defp relation_row(row, fields, acc) do
+    with {:ok, relation} <- relation_value(Map.get(fields, "relation"), row.relation),
+         {:ok, status} <- relation_value(Map.get(fields, "status"), row.status) do
+      if relation == nil and status == nil,
+        do: {:cont, {:ok, acc}},
+        else: {:cont, {:ok, acc ++ [{row.other, relation, status}]}}
+    else
+      _ -> {:halt, {:error, :bad_relations}}
+    end
+  end
+
+  # `nil` for a value that is not given or equals the saved one, so only changes are written.
+  defp relation_value(raw, current) do
+    case number(raw) do
+      :skip -> {:ok, nil}
+      {:ok, ^current} -> {:ok, nil}
+      {:ok, n} -> {:ok, n}
+      :error -> :error
+    end
+  end
+
   defp offered(:same, _details), do: :ok
   defp offered(n, details), do: if(n in details.candidates, do: :ok, else: {:error, :not_offered})
 
@@ -482,9 +541,15 @@ defmodule MirrorWeb.WizardPanel do
         {:researching, 0} -> "no spell researched"
         {:researching, n} -> "researching spell #{n}"
         {:research_left, n} -> "#{n} research points left"
+        {:relations, rows} -> "relations with " <> relation_names(details, rows)
       end)
 
     "Edited #{details.name}: #{Enum.join(parts, ", ")}"
+  end
+
+  defp relation_names(details, rows) do
+    names = for {other, _, _} <- rows, r <- details.relations, r.other == other, do: r.name
+    Enum.join(names, ", ")
   end
 
   @doc "The words for a refused edit."
@@ -497,6 +562,10 @@ defmodule MirrorWeb.WizardPanel do
     do: "A name is 1 to 19 letters, digits or punctuation (no accents)."
 
   def error_message(:bad_books), do: "Books are whole numbers from 0 to 13."
+
+  def error_message(:bad_relations),
+    do:
+      "A relation is a whole number from -100 to 100, a standing one of None, Pact, Alliance, War."
 
   def error_message(:not_offered),
     do: "Research can only be set to one of the spells the game offers (its research list)."
