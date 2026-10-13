@@ -1,7 +1,7 @@
 # STORY-050: Relations between wizards: peace, war, attitude
 
 **Parent:** [EPIC-009](../epics/EPIC-009-wizard-editing.md)
-**Status:** open (2026-10-12). The layout is located (see below); what remains is confirming each code in the game.
+**Status:** open (2026-10-12). **Decode largely done** (see the findings in the reference doc): visible relations, pact status, interest values and threat flags confirmed in the real game; war (3) and alliance (2) not yet changed. Showing and editing are not started.
 **Size:** large (the decode decides)
 **Raised by:** [Kevin](https://github.com/KevinAsbury), 2026-10-12 ("a relationship editor", "peace/war tags")
 
@@ -22,3 +22,21 @@
 
 A documented layout with two sources; one edited relation loaded in the real game and visible on its Diplomacy screen, and
 the AI behaving as the new state says over one End Turn (it does not break a peace on the spot, or if it does, that is noted).
+
+## Decode results (2026-10-12)
+
+Checked by a real-game session (vault checkpoint 108; [findings](../reference/wizard-heroes-diplomacy-items.md#findings-2026-10-12-aura-of-majesty-just-cause-gold-a-pact-and-threats)):
+
+- `+42` **visible relations** are what the Diplomacy screen shows, kept on **both** wizards' records (a gift or a threat changes both). Aura of Majesty
+  sets them to 20 and adds 2 a turn; 50 gold buys +3 or +4, 100 gold +6; a threat costs 5 to 8.
+- `+48` **status**: a pact is **1** on both records (0 none). 2 (alliance) and 3 (war) fit the saved values, *not yet changed*.
+- The interest values (`+6`, `+18`, `+30`) drop when a treaty is made or a threat is made; they are the wizard's own willingness, held in the wizard's own block.
+- A refusal changes nothing. Peace is only offered at war, war only when relations are bad.
+
+**What editing needs to know before it is built:** write both records' relation and status (the game keeps both); whether a status set by hand is kept
+or undone at the next turn (test: set a pact, End Turn); whether the interest values need to follow (they are the AI's willingness, so a pact
+with interest left high may be broken at once). The tags to show: None, Pact, Alliance (*guess*), War (*guess*).
+
+**Suggested next steps:** (a) show the table of relations and status on each wizard's page, read-only (no new game test); (b) one edit test: set a pact and
+a relation on a copy of the advanced SAVE2, load it, read the Diplomacy screen, End Turn once; (c) set a status 3 (war) and 2 (alliance) the same way, which
+also settles their meaning.
