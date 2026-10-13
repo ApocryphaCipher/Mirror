@@ -12,10 +12,16 @@ First session: 2026-09-23. Dumps and the matching save are in
 
 - **Source:** `~/repo/c++/dosbox-staging`, a fork of DOSBox Staging
   (`ApocryphaCipher/dosbox-staging`, GPL). Upstream already has an HTTP
-  API (`src/webserver/`); the fork's branch `webserver-write-guard` adds
-  `webserver_allow_writes` (off by default: memory writes, allocate/free
-  and shutdown return 403), refuses non-loopback bind addresses, and adds
-  a **screenshot endpoint** (below).
+  API (`src/webserver/`, in the v0.83.0 release, writes allowed). The fork's
+  branches (reorganised 2026-10-13, one concern each so they can be offered upstream):
+  `feat/webserver-write-gate` (`webserver_allow_writes`, off by default: memory
+  writes, allocate/free and shutdown return 403), `feat/webserver-loopback-only`
+  (refuses non-loopback bind addresses), `feat/webserver-screenshot` (the
+  **screenshot endpoint**, below) and `feat/webserver-pause-resume`. Its `main` is
+  upstream plus the first three. **`apocrypha/research`** (the branch to build and run; it
+  was `webserver-write-guard` until then, kept as the tag
+  `archive/webserver-write-guard-2026-10-13`) is `main` plus pause/resume and
+  the research tools: the DOS file-call log and signature watching.
 - **Build:**
   `VCPKG_ROOT=$HOME/vcpkg cmake --preset=debug-macos && cmake --build --preset=debug-macos`.
   The binary is `build/debug-macos/Debug/dosbox`. If configure says
