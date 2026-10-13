@@ -33,6 +33,29 @@ defmodule MirrorWeb.WizardLiveTest do
     assert has_element?(view, "#wizard-switcher a[href='/wizard/2']", "Sharee")
   end
 
+  test "shows the relations table and the active global enchantments", %{conn: conn, sid: sid} do
+    load_save(sid)
+    {:ok, view, _} = live(conn, ~p"/wizard/1")
+
+    assert has_element?(view, "#wizard-relation-1", "Sharee")
+    assert has_element?(view, "#wizard-relation-1", "Wizard pact")
+    assert has_element?(view, "#wizard-relation-1", "+25")
+    assert has_element?(view, "#wizard-relation-1 a[href='/wizard/2']")
+    assert has_element?(view, "#wizard-relation-5", "Neutral")
+    assert has_element?(view, "#wizard-relation-5", "-81")
+    refute has_element?(view, "#wizard-relation-5", "not met")
+    # War is not confirmed in the game yet: marked
+    assert has_element?(view, "#wizard-relation-5", "War?")
+    refute has_element?(view, "#wizard-relation-1", "Wizard pact?")
+
+    assert has_element?(view, "#wizard-globals", "Aura of Majesty")
+    assert has_element?(view, "#wizard-globals", "Just Cause")
+
+    {:ok, rival, _} = live(conn, ~p"/wizard/2")
+    assert has_element?(rival, "#wizard-globals", "none cast by this wizard")
+    assert has_element?(rival, "#wizard-relation-0 a[href='/wizard/1']")
+  end
+
   test "a missing wizard answers 404 with the note; an existing one 200", %{conn: conn, sid: sid} do
     assert get(conn, ~p"/wizard/6").status == 404
     assert get(conn, ~p"/wizard/abc").status == 404

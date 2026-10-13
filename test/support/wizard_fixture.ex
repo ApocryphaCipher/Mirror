@@ -37,6 +37,13 @@ defmodule Mirror.WizardFixture do
     |> field(0, 0x264, <<2, 1, 1>>)
     |> field(0, 0x264 + 40, <<2>>)
     |> field(0, 0x356, <<1234::little-16>>)
+    |> field(0, 0x128, <<0, 1, 0, 0, 0, 0>>)
+    |> field(0, 0x128 + 42, <<0, 25, 0, 0, 0, -81::signed>>)
+    |> field(0, 0x128 + 48, <<0, 1, 0, 0, 0, 3>>)
+    |> field(0, 0x482 + 3, <<1>>)
+    |> field(0, 0x482 + 18, <<1>>)
+    |> field(1, 0x128, <<1, 0, 0, 0, 0, 0>>)
+    |> field(1, 0x128 + 42, <<-20::signed, 0, 0, 0, 0, 0>>)
     |> field(1, 0x01, String.pad_trailing("Sharee", 20, <<0>>))
     |> field(1, 0x16, <<3>>)
   end
