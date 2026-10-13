@@ -341,4 +341,39 @@ defmodule MirrorWeb.WizardPanelTest do
       assert Enum.at(WizardPanel.global_names(), 18) == "Just Cause"
     end
   end
+
+  describe "defeated wizards" do
+    test "a wizard whose fortress is inactive is defeated, and so is his row on the others' pages" do
+      raw = WizardFixture.synthetic()
+      refute WizardPanel.details(raw, 1).defeated
+      refute WizardPanel.details(raw, 2).defeated
+
+      dead = WizardFixture.defeat(raw, 1)
+      assert WizardPanel.details(dead, 2).defeated
+      refute WizardPanel.details(dead, 1).defeated
+
+      assert %{defeated: true} =
+               Enum.find(WizardPanel.details(dead, 1).relations, &(&1.other == 1))
+
+      assert %{defeated: false} =
+               Enum.find(WizardPanel.details(dead, 1).relations, &(&1.other == 5))
+    end
+
+    test "a defeated wizard's relation row is not editable" do
+      dead = WizardFixture.defeat(WizardFixture.synthetic(), 1)
+      d = WizardPanel.details(dead, 1)
+
+      params = %{
+        "relations_present" => "1",
+        "relations" => %{"1" => %{"relation" => "-40", "status" => "3"}}
+      }
+
+      assert WizardPanel.changes(params, d) == {:ok, []}
+    end
+
+    test "a save with no fortress block is not read as defeated" do
+      raw = WizardFixture.synthetic()
+      refute WizardPanel.details(binary_part(raw, 0, 0x9E8 + 6 * 0x4C8), 1).defeated
+    end
+  end
 end

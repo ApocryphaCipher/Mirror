@@ -51,3 +51,7 @@ player's, one Apply, one undo step, a label "relations with ..." and a refusal t
 0 none (which is also what peace is), 1 wizard pact, 2 alliance, 3 war. The hand-written values loaded as written, the Diplomacy menu followed the status, a peace treaty with the wizard at
 war (even at -90) was accepted and set 3 back to 0 with +40, and one End Turn kept the alliance and the relations. *Untried:* status 4; the neutral player's row; whether the AI later
 breaks a hand-made alliance when its other relations disagree (it did not in one turn); writing the interest values (left alone).
+
+**Defeated wizards (2026-10-13):** a wizard whose fortress "active" byte (`0x65F8 + 4 × wizard + 3`) is 0 is defeated: the game draws his Magic-screen frame cracked (see the reference doc; two one-byte tests, in both directions).
+The wizard page now shows a "Defeated" tag on that wizard's own page and in the others' Relations tables, and does not offer controls on a defeated wizard's row. *Not built, deliberately:* a way to defeat or revive a wizard; what the next turn
+does to a hand-defeated wizard's cities and units is unknown.

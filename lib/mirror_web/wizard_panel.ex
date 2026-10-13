@@ -162,7 +162,8 @@ defmodule MirrorWeb.WizardPanel do
         researching: spell(researching),
         research_left: research_left,
         researching_number: researching,
-        relations: relations(record, names, diplomacy),
+        defeated: defeated?(raw, record),
+        relations: relations(raw, record, names, diplomacy),
         globals:
           for(
             {name, value} when value != 0 <- Enum.zip(@globals, :binary.bin_to_list(globals)),
@@ -183,7 +184,20 @@ defmodule MirrorWeb.WizardPanel do
   # The diplomacy block's arrays (`+0` contacted, `+42` visible relations, `+48` status), by the other player
   # 0 to 5 (5 is the neutral player). The tag words: 0 none and 1 pact are checked in the real game
   # (2026-10-12); 2 alliance and 3 war are the saved values' natural reading, *not yet changed in the game*.
-  defp relations(record, names, diplomacy) do
+  # A wizard is **defeated** when the "active" byte of his fortress record (`0x65F8 + 4 × record + 3`) is 0:
+  # the game draws him as a cracked stone frame on the Magic screen. Checked both ways in the real game
+  # (2026-10-13): that one byte cleared on a living wizard cracked his frame; set on a defeated one, it
+  # went away (STORY-050). The fortress block is also where the wizard's capital is.
+  @fortress_block 0x65F8
+
+  defp defeated?(raw, record) when record in 0..4//1 do
+    byte_size(raw) > @fortress_block + record * 4 + 3 and
+      :binary.at(raw, @fortress_block + record * 4 + 3) == 0
+  end
+
+  defp defeated?(_raw, _record), do: false
+
+  defp relations(raw, record, names, diplomacy) do
     <<contacted::binary-size(6), _::binary-size(36), relations::binary-size(6),
       status::binary-size(6), _::binary>> = diplomacy
 
@@ -195,6 +209,7 @@ defmodule MirrorWeb.WizardPanel do
         name: if(other == 5, do: "Neutral", else: Map.fetch!(names, other)),
         page: page_id(other, if(other == 5, do: "", else: Map.fetch!(names, other))),
         contacted: :binary.at(contacted, other) != 0,
+        defeated: defeated?(raw, other),
         relation: relation,
         status: :binary.at(status, other),
         tag: status_tag(:binary.at(status, other))
@@ -406,7 +421,8 @@ defmodule MirrorWeb.WizardPanel do
   defp relations_changes(_params, _details), do: {:ok, []}
 
   defp relation_rows(given, details) do
-    editable = Enum.filter(details.relations, &(&1.other < 5))
+    # a defeated wizard's row is not editable (the neutral player's never is)
+    editable = Enum.filter(details.relations, &(&1.other < 5 and not &1.defeated))
 
     editable
     |> Enum.reduce_while({:ok, []}, fn row, {:ok, acc} ->

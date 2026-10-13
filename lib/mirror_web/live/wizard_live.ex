@@ -154,6 +154,14 @@ defmodule MirrorWeb.WizardLive do
                 Wizard {@details.id} · {@details.banner} banner
               </p>
               <h1 id="wizard-name" class="text-4xl font-semibold text-white">{@details.name}</h1>
+              <p
+                :if={@details.defeated}
+                id="wizard-defeated"
+                class="mt-1 inline-block rounded border border-rose-300/50 px-2 py-0.5 text-sm text-rose-200"
+                title="The game draws this wizard as a cracked stone frame (his fortress is marked inactive)"
+              >
+                Defeated
+              </p>
             </div>
             <button
               id="wizard-edit-toggle"
@@ -447,7 +455,7 @@ defmodule MirrorWeb.WizardLive do
                     }
                   >
                     <select
-                      :if={@editing and r.other < 5}
+                      :if={@editing and r.other < 5 and not r.defeated}
                       form="wizard-form"
                       name={"wizard[relations][#{r.other}][status]"}
                       class="rounded bg-slate-900 px-1 py-0.5 text-white"
@@ -460,13 +468,14 @@ defmodule MirrorWeb.WizardLive do
                         {label}
                       </option>
                     </select>
-                    <span :if={!(@editing and r.other < 5)}>
+                    <span :if={!(@editing and r.other < 5 and not r.defeated)}>
                       {r.tag}{if !WizardPanel.status_checked?(r.status), do: "?"}
                     </span>
+                    <span :if={r.defeated} class="ml-2 text-xs text-rose-300">defeated</span>
                   </td>
                   <td class={["py-1 text-right tabular-nums", relation_class(r.relation)]}>
                     <input
-                      :if={@editing and r.other < 5}
+                      :if={@editing and r.other < 5 and not r.defeated}
                       form="wizard-form"
                       type="number"
                       min="-100"
@@ -475,7 +484,7 @@ defmodule MirrorWeb.WizardLive do
                       value={r.relation}
                       class="w-20 rounded bg-slate-900 px-1 py-0.5 text-right text-white"
                     />
-                    <span :if={!(@editing and r.other < 5)}>
+                    <span :if={!(@editing and r.other < 5 and not r.defeated)}>
                       {if r.relation > 0, do: "+"}{r.relation}
                     </span>
                   </td>
