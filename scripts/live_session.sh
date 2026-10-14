@@ -18,10 +18,12 @@ case "${1:-}" in
     mkdir -p "$LOG_DIR"
     # Mounts ~/DOS as C:. Then in DOSBox: cd MAGIC, then magic
     cd "$HOME/DOS"
+    # Writes on: the research fork refuses every write (403) without it, so mompy poke/banish/cast would all fail (2026-10-13).
     # 6500 cycles: the config's default of 3000 is painfully slow for the game (Kevin, 2026-10-13).
     exec "$DOSBOX" \
       --set cpu_cycles=6500 \
       --set webserver_enabled=true \
+      --set webserver_allow_writes=true \
       --set webserver_file_log="$LOG_DIR/files-$(date +%Y%m%d-%H%M).jsonl" \
       .
     ;;
