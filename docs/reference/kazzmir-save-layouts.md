@@ -83,9 +83,9 @@ SAVE1. The 4th byte varies (0, 78, 39): *unknown*.
 | `+10` / `+12` | gold / mana reward (i16) |
 | `+14` | treasure **code**, 0 to 6 in every save (kazzmir calls it `SpellSpecial`): **not** a spell id and **it does not decide the reward**. Real game, 2026-10-12: two experiments with keeps that had no gold, mana or items and one to six Sprites for guards. The same code gave different rewards (code 1: a Create Artifact spell once, nothing once; code 5: a Chain Mail once, a Disjunction spell once), so the reward is **rolled when the site is cleared**, and the code's real meaning is unknown. The rewards seen: nothing, a Create Artifact spell, a Summon Hero spell, a Weakness spell, a Disjunction spell, a Death spell book, a Chain Mail and a Sword. Gold and mana are the record's own fields (a keep set to 777 gold and 333 mana paid exactly that). An item is made at clearing: the cleared record's item count (`+16`) goes from 0 to 1. The spells fit kazzmir's treasure code, which draws from the realms the wizard has books in plus Arcane. Every cleared site also had its guards' low nibble set to 0 and its flags byte (`+15`) set to `6` |
 | `+15` | flags: *guess:* who has explored the site (see below) |
-| `+16` | item count |
+| `+16` | item count: **how many items the game makes when the site is cleared** (checked 2026-10-15) |
 | `+17` | unknown |
-| `+18` `+20` `+22` | items 1–3 (i16) |
+| `+18` `+20` `+22` | three i16 (kazzmir: items 1–3), **not item indexes and not a quality cap** (see [the 2026-10-15 findings](wizard-heroes-diplomacy-items.md#findings-2026-10-15-lairs-new-items-and-the-premade-table-real-game)): an item came with each at 0, 100, 9000 and 30000 |
 
 | Kind | Site | Sprite (kazzmir) |
 | --- | --- | --- |

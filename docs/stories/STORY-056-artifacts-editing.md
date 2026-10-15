@@ -83,7 +83,7 @@ lists the premade items whose slot code equals that place's slot type) and the v
 - `Structures.put_item/4` writes the 50-byte record: **over the record the place already holds** when nothing else points at it, else into **the first free record** (an empty name that no place points at) and the index into the place.
   `Structures.clear_item/3` empties the place and **blanks the record** (50 zero bytes) when nothing else points at it. 138 records is the limit (`:no_free_item`).
 - **In a real save an empty hero slot is unit -1 but its three item places read 0**, not -1 (SAVE2). Counting those as references would make item 0 look shared, so only existing heroes' places count.
-- The game's own **free-record marker is unknown**: Mirror reads an empty name. A premade-items-still-available table the game keeps (kazzmir `loadPremadeItems`, 250 bytes, location not found) is **not** updated, so the game may later draw the same premade item again.
+- The game's own free-record marker is not a name check: **it takes the first record that nothing points at** (2026-10-15, below). Mirror still reads an empty name, which is stricter.
 
 ### Real-game check of the premade items (2026-10-15)
 
@@ -103,3 +103,14 @@ an Elvish Longbow in the vault's second place, and Protection of Ramses' record 
 - **Remove**, simulated in the running game's memory (nothing saved): the bow's place set to -1 and its record zeroed, as `clear_item/3` does. The Items screen no longer showed the bow, and after another End Turn the places and the blank record were unchanged. (checkpoint 127)
   Not tried: a **save written by `clear_item/3`** and loaded as such (the memory state is the same bytes), and the game's own free-record marker (an all-zero record works, which is all Mirror needs).
 - Not checked: whether the game later draws a premade item Mirror already placed (the "still available" table is not updated), and what a Chainmail of Speed does in a fight.
+
+## Real-game findings from clearing lairs (2026-10-15), and what they changed
+
+Writing the running game's memory and clearing lairs (checkpoints 128 to 134; details in [the reference doc](../reference/wizard-heroes-diplomacy-items.md#findings-2026-10-15-lairs-new-items-and-the-premade-table-real-game)):
+
+- **The premade "in play" flags are in the save** (last 810 bytes: 250 flags then the hero names). The game sets a flag when it makes the item. `put_item/5` now sets it too (`number:`), and an item given up (overwritten or blanked) hands its number back by name (`premade_names:`), so the game
+  does not later draw an item Mirror already placed, and a removed one can drop again. Replaces the open item in the third slice.
+- **Record 136 is the game's working copy** of the item it is making (seen five times), so Mirror allocates only among records 0 to 135.
+- **Lair rewards:** the lair panel edits **how many items** a site gives (0 to 3, `Structures.edit_encounter/3` `:item_count`), which the game honours. It cannot choose *which* item (the game picks it) and the three stored numbers do not matter, so they are not shown or edited.
+  STORY-056's "a lair's reward" is therefore done as far as the game allows.
+- Not checked in the game: a **save written by this code** with a changed item count or premade flags loaded and cleared (the live tests wrote the same bytes through memory), a count of 3, and whether the game's hero list needs the tail name table updated after a rename.

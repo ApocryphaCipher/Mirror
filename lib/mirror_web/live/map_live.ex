@@ -2341,6 +2341,17 @@ defmodule MirrorWeb.MapLive do
               class="mt-0.5 block w-20 rounded border border-white/15 bg-slate-950 px-1.5 py-0.5 text-slate-100"
             />
           </label>
+          <label class="text-slate-400">
+            Items
+            <input
+              type="number"
+              name="lair[item_count]"
+              min="0"
+              max="3"
+              value={@details.item_count}
+              class="mt-0.5 block w-14 rounded border border-white/15 bg-slate-950 px-1.5 py-0.5 text-slate-100"
+            />
+          </label>
           <button
             id="lair-apply"
             type="submit"
@@ -2364,9 +2375,7 @@ defmodule MirrorWeb.MapLive do
         {@note}
       </p>
       <p class="mt-2 text-slate-500">
-        Treasure code {@details.spell_code}{if @details.item_count > 0,
-          do:
-            " · #{@details.item_count} #{if @details.item_count == 1, do: "item", else: "items"} to roll (value #{Enum.join(@details.items, ", ")}, a guess)"} (not editable, and it does not decide the reward: spells, spell books and items are rolled when the site is cleared)
+        Treasure code {@details.spell_code} (not editable, and it does not decide the reward: spells, spell books and items are rolled when the site is cleared). Items to roll: {@details.item_count}; the game picks them, the three numbers stored with them do not set their quality.
       </p>
     </div>
     """
