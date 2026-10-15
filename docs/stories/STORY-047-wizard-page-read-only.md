@@ -1,7 +1,7 @@
 # STORY-047: The wizard page, read-only
 
 **Parent:** [EPIC-009](../epics/EPIC-009-wizard-editing.md)
-**Status:** built (2026-10-12) and merged; checked against the game by Kevin (2026-10-15, see "Checked" below); phone width and the light theme were not reported
+**Status:** built (2026-10-12) and merged; checked against the game by Kevin (2026-10-15, see "Checked" below)
 **Size:** medium
 **Raised by:** [Kevin](https://github.com/KevinAsbury), 2026-10-12
 
@@ -19,7 +19,7 @@ save holds for that wizard, using only fields that are already decoded:
 - **Standing:** how many cities, units and nodes the wizard owns, with links to the map.
 - **Background:** a gradient from the wizard's banner colour at the top, fading to black down the screen. Use the
   same banner colours the map's city flags and unit plaques use (blue, green, purple, red, yellow; neutral is
-  brown), so the page and the map agree. Check it on a phone-width screen and in dark and light themes.
+  brown), so the page and the map agree.
 - Reached from the header (a wizard switcher), and from the map panels' owner names (city, node and unit; a lair has no owner, its record is not assigned to a wizard).
 
 A wizard that does not exist (no name, or an id out of range) is a 404 with a note. **First question:** does
@@ -47,7 +47,7 @@ A wizard switcher lists the named wizards. A wizard that does not exist answers 
   summoning-circle link opens the right plane but does not centre the map (the map has no such parameter), and a wizard link in the map page header.
 - **Colours:** the page uses fixed CSS hues for the five banners and brown for neutral, close to the map's flags. *Guess* that
   they match closely; the map takes its colours from the game's palette ramps. Compare on screen.
-- **Still to do for done:** read the player and one rival against the game's Info, Magic and Research screens; check phone width and the light theme.
+- **Still to do for done:** read the player and one rival against the game's Info, Magic and Research screens.
   (The in-app browser refused `localhost:4010` this session, so the page has been checked by tests and by reading real saves, not by eye.)
 
 ## Checked (2026-10-15)
@@ -56,5 +56,5 @@ Kevin ran the current build (the Docker image from `main` at `7eb62f2`, with `IT
 edited a hero, set the researching spell, added spells and set a global or two on the page and looked at the results in the game (STORY-049, 051, 053 and 056 features; no numbers were recorded, so the real-game
 results written in those stories are still the ones from the vault checkpoints).
 
-Still not reported: the phone-width and light-theme look, and the page's colours against the map's flags. The remaining nice-to-haves are unchanged: the portrait is an id, the summoning-circle link does not centre the map,
+Not reported: the page's colours against the map's flags. (Earlier notes in this story asked for a phone-width and light-theme check; Mirror is a desktop tool with one theme, so that requirement is dropped.) The remaining nice-to-haves are unchanged: the portrait is an id, the summoning-circle link does not centre the map,
 and there is no wizard link in the map page header.
