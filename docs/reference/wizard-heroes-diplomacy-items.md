@@ -152,7 +152,7 @@ is the OR of the ticked powers' masks in `ITEMPOW`). So the program is an editor
 
 - **Type codes** are the program's ten tabs in order: **0 Sword, 1 Mace, 2 Axe, 3 Bow, 4 Staff, 5 Wand, 6 Misc, 7 Shield, 8 Chain,
   9 Plate** (seen: 0, 1, 2, 3, 4, 5, 6, 7, 8 and 9 each on at least one item).
-- **Slot codes** (what a hero's slot type must equal; the heroes' own three slot types are in the hero list): **1** melee weapon (sword,
+- **Slot codes** (what a hero's slot type must equal, except that **3** accepts any weapon kind; the heroes' own three slot types are in the hero list; see `Mirror.SaveFile.HeroTypes` for each hero's three): **1** melee weapon (sword,
   mace, axe), **2** bow, **4** staff and wand, **5** armor and shield (shield, chain, plate), **6** misc (amulets and the like). Seen
   on all 14 items.
 - **Stat bytes** are the plain numbers on the screen: attack, to hit, defense, movement, resistance, spell skill, and spell save (the

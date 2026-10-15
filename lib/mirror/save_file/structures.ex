@@ -36,7 +36,7 @@ defmodule Mirror.SaveFile.Structures do
   `docs/reference/real-game-acceptance.md` says how to check one.
   """
 
-  alias Mirror.SaveFile.{Cities, Encounters, Sites, Units, Wizards}
+  alias Mirror.SaveFile.{Cities, Encounters, HeroTypes, Sites, UnitTypes, Units, Wizards}
 
   @width 60
   @height 40
@@ -702,6 +702,110 @@ defmodule Mirror.SaveFile.Structures do
   @hero_entry 28
   @hero_name_max 13
 
+  @units_table 0x00B734
+  @unit_size 32
+  @units_max 1009
+  @unit_count_at 0x0009E2
+  @hero_table_entry 12
+  @hero_table_block 420
+  @hired_level -20
+  @hero_names_entry 16
+  @hero_names_size 560
+
+  @doc """
+  Adds the hero of unit type `type` (0 to 34) to wizard `record`'s empty hero list slot `slot` (STORY-053). The hero is
+  new: level 1 with experience 1 (what the game makes of a new hero), no items, standing on the wizard's summoning circle. Written, as a hire does (the three
+  heroes of SAVE2 are the model; *not yet loaded in the real game*):
+
+    * a unit record appended to the unit table (the live count at `0x9E2` goes up by one): the wizard as owner, the tile
+      of his summoning circle, 4 half-points of movement, the hero slot, level 1 and experience 1, sight 1, no enchantments, the same filler bytes
+      the game's own hero units have,
+    * the hero list entry: the unit index, the type's name (13 characters at most), three empty item places and the
+      type's three slot types (`Mirror.SaveFile.HeroTypes`),
+    * the per-player hero table's first word for that hero, `-20`, which every hired hero in SAVE2 has and no free one,
+    * for wizard 0 (the player) the hero-name table at the end of the save: the name and experience 0.
+
+  Refused: `:no_such_wizard`, `:bad_hero_type`, `:slot_taken` (the list slot is not empty or does not exist),
+  `:hero_in_play` (a live unit of that type exists, whoever owns it), `:no_circle` (the wizard has no summoning circle
+  on the map), `:stack_full` (nine units already stand there) and `:no_free_unit` (the unit table is full).
+  """
+  @spec add_hero(binary(), non_neg_integer(), non_neg_integer(), integer()) :: result()
+  def add_hero(raw, record, slot, type) do
+    with :ok <- check_wizard(raw, record),
+         :ok <- if(type in 0..34//1, do: :ok, else: {:error, :bad_hero_type}),
+         {:ok, entry} <- empty_hero_entry(raw, record, slot),
+         {:ok, units} <- Units.parse(raw),
+         :ok <- if(Enum.any?(units, &(&1.type == type)), do: {:error, :hero_in_play}, else: :ok),
+         {:ok, {x, y, plane}} <- summoning_circle(raw, record),
+         :ok <-
+           if(
+             Enum.count(units, &({&1.x, &1.y, plane_index(&1.plane)} == {x, y, plane})) <
+               @max_stack,
+             do: :ok,
+             else: {:error, :stack_full}
+           ),
+         <<count::little-16>> = binary_part(raw, @unit_count_at, 2),
+         :ok <- if(count < @units_max, do: :ok, else: {:error, :no_free_unit}) do
+      name = type |> UnitTypes.name() |> String.slice(0, @hero_name_max)
+
+      unit =
+        <<x, y, plane, record, 4, type, slot, 0, 4, 0, 0, 0, 1, 0, 1::little-16, 0, 0, 8, 0,
+          0::little-16, 1, 0, 0::little-32, 255, 0, 0, 0>>
+
+      list_entry =
+        <<count::little-16>> <>
+          String.pad_trailing(name, 14, <<0>>) <>
+          <<-1::little-signed-16, -1::little-signed-16, -1::little-signed-16>> <>
+          for(t <- HeroTypes.slot_types(type), into: <<>>, do: <<t::little-16>>)
+
+      raw =
+        raw
+        |> put(@units_table + count * @unit_size, unit)
+        |> put(@unit_count_at, <<count + 1::little-16>>)
+        |> put(entry, list_entry)
+        |> put(
+          record * @hero_table_block + type * @hero_table_entry,
+          <<@hired_level::little-signed-16>>
+        )
+        |> put_hero_name(record, type, name)
+
+      {:ok, raw, %{added: type, unit: count, slot: slot}}
+    end
+  end
+
+  defp empty_hero_entry(raw, record, slot) when slot in 0..5//1 do
+    entry = @hero_wizards + record * @hero_wizard_size + @hero_list_at + slot * @hero_entry
+
+    case binary_part(raw, entry, 2) do
+      <<unit::little-signed-16>> when unit < 0 -> {:ok, entry}
+      _ -> {:error, :slot_taken}
+    end
+  end
+
+  defp empty_hero_entry(_raw, _record, _slot), do: {:error, :slot_taken}
+
+  # The wizard record's summoning circle: x and y (i16) and the plane (u16) at +0x2E.
+  defp summoning_circle(raw, record) do
+    at = @hero_wizards + record * @hero_wizard_size + 0x2E
+
+    case binary_part(raw, at, 6) do
+      <<x::little-signed-16, y::little-signed-16, plane::little-16>>
+      when x in 0..59 and y in 0..39 and plane in 0..1 ->
+        {:ok, {x, y, plane}}
+
+      _ ->
+        {:error, :no_circle}
+    end
+  end
+
+  # Only the player's heroes are in the name table (SAVE2: Sir Harold and Warrax, not the rival's Bahgtru).
+  defp put_hero_name(raw, 0, type, name) do
+    at = byte_size(raw) - @hero_names_size + type * @hero_names_entry
+    put(raw, at, String.pad_trailing(name, 14, <<0>>) <> <<0::little-16>>)
+  end
+
+  defp put_hero_name(raw, _record, _type, _name), do: raw
+
   @doc """
   Edits the hero in `slot` (0 to 5) of wizard `record`'s hero list (STORY-053): `name:` (1 to #{@hero_name_max} printable
   ASCII characters, written NUL-padded to the entry's 14 bytes) and the hero's unit fields `level:`, `experience:` and
@@ -888,7 +992,7 @@ defmodule Mirror.SaveFile.Structures do
   defp slot_code_fits(raw, record, {:hero, slot, place}, code) do
     entry = @hero_wizards + record * @hero_wizard_size + @hero_list_at + slot * @hero_entry
     <<type::little-signed-16>> = binary_part(raw, entry + 22 + place * 2, 2)
-    if type == code, do: :ok, else: {:error, :wrong_slot}
+    if Mirror.SaveFile.Items.slot_accepts?(type, code), do: :ok, else: {:error, :wrong_slot}
   end
 
   # The game's own table of which premade items (`ITEMDATA.LBX`, numbered from 1) are already in play: 250 bytes, 1 once

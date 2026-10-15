@@ -139,6 +139,22 @@ defmodule MirrorWeb.WizardLive do
     end
   end
 
+  # Add a hero (STORY-053) to the first empty hero place: a new hero of the chosen type, level 0, on the wizard's
+  # summoning circle. A hero already in play, whoever owns him, is refused.
+  def handle_event("hero_add", %{"type" => type}, socket) do
+    changes_for = fn details ->
+      with {:ok, request} <- WizardPanel.hero_add_request(details, type),
+           do: {:ok, [add: request]}
+    end
+
+    write = fn raw, details, [add: {slot, type}] ->
+      Structures.add_hero(raw, details.record, slot, type)
+    end
+
+    label = fn details, [add: {_slot, type}] -> WizardPanel.hero_add_label(details, type) end
+    {:noreply, apply_edit(socket, changes_for, write, label)}
+  end
+
   # "Learn every spell of a realm": the common edit, applied at once.
   def handle_event("learn_realm", %{"realm" => realm}, socket) do
     case Enum.find(Spells.realms(), &(Atom.to_string(&1) == realm)) do
@@ -776,6 +792,34 @@ defmodule MirrorWeb.WizardLive do
                 </form>
               </li>
             </ul>
+
+            <form
+              :if={@editing and WizardPanel.hero_choices(@details) != []}
+              id="wizard-hero-add"
+              phx-submit="hero_add"
+              class="mt-3 flex flex-wrap items-end gap-2"
+            >
+              <label class="text-xs text-slate-400">
+                Add a hero
+                <select
+                  name="type"
+                  class="mt-1 block w-48 rounded bg-slate-900 px-2 py-1 text-sm text-white"
+                >
+                  <option :for={{type, name} <- WizardPanel.hero_choices(@details)} value={type}>
+                    {name}
+                  </option>
+                </select>
+              </label>
+              <button
+                type="submit"
+                class="rounded-lg border border-emerald-300/50 px-3 py-1 text-xs text-emerald-100 hover:border-emerald-200"
+              >
+                Add
+              </button>
+              <span class="text-xs text-slate-500">
+                A new hero, level 0, on his summoning circle.
+              </span>
+            </form>
           </section>
 
           <section id="wizard-vault" class="rounded-xl border border-white/10 bg-black/30 p-4">

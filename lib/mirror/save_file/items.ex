@@ -132,10 +132,20 @@ defmodule Mirror.SaveFile.Items do
   @spec slot_name(integer()) :: String.t() | nil
   def slot_name(1), do: "melee weapon"
   def slot_name(2), do: "bow"
+  def slot_name(3), do: "any weapon"
   def slot_name(4), do: "staff or wand"
   def slot_name(5), do: "armor"
   def slot_name(6), do: "misc"
   def slot_name(_), do: nil
+
+  @doc """
+  Whether an item whose slot code is `item_slot` fits a hero's place of slot type `place_type`: the same code, or any
+  of the three weapon kinds (1 melee, 2 bow, 4 staff or wand) in an "any weapon" place (type 3, Warrax's, Mystic X's and
+  Reywind's first place; Warrax's is (3, 5, 6) in SAVE2, the weapon kinds are from kazzmir's `AnyWeapon`).
+  """
+  @spec slot_accepts?(integer(), integer()) :: boolean()
+  def slot_accepts?(place_type, item_slot),
+    do: place_type == item_slot or (place_type == 3 and item_slot in [1, 2, 4])
 
   defp decode(<<name::binary-size(30), rest::binary>>, index) do
     <<icon::little-16, slot, type, cost::little-16, attack, to_hit, defense, movement, resistance,
