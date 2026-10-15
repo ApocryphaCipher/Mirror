@@ -12,7 +12,7 @@ defmodule MirrorWeb.WizardPanel do
   `docs/reference/wizard-record-and-exploration.md`.
   """
 
-  alias Mirror.SaveFile.{Cities, Heroes, Items, Sites, Units, Wizards}
+  alias Mirror.SaveFile.{Cities, Heroes, Items, Sites, UnitTypes, Units, Wizards}
 
   @offset 0x9E8
   @record 0x4C8
@@ -183,6 +183,8 @@ defmodule MirrorWeb.WizardPanel do
           ),
         vault: Items.for_indexes(raw, Items.vault(raw, record)),
         vault_places: Items.vault_places(raw, record),
+        free_hero_slots: free_hero_slots(raw, record),
+        heroes_in_play: heroes_in_play(raw),
         candidates: for(<<n::little-16 <- candidates>>, n in 1..214//1, do: n),
         library: :binary.bin_to_list(binary_part(library, 0, 214)),
         spells: known_by_realm(library),
@@ -390,7 +392,7 @@ defmodule MirrorWeb.WizardPanel do
     heroes =
       for h <- details.heroes,
           {nil, place} <- Enum.with_index(h.item_places),
-          Enum.at(h.slot_types, place) == item.slot,
+          Items.slot_accepts?(Enum.at(h.slot_types, place), item.slot),
           {:hero, h.slot, place} != from,
           do: {"hero:#{h.slot}:#{place}", "#{h.name} (#{slot_kind(item.slot)})"}
 
@@ -448,6 +450,68 @@ defmodule MirrorWeb.WizardPanel do
     end
   end
 
+  # The hero list slots with no hero in them (the game writes -1 as the unit index).
+  defp free_hero_slots(raw, record) do
+    for slot <- 0..5,
+        <<unit::little-signed-16>> <- [
+          binary_part(raw, @offset + record * @record + 0x76 + slot * 28, 2)
+        ],
+        unit < 0,
+        do: slot
+  end
+
+  # The hero unit types (0 to 34) that have a live unit, whoever owns it: such a hero cannot be added again.
+  defp heroes_in_play(raw) do
+    case Units.parse(raw) do
+      {:ok, units} ->
+        units |> Enum.map(& &1.type) |> Enum.filter(&(&1 in 0..34//1)) |> Enum.uniq()
+
+      _ ->
+        []
+    end
+  end
+
+  @doc """
+  The heroes that can be added to this wizard, `{type, name}` sorted by name: all 35 minus those in play, and none
+  when his hero list has no empty place.
+  """
+  @spec hero_choices(map()) :: [{non_neg_integer(), String.t()}]
+  def hero_choices(%{free_hero_slots: []}), do: []
+
+  def hero_choices(details) do
+    for type <- 0..34,
+        type not in details.heroes_in_play,
+        do: {type, UnitTypes.name(type)}
+  end
+
+  @doc """
+  The hero add form's choice (`type`, a string) for `details`' first empty hero place, as `{:ok, {slot, type}}`, or an
+  error: `:bad_hero_type` for something that is not a hero number, `:hero_in_play`, `:slot_taken` (no empty place).
+  """
+  @spec hero_add_request(map(), term()) ::
+          {:ok, {non_neg_integer(), non_neg_integer()}} | {:error, atom()}
+  def hero_add_request(details, type) do
+    case parse_int(type) do
+      {type, ""} when type in 0..34 ->
+        cond do
+          details.free_hero_slots == [] -> {:error, :slot_taken}
+          type in details.heroes_in_play -> {:error, :hero_in_play}
+          true -> {:ok, {hd(details.free_hero_slots), type}}
+        end
+
+      _ ->
+        {:error, :bad_hero_type}
+    end
+  end
+
+  defp parse_int(value) when is_binary(value), do: Integer.parse(value)
+  defp parse_int(_), do: nil
+
+  @doc "A short description of an added hero, for the notice and the undo list."
+  @spec hero_add_label(map(), non_neg_integer()) :: String.t()
+  def hero_add_label(details, type),
+    do: "Added #{UnitTypes.name(type)} to #{details.name}'s heroes"
+
   @doc """
   Every place of the wizard's items, in page order: each hero's three (with the hero's name and the place's slot
   type) and the four vault places. `key` is the form's name for the place (`"hero:SLOT:PLACE"` or `"vault:PLACE"`);
@@ -487,7 +551,7 @@ defmodule MirrorWeb.WizardPanel do
 
     items =
       for p <- Enum.sort_by(premade, &String.downcase(&1.name)),
-          is_nil(type) or p.slot == type,
+          is_nil(type) or Items.slot_accepts?(type, p.slot),
           do: {"item:#{p.number}", "#{p.name} (#{p.cost} gold)"}
 
     [current] ++ clear ++ items
@@ -1006,6 +1070,15 @@ defmodule MirrorWeb.WizardPanel do
     do: "A hero carries each kind of item in a place of its own kind."
 
   def error_message(:same_place), do: "The item is already there."
+  def error_message(:slot_taken), do: "His hero list has no empty place."
+  def error_message(:hero_in_play), do: "That hero is already in the game."
+  def error_message(:bad_hero_type), do: "That is not one of the 35 heroes."
+
+  def error_message(:no_circle),
+    do: "He has no summoning circle on the map to stand a new hero on."
+
+  def error_message(:stack_full), do: "Nine units already stand on his summoning circle."
+  def error_message(:no_free_unit), do: "The save's unit table is full."
   def error_message(:no_free_item), do: "All 138 item records are in use."
   def error_message(:bad_item_record), do: "That item could not be written."
   def error_message(:bad_move), do: "That is not a place the item can go."

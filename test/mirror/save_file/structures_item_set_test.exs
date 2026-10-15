@@ -161,4 +161,20 @@ defmodule Mirror.SaveFile.StructuresItemSetTest do
     assert Structures.clear_item(r, 0, {:hero, 4, 0}) == {:error, :no_such_hero}
     assert Structures.clear_item(r, 6, {:vault, 0}) == {:error, :no_such_wizard}
   end
+
+  describe "an any-weapon place (Warrax, Mystic X, Reywind)" do
+    # the hero's three slot types are (3, 5, 6) as for Warrax in SAVE2
+    defp any_weapon_hero(raw),
+      do: WizardFixture.field(raw, 0, 0x76 + 22, <<3::little-16, 5::little-16, 6::little-16>>)
+
+    test "takes a sword, a bow and a staff, not armor" do
+      r = any_weapon_hero(raw())
+      {:ok, _, _} = Structures.put_item(r, 0, {:hero, 0, 0}, record("Sword", 1, 0))
+      {:ok, _, _} = Structures.put_item(r, 0, {:hero, 0, 0}, record("Bow", 2, 3))
+      {:ok, _, _} = Structures.put_item(r, 0, {:hero, 0, 0}, record("Staff", 4, 4))
+
+      assert Structures.put_item(r, 0, {:hero, 0, 0}, record("Mail", 5, 8)) ==
+               {:error, :wrong_slot}
+    end
+  end
 end

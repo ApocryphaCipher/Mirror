@@ -720,4 +720,63 @@ defmodule MirrorWeb.WizardLiveTest do
       assert SessionStore.get(sid).save.raw == raw
     end
   end
+
+  describe "adding a hero" do
+    defp load_empty_heroes(sid) do
+      empty = <<-1::little-signed-16>> <> :binary.copy(<<0>>, 26)
+
+      raw =
+        Enum.reduce(0..4, Mirror.WizardFixture.synthetic(), fn w, acc ->
+          Mirror.WizardFixture.field(acc, w, 0x76, :binary.copy(empty, 6))
+        end)
+
+      SessionStore.put(sid, Mirror.SaveManager.normalize_state(%{save: %{raw: raw}}))
+      raw
+    end
+
+    test "a hero is added from the drop-down in edit mode, as one undo step", %{
+      conn: conn,
+      sid: sid
+    } do
+      load_empty_heroes(sid)
+      {:ok, view, _} = live(conn, ~p"/wizard/1")
+      refute has_element?(view, "#wizard-hero-add")
+      view |> element("#wizard-edit-toggle") |> render_click()
+
+      assert has_element?(view, "#wizard-hero-add option[value='31']", "Sir Harold")
+      assert has_element?(view, "#wizard-hero-add option[value='0']", "Brax")
+      before = SessionStore.get(sid)
+
+      view |> element("#wizard-hero-add") |> render_submit(%{"type" => "31"})
+      assert has_element?(view, "#wizard-note", "Added Sir Harold to Jafar's heroes")
+      assert has_element?(view, "#wizard-hero-0", "Sir Harold")
+      assert has_element?(view, "#wizard-hero-0", "level 0")
+      assert has_element?(view, "#wizard-hero-0", "at 38, 21 Myrror")
+      # he is in play now, so he is no longer offered
+      refute has_element?(view, "#wizard-hero-add option[value='31']")
+
+      added = SessionStore.get(sid)
+      assert length(added.history.arcanus) == length(before.history.arcanus) + 1
+      {undone, _} = Mirror.Editor.undo(added, :arcanus)
+      assert undone.save.raw == before.save.raw
+    end
+
+    test "a hero already in play, or a bad number, is refused in words and changes nothing", %{
+      conn: conn,
+      sid: sid
+    } do
+      load_empty_heroes(sid)
+      {:ok, view, _} = live(conn, ~p"/wizard/1")
+      view |> element("#wizard-edit-toggle") |> render_click()
+      view |> element("#wizard-hero-add") |> render_submit(%{"type" => "31"})
+      raw = SessionStore.get(sid).save.raw
+
+      render_hook(view, "hero_add", %{"type" => "31"})
+      assert has_element?(view, "#wizard-note", "already in the game")
+
+      render_hook(view, "hero_add", %{"type" => "99"})
+      assert has_element?(view, "#wizard-note", "35 heroes")
+      assert SessionStore.get(sid).save.raw == raw
+    end
+  end
 end

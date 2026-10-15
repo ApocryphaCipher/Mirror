@@ -109,7 +109,17 @@ defmodule Mirror.SaveFile.ItemsTest do
              ~w(Sword Mace Axe Bow Staff Wand Misc Shield Chain Plate)
 
     assert Items.type_name(10) == nil
-    assert Items.slot_name(3) == nil
+    assert Items.slot_name(3) == "any weapon"
+    assert Items.slot_name(7) == nil
     assert Items.slot_name(5) == "armor"
+  end
+
+  test "an any-weapon place (type 3) takes a melee weapon, a bow or a staff, other places only their own kind" do
+    for item_slot <- [1, 2, 4], do: assert(Items.slot_accepts?(3, item_slot))
+    refute Items.slot_accepts?(3, 5)
+    refute Items.slot_accepts?(3, 6)
+    assert Items.slot_accepts?(5, 5)
+    refute Items.slot_accepts?(1, 2)
+    refute Items.slot_accepts?(4, 1)
   end
 end

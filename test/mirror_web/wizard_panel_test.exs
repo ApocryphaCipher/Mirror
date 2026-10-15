@@ -743,4 +743,57 @@ defmodule MirrorWeb.WizardPanelTest do
       assert WizardPanel.set_label(d, {:clear, {:hero, 0, 0}}, nil) == "Removed Sword from Harold"
     end
   end
+
+  describe "adding a hero" do
+    defp hero_save do
+      # the game writes -1 in an empty hero entry; Jafar's circle is at (38, 21) on Myrror in the fixture
+      empty = <<-1::little-signed-16>> <> :binary.copy(<<0>>, 26)
+
+      Enum.reduce(0..4, Mirror.WizardFixture.synthetic(), fn w, acc ->
+        Mirror.WizardFixture.field(acc, w, 0x76, :binary.copy(empty, 6))
+      end)
+    end
+
+    setup do
+      %{d: WizardPanel.details(hero_save(), 1)}
+    end
+
+    test "knows the empty hero places and the heroes in play", %{d: d} do
+      assert d.free_hero_slots == [0, 1, 2, 3, 4, 5]
+      assert d.heroes_in_play == []
+    end
+
+    test "offers all 35 heroes by name, minus any in play, and none without an empty place", %{
+      d: d
+    } do
+      choices = WizardPanel.hero_choices(d)
+      assert length(choices) == 35
+      assert {31, "Sir Harold"} in choices
+
+      assert length(WizardPanel.hero_choices(%{d | heroes_in_play: [31, 6]})) == 33
+      refute {31, "Sir Harold"} in WizardPanel.hero_choices(%{d | heroes_in_play: [31]})
+      assert WizardPanel.hero_choices(%{d | free_hero_slots: []}) == []
+    end
+
+    test "reads the form into the first empty place and the type", %{d: d} do
+      assert WizardPanel.hero_add_request(d, "31") == {:ok, {0, 31}}
+      assert WizardPanel.hero_add_request(%{d | free_hero_slots: [3, 4]}, "0") == {:ok, {3, 0}}
+
+      assert WizardPanel.hero_add_request(%{d | heroes_in_play: [31]}, "31") ==
+               {:error, :hero_in_play}
+
+      assert WizardPanel.hero_add_request(%{d | free_hero_slots: []}, "31") ==
+               {:error, :slot_taken}
+
+      for bad <- ["35", "-1", "x", "", "3.5", nil, 31] do
+        assert WizardPanel.hero_add_request(d, bad) == {:error, :bad_hero_type}
+      end
+    end
+
+    test "labels and messages", %{d: d} do
+      assert WizardPanel.hero_add_label(d, 31) == "Added Sir Harold to Jafar's heroes"
+      assert WizardPanel.error_message(:hero_in_play) =~ "already in the game"
+      assert WizardPanel.error_message(:no_circle) =~ "summoning circle"
+    end
+  end
 end
