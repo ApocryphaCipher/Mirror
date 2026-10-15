@@ -102,6 +102,46 @@ defmodule MirrorWeb.WizardLiveTest do
     assert SessionStore.get(sid).save.raw == after_state.save.raw
   end
 
+  test "shows a hero's items and the vault in words", %{conn: conn, sid: sid} do
+    raw =
+      Mirror.WizardFixture.synthetic()
+      |> Mirror.WizardFixture.with_hero([1, 2, -1])
+      |> Mirror.WizardFixture.with_items(
+        %{
+          1 => {"Mae Govannon", 0, 1, 1200, [1, 0, 1, 0, 0, 5, 0, 0], 0, 0},
+          2 => {"Staff of Zap", 4, 4, 900, [0, 0, 0, 0, 0, 0, 0, 67], 4, 0},
+          9 => {"Spare Shield", 7, 5, 300, [0, 0, 3, 0, 0, 0, 0, 0], 0, 0x4000}
+        },
+        0,
+        [9]
+      )
+
+    SessionStore.put(sid, Mirror.SaveManager.normalize_state(%{save: %{raw: raw}}))
+    {:ok, view, _} = live(conn, ~p"/wizard/1")
+
+    assert has_element?(view, "#wizard-hero-0-item-1", "Mae Govannon")
+    assert has_element?(view, "#wizard-hero-0-item-1", "Sword")
+    assert has_element?(view, "#wizard-hero-0-item-1", "1200 gold")
+    assert has_element?(view, "#wizard-hero-0-item-1", "+5 Spell Skill")
+    assert has_element?(view, "#wizard-hero-0-item-2", "Staff of Zap")
+    assert has_element?(view, "#wizard-vault-item-9", "Spare Shield")
+    assert has_element?(view, "#wizard-vault-item-9", "+3 Defense")
+    refute has_element?(view, "#wizard-vault", "no spare items")
+  end
+
+  test "an empty vault and a hero with no items say so or show nothing", %{conn: conn, sid: sid} do
+    SessionStore.put(
+      sid,
+      Mirror.SaveManager.normalize_state(%{
+        save: %{raw: Mirror.WizardFixture.with_hero(Mirror.WizardFixture.synthetic())}
+      })
+    )
+
+    {:ok, view, _} = live(conn, ~p"/wizard/1")
+    assert has_element?(view, "#wizard-vault", "no spare items")
+    refute has_element?(view, "#wizard-hero-0 li")
+  end
+
   test "shows the relations table and the active global enchantments", %{conn: conn, sid: sid} do
     load_save(sid)
     {:ok, view, _} = live(conn, ~p"/wizard/1")

@@ -5,9 +5,9 @@ defmodule MirrorWeb.WizardLive do
   """
   use MirrorWeb, :live_view
 
-  alias Mirror.{Editor, SessionStore, Spells}
+  alias Mirror.{Editor, ItemPowers, SessionStore, Spells}
   alias Mirror.SaveFile.Structures
-  alias MirrorWeb.WizardPanel
+  alias MirrorWeb.{ItemPanel, WizardPanel}
 
   @impl true
   def mount(%{"id" => id}, session, socket) do
@@ -118,12 +118,20 @@ defmodule MirrorWeb.WizardLive do
     |> assign(:details, details)
     |> assign(:wizards, WizardPanel.wizards(raw))
     |> assign(:spell_table, spell_table())
+    |> assign(:powers, powers())
     |> assign(:spell_rows, spell_rows(details))
     |> assign(:page_title, if(details, do: details.name, else: "Wizard"))
   end
 
   defp spell_rows(nil), do: []
   defp spell_rows(details), do: WizardPanel.spell_rows(details, spell_table())
+
+  defp powers do
+    case ItemPowers.table() do
+      {:ok, table} -> table
+      _ -> nil
+    end
+  end
 
   defp spell_table do
     case Spells.table() do
@@ -591,10 +599,11 @@ defmodule MirrorWeb.WizardLive do
                   <span :if={h.spells != []}>
                     · {Enum.map_join(h.spells, ", ", &spell_name(@spell_table, &1))}
                   </span>
-                  <span :if={h.items != []}>
-                    · {length(h.items)} {if length(h.items) == 1, do: "item", else: "items"}
-                  </span>
                 </p>
+                <.item_list
+                  items={Enum.map(h.item_list, &ItemPanel.describe(&1, @powers, @spell_table))}
+                  prefix={"wizard-hero-#{h.slot}-item"}
+                />
                 <form
                   :if={@editing}
                   id={"wizard-hero-form-#{h.slot}"}
@@ -656,6 +665,15 @@ defmodule MirrorWeb.WizardLive do
             </ul>
           </section>
 
+          <section id="wizard-vault" class="rounded-xl border border-white/10 bg-black/30 p-4">
+            <h2 class="mb-2 text-lg font-semibold text-white">Vault</h2>
+            <p :if={@details.vault == []} class="text-slate-500">no spare items</p>
+            <.item_list
+              items={Enum.map(@details.vault, &ItemPanel.describe(&1, @powers, @spell_table))}
+              prefix="wizard-vault-item"
+            />
+          </section>
+
           <section id="wizard-standing" class="rounded-xl border border-white/10 bg-black/30 p-4">
             <h2 class="mb-2 text-lg font-semibold text-white">Standing</h2>
             <p class="text-slate-200">
@@ -695,6 +713,30 @@ defmodule MirrorWeb.WizardLive do
   defp relation_class(_), do: "text-slate-200"
 
   defp spell_name(table, number), do: Spells.name(table, number)
+
+  attr :items, :list, required: true
+  attr :prefix, :string, required: true
+
+  defp item_list(assigns) do
+    ~H"""
+    <ul :if={@items != []} class="mt-1 space-y-1">
+      <li
+        :for={item <- @items}
+        id={"#{@prefix}-#{item.index}"}
+        class="rounded border border-white/10 px-2 py-1 text-xs text-slate-300"
+      >
+        <span class="font-semibold text-amber-200">{item.name}</span>
+        · {item.kind} · {item.cost} gold
+        <span :if={item.stats != []}>· {Enum.join(item.stats, ", ")}</span>
+        <span :if={item.powers != []}>· {Enum.join(item.powers, ", ")}</span>
+        <span :if={item.spell}>· {item.spell}</span>
+        <span :if={item.unnamed_powers} class="text-slate-500">
+          · has powers (names need ITEMPOW.LBX; run mix mirror.import_game)
+        </span>
+      </li>
+    </ul>
+    """
+  end
 
   defp realm_label(realm), do: realm |> Atom.to_string() |> String.capitalize()
 

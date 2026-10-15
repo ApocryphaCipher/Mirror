@@ -54,11 +54,12 @@ defmodule Mirror.WizardFixture do
   Gives Jafar (record 0) one hero in slot 0: unit 1, type 31, named "Harold", level 2, 27 xp, damage 3, at
   7,17 Arcanus. The other five slots are empty (-1), as the game writes them.
   """
-  def with_hero(raw) do
+  def with_hero(raw, items \\ [-1, -1, -1]) do
     entry =
       <<1::little-signed-16>> <>
         String.pad_trailing("Harold", 14, <<0>>) <>
-        :binary.copy(<<-1::little-signed-16>>, 3) <> <<1::little-16, 5::little-16, 6::little-16>>
+        for(i <- items, into: <<>>, do: <<i::little-signed-16>>) <>
+        <<1::little-16, 5::little-16, 6::little-16>>
 
     empty = <<-1::little-signed-16>> <> :binary.copy(<<0>>, 26)
 
@@ -70,6 +71,27 @@ defmodule Mirror.WizardFixture do
     |> field(0, 0x76, entry <> :binary.copy(empty, 5))
     |> put(0x9E2, <<2::little-16>>)
     |> put(0x00B734 + 32, unit)
+  end
+
+  @doc """
+  Writes item records into the item block (`index => {name, type, slot, cost, stats, spell, charges, abilities}`,
+  stats being the eight stat bytes) and gives wizard `record`'s vault the item indexes `vault` (padded with -1).
+  """
+  def with_items(raw, items, record \\ 0, vault \\ []) do
+    raw =
+      Enum.reduce(items, raw, fn {index, {name, type, slot, cost, stats, charges, abilities}},
+                                 acc ->
+        put(
+          acc,
+          0x6FB8 + index * 50,
+          String.pad_trailing(name, 30, <<0>>) <>
+            <<0::little-16, slot, type, cost::little-16>> <>
+            :binary.list_to_bin(stats) <> <<charges::little-16, abilities::little-32>>
+        )
+      end)
+
+    places = Enum.take(vault ++ [-1, -1, -1, -1], 4)
+    field(raw, record, 0x120, for(i <- places, into: <<>>, do: <<i::little-signed-16>>))
   end
 
   def put_bytes(raw, at, bytes), do: put(raw, at, bytes)

@@ -2365,7 +2365,8 @@ defmodule MirrorWeb.MapLive do
       </p>
       <p class="mt-2 text-slate-500">
         Treasure code {@details.spell_code}{if @details.item_count > 0,
-          do: " · #{@details.item_count} #{if @details.item_count == 1, do: "item", else: "items"}"} (not editable, and it does not decide the reward: spells, spell books and items are rolled when the site is cleared)
+          do:
+            " · #{@details.item_count} #{if @details.item_count == 1, do: "item", else: "items"} to roll (value #{Enum.join(@details.items, ", ")}, a guess)"} (not editable, and it does not decide the reward: spells, spell books and items are rolled when the site is cleared)
       </p>
     </div>
     """

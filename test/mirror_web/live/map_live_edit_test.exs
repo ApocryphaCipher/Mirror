@@ -2580,6 +2580,24 @@ defmodule MirrorWeb.MapLiveEditTest do
       assert has_element?(view, ~s|input[name="lair[gold]"][value="120"]|)
     end
 
+    test "a lair's item numbers are described as values to roll, not as items", %{
+      conn: conn,
+      dir: dir
+    } do
+      raw =
+        synthetic_save_bytes()
+        |> put_bytes(0x6628 + 20 * 24, lair_record(26, 25, 0, 1, 7, 39, 0x53, 120, 40))
+        # one item, worth 360 (the record's +16 count and +18 value; the value is not an item index)
+        |> put_bytes(0x6628 + 20 * 24 + 16, <<1, 0, 360::little-16>>)
+
+      path = Path.join(dir, "LAIRITEM.GAM")
+      File.write!(path, raw)
+
+      view = editing(conn, path, "lair")
+      click(view, 26, 25)
+      assert lpanel(view) =~ "1 item to roll (value 360, a guess)"
+    end
+
     test "clearing a site and emptying a guard slot", %{conn: conn, dir: dir} do
       view = editing(conn, lairs_save(dir), "lair")
       click(view, 26, 25)
