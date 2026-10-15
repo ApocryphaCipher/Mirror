@@ -1,7 +1,7 @@
 # STORY-056: Edit, move and create artifacts
 
 **Parent:** [EPIC-011](../epics/EPIC-011-artifacts.md)
-**Status:** second slice built and checked in the real game (2026-10-15): items can be moved between a hero's places and the vault. First slice built and checked in the real game (2026-10-15): an item can be edited in place (name, cost, stats, special powers) from the wizard page, loaded and kept through one End Turn; move, create, remove and a lair's reward are not built. *Original note:* open (2026-10-12), after STORY-055
+**Status:** third slice built (2026-10-15): a hero's or the vault's place can be filled with a premade item or emptied, checked in the real game. Second slice built and checked in the real game (2026-10-15): items can be moved between a hero's places and the vault. First slice built and checked in the real game (2026-10-15): an item can be edited in place (name, cost, stats, special powers) from the wizard page, loaded and kept through one End Turn; move, create, remove and a lair's reward are not built. *Original note:* open (2026-10-12), after STORY-055
 **Size:** large
 
 ## What to do
@@ -71,3 +71,35 @@ the vault's first place to his armor place. Written to slot 8 (the previous slot
   So the game does not check an item's slot code against the place's slot type on display or over a turn. *Not tried:* whether the bonus counts, picking the item up with the mouse, or putting it back in play.
 
 Not built: giving an item to another wizard's hero or vault, create, remove, and a lair's reward.
+
+## Third slice built (2026-10-15): fill a place with a premade item, or empty it
+
+Kevin's design (2026-10-15): the game does not build artifacts from powers, it draws them from the premade table, so Mirror offers that table. In edit mode **every item place gets a drop-down**: a hero's three places (each
+lists the premade items whose slot code equals that place's slot type) and the vault's four (any premade item). "(keep what is there)", "(remove the item)" and "(empty)" are in the list too.
+
+- **The table is `ITEMDATA.LBX`**, 250 records of 56 bytes, read by `Mirror.ItemData` (now in the manifest, no hash; Kevin agreed to adding it). Two copies exist: `~/DOS/MAGIC` (rewritten by ITEMMAKE on 2026-10-12) and `~/DOS/MagicCom`
+  (2024); they differ only in the cost and the 6-byte tail of about 100 records, all stat bytes agree. The copy in `~/.mirror/game` is MagicCom's.
+- **A premade record stores movement as the screen shows it; a save stores half points**, so `ItemData.save_record/1` doubles it (Protection of Ramses: 4 here, 8 in a save).
+- `Structures.put_item/4` writes the 50-byte record: **over the record the place already holds** when nothing else points at it, else into **the first free record** (an empty name that no place points at) and the index into the place.
+  `Structures.clear_item/3` empties the place and **blanks the record** (50 zero bytes) when nothing else points at it. 138 records is the limit (`:no_free_item`).
+- **In a real save an empty hero slot is unit -1 but its three item places read 0**, not -1 (SAVE2). Counting those as references would make item 0 look shared, so only existing heroes' places count.
+- The game's own **free-record marker is unknown**: Mirror reads an empty name. A premade-items-still-available table the game keeps (kazzmir `loadPremadeItems`, 250 bytes, location not found) is **not** updated, so the game may later draw the same premade item again.
+
+### Real-game check of the premade items (2026-10-15)
+
+Test save: `SAVE2.GAM` through `clear_item/3` and `put_item/4` (**119 bytes differ**, all in the item block, Sir Harold's list entry and the vault; the previous slot 8 is in
+`~/.mirror/dev/DOSbox/backups/SAVE8-pre-premade-2026-10-15.GAM`): the Plate removed from his armor place, then a Ring of Power in his misc place, a Chainmail of Speed in his armor place,
+an Elvish Longbow in the vault's second place, and Protection of Ramses' record overwritten with a Shield of Speed. Research DOSBox, Load Game, Armies > Items, right-click for each item's info:
+
+| Place | Premade item put in | The game shows |
+| --- | --- | --- |
+| armor (record 4, a free record) | Chainmail of Speed (table: defense 4, movement 4, resistance 4) | **+4 Defense, +4 Movement, +4 Resistance, Endurance** |
+| misc (record 0, the removed Plate's blanked record, reused) | Ring of Power (table: 2, 1, 2, spell skill 5) | **+2 Defense, +1 Movement, +2 Resistance, +5 Spell Skill** |
+| vault 0 (Ramses' record 2, overwritten in place) | Shield of Speed (table: defense 2, movement 3) | **+2 Defense, +3 Movement** |
+| vault 1 (record 5, a free record) | Elvish Longbow | drawn as a bow in the vault |
+
+- Loaded without complaint; the game's memory held the places (1, 4, 0) and (2, 5, -1, -1) and the item block exactly as in the file, **and again after one End Turn**. (checkpoints 122 to 126)
+- **The doubling of movement is confirmed** (a premade 4 is the byte 8 in the save and reads +4; 3 is 6 and reads +3). A blanked record is reused without trouble, and a record is overwritten in place without trouble.
+- **Remove**, simulated in the running game's memory (nothing saved): the bow's place set to -1 and its record zeroed, as `clear_item/3` does. The Items screen no longer showed the bow, and after another End Turn the places and the blank record were unchanged. (checkpoint 127)
+  Not tried: a **save written by `clear_item/3`** and loaded as such (the memory state is the same bytes), and the game's own free-record marker (an all-zero record works, which is all Mirror needs).
+- Not checked: whether the game later draws a premade item Mirror already placed (the "still available" table is not updated), and what a Chainmail of Speed does in a fight.

@@ -609,4 +609,138 @@ defmodule MirrorWeb.WizardPanelTest do
       assert WizardPanel.error_message(:wrong_slot) =~ "place of its own kind"
     end
   end
+
+  describe "filling and emptying places" do
+    @premade [
+      %{
+        number: 1,
+        name: "Black Asp",
+        slot: 1,
+        type: 0,
+        cost: 250,
+        icon: 3,
+        stats: <<1, 0, 0, 0, 0, 0, 0, 0>>,
+        charges: 0,
+        abilities: 0x200,
+        slot_name: "melee weapon",
+        type_name: "Sword"
+      },
+      %{
+        number: 7,
+        name: "Ring of Power",
+        slot: 6,
+        type: 6,
+        cost: 600,
+        icon: 4,
+        stats: <<0, 0, 2, 1, 2, 5, 0, 0>>,
+        charges: 0,
+        abilities: 0,
+        slot_name: "misc",
+        type_name: "Misc"
+      },
+      %{
+        number: 9,
+        name: "Another Sword",
+        slot: 1,
+        type: 0,
+        cost: 300,
+        icon: 5,
+        stats: <<0::64>>,
+        charges: 0,
+        abilities: 0,
+        slot_name: "melee weapon",
+        type_name: "Sword"
+      }
+    ]
+
+    defp place_save do
+      Mirror.WizardFixture.synthetic()
+      |> Mirror.WizardFixture.with_hero([1, 2, -1])
+      |> Mirror.WizardFixture.with_items(
+        %{
+          1 => {"Sword", 0, 1, 100, [0, 0, 0, 0, 0, 0, 0, 0], 0, 0},
+          2 => {"Shield", 7, 5, 100, [0, 0, 1, 0, 0, 0, 0, 0], 0, 0},
+          9 => {"Spare Shield", 7, 5, 100, [0, 0, 2, 0, 0, 0, 0, 0], 0, 0}
+        },
+        0,
+        [9]
+      )
+    end
+
+    setup do
+      %{d: WizardPanel.details(place_save(), 1)}
+    end
+
+    test "lists the hero's three places and the vault's four, with the slot types", %{d: d} do
+      places = WizardPanel.item_places(d)
+
+      assert Enum.map(places, & &1.key) == [
+               "hero:0:0",
+               "hero:0:1",
+               "hero:0:2",
+               "vault:0",
+               "vault:1",
+               "vault:2",
+               "vault:3"
+             ]
+
+      assert Enum.map(places, & &1.item) == [1, 2, nil, 9, nil, nil, nil]
+      assert Enum.map(Enum.take(places, 3), & &1.slot_type) == [1, 5, 6]
+      assert Enum.all?(Enum.drop(places, 3), &is_nil(&1.slot_type))
+    end
+
+    test "a hero's place offers the premade items of its own kind, the vault all of them", %{d: d} do
+      [melee, _armor, misc, vault_taken, vault_empty | _] = WizardPanel.item_places(d)
+
+      assert WizardPanel.place_choices(melee, @premade) == [
+               {"keep", "(keep what is there)"},
+               {"clear", "(remove the item)"},
+               {"item:9", "Another Sword (300 gold)"},
+               {"item:1", "Black Asp (250 gold)"}
+             ]
+
+      assert WizardPanel.place_choices(misc, @premade) == [
+               {"keep", "(empty)"},
+               {"item:7", "Ring of Power (600 gold)"}
+             ]
+
+      assert length(WizardPanel.place_choices(vault_taken, @premade)) == 2 + 3
+      assert length(WizardPanel.place_choices(vault_empty, @premade)) == 1 + 3
+    end
+
+    test "reads the form's choice", %{d: d} do
+      assert WizardPanel.set_request(d, "hero:0:2", "keep", @premade) == {:ok, nil}
+
+      assert WizardPanel.set_request(d, "hero:0:0", "clear", @premade) ==
+               {:ok, {:clear, {:hero, 0, 0}}}
+
+      assert {:ok, {:set, {:hero, 0, 2}, %{name: "Ring of Power"}}} =
+               WizardPanel.set_request(d, "hero:0:2", "item:7", @premade)
+
+      assert {:ok, {:set, {:vault, 3}, %{name: "Black Asp"}}} =
+               WizardPanel.set_request(d, "vault:3", "item:1", @premade)
+    end
+
+    test "refuses a place that is not there, a choice that is not one, a premade number not in the table",
+         %{d: d} do
+      assert WizardPanel.set_request(d, "hero:3:0", "clear", @premade) == {:error, :bad_move}
+      assert WizardPanel.set_request(d, "nowhere", "clear", @premade) == {:error, :bad_move}
+      assert WizardPanel.set_request(d, "vault:1", "everything", @premade) == {:error, :bad_move}
+
+      assert WizardPanel.set_request(d, "vault:1", "item:999", @premade) ==
+               {:error, :no_such_item}
+
+      assert WizardPanel.set_request(d, "vault:1", "item:x", @premade) == {:error, :no_such_item}
+    end
+
+    test "the labels name the item and the owner", %{d: d} do
+      assert WizardPanel.set_label(d, {:set, {:hero, 0, 2}, hd(@premade)}, nil) ==
+               "Put Black Asp in Harold"
+
+      assert WizardPanel.set_label(d, {:clear, {:vault, 0}}, nil) ==
+               "Removed Spare Shield from the vault"
+
+      assert WizardPanel.set_label(d, {:clear, {:hero, 0, 0}}, nil) == "Removed Sword from Harold"
+    end
+  end
 end

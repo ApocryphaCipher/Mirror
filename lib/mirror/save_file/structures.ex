@@ -869,11 +869,118 @@ defmodule Mirror.SaveFile.Structures do
 
   defp slot_fits(_raw, _record, {:vault, _}, _item), do: :ok
 
-  defp slot_fits(raw, record, {:hero, slot, place}, item) do
+  defp slot_fits(raw, record, place, item),
+    do:
+      slot_code_fits(raw, record, place, :binary.at(raw, @item_block + item * @item_record + 32))
+
+  defp slot_code_fits(_raw, _record, {:vault, _}, _code), do: :ok
+
+  defp slot_code_fits(raw, record, {:hero, slot, place}, code) do
     entry = @hero_wizards + record * @hero_wizard_size + @hero_list_at + slot * @hero_entry
     <<type::little-signed-16>> = binary_part(raw, entry + 22 + place * 2, 2)
-    item_slot = :binary.at(raw, @item_block + item * @item_record + 32)
-    if type == item_slot, do: :ok, else: {:error, :wrong_slot}
+    if type == code, do: :ok, else: {:error, :wrong_slot}
+  end
+
+  @doc """
+  Fills the place `place` of wizard `record` with the 50-byte item record `item_record` (STORY-056; the premade items
+  of `Mirror.ItemData.save_record/1`): a hero's item place or a vault place. The record's slot code must equal a hero
+  place's slot type (the editor's rule, as in `move_item/4`).
+
+  If the place already holds an item that nothing else points at, **that item's record is overwritten in place**;
+  otherwise the record goes into the first free one (a record with an empty name that no place points at) and its index
+  is written into the place. A place holding an item shared with another place keeps it there untouched.
+
+  Refused: `:no_such_wizard`, `:no_such_hero`, `:no_item_there` (a place that does not exist), `:bad_item_record` (not 50
+  bytes, or no name), `:wrong_slot`, and `:no_free_item` when all #{@item_count} records are in use.
+  """
+  @spec put_item(binary(), non_neg_integer(), item_place(), binary()) :: result()
+  def put_item(raw, record, place, item_record)
+      when is_binary(item_record) and byte_size(item_record) == @item_record do
+    with :ok <- check_wizard(raw, record),
+         {:ok, at} <- place_at(raw, record, place),
+         :ok <-
+           if(:binary.at(item_record, 0) != 0, do: :ok, else: {:error, :bad_item_record}),
+         :ok <- slot_code_fits(raw, record, place, :binary.at(item_record, 32)),
+         {:ok, index} <- record_for(raw, at) do
+      raw =
+        raw
+        |> put(@item_block + index * @item_record, item_record)
+        |> put(at, <<index::little-signed-16>>)
+
+      {:ok, raw, %{set: index, place: place}}
+    end
+  end
+
+  def put_item(_raw, _record, _place, _item_record), do: {:error, :bad_item_record}
+
+  # The record a place's new item is written to: the one it holds when nothing else shares it, else a free one.
+  defp record_for(raw, at) do
+    <<current::little-signed-16>> = binary_part(raw, at, 2)
+
+    if current >= 0 and current < @item_count and item_record_used?(raw, current) and
+         item_refs(raw, current) == 1,
+       do: {:ok, current},
+       else: free_item(raw)
+  end
+
+  defp item_record_used?(raw, index), do: :binary.at(raw, @item_block + index * @item_record) != 0
+
+  defp free_item(raw) do
+    case Enum.find(
+           0..(@item_count - 1),
+           &(not item_record_used?(raw, &1) and item_refs(raw, &1) == 0)
+         ) do
+      nil -> {:error, :no_free_item}
+      index -> {:ok, index}
+    end
+  end
+
+  # How many places (the hero lists' item places, the vaults) of all five wizards point at the item. **An empty hero
+  # slot (unit -1) is not counted:** in a real save its three item places read 0, not -1 (SAVE2), which would make
+  # item 0 look shared by every empty slot.
+  defp item_refs(raw, item) do
+    heroes =
+      for wizard <- 0..4,
+          slot <- 0..5,
+          entry = @hero_wizards + wizard * @hero_wizard_size + @hero_list_at + slot * @hero_entry,
+          <<unit::little-signed-16>> <- [binary_part(raw, entry, 2)],
+          unit >= 0,
+          place <- 0..2,
+          <<^item::little-signed-16>> <- [binary_part(raw, entry + 16 + place * 2, 2)],
+          do: :ref
+
+    vaults =
+      for wizard <- 0..4,
+          place <- 0..(@vault_places - 1),
+          at = @hero_wizards + wizard * @hero_wizard_size + @vault_at + place * 2,
+          <<^item::little-signed-16>> <- [binary_part(raw, at, 2)],
+          do: :ref
+
+    length(heroes) + length(vaults)
+  end
+
+  @doc """
+  Empties the place `place` of wizard `record` (`-1`), and **blanks the item's record** (50 zero bytes) when no other
+  place points at it, which is how Mirror reads a free record (an empty name; the game's own marker is not known,
+  checked only that the game loads such a save, see STORY-056).
+
+  Refused: `:no_such_wizard`, `:no_such_hero`, `:no_item_there` (the place is already empty or does not exist).
+  """
+  @spec clear_item(binary(), non_neg_integer(), item_place()) :: result()
+  def clear_item(raw, record, place) do
+    with :ok <- check_wizard(raw, record),
+         {:ok, at} <- place_at(raw, record, place),
+         <<item::little-signed-16>> = binary_part(raw, at, 2),
+         :ok <- if(item >= 0, do: :ok, else: {:error, :no_item_there}) do
+      raw = put(raw, at, <<-1::little-signed-16>>)
+
+      raw =
+        if item < @item_count and item_refs(raw, item) == 0,
+          do: put(raw, @item_block + item * @item_record, :binary.copy(<<0>>, @item_record)),
+          else: raw
+
+      {:ok, raw, %{cleared: item, place: place}}
+    end
   end
 
   defp item_edits(changes) do

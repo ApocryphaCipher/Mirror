@@ -5,7 +5,7 @@ defmodule MirrorWeb.WizardLive do
   """
   use MirrorWeb, :live_view
 
-  alias Mirror.{Editor, ItemPowers, SessionStore, Spells}
+  alias Mirror.{Editor, ItemData, ItemPowers, SessionStore, Spells}
   alias Mirror.SaveFile.Structures
   alias MirrorWeb.{ItemPanel, WizardPanel}
 
@@ -102,6 +102,37 @@ defmodule MirrorWeb.WizardLive do
     end
   end
 
+  # Fill, empty or leave one of the wizard's item places (STORY-056): a premade item for a hero's place of its kind, any
+  # for the vault. `place` names the place, `choice` is "keep", "clear" or "item:N".
+  def handle_event("place_set", %{"place" => key, "choice" => choice}, socket) do
+    case socket.assigns.premade do
+      nil ->
+        {:noreply, socket}
+
+      premade ->
+        changes_for = fn details ->
+          case WizardPanel.set_request(details, key, choice, premade) do
+            {:ok, nil} -> {:ok, []}
+            {:ok, request} -> {:ok, [request: request]}
+            {:error, _} = error -> error
+          end
+        end
+
+        write = fn raw, details, [request: request] ->
+          case request do
+            {:clear, place} ->
+              Structures.clear_item(raw, details.record, place)
+
+            {:set, place, p} ->
+              Structures.put_item(raw, details.record, place, ItemData.save_record(p))
+          end
+        end
+
+        label = fn details, [request: request] -> WizardPanel.set_label(details, request, nil) end
+        {:noreply, apply_edit(socket, changes_for, write, label)}
+    end
+  end
+
   # "Learn every spell of a realm": the common edit, applied at once.
   def handle_event("learn_realm", %{"realm" => realm}, socket) do
     case Enum.find(Spells.realms(), &(Atom.to_string(&1) == realm)) do
@@ -169,6 +200,8 @@ defmodule MirrorWeb.WizardLive do
     |> assign(:spell_table, spell_table())
     |> assign(:powers, powers())
     |> assign(:moves, moves(details))
+    |> assign(:premade, premade())
+    |> assign(:places, places(details))
     |> assign(:spell_rows, spell_rows(details))
     |> assign(:page_title, if(details, do: details.name, else: "Wizard"))
   end
@@ -181,6 +214,16 @@ defmodule MirrorWeb.WizardLive do
 
   defp moves(details),
     do: Map.new(held_items(details), &{&1.index, WizardPanel.item_moves(details, &1)})
+
+  defp places(nil), do: []
+  defp places(details), do: WizardPanel.item_places(details)
+
+  defp premade do
+    case ItemData.table() do
+      {:ok, table} -> table
+      _ -> nil
+    end
+  end
 
   defp powers do
     case ItemPowers.table() do
@@ -663,6 +706,11 @@ defmodule MirrorWeb.WizardLive do
                   powers={@powers}
                   moves={@moves}
                 />
+                <.place_forms
+                  :if={@editing and @premade}
+                  places={Enum.filter(@places, &(&1.hero && &1.place |> elem(1) == h.slot))}
+                  premade={@premade}
+                />
                 <form
                   :if={@editing}
                   id={"wizard-hero-form-#{h.slot}"}
@@ -734,6 +782,14 @@ defmodule MirrorWeb.WizardLive do
               powers={@powers}
               moves={@moves}
             />
+            <.place_forms
+              :if={@editing and @premade}
+              places={Enum.filter(@places, &is_nil(&1.hero))}
+              premade={@premade}
+            />
+            <p :if={@editing and is_nil(@premade)} class="mt-2 text-xs text-slate-500">
+              Filling a place with a premade item needs ITEMDATA.LBX in the game folder (run mix mirror.import_game).
+            </p>
           </section>
 
           <section id="wizard-standing" class="rounded-xl border border-white/10 bg-black/30 p-4">
@@ -906,6 +962,48 @@ defmodule MirrorWeb.WizardLive do
       {:spell_save, "Spell save", 4}
     ]
   end
+
+  attr :places, :list, required: true
+  attr :premade, :list, required: true
+
+  # One small form per item place: a select of what could go there (a hero's place takes the premade items of its own
+  # kind, the vault any) and a Set button.
+  defp place_forms(assigns) do
+    ~H"""
+    <div class="mt-2 space-y-1">
+      <form
+        :for={pl <- @places}
+        id={"wizard-place-#{String.replace(pl.key, ":", "-")}"}
+        phx-submit="place_set"
+        class="flex flex-wrap items-end gap-2"
+      >
+        <input type="hidden" name="place" value={pl.key} />
+        <label class="text-xs text-slate-400">
+          {place_label(pl)}
+          <select
+            name="choice"
+            class="mt-1 block w-64 rounded bg-slate-900 px-2 py-1 text-sm text-white"
+          >
+            <option :for={{value, label} <- WizardPanel.place_choices(pl, @premade)} value={value}>
+              {label}
+            </option>
+          </select>
+        </label>
+        <button
+          type="submit"
+          class="rounded-lg border border-emerald-300/50 px-3 py-1 text-xs text-emerald-100 hover:border-emerald-200"
+        >
+          Set
+        </button>
+      </form>
+    </div>
+    """
+  end
+
+  defp place_label(%{hero: nil, place: {:vault, n}}), do: "Vault place #{n + 1}"
+
+  defp place_label(%{place: {:hero, _, n}, slot_type: type}),
+    do: "Place #{n + 1} (#{Mirror.SaveFile.Items.slot_name(type) || "slot #{type}"})"
 
   defp realm_label(realm), do: realm |> Atom.to_string() |> String.capitalize()
 
