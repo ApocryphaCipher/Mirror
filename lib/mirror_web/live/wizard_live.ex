@@ -870,8 +870,8 @@ defmodule MirrorWeb.WizardLive do
   defp gradient(colour),
     do: "background: linear-gradient(to bottom, #{colour} 0%, #000 90%);"
 
-  defp circle_path(%{plane: :arcanus}), do: ~p"/arcanus"
-  defp circle_path(%{plane: :myrror}), do: ~p"/myrror"
+  defp circle_path(%{plane: :arcanus, x: x, y: y}), do: ~p"/arcanus?#{[x: x, y: y]}"
+  defp circle_path(%{plane: :myrror, x: x, y: y}), do: ~p"/myrror?#{[x: x, y: y]}"
 
   defp plane_name(:arcanus), do: "Arcanus"
   defp plane_name(:myrror), do: "Myrror"

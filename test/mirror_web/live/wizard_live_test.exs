@@ -29,7 +29,7 @@ defmodule MirrorWeb.WizardLiveTest do
     assert html =~ "12 Sorcery"
     assert html =~ "Alchemy, Famous"
     assert html =~ "linear-gradient(to bottom, #{MirrorWeb.WizardPanel.colour(:blue)}"
-    assert has_element?(view, "#wizard-circle[href='/myrror']")
+    assert has_element?(view, "#wizard-circle[href='/myrror?x=38&y=21']")
     assert has_element?(view, "#wizard-switcher a[href='/wizard/2']", "Sharee")
   end
 

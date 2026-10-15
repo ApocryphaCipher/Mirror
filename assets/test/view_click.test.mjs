@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import {tileAtViewportPoint} from "../js/view_click.mjs"
+import {centerOnTile, tileAtViewportPoint} from "../js/view_click.mjs"
 
 const base = {rect: {left: 100, top: 50}, tx: 0, ty: 0, scale: 1, tileSize: 12, mapWidth: 60, mapHeight: 40}
 
@@ -24,4 +24,10 @@ test("outside the map is null", () => {
 test("a missing scale or tile size gives null, not NaN", () => {
   assert.equal(tileAtViewportPoint({...base, scale: 0, clientX: 120, clientY: 60}), null)
   assert.equal(tileAtViewportPoint({...base, tileSize: undefined, clientX: 120, clientY: 60}), null)
+})
+
+test("centerOnTile puts the middle of the tile in the middle of the viewport", () => {
+  const {tx, ty} = centerOnTile({x: 10, y: 5, scale: 2, tileSize: 12, viewWidth: 800, viewHeight: 600})
+  assert.equal(tx + (10 + 0.5) * 12 * 2, 400)
+  assert.equal(ty + (5 + 0.5) * 12 * 2, 300)
 })

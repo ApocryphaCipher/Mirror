@@ -11,3 +11,12 @@ export function tileAtViewportPoint({clientX, clientY, rect, tx, ty, scale, tile
   if (x < 0 || y < 0 || x >= mapWidth || y >= mapHeight) return null
   return {x, y}
 }
+
+// Where to put the stage so tile `(x, y)` sits in the middle of the viewport at `scale`
+// (the "centre on this tile" link from the wizard page). Returns `{tx, ty}`.
+export function centerOnTile({x, y, scale, tileSize, viewWidth, viewHeight}) {
+  return {
+    tx: viewWidth / 2 - (x + 0.5) * tileSize * scale,
+    ty: viewHeight / 2 - (y + 0.5) * tileSize * scale,
+  }
+}
