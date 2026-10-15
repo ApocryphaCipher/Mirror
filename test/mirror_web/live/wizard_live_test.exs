@@ -33,6 +33,36 @@ defmodule MirrorWeb.WizardLiveTest do
     assert has_element?(view, "#wizard-switcher a[href='/wizard/2']", "Sharee")
   end
 
+  test "lists a wizard's heroes, or says there are none", %{conn: conn, sid: sid} do
+    load_save(sid)
+    {:ok, view, _} = live(conn, ~p"/wizard/1")
+    assert has_element?(view, "#wizard-heroes", "none")
+
+    entry =
+      <<1::little-signed-16>> <>
+        String.pad_trailing("Harold", 14, <<0>>) <>
+        :binary.copy(<<255>>, 6) <> :binary.copy(<<0>>, 6)
+
+    unit =
+      <<7, 17, 0, 0, 2, 31, 0, 0, 0, 0, 0, 0, 2, 0, 27::little-16>> <> :binary.copy(<<0>>, 16)
+
+    raw =
+      Mirror.WizardFixture.synthetic()
+      |> Mirror.WizardFixture.field(
+        0,
+        0x76,
+        entry <> :binary.copy(<<-1::little-signed-16>> <> :binary.copy(<<0>>, 26), 5)
+      )
+      |> Mirror.WizardFixture.put_bytes(0x9E2, <<2::little-16>>)
+      |> Mirror.WizardFixture.put_bytes(0x00B734 + 32, unit)
+
+    SessionStore.put(sid, Mirror.SaveManager.normalize_state(%{save: %{raw: raw}}))
+    {:ok, view, _} = live(conn, ~p"/wizard/1")
+    assert has_element?(view, "#wizard-hero-0", "Harold")
+    assert has_element?(view, "#wizard-hero-0", "level 2")
+    assert has_element?(view, "#wizard-hero-0", "27 xp")
+  end
+
   test "shows the relations table and the active global enchantments", %{conn: conn, sid: sid} do
     load_save(sid)
     {:ok, view, _} = live(conn, ~p"/wizard/1")

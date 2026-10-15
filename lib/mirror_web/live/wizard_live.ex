@@ -550,6 +550,33 @@ defmodule MirrorWeb.WizardLive do
             </ul>
           </section>
 
+          <section id="wizard-heroes" class="rounded-xl border border-white/10 bg-black/30 p-4">
+            <h2 class="mb-2 text-lg font-semibold text-white">Heroes</h2>
+            <p :if={@details.heroes == []} class="text-slate-500">none</p>
+            <ul :if={@details.heroes != []} class="space-y-2">
+              <li
+                :for={h <- @details.heroes}
+                id={"wizard-hero-#{h.slot}"}
+                class="rounded-lg border border-white/10 px-3 py-2 text-sm text-slate-200"
+              >
+                <p>
+                  <span class="font-semibold text-white">{h.name}</span>
+                  · {h.type_name} · level {h.level} · {h.experience} xp
+                  · at {h.location.x}, {h.location.y} {plane_name(h.location.plane)}
+                </p>
+                <p class="text-slate-400">
+                  Casting skill {h.casting_skill}
+                  <span :if={h.spells != []}>
+                    · {Enum.map_join(h.spells, ", ", &spell_name(@spell_table, &1))}
+                  </span>
+                  <span :if={h.items != []}>
+                    · {length(h.items)} {if length(h.items) == 1, do: "item", else: "items"}
+                  </span>
+                </p>
+              </li>
+            </ul>
+          </section>
+
           <section id="wizard-standing" class="rounded-xl border border-white/10 bg-black/30 p-4">
             <h2 class="mb-2 text-lg font-semibold text-white">Standing</h2>
             <p class="text-slate-200">

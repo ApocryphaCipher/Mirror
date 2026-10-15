@@ -1,7 +1,7 @@
 # STORY-052: Decode the hero list, and show a wizard's heroes
 
 **Parent:** [EPIC-010](../epics/EPIC-010-heroes.md)
-**Status:** open (2026-10-12). The list's layout is found (see below); the per-hero tables and hiring are not.
+**Status:** partly built (2026-10-15): the list, the unit link and the per-player hero table are read and shown on the wizard page (`Mirror.SaveFile.Heroes`); the ability bits, the experience thresholds, the units-panel rows, hiring and the Heroes-screen comparison are not done. *Original note:* open (2026-10-12). The list's layout is found (see below); the per-hero tables and hiring are not.
 **Size:** medium to large
 **Raised by:** [Kevin](https://github.com/KevinAsbury), 2026-10-12
 
@@ -20,3 +20,21 @@
 ## Definition of done
 
 A documented layout with two sources; the page and the units panel agree with the game's Heroes screen for one real save.
+
+## Built (2026-10-15)
+
+`Mirror.SaveFile.Heroes.for_wizard/2` reads a wizard's heroes from three places and `/wizard/:id` shows them (name, unit type, level, experience, tile, casting
+skill, spells, item count):
+
+- the wizard record's hero list at `+0x76` (6 x 28 bytes; **an empty slot is unit index -1**);
+- the hero's unit record (type `+5`, hero slot `+6`, level `+12`, experience `+14`);
+- **the per-player hero table at the start of the file: 6 x 420 bytes, 35 heroes x 12 bytes, indexed by unit type** (found 2026-10-15; the RAM map had it as
+  "heroes, one block per player", the layout inside was not known): `+0` i16 (-20 for a hero the player has hired, 0 otherwise, *meaning unknown*), `+2..+5`
+  ability bits (*not decoded*), `+6` casting skill, `+7..+10` four spell numbers (0 none), `+11` padding.
+
+Checked on `SAVE2.GAM` (no game session): Sir Harold is unit 50 (type 31, level 2, 27 xp, at 7,17 Arcanus) and the rival's Rockfist is a Bahgtru (type 6) at 23,23;
+both carry the -20 marker in their own player's table; every hero with spells in the table has numbers inside its realm's range (Chaos 81 to 120, Death 161 to
+200, Nature 1 to 40). Sir Harold and Rockfist have no spells, as expected for warriors.
+
+Not done: the ability names (a bit table, needs the game's Heroes screen), a hero's casting skill vs the game's number (the byte may be a base, not the shown value), the
+experience thresholds (step 3), the units-panel rows, and what the -20 means.
