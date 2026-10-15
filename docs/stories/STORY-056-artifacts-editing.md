@@ -1,7 +1,7 @@
 # STORY-056: Edit, move and create artifacts
 
 **Parent:** [EPIC-011](../epics/EPIC-011-artifacts.md)
-**Status:** second slice built (2026-10-15): items can be moved between a hero's places and the vault, not yet loaded in the real game. First slice built and checked in the real game (2026-10-15): an item can be edited in place (name, cost, stats, special powers) from the wizard page, loaded and kept through one End Turn; move, create, remove and a lair's reward are not built. *Original note:* open (2026-10-12), after STORY-055
+**Status:** second slice built and checked in the real game (2026-10-15): items can be moved between a hero's places and the vault. First slice built and checked in the real game (2026-10-15): an item can be edited in place (name, cost, stats, special powers) from the wizard page, loaded and kept through one End Turn; move, create, remove and a lair's reward are not built. *Original note:* open (2026-10-12), after STORY-055
 **Size:** large
 
 ## What to do
@@ -56,8 +56,18 @@ In edit mode an item that has somewhere to go gets a **Move to** list on `/wizar
 `Structures.move_item/4` writes the item index into the target and `-1` into the source (four bytes change, the item record is untouched), as one undo step. A swap is two moves through a free place.
 
 - **A hero's place has a slot type** (`+22` of his list entry: 1 melee weapon, 2 bow, 4 staff or wand, 5 armor, 6 misc) and the item's slot code (`+32` of its record) must equal it. Sir Harold's places are (1, 5, 6): a sword, an armor and a misc item.
-  *Guess:* the game depends on that match. What it does with a mismatch (an armor in a sword place) was **not tried** and the editor refuses it (`:wrong_slot`); a game test with one deliberately wrong move would settle it.
+  **The game does not enforce it** (checked 2026-10-15, below): an armor placed in a misc place was drawn there, with no complaint, and kept through an End Turn. The editor still refuses a mismatch (`:wrong_slot`) because nothing is known about what such an item does in play; relaxing it is a one-line change.
 - Moves stay inside one wizard (his heroes and his vault). Giving an item to another wizard's hero or vault is not built.
 - Refused with a reason: nothing at the source, a taken target, a hero not in the list, a wrong kind of place, the same place twice, a free item record.
 - `Heroes` now also reports each hero's `item_places` (the three places with their gaps) and `slot_types`; `Items.vault_places/2` the four vault places with their gaps.
-- **Not loaded in the real game yet:** the definition of done for a move (seen on the item screen, through one End Turn) is not met.
+
+### Real-game check of the move (2026-10-15)
+
+Test save: `SAVE2.GAM` with two moves made by `Structures.move_item/4` (**5 bytes differ**): the Plate of Enduring Immunity from Sir Harold's armor place to the vault's second place, then Protection of Ramses from
+the vault's first place to his armor place. Written to slot 8 (the previous slot 8 is in `~/.mirror/dev/DOSbox/backups/SAVE8-pre-itemmove-2026-10-15.GAM`). Research DOSBox, Load Game, Armies > Items:
+
+- Loaded without complaint. The game's memory had hero places (1, 2, -1) and vault (-1, 0, -1, -1), exactly the save, and the item block unchanged. The Items screen shows Sir Harold with his sword and the shield, and the red plate in the vault's second place. **One End Turn later** the places and the item block were unchanged. (vault checkpoints 118 and 119)
+- **Wrong-kind placement, by writing the game's memory (nothing saved):** the plate (armor, slot code 5) put into Sir Harold's third place (slot type 6, misc). The Items screen draws it there, no crash; after another End Turn the placement was still (1, 2, 0). (checkpoints 120 and 121)
+  So the game does not check an item's slot code against the place's slot type on display or over a turn. *Not tried:* whether the bonus counts, picking the item up with the mouse, or putting it back in play.
+
+Not built: giving an item to another wizard's hero or vault, create, remove, and a lair's reward.
