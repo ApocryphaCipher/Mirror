@@ -43,9 +43,9 @@ defmodule MirrorWeb.ItemPanel do
   defp kind(%{type_name: type}), do: type
 
   # The stat bytes are the plain numbers on the Create Artifact screen; the spell save byte is shown as a penalty
-  # there ("-1 Spell Save" is the byte 1). **Movement is stored in half points in a save** (*inferred*, 2026-10-15:
-  # Protection of Ramses, Plate of Enduring Immunity and Shield of Eros have 8, 4 and 2 in SAVE2 against 4, 2 and 1 in
-  # the premade table, all their other bytes equal), so it is shown halved.
+  # there ("-1 Spell Save" is the byte 1). **Movement is stored in half points in a save** (checked in the game,
+  # 2026-10-15: Protection of Ramses has 8 and the Items screen says +4 Movement, Plate of Enduring Immunity has 4 and
+  # says +2; the premade table has 4 and 2), so it is shown halved.
   defp stats(item) do
     for {label, value, sign} <- [
           {"Attack", item.attack, "+"},
