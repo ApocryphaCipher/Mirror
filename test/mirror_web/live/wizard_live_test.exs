@@ -129,6 +129,81 @@ defmodule MirrorWeb.WizardLiveTest do
     refute has_element?(view, "#wizard-vault", "no spare items")
   end
 
+  test "an item is edited in place from the wizard page, as one undo step", %{
+    conn: conn,
+    sid: sid
+  } do
+    raw =
+      Mirror.WizardFixture.synthetic()
+      |> Mirror.WizardFixture.with_hero([1, -1, -1])
+      |> Mirror.WizardFixture.with_items(
+        %{
+          1 => {"Mae Govannon", 0, 1, 1200, [1, 0, 1, 0, 0, 5, 0, 0], 0, 0},
+          9 => {"Spare Shield", 7, 5, 300, [0, 0, 3, 2, 0, 0, 0, 0], 0, 0}
+        },
+        0,
+        [9]
+      )
+
+    SessionStore.put(sid, Mirror.SaveManager.normalize_state(%{save: %{raw: raw}}))
+    {:ok, view, _} = live(conn, ~p"/wizard/1")
+
+    refute has_element?(view, "#wizard-item-form-1")
+    view |> element("#wizard-edit-toggle") |> render_click()
+    assert has_element?(view, "#wizard-item-form-1")
+    assert has_element?(view, "#wizard-item-form-9")
+    # movement is shown as the screen does: the byte 2 is +1
+    assert has_element?(view, "#wizard-item-form-9 input[name='item[movement]'][value='1']")
+
+    before = SessionStore.get(sid)
+
+    view
+    |> element("#wizard-item-form-9")
+    |> render_submit(%{"item" => %{"name" => "Big Shield", "cost" => "500", "movement" => "2.5"}})
+
+    assert has_element?(
+             view,
+             "#wizard-note",
+             "Edited item Spare Shield: name Big Shield, cost 500, movement 2.5"
+           )
+
+    assert has_element?(view, "#wizard-vault-item-9", "Big Shield")
+    assert has_element?(view, "#wizard-vault-item-9", "500 gold")
+
+    edited = SessionStore.get(sid)
+    assert length(edited.history.arcanus) == length(before.history.arcanus) + 1
+    {:ok, items} = Mirror.SaveFile.Items.parse(edited.save.raw)
+
+    assert %{name: "Big Shield", cost: 500, movement: 5, defense: 3} =
+             Enum.find(items, &(&1.index == 9))
+
+    {undone, _} = Mirror.Editor.undo(edited, :arcanus)
+    assert undone.save.raw == before.save.raw
+
+    # a bad value is refused in words and changes nothing
+    view |> element("#wizard-item-form-1") |> render_submit(%{"item" => %{"attack" => "99"}})
+    assert has_element?(view, "#wizard-note", "Stats stay within")
+    assert SessionStore.get(sid).save.raw == edited.save.raw
+  end
+
+  test "an item the wizard does not hold cannot be edited from his page", %{conn: conn, sid: sid} do
+    raw =
+      Mirror.WizardFixture.synthetic()
+      |> Mirror.WizardFixture.with_hero([1, -1, -1])
+      |> Mirror.WizardFixture.with_items(%{
+        1 => {"Mae Govannon", 0, 1, 1200, [1, 0, 1, 0, 0, 5, 0, 0], 0, 0},
+        7 => {"Elsewhere", 6, 6, 100, [0, 0, 0, 0, 0, 0, 0, 0], 0, 0}
+      })
+
+    SessionStore.put(sid, Mirror.SaveManager.normalize_state(%{save: %{raw: raw}}))
+    {:ok, view, _} = live(conn, ~p"/wizard/1")
+    view |> element("#wizard-edit-toggle") |> render_click()
+
+    render_hook(view, "item_edit", %{"index" => "7", "item" => %{"name" => "Hijacked"}})
+    assert has_element?(view, "#wizard-note", "no longer in the save")
+    assert SessionStore.get(sid).save.raw == raw
+  end
+
   test "an empty vault and a hero with no items say so or show nothing", %{conn: conn, sid: sid} do
     SessionStore.put(
       sid,

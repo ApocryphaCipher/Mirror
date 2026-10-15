@@ -18,7 +18,8 @@ defmodule MirrorWeb.ItemPanel do
           stats: [String.t()],
           powers: [String.t()],
           unnamed_powers: boolean(),
-          spell: String.t() | nil
+          spell: String.t() | nil,
+          raw: map()
         }
 
   @doc """
@@ -34,7 +35,8 @@ defmodule MirrorWeb.ItemPanel do
       stats: stats(item),
       powers: if(is_list(powers), do: ItemPowers.names_for(powers, item.abilities), else: []),
       unnamed_powers: item.abilities != 0 and not is_list(powers),
-      spell: spell(item, spell_table)
+      spell: spell(item, spell_table),
+      raw: item
     }
   end
 
@@ -59,6 +61,10 @@ defmodule MirrorWeb.ItemPanel do
         value > 0,
         do: "#{sign}#{number(value)} #{label}"
   end
+
+  @doc "A movement byte (half points) as the screen shows it: 8 is `\"4\"`, 3 is `\"1.5\"`."
+  @spec movement_shown(non_neg_integer()) :: String.t()
+  def movement_shown(half_points), do: number(half_points / 2)
 
   defp number(value) when is_float(value) do
     if value == Float.floor(value),

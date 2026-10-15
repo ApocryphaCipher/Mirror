@@ -363,6 +363,110 @@ defmodule MirrorWeb.WizardPanel do
       Enum.map_join(changes, ", ", fn {field, v} -> "#{field} #{v}" end)
   end
 
+  @doc """
+  The item edit form's values (`name`, `cost`, `attack`, `to_hit`, `defense`, `movement` as the screen shows it,
+  `resistance`, `spell_skill`, `spell_save`, and `powers` with its `powers_present` marker, a map of power mask to
+  `"on"`) turned into `Mirror.SaveFile.Structures.edit_item/3` changes, keeping only what differs from `item` (an
+  `Mirror.SaveFile.Items` item). `powers` is `Mirror.ItemPowers.table/0`'s list or `nil`; the special powers are
+  ticked boxes, and ability bits no power owns are kept as they are.
+  """
+  @spec item_changes(map(), map(), [map()] | nil) :: {:ok, keyword()} | {:error, atom()}
+  def item_changes(params, item, powers) when is_map(params) do
+    with {:ok, name} <- item_name(params, item),
+         {:ok, numbers} <- item_numbers(params, item),
+         {:ok, movement} <- item_movement(params, item),
+         {:ok, abilities} <- item_abilities(params, item, powers) do
+      {:ok, name ++ numbers ++ movement ++ abilities}
+    end
+  end
+
+  def item_changes(_params, _item, _powers), do: {:ok, []}
+
+  defp item_name(params, item) do
+    case Map.get(params, "name", item.name) do
+      name when is_binary(name) ->
+        name = String.trim(name)
+        {:ok, if(name != item.name, do: [name: name], else: [])}
+
+      _ ->
+        {:error, :bad_item_name}
+    end
+  end
+
+  defp item_numbers(params, item) do
+    fields = [:cost, :attack, :to_hit, :defense, :resistance, :spell_skill, :spell_save]
+
+    Enum.reduce_while(fields, {:ok, []}, fn field, {:ok, acc} ->
+      case number(Map.get(params, Atom.to_string(field))) do
+        :skip -> {:cont, {:ok, acc}}
+        {:ok, n} when n == :erlang.map_get(field, item) -> {:cont, {:ok, acc}}
+        {:ok, n} -> {:cont, {:ok, acc ++ [{field, n}]}}
+        :error -> {:halt, {:error, if(field == :cost, do: :bad_item_cost, else: :bad_item_stat)}}
+      end
+    end)
+  end
+
+  # The form shows movement as the screen does (4 for the byte 8); the save keeps half points.
+  defp item_movement(params, item) do
+    case Map.get(params, "movement") do
+      nil ->
+        {:ok, []}
+
+      "" ->
+        {:ok, []}
+
+      value when is_binary(value) ->
+        with {shown, ""} <- Float.parse(String.trim(value)),
+             half = shown * 2,
+             true <- shown >= 0 and half == Float.round(half) do
+          half = trunc(half)
+          {:ok, if(half == item.movement, do: [], else: [movement: half])}
+        else
+          _ -> {:error, :bad_item_stat}
+        end
+
+      _ ->
+        {:error, :bad_item_stat}
+    end
+  end
+
+  defp item_abilities(%{"powers_present" => _} = params, item, powers) when is_list(powers) do
+    case Map.get(params, "powers", %{}) do
+      given when is_map(given) ->
+        special = for %{mask: mask} <- powers, mask != 0, do: mask
+        known = Enum.reduce(special, 0, &Bitwise.bor/2)
+
+        ticked =
+          for mask <- special,
+              Map.get(given, Integer.to_string(mask)) in ["on", "true"],
+              reduce: 0 do
+            acc -> Bitwise.bor(acc, mask)
+          end
+
+        kept = Bitwise.band(item.abilities, Bitwise.bxor(0xFFFFFFFF, known))
+        abilities = Bitwise.bor(kept, ticked)
+        {:ok, if(abilities == item.abilities, do: [], else: [abilities: abilities])}
+
+      _ ->
+        {:error, :bad_item_abilities}
+    end
+  end
+
+  defp item_abilities(_params, _item, _powers), do: {:ok, []}
+
+  @doc "A short description of an item edit, for the notice and the undo list."
+  @spec item_label(map(), keyword()) :: String.t()
+  def item_label(item, changes) do
+    parts =
+      Enum.map(changes, fn
+        {:abilities, _} -> "powers"
+        {:movement, half} -> "movement #{MirrorWeb.ItemPanel.movement_shown(half)}"
+        {field, v} -> "#{field |> Atom.to_string() |> String.replace("_", " ")} #{v}"
+      end)
+
+    "Edited item #{item.name}: #{Enum.join(parts, ", ")}"
+  end
+
   defp name(params, details) do
     case Map.get(params, "name", details.name) do
       name when is_binary(name) -> {:ok, String.trim(name)}
@@ -679,6 +783,17 @@ defmodule MirrorWeb.WizardPanel do
   def error_message(:bad_hero_name),
     do: "A hero's name is 1 to 13 letters, digits or punctuation (no accents)."
 
+  def error_message(:bad_item_name),
+    do: "An item's name is 1 to 26 letters, digits or punctuation (no accents)."
+
+  def error_message(:bad_item_cost), do: "Cost is a whole number from 0 to 65535."
+
+  def error_message(:bad_item_stat),
+    do:
+      "Stats stay within what Create Artifact allows: attack 0-6, to hit 0-3, defense 0-6, movement 0-4 (halves allowed), resistance 0-6, spell skill 0-20, spell save 0-4."
+
+  def error_message(:bad_item_abilities), do: "Those powers could not be read."
+  def error_message(:no_such_item), do: "That item is no longer in the save."
   def error_message(:bad_level), do: "Level is a whole number from 0 to 9."
   def error_message(:bad_experience), do: "Experience is a whole number from 0 to 30000."
   def error_message(:bad_damage), do: "Damage is a whole number from 0 to 255."

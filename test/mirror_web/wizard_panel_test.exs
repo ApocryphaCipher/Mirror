@@ -441,4 +441,108 @@ defmodule MirrorWeb.WizardPanelTest do
                "Edited hero Harold: name Sir H, level 3"
     end
   end
+
+  describe "item edit form" do
+    @item %{
+      index: 4,
+      name: "Staff of Zap",
+      cost: 900,
+      attack: 0,
+      to_hit: 1,
+      defense: 3,
+      movement: 4,
+      resistance: 0,
+      spell_skill: 5,
+      spell_save: 0,
+      abilities: 0x4000 + 0x80_0000_00
+    }
+    @powers [
+      %{index: 0, name: "+3 Defense", kind: 2, realm: 0, amount: 3, mask: 0},
+      %{index: 1, name: "Haste", kind: 9, realm: 1, amount: 7, mask: 0x4000},
+      %{index: 2, name: "Regeneration", kind: 9, realm: 0, amount: 6, mask: 0x40}
+    ]
+
+    @same %{
+      "name" => "Staff of Zap",
+      "cost" => "900",
+      "attack" => "0",
+      "to_hit" => "1",
+      "defense" => "3",
+      "movement" => "2",
+      "resistance" => "0",
+      "spell_skill" => "5",
+      "spell_save" => "0"
+    }
+
+    test "keeps only what differs; movement is typed as the screen shows it" do
+      assert WizardPanel.item_changes(@same, @item, @powers) == {:ok, []}
+
+      assert WizardPanel.item_changes(
+               %{
+                 @same
+                 | "name" => " Rod ",
+                   "cost" => "10",
+                   "movement" => "3.5",
+                   "defense" => "6"
+               },
+               @item,
+               @powers
+             ) == {:ok, [name: "Rod", cost: 10, defense: 6, movement: 7]}
+    end
+
+    test "powers are ticked boxes; bits no power owns are kept" do
+      ticked = fn masks ->
+        Map.merge(@same, %{
+          "powers_present" => "1",
+          "powers" => Map.new(masks, &{Integer.to_string(&1), "on"})
+        })
+      end
+
+      # Haste stays, Regeneration is added, the unowned bit 0x8000000 stays
+      assert WizardPanel.item_changes(ticked.([0x4000, 0x40]), @item, @powers) ==
+               {:ok, [abilities: 0x4000 + 0x40 + 0x80_0000_00]}
+
+      # nothing ticked removes Haste only
+      assert WizardPanel.item_changes(ticked.([]), @item, @powers) ==
+               {:ok, [abilities: 0x80_0000_00]}
+
+      assert WizardPanel.item_changes(ticked.([0x4000]), @item, @powers) == {:ok, []}
+
+      # without the power table the boxes are not offered, so the powers are left alone
+      assert WizardPanel.item_changes(ticked.([]), @item, nil) == {:ok, []}
+
+      assert WizardPanel.item_changes(
+               %{@same | "name" => "Staff of Zap"}
+               |> Map.put("powers_present", "1")
+               |> Map.put("powers", "on"),
+               @item,
+               @powers
+             ) == {:error, :bad_item_abilities}
+    end
+
+    test "refuses what is not a number, a half that is not a half, and says why" do
+      assert WizardPanel.item_changes(%{@same | "cost" => "x"}, @item, nil) ==
+               {:error, :bad_item_cost}
+
+      assert WizardPanel.item_changes(%{@same | "attack" => "1.5"}, @item, nil) ==
+               {:error, :bad_item_stat}
+
+      assert WizardPanel.item_changes(%{@same | "movement" => "1.3"}, @item, nil) ==
+               {:error, :bad_item_stat}
+
+      assert WizardPanel.item_changes(%{@same | "movement" => "-1"}, @item, nil) ==
+               {:error, :bad_item_stat}
+
+      assert WizardPanel.item_changes(%{@same | "name" => 5}, @item, nil) ==
+               {:error, :bad_item_name}
+
+      assert WizardPanel.error_message(:bad_item_stat) =~ "attack 0-6"
+      assert WizardPanel.error_message(:bad_item_name) =~ "1 to 26"
+    end
+
+    test "the label names the item and the fields" do
+      assert WizardPanel.item_label(@item, name: "Rod", movement: 7, spell_skill: 9, abilities: 1) ==
+               "Edited item Staff of Zap: name Rod, movement 3.5, spell skill 9, powers"
+    end
+  end
 end

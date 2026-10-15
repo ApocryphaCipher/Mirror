@@ -56,6 +56,28 @@ defmodule MirrorWeb.WizardLive do
     end
   end
 
+  # One item's name, cost, stats and powers (STORY-056), in place wherever it is carried. Only an item this wizard
+  # holds (a hero's or the vault's) can be edited from his page.
+  def handle_event("item_edit", %{"index" => index, "item" => params}, socket) do
+    with {index, ""} <- Integer.parse(index) do
+      held = fn details -> Enum.find(held_items(details), &(&1.index == index)) end
+
+      changes_for = fn details ->
+        case held.(details) do
+          nil -> {:error, :no_such_item}
+          item -> WizardPanel.item_changes(params, item, socket.assigns.powers)
+        end
+      end
+
+      write = fn raw, _details, changes -> Structures.edit_item(raw, index, changes) end
+      label = fn details, changes -> WizardPanel.item_label(held.(details), changes) end
+
+      {:noreply, apply_edit(socket, changes_for, write, label)}
+    else
+      _ -> {:noreply, socket}
+    end
+  end
+
   # "Learn every spell of a realm": the common edit, applied at once.
   def handle_event("learn_realm", %{"realm" => realm}, socket) do
     case Enum.find(Spells.realms(), &(Atom.to_string(&1) == realm)) do
@@ -98,6 +120,9 @@ defmodule MirrorWeb.WizardLive do
       {:error, reason} -> assign(socket, :note, {:error, WizardPanel.error_message(reason)})
     end
   end
+
+  # The items this wizard holds: his heroes' and the vault's.
+  defp held_items(details), do: Enum.flat_map(details.heroes, & &1.item_list) ++ details.vault
 
   defp write_wizard(raw, details, changes),
     do: Structures.edit_wizard(raw, details.record, changes)
@@ -603,6 +628,8 @@ defmodule MirrorWeb.WizardLive do
                 <.item_list
                   items={Enum.map(h.item_list, &ItemPanel.describe(&1, @powers, @spell_table))}
                   prefix={"wizard-hero-#{h.slot}-item"}
+                  editing={@editing}
+                  powers={@powers}
                 />
                 <form
                   :if={@editing}
@@ -671,6 +698,8 @@ defmodule MirrorWeb.WizardLive do
             <.item_list
               items={Enum.map(@details.vault, &ItemPanel.describe(&1, @powers, @spell_table))}
               prefix="wizard-vault-item"
+              editing={@editing}
+              powers={@powers}
             />
           </section>
 
@@ -716,6 +745,8 @@ defmodule MirrorWeb.WizardLive do
 
   attr :items, :list, required: true
   attr :prefix, :string, required: true
+  attr :editing, :boolean, default: false
+  attr :powers, :any, default: nil
 
   defp item_list(assigns) do
     ~H"""
@@ -733,9 +764,88 @@ defmodule MirrorWeb.WizardLive do
         <span :if={item.unnamed_powers} class="text-slate-500">
           · has powers (names need ITEMPOW.LBX; run mix mirror.import_game)
         </span>
+        <form
+          :if={@editing}
+          id={"wizard-item-form-#{item.index}"}
+          phx-submit="item_edit"
+          class="mt-2 space-y-2"
+        >
+          <input type="hidden" name="index" value={item.index} />
+          <div class="flex flex-wrap items-end gap-2">
+            <label class="text-xs text-slate-400">
+              Name
+              <input
+                type="text"
+                name="item[name]"
+                value={item.name}
+                maxlength="26"
+                class="mt-1 block w-44 rounded bg-slate-900 px-2 py-1 text-sm text-white"
+              />
+            </label>
+            <label :for={{field, label, max} <- item_fields()} class="text-xs text-slate-400">
+              {label}
+              <input
+                type="number"
+                name={"item[#{field}]"}
+                value={Map.fetch!(item.raw, field)}
+                min="0"
+                max={max}
+                class="mt-1 block w-20 rounded bg-slate-900 px-2 py-1 text-sm text-white"
+              />
+            </label>
+            <label class="text-xs text-slate-400">
+              Movement
+              <input
+                type="number"
+                name="item[movement]"
+                value={ItemPanel.movement_shown(item.raw.movement)}
+                min="0"
+                max="4"
+                step="0.5"
+                class="mt-1 block w-20 rounded bg-slate-900 px-2 py-1 text-sm text-white"
+              />
+            </label>
+          </div>
+          <fieldset :if={is_list(@powers)}>
+            <legend class="text-xs text-slate-400">Powers</legend>
+            <input type="hidden" name="item[powers_present]" value="1" />
+            <div class="grid grid-cols-2 gap-x-3 sm:grid-cols-4">
+              <label
+                :for={p <- Enum.filter(@powers, &(&1.mask != 0))}
+                class="flex items-center gap-1 text-xs text-slate-300"
+              >
+                <input
+                  type="checkbox"
+                  name={"item[powers][#{p.mask}]"}
+                  checked={Bitwise.band(item.raw.abilities, p.mask) == p.mask}
+                />
+                {p.name}
+              </label>
+            </div>
+          </fieldset>
+          <button
+            type="submit"
+            class="rounded-lg bg-emerald-300 px-3 py-1 text-xs font-semibold text-slate-950 hover:bg-emerald-200"
+          >
+            Apply
+          </button>
+        </form>
       </li>
     </ul>
     """
+  end
+
+  # `{field, label, max}` for the plain number boxes; movement has its own (half points).
+  defp item_fields do
+    [
+      {:cost, "Cost", 65_535},
+      {:attack, "Attack", 6},
+      {:to_hit, "To hit", 3},
+      {:defense, "Defense", 6},
+      {:resistance, "Resistance", 6},
+      {:spell_skill, "Spell skill", 20},
+      {:spell_save, "Spell save", 4}
+    ]
   end
 
   defp realm_label(realm), do: realm |> Atom.to_string() |> String.capitalize()
