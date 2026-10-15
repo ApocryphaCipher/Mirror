@@ -162,6 +162,94 @@ defmodule Mirror.SaveFile.StructuresItemSetTest do
     assert Structures.clear_item(r, 6, {:vault, 0}) == {:error, :no_such_wizard}
   end
 
+  describe "the game's premade \"in play\" flags" do
+    defp flag(raw, number), do: :binary.at(raw, byte_size(raw) - 810 + number - 1)
+
+    test "putting a premade item sets its flag, and nothing else outside the item block and the place changes" do
+      before = raw()
+      assert flag(before, 95) == 0
+
+      {:ok, new, _} =
+        Structures.put_item(before, 0, {:hero, 0, 2}, record("Amulet", 6, 6), number: 95)
+
+      assert flag(new, 95) == 1
+      assert flag(new, 94) == 0 and flag(new, 96) == 0
+
+      differing =
+        for i <- 0..(byte_size(before) - 1), :binary.at(before, i) != :binary.at(new, i), do: i
+
+      assert (byte_size(before) - 810 + 94) in differing
+    end
+
+    test "overwriting an item gives its premade number back when the name is known" do
+      with_flags =
+        raw()
+        |> WizardFixture.put_bytes(123_300 - 810 + 72, <<1>>)
+        |> WizardFixture.put_bytes(123_300 - 810 + 94, <<0>>)
+
+      # item 2 is "Shield"; pretend that is premade number 73 and the new item is number 95
+      {:ok, new, %{set: 2}} =
+        Structures.put_item(with_flags, 0, {:hero, 0, 1}, record("Plate", 5, 9),
+          number: 95,
+          premade_names: %{"Shield" => 73, "Plate" => 95}
+        )
+
+      assert flag(new, 73) == 0
+      assert flag(new, 95) == 1
+    end
+
+    test "an overwritten item that is no premade item leaves the flags alone" do
+      {:ok, new, _} =
+        Structures.put_item(raw(), 0, {:hero, 0, 1}, record("Plate", 5, 9),
+          number: 95,
+          premade_names: %{"Something Else" => 5}
+        )
+
+      assert flag(new, 5) == 0
+      assert flag(new, 95) == 1
+    end
+
+    test "clearing a place releases the premade number of the record it blanks" do
+      flagged = WizardFixture.put_bytes(raw(), 123_300 - 810 + 8, <<1>>)
+
+      {:ok, new, _} =
+        Structures.clear_item(flagged, 0, {:vault, 0}, premade_names: %{"Spare Shield" => 9})
+
+      assert flag(new, 9) == 0
+
+      # a record another place still points at is kept, and so is its flag
+      shared = WizardFixture.field(flagged, 0, 0x120 + 2, <<9::little-signed-16>>)
+
+      {:ok, kept, _} =
+        Structures.clear_item(shared, 0, {:vault, 0}, premade_names: %{"Spare Shield" => 9})
+
+      assert flag(kept, 9) == 1
+    end
+
+    test "a save too short for the table is left without flags, not broken" do
+      short = binary_part(raw(), 0, 0x6FB8 + 138 * 50 + 100)
+
+      assert {:ok, _, _} =
+               Structures.put_item(short, 0, {:vault, 2}, record("Amulet", 6, 6), number: 5)
+    end
+  end
+
+  describe "the record pool" do
+    test "records 136 and 137 are the game's working copy and are never handed out" do
+      pool_full =
+        Enum.reduce(0..135, raw(), fn i, acc ->
+          if :binary.at(acc, @block + i * 50) == 0,
+            do: WizardFixture.put_bytes(acc, @block + i * 50, record("Filler #{i}", 6, 6)),
+            else: acc
+        end)
+
+      assert :binary.at(pool_full, @block + 136 * 50) == 0
+
+      assert Structures.put_item(pool_full, 0, {:hero, 0, 2}, record("Amulet", 6, 6)) ==
+               {:error, :no_free_item}
+    end
+  end
+
   describe "an any-weapon place (Warrax, Mystic X, Reywind)" do
     # the hero's three slot types are (3, 5, 6) as for Warrax in SAVE2
     defp any_weapon_hero(raw),

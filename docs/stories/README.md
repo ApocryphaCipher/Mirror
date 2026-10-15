@@ -50,7 +50,7 @@
 - [STORY-050](STORY-050-wizard-relations.md): relations between wizards, peace/war/attitude (EPIC-009) **Built and checked in the real game (2026-10-13); merged**
 - [STORY-051](STORY-051-global-enchantments.md): global enchantments, see/add/remove (EPIC-009) **Built (2026-10-15): the globals are editable except Time Stop; merged**
 - [STORY-052](STORY-052-hero-list-decode-and-view.md): decode the hero list; show a wizard's heroes (EPIC-010) **Partly built (2026-10-15): the wizard page lists heroes; ability names, XP thresholds and units-panel rows open**
-- [STORY-053](STORY-053-hero-editing.md): edit a hero: name, experience, owner, dismiss (EPIC-010) **Partly built (2026-10-15): name, level, experience, damage; transfer, dismiss and add open**
+- [STORY-053](STORY-053-hero-editing.md): edit a hero: name, level, experience, damage, and add a hero (EPIC-010) **Built and checked in the real game (2026-10-15): name, level, experience, damage and add a hero; transfer and dismiss dropped by decision**
 - [STORY-054](STORY-054-artifact-decode.md): decode artifacts: the item record and where items live (EPIC-011) **Mostly done (2026-10-15): the item block, a hero's and a vault's items and the power names are read; premade tail and game check of lair rewards open**
 - [STORY-055](STORY-055-artifacts-view.md): show artifacts on heroes, the wizard page and lair panels (EPIC-011) **Built and checked in the real game (2026-10-15)**
-- [STORY-056](STORY-056-artifacts-editing.md): edit, move and create artifacts (EPIC-011) **Edit in place and move within a wizard built and checked in the real game (2026-10-15); create, remove, other wizards and lair rewards open**
+- [STORY-056](STORY-056-artifacts-editing.md): edit, move and create artifacts (EPIC-011) **Built and checked in the real game (2026-10-15): edit in place, move, fill any place from the premade table, remove, and a lair's item count; giving between wizards dropped by decision**

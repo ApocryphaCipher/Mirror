@@ -690,6 +690,9 @@ defmodule MirrorWeb.WizardLiveTest do
       assert %{name: "Ring of Power", movement: 4, cost: 600, resistance: 2} =
                Enum.find(items, &(&1.name == "Ring of Power"))
 
+      # the game's "in play" flag for premade number 7 is set, as the game does when it makes an item
+      assert :binary.at(filled.save.raw, byte_size(filled.save.raw) - 810 + 6) == 1
+
       {undone, _} = Mirror.Editor.undo(filled, :arcanus)
       assert undone.save.raw == before.save.raw
 

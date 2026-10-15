@@ -1,7 +1,7 @@
 # STORY-053: Edit a hero
 
 **Parent:** [EPIC-010](../epics/EPIC-010-heroes.md)
-**Status:** partly built (2026-10-15): name, level, experience and damage are editable from the wizard page, and a hero can be added to an empty hero place from a drop-down (checked in the real game); giving a hero to another wizard, dismissing and adding are not built, and nothing was loaded in the real game. *Original note:* open (2026-10-12), after STORY-052
+**Status:** built (2026-10-15), with transfer and dismiss dropped by Kevin (a hero is added for any wizard from the drop-down on that wizard's page; dismissing is done in the game; an existing hero is never overwritten). Built: name, level, experience and damage are editable from the wizard page, and a hero can be added to an empty hero place from a drop-down (checked in the real game); giving a hero to another wizard, dismissing and adding are not built, and nothing was loaded in the real game. *Original note:* open (2026-10-12), after STORY-052
 **Size:** medium
 **Raised by:** [Kevin](https://github.com/KevinAsbury), 2026-10-12
 
@@ -63,3 +63,8 @@ Test save: `SAVE2.GAM` with **Gunther (fighter), Jaer (mage) and B'Shan (archer)
 - **After one End Turn** (checkpoint 138) the game had compacted the unit table (the units after a removed one moved down by one) and **renumbered the hero list entries to match**; the three new heroes, their names, their slot types and their items were intact. It made the new heroes **level 1 with experience 1**, which is what Warrax had after joining,
   so `add_hero/4` now writes that to begin with (it wrote level 0, experience 0 first).
 - Not tried: a hero of another wizard (the code path is the same), a hero added to a wizard whose circle is crowded, and what an added hero does in a fight.
+
+## Decision (2026-10-15)
+
+Kevin: no transferring a hero between wizards (add the hero to the other wizard from his page instead), no dismissing (do that in the game), no overwriting an existing hero. So **STORY-053 is complete** with the name, level, experience and damage edits, and adding a new hero to an empty place.
+Still not known: whether a rename should also change the hero-name table at the end of the save (see the handoff note).

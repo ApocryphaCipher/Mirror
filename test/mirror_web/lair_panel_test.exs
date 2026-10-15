@@ -12,7 +12,8 @@ defmodule MirrorWeb.LairPanelTest do
       %{slot: 2, type: nil, name: nil, left: nil, start: nil}
     ],
     gold: 120,
-    mana: 40
+    mana: 40,
+    item_count: 1
   }
 
   defp form(extra) do
@@ -25,7 +26,8 @@ defmodule MirrorWeb.LairPanelTest do
         "guard2_type" => "",
         "guard2_count" => "1",
         "gold" => "120",
-        "mana" => "40"
+        "mana" => "40",
+        "item_count" => "1"
       },
       extra
     )
@@ -41,6 +43,7 @@ defmodule MirrorWeb.LairPanelTest do
 
     assert {:ok, [gold: 5]} = LairPanel.changes(form(%{"gold" => "5"}), @details)
     assert {:ok, [mana: 0]} = LairPanel.changes(form(%{"mana" => "0"}), @details)
+    assert {:ok, [item_count: 3]} = LairPanel.changes(form(%{"item_count" => "3"}), @details)
 
     assert {:ok, [guards: %{1 => {39, 8}}]} =
              LairPanel.changes(form(%{"guard1_count" => "8"}), @details)
@@ -100,5 +103,15 @@ defmodule MirrorWeb.LairPanelTest do
   test "the unit select lists all 198 types" do
     assert length(LairPanel.unit_type_options()) == 198
     assert {196, "Sky Drake"} in LairPanel.unit_type_options()
+  end
+
+  test "the item count must be a whole number the record can hold" do
+    for bad <- ["x", "", "1.5"] do
+      assert {:error, :bad_item_count} = LairPanel.changes(form(%{"item_count" => bad}), @details)
+    end
+
+    # a number outside 0 to 3 is refused by the save code, which knows the record
+    assert LairPanel.error_message(:bad_item_count) =~ "0 to 3"
+    assert LairPanel.label(@details, item_count: 2) =~ "items to roll to 2"
   end
 end

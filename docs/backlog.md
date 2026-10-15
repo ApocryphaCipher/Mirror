@@ -84,3 +84,8 @@ Unsorted, not yet promoted to a story.
   [stories/STORY-045-enchanted-road-shimmer.md](stories/STORY-045-enchanted-road-shimmer.md). The game shows one frame
   across the whole road, not a per-tile offset like the node sparkles.
 - **Banish / lift a wizard** (found 2026-10-13, STORY-050): clearing a wizard's fortress active byte makes the game draw him banished (checked on the Magic screen); an editor control would need one End Turn test on a copy to see what the game does with his cities and units, and whether the conqueror's `DefeatedWizards` count (`+0x354`) must follow.
+- **Plan the first release** (Kevin, 2026-10-15; not started, needs a planning session). Things to settle, none decided: what "1.0" covers (the editors for the map, structures, wizards, heroes and artifacts are built; what is
+  still missing or unproven in the real game, see [notes/2026-10-15-handoff.md](notes/2026-10-15-handoff.md)); the version number (`mix.exs` says 0.1.0); how people get it (the Docker image, a source checkout, or both) and
+  what the README says to a newcomer; the game files (nobody can be given them: `mix mirror.import_game` from their own copy, which files are required and which only add names or pictures, and the unhashed manifest entries `ITEMPOW.LBX` and `ITEMDATA.LBX`);
+  the licence and `NOTICE.md`; the known limits to state plainly (saves only from the GOG 1.31 game, the real-game checks that were not made, the guesses that remain); and a release checklist (CI green, a clean install from the README, a tag and notes).
+  A first step is a story that lists what is in scope and what is not.

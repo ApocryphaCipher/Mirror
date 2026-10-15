@@ -1,6 +1,6 @@
 # EPIC-010: Heroes
 
-**Status:** in progress (2026-10-15): STORY-052 partly built (the wizard page lists heroes); STORY-053 partly built (name, level, experience, damage); adding a hero from a drop-down is built and checked in the game; transfer and dismiss are not
+**Status:** STORY-053 done (2026-10-15; transfer and dismiss dropped by decision); STORY-052 partly built (the wizard page lists heroes; ability names, experience thresholds and units-panel rows are open)
 **Owner:** [Kevin](https://github.com/KevinAsbury)
 **Requested:** 2026-10-12, split out of EPIC-009 (wizard editing): heroes get their own epic.
 

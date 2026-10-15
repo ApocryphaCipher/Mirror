@@ -110,6 +110,9 @@ defmodule MirrorWeb.WizardLive do
         {:noreply, socket}
 
       premade ->
+        # premade name to number, so that an item given up hands its number back to the game
+        names = Map.new(premade, &{&1.name, &1.number})
+
         changes_for = fn details ->
           case WizardPanel.set_request(details, key, choice, premade) do
             {:ok, nil} -> {:ok, []}
@@ -121,10 +124,13 @@ defmodule MirrorWeb.WizardLive do
         write = fn raw, details, [request: request] ->
           case request do
             {:clear, place} ->
-              Structures.clear_item(raw, details.record, place)
+              Structures.clear_item(raw, details.record, place, premade_names: names)
 
             {:set, place, p} ->
-              Structures.put_item(raw, details.record, place, ItemData.save_record(p))
+              Structures.put_item(raw, details.record, place, ItemData.save_record(p),
+                number: p.number,
+                premade_names: names
+              )
           end
         end
 

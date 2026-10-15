@@ -1027,6 +1027,34 @@ defmodule Mirror.SaveFile.StructuresTest do
              ]
     end
 
+    test "item_count is the byte at +16 and nothing else changes; the three values are left alone" do
+      raw = blank() |> encounter(20, 10, 11, 0, 8)
+      raw = put(raw, @encounters + 20 * 24 + 16, <<1, 0, 360::little-16, 0::32>>)
+
+      assert {:ok, edited, %{changed: [:item_count]}} =
+               Structures.edit_encounter(raw, 20, item_count: 3)
+
+      assert %{item_count: 3} = enc(edited, 20)
+      assert binary_part(edited, @encounters + 20 * 24 + 18, 2) == <<360::little-16>>
+
+      diff =
+        for {{a, b}, i} <-
+              Enum.with_index(Enum.zip(:binary.bin_to_list(raw), :binary.bin_to_list(edited))),
+            a != b,
+            do: i
+
+      assert diff == [@encounters + 20 * 24 + 16]
+      assert {:ok, _, _} = Structures.edit_encounter(raw, 20, item_count: 0)
+    end
+
+    test "item_count outside 0 to 3 or not a number is refused" do
+      raw = blank() |> encounter(20, 10, 11, 0, 8)
+
+      for bad <- [4, -1, "2", nil, 1.0] do
+        assert Structures.edit_encounter(raw, 20, item_count: bad) == {:error, :bad_item_count}
+      end
+    end
+
     test "guards: set a slot with equal nibbles, empty another" do
       # encounter/6 gives guard 1 = type 7, count byte 1 and nothing in slot 2
       raw = blank() |> encounter(20, 10, 11, 0, 8)
