@@ -410,4 +410,35 @@ defmodule MirrorWeb.WizardPanelTest do
                {:error, :bad_globals}
     end
   end
+
+  describe "hero edit form" do
+    setup do
+      %{d: WizardPanel.details(WizardFixture.with_hero(WizardFixture.synthetic()), 1)}
+    end
+
+    test "details carry the hero with its damage", %{d: d} do
+      assert [%{slot: 0, name: "Harold", level: 2, experience: 27, damage: 3}] = d.heroes
+    end
+
+    test "keeps only what differs", %{d: d} do
+      same = %{"name" => "Harold", "level" => "2", "experience" => "27", "damage" => "3"}
+      assert WizardPanel.hero_changes(same, d, 0) == {:ok, []}
+
+      assert WizardPanel.hero_changes(%{same | "name" => "Sir H", "damage" => "0"}, d, 0) ==
+               {:ok, [name: "Sir H", damage: 0]}
+    end
+
+    test "refuses what is not a number, and a slot with no hero", %{d: d} do
+      assert WizardPanel.hero_changes(%{"level" => "abc"}, d, 0) == {:error, :bad_level}
+      assert WizardPanel.hero_changes(%{"name" => "x"}, d, 3) == {:error, :no_such_hero}
+      assert WizardPanel.error_message(:bad_hero_name) =~ "1 to 13"
+    end
+
+    test "the label names the hero and the fields", %{d: d} do
+      [hero] = d.heroes
+
+      assert WizardPanel.hero_label(hero, name: "Sir H", level: 3) ==
+               "Edited hero Harold: name Sir H, level 3"
+    end
+  end
 end

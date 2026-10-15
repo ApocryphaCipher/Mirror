@@ -320,6 +320,44 @@ defmodule MirrorWeb.WizardPanel do
 
   def changes(_params, _details), do: {:ok, []}
 
+  @doc """
+  The hero edit form's values (`name`, `level`, `experience`, `damage`) for the hero in `slot` turned into
+  `Mirror.SaveFile.Structures.edit_hero/4` changes, keeping only what differs from the save.
+  """
+  @spec hero_changes(map(), map(), term()) :: {:ok, keyword()} | {:error, atom()}
+  def hero_changes(params, details, slot) when is_map(params) do
+    case Enum.find(details.heroes, &(&1.slot == slot)) do
+      nil -> {:error, :no_such_hero}
+      hero -> hero_fields(params, hero)
+    end
+  end
+
+  def hero_changes(_params, _details, _slot), do: {:ok, []}
+
+  defp hero_fields(params, hero) do
+    name = String.trim(to_string(Map.get(params, "name", hero.name)))
+
+    Enum.reduce_while(
+      [:level, :experience, :damage],
+      {:ok, if(name != hero.name, do: [name: name], else: [])},
+      fn field, {:ok, acc} ->
+        case number(Map.get(params, Atom.to_string(field))) do
+          :skip -> {:cont, {:ok, acc}}
+          {:ok, n} when n == :erlang.map_get(field, hero) -> {:cont, {:ok, acc}}
+          {:ok, n} -> {:cont, {:ok, acc ++ [{field, n}]}}
+          :error -> {:halt, {:error, :"bad_#{field}"}}
+        end
+      end
+    )
+  end
+
+  @doc "A short description of a hero edit, for the notice and the undo list."
+  @spec hero_label(map(), keyword()) :: String.t()
+  def hero_label(hero, changes) do
+    "Edited hero #{hero.name}: " <>
+      Enum.map_join(changes, ", ", fn {field, v} -> "#{field} #{v}" end)
+  end
+
   defp name(params, details) do
     case Map.get(params, "name", details.name) do
       name when is_binary(name) -> {:ok, String.trim(name)}
@@ -632,6 +670,14 @@ defmodule MirrorWeb.WizardPanel do
     do: "Research points left is a whole number from 0 to 65535."
 
   def error_message(:bad_globals), do: "Those global enchantments could not be read."
+
+  def error_message(:bad_hero_name),
+    do: "A hero's name is 1 to 13 letters, digits or punctuation (no accents)."
+
+  def error_message(:bad_level), do: "Level is a whole number from 0 to 9."
+  def error_message(:bad_experience), do: "Experience is a whole number from 0 to 30000."
+  def error_message(:bad_damage), do: "Damage is a whole number from 0 to 255."
+  def error_message(:no_such_hero), do: "That hero is no longer in the save."
   def error_message(:bad_retorts), do: "Those retorts could not be read."
   def error_message(:no_such_wizard), do: "That wizard is no longer in the save."
   def error_message(:nothing_changed), do: "Nothing to change."

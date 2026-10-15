@@ -50,6 +50,28 @@ defmodule Mirror.WizardFixture do
     |> field(1, 0x16, <<3>>)
   end
 
+  @doc """
+  Gives Jafar (record 0) one hero in slot 0: unit 1, type 31, named "Harold", level 2, 27 xp, damage 3, at
+  7,17 Arcanus. The other five slots are empty (-1), as the game writes them.
+  """
+  def with_hero(raw) do
+    entry =
+      <<1::little-signed-16>> <>
+        String.pad_trailing("Harold", 14, <<0>>) <>
+        :binary.copy(<<-1::little-signed-16>>, 3) <> <<1::little-16, 5::little-16, 6::little-16>>
+
+    empty = <<-1::little-signed-16>> <> :binary.copy(<<0>>, 26)
+
+    unit =
+      <<7, 17, 0, 0, 2, 31, 0, 0, 0, 0, 0, 0, 2, 0, 27::little-16, 0, 3>> <>
+        :binary.copy(<<0>>, 14)
+
+    raw
+    |> field(0, 0x76, entry <> :binary.copy(empty, 5))
+    |> put(0x9E2, <<2::little-16>>)
+    |> put(0x00B734 + 32, unit)
+  end
+
   def put_bytes(raw, at, bytes), do: put(raw, at, bytes)
 
   @doc "Marks wizard `record`'s fortress inactive: the game then treats him as banished."
