@@ -26,8 +26,8 @@ defmodule Mirror.SaveFile.StructuresHeroAddTest do
              unit_index: 0,
              name: "Sir Harold",
              type: 31,
-             level: 0,
-             experience: 0,
+             level: 1,
+             experience: 1,
              damage: 0,
              location: %{x: 38, y: 21, plane: :myrror},
              items: [],
@@ -38,7 +38,7 @@ defmodule Mirror.SaveFile.StructuresHeroAddTest do
 
     # the unit record, byte for byte
     assert binary_part(new, @units, 32) ==
-             <<38, 21, 1, 0, 4, 31, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 1, 0, 0, 0, 0,
+             <<38, 21, 1, 0, 4, 31, 0, 0, 4, 0, 0, 0, 1, 0, 1, 0, 0, 0, 8, 0, 0, 0, 1, 0, 0, 0, 0,
                0, 255, 0, 0, 0>>
 
     assert {:ok, [unit]} = Units.parse(new)

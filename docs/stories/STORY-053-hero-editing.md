@@ -1,7 +1,7 @@
 # STORY-053: Edit a hero
 
 **Parent:** [EPIC-010](../epics/EPIC-010-heroes.md)
-**Status:** partly built (2026-10-15): name, level, experience and damage are editable from the wizard page, and a hero can be added to an empty hero place from a drop-down (not yet loaded in the real game); giving a hero to another wizard, dismissing and adding are not built, and nothing was loaded in the real game. *Original note:* open (2026-10-12), after STORY-052
+**Status:** partly built (2026-10-15): name, level, experience and damage are editable from the wizard page, and a hero can be added to an empty hero place from a drop-down (checked in the real game); giving a hero to another wizard, dismissing and adding are not built, and nothing was loaded in the real game. *Original note:* open (2026-10-12), after STORY-052
 **Size:** medium
 **Raised by:** [Kevin](https://github.com/KevinAsbury), 2026-10-12
 
@@ -36,9 +36,9 @@ Not done, and why:
 ## Adding a hero (2026-10-15), Kevin's design
 
 "We can just put drop downs under the heroes section for empty hero slots and pick a game hero from the list." In edit mode the Heroes section has **Add a hero**: all 35 heroes by name, minus any that has a live unit (whoever owns him),
-for the first empty hero place. **No overwriting a hero** (levels, gear). `Structures.add_hero/4` writes, as the three heroes in SAVE2 show a hire does (*not yet loaded in the real game*):
+for the first empty hero place. **No overwriting a hero** (levels, gear). `Structures.add_hero/4` writes, as the three heroes in SAVE2 show a hire does (checked in the real game, below):
 
-- a **unit record** appended at the end of the unit table and the live count at `0x9E2` raised: owner, the wizard's **summoning circle** as the tile, 4 half-points of movement, the list slot at `+6`, level 0, no experience, sight 1, and the filler bytes the game's own
+- a **unit record** appended at the end of the unit table and the live count at `0x9E2` raised: owner, the wizard's **summoning circle** as the tile, 4 half-points of movement, the list slot at `+6`, level 1 and experience 1 (what the game makes of a new hero: it turned the first version's level 0 into this), sight 1, and the filler bytes the game's own
   hero units have (`+18` draw priority 8, `+28` 255). Field names are kazzmir's `UnitData`.
 - the **hero list entry**: the unit index, the type's name, three empty places (-1) and the three **slot types** of the hero (below);
 - the per-player hero table's first word for that hero set to **-20**. kazzmir calls that word `Level`; in SAVE2 it is -20 for every hired hero (Sir Harold and Warrax for the player, Bahgtru for the first rival) and 0 for the 32 others;
@@ -51,3 +51,15 @@ Refused with a reason: no empty place, a hero already in play, a summoning circl
 
 *Not known:* what the unit counters at `0x9D8` (the 7th and 8th words change between saves: 28 and 128, 30 and 82 ...) mean; they are not touched. And the draw priority and the movement are a default (8, and 4 half-points) not worked out per hero type: the game recomputes the movement
 with items, and the draw priority only orders a stack. A load in the game will tell if the hero looks right.
+
+### Real-game check of adding heroes (2026-10-15)
+
+Test save: `SAVE2.GAM` with **Gunther (fighter), Jaer (mage) and B'Shan (archer)** added by `add_hero/4`, plus a Stick of the Mage and an Elvish Longbow put in their first places by `put_item/4` (136 bytes differ; the previous slot 8 is in
+`~/.mirror/dev/DOSbox/backups/SAVE8-pre-addhero-2026-10-15.GAM`). Research DOSBox, Load Game:
+
+- **Loaded without complaint.** The Armies screen lists Sir Harold, Warrax, Gunther, Jaer and B'Shan with their portraits; the Items screen shows each hero's three places as the right kinds: Gunther sword, armor, ring; Jaer staff, ring, ring; B'Shan bow, armor, ring.
+  The Stick of the Mage (Jaer) and Elvish Longbow (B'Shan) show in their places with the premade stats. The new heroes stand on the summoning circle, the tile where the game itself put Warrax. (checkpoints 137)
+- **In memory the new units equal the file except the draw priority**, which the game sets to 0 for the units sharing the tile (it did so for Warrax too). The wizard record's `+0x26` also went from 79 to 80, which the game recomputes.
+- **After one End Turn** (checkpoint 138) the game had compacted the unit table (the units after a removed one moved down by one) and **renumbered the hero list entries to match**; the three new heroes, their names, their slot types and their items were intact. It made the new heroes **level 1 with experience 1**, which is what Warrax had after joining,
+  so `add_hero/4` now writes that to begin with (it wrote level 0, experience 0 first).
+- Not tried: a hero of another wizard (the code path is the same), a hero added to a wizard whose circle is crowded, and what an added hero does in a fight.

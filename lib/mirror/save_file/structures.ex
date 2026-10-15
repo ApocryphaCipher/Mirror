@@ -704,11 +704,11 @@ defmodule Mirror.SaveFile.Structures do
 
   @doc """
   Adds the hero of unit type `type` (0 to 34) to wizard `record`'s empty hero list slot `slot` (STORY-053). The hero is
-  new: level 0, no experience, no items, standing on the wizard's summoning circle. Written, as a hire does (the three
+  new: level 1 with experience 1 (what the game makes of a new hero), no items, standing on the wizard's summoning circle. Written, as a hire does (the three
   heroes of SAVE2 are the model; *not yet loaded in the real game*):
 
     * a unit record appended to the unit table (the live count at `0x9E2` goes up by one): the wizard as owner, the tile
-      of his summoning circle, 4 half-points of movement, the hero slot, sight 1, no enchantments, the same filler bytes
+      of his summoning circle, 4 half-points of movement, the hero slot, level 1 and experience 1, sight 1, no enchantments, the same filler bytes
       the game's own hero units have,
     * the hero list entry: the unit index, the type's name (13 characters at most), three empty item places and the
       type's three slot types (`Mirror.SaveFile.HeroTypes`),
@@ -739,7 +739,7 @@ defmodule Mirror.SaveFile.Structures do
       name = type |> UnitTypes.name() |> String.slice(0, @hero_name_max)
 
       unit =
-        <<x, y, plane, record, 4, type, slot, 0, 4, 0, 0, 0, 0, 0, 0::little-16, 0, 0, 8, 0,
+        <<x, y, plane, record, 4, type, slot, 0, 4, 0, 0, 0, 1, 0, 1::little-16, 0, 0, 8, 0,
           0::little-16, 1, 0, 0::little-32, 255, 0, 0, 0>>
 
       list_entry =

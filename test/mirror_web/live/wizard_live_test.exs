@@ -750,7 +750,7 @@ defmodule MirrorWeb.WizardLiveTest do
       view |> element("#wizard-hero-add") |> render_submit(%{"type" => "31"})
       assert has_element?(view, "#wizard-note", "Added Sir Harold to Jafar's heroes")
       assert has_element?(view, "#wizard-hero-0", "Sir Harold")
-      assert has_element?(view, "#wizard-hero-0", "level 0")
+      assert has_element?(view, "#wizard-hero-0", "level 1")
       assert has_element?(view, "#wizard-hero-0", "at 38, 21 Myrror")
       # he is in play now, so he is no longer offered
       refute has_element?(view, "#wizard-hero-add option[value='31']")
