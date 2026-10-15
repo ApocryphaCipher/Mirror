@@ -63,6 +63,45 @@ defmodule MirrorWeb.WizardLiveTest do
     assert has_element?(view, "#wizard-hero-0", "27 xp")
   end
 
+  test "a hero's name and experience are edited from the wizard page, as one undo step",
+       %{conn: conn, sid: sid} do
+    raw = Mirror.WizardFixture.with_hero(Mirror.WizardFixture.synthetic())
+    SessionStore.put(sid, Mirror.SaveManager.normalize_state(%{save: %{raw: raw}}))
+    {:ok, view, _} = live(conn, ~p"/wizard/1")
+
+    refute has_element?(view, "#wizard-hero-form-0")
+    view |> element("#wizard-edit-toggle") |> render_click()
+    assert has_element?(view, "#wizard-hero-form-0")
+
+    before = SessionStore.get(sid)
+
+    view
+    |> element("#wizard-hero-form-0")
+    |> render_submit(%{"hero" => %{"name" => "Sir Harold", "experience" => "150"}})
+
+    assert has_element?(
+             view,
+             "#wizard-note",
+             "Edited hero Harold: name Sir Harold, experience 150"
+           )
+
+    assert has_element?(view, "#wizard-hero-0", "Sir Harold")
+    assert has_element?(view, "#wizard-hero-0", "150 xp")
+
+    after_state = SessionStore.get(sid)
+    assert length(after_state.history.arcanus) == length(before.history.arcanus) + 1
+    {undone, _} = Mirror.Editor.undo(after_state, :arcanus)
+    assert undone.save.raw == before.save.raw
+
+    # a bad value is refused in words and changes nothing
+    view
+    |> element("#wizard-hero-form-0")
+    |> render_submit(%{"hero" => %{"level" => "99"}})
+
+    assert has_element?(view, "#wizard-note", "Level is a whole number")
+    assert SessionStore.get(sid).save.raw == after_state.save.raw
+  end
+
   test "shows the relations table and the active global enchantments", %{conn: conn, sid: sid} do
     load_save(sid)
     {:ok, view, _} = live(conn, ~p"/wizard/1")

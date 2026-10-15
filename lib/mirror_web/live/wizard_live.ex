@@ -39,6 +39,23 @@ defmodule MirrorWeb.WizardLive do
     {:noreply, apply_edit(socket, &WizardPanel.changes(params, &1))}
   end
 
+  # One hero's name, level, experience and damage (STORY-053), the form is per hero slot.
+  def handle_event("hero_edit", %{"slot" => slot, "hero" => params}, socket) do
+    with {slot, ""} <- Integer.parse(slot) do
+      write = fn raw, details, changes ->
+        Structures.edit_hero(raw, details.record, slot, changes)
+      end
+
+      label = fn details, changes ->
+        WizardPanel.hero_label(Enum.find(details.heroes, &(&1.slot == slot)), changes)
+      end
+
+      {:noreply, apply_edit(socket, &WizardPanel.hero_changes(params, &1, slot), write, label)}
+    else
+      _ -> {:noreply, socket}
+    end
+  end
+
   # "Learn every spell of a realm": the common edit, applied at once.
   def handle_event("learn_realm", %{"realm" => realm}, socket) do
     case Enum.find(Spells.realms(), &(Atom.to_string(&1) == realm)) do
@@ -53,9 +70,11 @@ defmodule MirrorWeb.WizardLive do
   # there now, not with what the page showed when it was drawn. (A form from a stale page still
   # submits all of its fields, so another tab's edit to a field this form also shows is put back.)
   # `changes_for` turns the current details into `{:ok, changes}`.
-  defp apply_edit(%{assigns: %{details: nil}} = socket, _changes_for), do: socket
+  defp apply_edit(socket, changes_for, write \\ &write_wizard/3, label \\ &WizardPanel.label/2)
 
-  defp apply_edit(%{assigns: %{details: %{id: id}}} = socket, changes_for) do
+  defp apply_edit(%{assigns: %{details: nil}} = socket, _changes_for, _write, _label), do: socket
+
+  defp apply_edit(%{assigns: %{details: %{id: id}}} = socket, changes_for, write, label_for) do
     {:ok, _state, result} =
       SessionStore.update(socket.assigns.session_id, fn current ->
         raw = raw_of(current)
@@ -64,8 +83,8 @@ defmodule MirrorWeb.WizardLive do
              %{} = details <- WizardPanel.details(raw, id) || {:error, :no_such_wizard},
              {:ok, changes} <- changes_for.(details),
              :ok <- if(changes == [], do: {:error, :nothing_changed}, else: :ok),
-             {:ok, edited, _} <- Structures.edit_wizard(raw, details.record, changes),
-             label = WizardPanel.label(details, changes),
+             {:ok, edited, _} <- write.(raw, details, changes),
+             label = label_for.(details, changes),
              {next, {:record, _, _}} <- Editor.apply_record(current, :arcanus, label, edited) do
           {next, {:ok, label}}
         else
@@ -79,6 +98,9 @@ defmodule MirrorWeb.WizardLive do
       {:error, reason} -> assign(socket, :note, {:error, WizardPanel.error_message(reason)})
     end
   end
+
+  defp write_wizard(raw, details, changes),
+    do: Structures.edit_wizard(raw, details.record, changes)
 
   defp load(socket) do
     raw = raw_of(SessionStore.get(socket.assigns.session_id))
@@ -573,6 +595,63 @@ defmodule MirrorWeb.WizardLive do
                     · {length(h.items)} {if length(h.items) == 1, do: "item", else: "items"}
                   </span>
                 </p>
+                <form
+                  :if={@editing}
+                  id={"wizard-hero-form-#{h.slot}"}
+                  phx-submit="hero_edit"
+                  class="mt-2 flex flex-wrap items-end gap-2"
+                >
+                  <input type="hidden" name="slot" value={h.slot} />
+                  <label class="text-xs text-slate-400">
+                    Name
+                    <input
+                      type="text"
+                      name="hero[name]"
+                      value={h.name}
+                      maxlength="13"
+                      class="mt-1 block w-36 rounded bg-slate-900 px-2 py-1 text-sm text-white"
+                    />
+                  </label>
+                  <label class="text-xs text-slate-400">
+                    Level
+                    <input
+                      type="number"
+                      name="hero[level]"
+                      value={h.level}
+                      min="0"
+                      max="9"
+                      class="mt-1 block w-20 rounded bg-slate-900 px-2 py-1 text-sm text-white"
+                    />
+                  </label>
+                  <label class="text-xs text-slate-400">
+                    Experience
+                    <input
+                      type="number"
+                      name="hero[experience]"
+                      value={h.experience}
+                      min="0"
+                      max="30000"
+                      class="mt-1 block w-24 rounded bg-slate-900 px-2 py-1 text-sm text-white"
+                    />
+                  </label>
+                  <label class="text-xs text-slate-400">
+                    Damage
+                    <input
+                      type="number"
+                      name="hero[damage]"
+                      value={h.damage}
+                      min="0"
+                      max="255"
+                      class="mt-1 block w-20 rounded bg-slate-900 px-2 py-1 text-sm text-white"
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    class="rounded-lg bg-emerald-300 px-3 py-1 text-sm font-semibold text-slate-950 hover:bg-emerald-200"
+                  >
+                    Apply
+                  </button>
+                </form>
               </li>
             </ul>
           </section>

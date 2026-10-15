@@ -6,7 +6,7 @@ defmodule Mirror.SaveFile.Heroes do
       slot; the hero's own given name, 14 bytes NUL-padded; 3 item indexes i16, `-1` none; 3 item slot
       types i16),
     * the hero's unit record (`Mirror.SaveFile.Units`: type `+5`, hero slot `+6`, level `+12`,
-      experience `+14`), and
+      experience `+14`, damage `+17`), and
     * the per-player hero table at the start of the file: 6 players x 35 heroes x 12 bytes, indexed by
       the unit type (0 to 34). Of its 12 bytes, `+0` is an i16 that reads -20 for a hero the player has
       hired and 0 otherwise (*guess:* seen only in SAVE2, meaning unknown), `+2` to `+5` are ability bits
@@ -41,6 +41,7 @@ defmodule Mirror.SaveFile.Heroes do
           type_name: String.t(),
           level: non_neg_integer(),
           experience: integer(),
+          damage: non_neg_integer(),
           location:
             %{x: non_neg_integer(), y: non_neg_integer(), plane: :arcanus | :myrror} | nil,
           items: [non_neg_integer()],
@@ -73,7 +74,7 @@ defmodule Mirror.SaveFile.Heroes do
   defp hero(raw, record, slot, unit, name, items) do
     with true <- unit < @units_max and unit_present?(raw, unit),
          <<x, y, plane, _owner, _moves, type, _hero_slot, _::binary-size(5), level, _,
-           experience::little-signed-16, _::binary>> <- unit_record(raw, unit),
+           experience::little-signed-16, _, damage, _::binary>> <- unit_record(raw, unit),
          true <- type in 0..34//1 and plane in 0..1//1 do
       {:ok,
        %{
@@ -84,6 +85,7 @@ defmodule Mirror.SaveFile.Heroes do
          type_name: UnitTypes.name(type),
          level: level,
          experience: experience,
+         damage: damage,
          location: %{x: x, y: y, plane: if(plane == 0, do: :arcanus, else: :myrror)},
          items: for(<<i::little-signed-16 <- items>>, i >= 0, do: i)
        }

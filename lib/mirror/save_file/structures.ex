@@ -685,6 +685,56 @@ defmodule Mirror.SaveFile.Structures do
     end
   end
 
+  # the wizard records (see `edit_wizard/3`, which defines its own copies further down)
+  @hero_wizards 0x9E8
+  @hero_wizard_size 0x4C8
+  @hero_list_at 0x76
+  @hero_entry 28
+  @hero_name_max 13
+
+  @doc """
+  Edits the hero in `slot` (0 to 5) of wizard `record`'s hero list (STORY-053): `name:` (1 to #{@hero_name_max} printable
+  ASCII characters, written NUL-padded to the entry's 14 bytes) and the hero's unit fields `level:`, `experience:` and
+  `damage:` (as `edit_units/3`; the game works the level out from experience again at End Turn). The owner is not
+  changed here: moving a hero between two wizards' lists is not built.
+
+  Refused: a record that is not a wizard or has no name (`:no_such_wizard`), an empty slot (`:no_such_hero`), a bad name
+  (`:bad_hero_name`), a bad unit value (see `edit_units/3`) and an unknown field.
+  """
+  @spec edit_hero(binary(), non_neg_integer(), non_neg_integer(), keyword()) :: result()
+  def edit_hero(raw, record, slot, changes) when is_list(changes) do
+    at = @hero_wizards + record * @hero_wizard_size + @hero_list_at + slot * @hero_entry
+
+    with true <-
+           record in 0..4//1 and slot in 0..5//1 and
+             byte_size(raw) >= @hero_wizards + 5 * @hero_wizard_size,
+         true <- :binary.at(raw, @hero_wizards + record * @hero_wizard_size + 1) != 0,
+         <<unit::little-signed-16, _::binary>> <- binary_part(raw, at, 2),
+         true <- unit >= 0 || {:error, :no_such_hero},
+         {name, unit_changes} = Keyword.pop(changes, :name),
+         :ok <- hero_name(name),
+         {:ok, raw, _} <- edit_hero_unit(raw, unit, unit_changes) do
+      raw = if name, do: put(raw, at + 2, String.pad_trailing(name, 14, <<0>>)), else: raw
+      {:ok, raw, %{changed: Keyword.keys(changes)}}
+    else
+      {:error, _} = error -> error
+      _ -> {:error, :no_such_wizard}
+    end
+  end
+
+  defp hero_name(nil), do: :ok
+
+  defp hero_name(name) when is_binary(name) and byte_size(name) in 1..@hero_name_max//1 do
+    if String.match?(name, ~r/\A[\x20-\x7E]+\z/) and String.trim(name) != "",
+      do: :ok,
+      else: {:error, :bad_hero_name}
+  end
+
+  defp hero_name(_), do: {:error, :bad_hero_name}
+
+  defp edit_hero_unit(raw, _unit, []), do: {:ok, raw, %{}}
+  defp edit_hero_unit(raw, unit, changes), do: edit_unit(raw, unit, changes)
+
   @doc "One unit's fields; see `edit_units/3`."
   @spec edit_unit(binary(), non_neg_integer(), keyword()) :: result()
   def edit_unit(raw, index, changes), do: edit_units(raw, [index], changes)
