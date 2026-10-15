@@ -182,6 +182,7 @@ defmodule MirrorWeb.WizardPanel do
             do: Map.put(hero, :item_list, Items.for_indexes(raw, hero.items))
           ),
         vault: Items.for_indexes(raw, Items.vault(raw, record)),
+        vault_places: Items.vault_places(raw, record),
         candidates: for(<<n::little-16 <- candidates>>, n in 1..214//1, do: n),
         library: :binary.bin_to_list(binary_part(library, 0, 214)),
         spells: known_by_realm(library),
@@ -361,6 +362,105 @@ defmodule MirrorWeb.WizardPanel do
   def hero_label(hero, changes) do
     "Edited hero #{hero.name}: " <>
       Enum.map_join(changes, ", ", fn {field, v} -> "#{field} #{v}" end)
+  end
+
+  @doc """
+  Where the item with index `item` is among wizard `details`' places: `{:hero, slot, place}`, `{:vault, place}` or `nil`.
+  """
+  @spec item_place(map(), non_neg_integer()) :: Mirror.SaveFile.Structures.item_place() | nil
+  def item_place(details, item) do
+    hero =
+      for h <- details.heroes,
+          {^item, place} <- Enum.with_index(h.item_places),
+          do: {:hero, h.slot, place}
+
+    vault = for {^item, place} <- Enum.with_index(details.vault_places), do: {:vault, place}
+    List.first(hero ++ vault)
+  end
+
+  @doc """
+  The places the item with index `item` could be moved to, as `{value, label}` for a select: the vault (its first
+  empty place) and every empty place of a hero whose slot type is the item's own kind. Empty when the item is not
+  held by this wizard or nowhere fits. `value` is what `move_request/3` reads.
+  """
+  @spec item_moves(map(), map()) :: [{String.t(), String.t()}]
+  def item_moves(details, item) do
+    from = item_place(details, item.index)
+
+    heroes =
+      for h <- details.heroes,
+          {nil, place} <- Enum.with_index(h.item_places),
+          Enum.at(h.slot_types, place) == item.slot,
+          {:hero, h.slot, place} != from,
+          do: {"hero:#{h.slot}:#{place}", "#{h.name} (#{slot_kind(item.slot)})"}
+
+    vault =
+      case {from, Enum.find_index(details.vault_places, &is_nil/1)} do
+        {{:vault, _}, _} -> []
+        {_, nil} -> []
+        {_, place} -> [{"vault:#{place}", "the vault"}]
+      end
+
+    if from, do: vault ++ heroes, else: []
+  end
+
+  defp slot_kind(code), do: Items.slot_name(code) || "slot #{code}"
+
+  @doc """
+  The move form's destination (`"vault:N"` or `"hero:SLOT:PLACE"`) for the item with index `item`, as
+  `{:ok, {from, to}}` for `Structures.move_item/4`, or an error: `:no_such_item` when this wizard does not hold it,
+  `:bad_move` for a destination that is not one of the two forms.
+  """
+  @spec move_request(map(), non_neg_integer(), term()) ::
+          {:ok,
+           {Mirror.SaveFile.Structures.item_place(), Mirror.SaveFile.Structures.item_place()}}
+          | {:error, atom()}
+  def move_request(details, item, to) do
+    with from when not is_nil(from) <- item_place(details, item),
+         {:ok, to} <- parse_place(to) do
+      {:ok, {from, to}}
+    else
+      nil -> {:error, :no_such_item}
+      {:error, _} = error -> error
+    end
+  end
+
+  defp parse_place(value) when is_binary(value) do
+    case String.split(value, ":") do
+      ["vault", p] ->
+        with {p, ""} <- Integer.parse(p), do: {:ok, {:vault, p}}, else: (_ -> {:error, :bad_move})
+
+      ["hero", s, p] ->
+        hero_place(s, p)
+
+      _ ->
+        {:error, :bad_move}
+    end
+  end
+
+  defp parse_place(_), do: {:error, :bad_move}
+
+  defp hero_place(s, p) do
+    with {s, ""} <- Integer.parse(s), {p, ""} <- Integer.parse(p) do
+      {:ok, {:hero, s, p}}
+    else
+      _ -> {:error, :bad_move}
+    end
+  end
+
+  @doc "A short description of an item move, for the notice and the undo list."
+  @spec move_label(map(), map(), Mirror.SaveFile.Structures.item_place()) :: String.t()
+  def move_label(details, item, to) do
+    where =
+      case to do
+        {:vault, _} ->
+          "the vault"
+
+        {:hero, slot, _} ->
+          Enum.find_value(details.heroes, "a hero", &(&1.slot == slot && &1.name))
+      end
+
+    "Moved #{item.name} to #{where}"
   end
 
   @doc """
@@ -792,6 +892,14 @@ defmodule MirrorWeb.WizardPanel do
     do:
       "Stats stay within what Create Artifact allows: attack 0-6, to hit 0-3, defense 0-6, movement 0-4 (halves allowed), resistance 0-6, spell skill 0-20, spell save 0-4."
 
+  def error_message(:no_item_there), do: "There is no item in that place any more."
+  def error_message(:place_taken), do: "That place is already taken; move its item away first."
+
+  def error_message(:wrong_slot),
+    do: "A hero carries each kind of item in a place of its own kind."
+
+  def error_message(:same_place), do: "The item is already there."
+  def error_message(:bad_move), do: "That is not a place the item can go."
   def error_message(:bad_item_abilities), do: "Those powers could not be read."
   def error_message(:no_such_item), do: "That item is no longer in the save."
   def error_message(:bad_level), do: "Level is a whole number from 0 to 9."

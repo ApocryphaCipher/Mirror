@@ -45,6 +45,8 @@ defmodule Mirror.SaveFile.Heroes do
           location:
             %{x: non_neg_integer(), y: non_neg_integer(), plane: :arcanus | :myrror} | nil,
           items: [non_neg_integer()],
+          item_places: [non_neg_integer() | nil],
+          slot_types: [integer()],
           casting_skill: non_neg_integer(),
           spells: [pos_integer()],
           abilities: non_neg_integer(),
@@ -62,16 +64,17 @@ defmodule Mirror.SaveFile.Heroes do
     base = @wizard_offset + record * @wizard_record + @list_at
 
     for slot <- 0..(@slots - 1),
-        <<unit::little-signed-16, name::binary-size(14), items::binary-size(6), _types::binary>> =
+        <<unit::little-signed-16, name::binary-size(14), items::binary-size(6),
+          types::binary-size(6)>> =
           binary_part(raw, base + slot * @entry, @entry),
         unit >= 0,
-        {:ok, hero} <- [hero(raw, record, slot, unit, name, items)],
+        {:ok, hero} <- [hero(raw, record, slot, unit, name, items, types)],
         do: hero
   end
 
   def for_wizard(_raw, _record), do: []
 
-  defp hero(raw, record, slot, unit, name, items) do
+  defp hero(raw, record, slot, unit, name, items, types) do
     with true <- unit < @units_max and unit_present?(raw, unit),
          <<x, y, plane, _owner, _moves, type, _hero_slot, _::binary-size(5), level, _,
            experience::little-signed-16, _, damage, _::binary>> <- unit_record(raw, unit),
@@ -87,7 +90,9 @@ defmodule Mirror.SaveFile.Heroes do
          experience: experience,
          damage: damage,
          location: %{x: x, y: y, plane: if(plane == 0, do: :arcanus, else: :myrror)},
-         items: for(<<i::little-signed-16 <- items>>, i >= 0, do: i)
+         items: for(<<i::little-signed-16 <- items>>, i >= 0, do: i),
+         item_places: for(<<i::little-signed-16 <- items>>, do: if(i >= 0, do: i)),
+         slot_types: for(<<t::little-signed-16 <- types>>, do: t)
        }
        |> Map.merge(template(raw, record, type))}
     else

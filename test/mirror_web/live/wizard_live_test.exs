@@ -519,4 +519,88 @@ defmodule MirrorWeb.WizardLiveTest do
       refute has_element?(view, "select[name='wizard[relations][1][status]']")
     end
   end
+
+  describe "moving items" do
+    defp load_moving(sid) do
+      raw =
+        Mirror.WizardFixture.synthetic()
+        |> Mirror.WizardFixture.with_hero([1, 2, -1])
+        |> Mirror.WizardFixture.with_items(
+          %{
+            1 => {"Sword", 0, 1, 100, [0, 0, 0, 0, 0, 0, 0, 0], 0, 0},
+            2 => {"Shield", 7, 5, 100, [0, 0, 1, 0, 0, 0, 0, 0], 0, 0},
+            3 => {"Amulet", 6, 6, 100, [0, 0, 0, 0, 0, 0, 0, 0], 0, 0},
+            9 => {"Spare Shield", 7, 5, 100, [0, 0, 2, 0, 0, 0, 0, 0], 0, 0}
+          },
+          0,
+          [9, 3]
+        )
+
+      SessionStore.put(sid, Mirror.SaveManager.normalize_state(%{save: %{raw: raw}}))
+      raw
+    end
+
+    test "an item moves from the vault to the hero and back, each as one undo step", %{
+      conn: conn,
+      sid: sid
+    } do
+      load_moving(sid)
+      {:ok, view, _} = live(conn, ~p"/wizard/1")
+      refute has_element?(view, "#wizard-item-move-3")
+      view |> element("#wizard-edit-toggle") |> render_click()
+
+      assert has_element?(view, "#wizard-item-move-3 option[value='hero:0:2']", "Harold")
+      # the spare shield has nowhere to go, so it has no move form
+      refute has_element?(view, "#wizard-item-move-9")
+
+      before = SessionStore.get(sid)
+      view |> element("#wizard-item-move-3") |> render_submit(%{"to" => "hero:0:2"})
+
+      assert has_element?(view, "#wizard-note", "Moved Amulet to Harold")
+      assert has_element?(view, "#wizard-hero-0-item-3", "Amulet")
+      refute has_element?(view, "#wizard-vault-item-3")
+
+      moved = SessionStore.get(sid)
+      assert length(moved.history.arcanus) == length(before.history.arcanus) + 1
+      assert Mirror.SaveFile.Items.vault_places(moved.save.raw, 0) == [9, nil, nil, nil]
+
+      # back to the vault
+      view |> element("#wizard-item-move-3") |> render_submit(%{"to" => "vault:1"})
+      assert has_element?(view, "#wizard-vault-item-3", "Amulet")
+
+      assert Mirror.SaveFile.Items.vault_places(SessionStore.get(sid).save.raw, 0) == [
+               9,
+               3,
+               nil,
+               nil
+             ]
+
+      {undone, _} = Mirror.Editor.undo(moved, :arcanus)
+      assert undone.save.raw == before.save.raw
+    end
+
+    test "a place that is no longer free, or an item not held, is refused in words", %{
+      conn: conn,
+      sid: sid
+    } do
+      raw = load_moving(sid)
+      {:ok, view, _} = live(conn, ~p"/wizard/1")
+      view |> element("#wizard-edit-toggle") |> render_click()
+
+      # the sword's own place: the hero's first place is taken, as a stale form would find it
+      render_hook(view, "item_move", %{"index" => "3", "to" => "hero:0:0"})
+      assert has_element?(view, "#wizard-note", "already taken")
+
+      render_hook(view, "item_move", %{"index" => "3", "to" => "hero:0:1"})
+      assert has_element?(view, "#wizard-note", "already taken")
+
+      render_hook(view, "item_move", %{"index" => "77", "to" => "vault:3"})
+      assert has_element?(view, "#wizard-note", "no longer in the save")
+
+      render_hook(view, "item_move", %{"index" => "9", "to" => "hero:0:2"})
+      assert has_element?(view, "#wizard-note", "place of its own kind")
+
+      assert SessionStore.get(sid).save.raw == raw
+    end
+  end
 end

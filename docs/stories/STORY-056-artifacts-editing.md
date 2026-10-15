@@ -1,7 +1,7 @@
 # STORY-056: Edit, move and create artifacts
 
 **Parent:** [EPIC-011](../epics/EPIC-011-artifacts.md)
-**Status:** first slice built and checked in the real game (2026-10-15): an item can be edited in place (name, cost, stats, special powers) from the wizard page, loaded and kept through one End Turn; move, create, remove and a lair's reward are not built. *Original note:* open (2026-10-12), after STORY-055
+**Status:** second slice built (2026-10-15): items can be moved between a hero's places and the vault, not yet loaded in the real game. First slice built and checked in the real game (2026-10-15): an item can be edited in place (name, cost, stats, special powers) from the wizard page, loaded and kept through one End Turn; move, create, remove and a lair's reward are not built. *Original note:* open (2026-10-12), after STORY-055
 **Size:** large
 
 ## What to do
@@ -49,3 +49,15 @@ in `~/.mirror/dev/DOSbox/backups/SAVE8-pre-itemedit-2026-10-15.GAM`). Research D
 - Evidence in the Evi vault, collection `mom-live-2026-10-15`: checkpoints 113 (the odd shield loaded), 114 (the sword), 115 (Haste shown when a line is free), 116 (after End Turn, memory) and 117 (the shield after the turn), each with a screenshot.
 
 Not checked: a charged spell or charges (not editable here), stat values above the premade maxima (refused by the editor), a fight with an edited item, and the story's other edits (move, create, remove).
+
+## Second slice built (2026-10-15): move an item
+
+In edit mode an item that has somewhere to go gets a **Move to** list on `/wizard/:id`: the vault (its first empty place) and every empty place of a hero whose **slot type** is the item's kind.
+`Structures.move_item/4` writes the item index into the target and `-1` into the source (four bytes change, the item record is untouched), as one undo step. A swap is two moves through a free place.
+
+- **A hero's place has a slot type** (`+22` of his list entry: 1 melee weapon, 2 bow, 4 staff or wand, 5 armor, 6 misc) and the item's slot code (`+32` of its record) must equal it. Sir Harold's places are (1, 5, 6): a sword, an armor and a misc item.
+  *Guess:* the game depends on that match. What it does with a mismatch (an armor in a sword place) was **not tried** and the editor refuses it (`:wrong_slot`); a game test with one deliberately wrong move would settle it.
+- Moves stay inside one wizard (his heroes and his vault). Giving an item to another wizard's hero or vault is not built.
+- Refused with a reason: nothing at the source, a taken target, a hero not in the list, a wrong kind of place, the same place twice, a free item record.
+- `Heroes` now also reports each hero's `item_places` (the three places with their gaps) and `slot_types`; `Items.vault_places/2` the four vault places with their gaps.
+- **Not loaded in the real game yet:** the definition of done for a move (seen on the item screen, through one End Turn) is not met.
