@@ -2580,10 +2580,11 @@ defmodule MirrorWeb.MapLiveEditTest do
       assert has_element?(view, ~s|input[name="lair[gold]"][value="120"]|)
     end
 
-    test "a lair's item numbers are described as values to roll, not as items", %{
-      conn: conn,
-      dir: dir
-    } do
+    test "a lair's item count is shown as items to roll, and its numbers are not called values",
+         %{
+           conn: conn,
+           dir: dir
+         } do
       raw =
         synthetic_save_bytes()
         |> put_bytes(0x6628 + 20 * 24, lair_record(26, 25, 0, 1, 7, 39, 0x53, 120, 40))
@@ -2595,7 +2596,35 @@ defmodule MirrorWeb.MapLiveEditTest do
 
       view = editing(conn, path, "lair")
       click(view, 26, 25)
-      assert lpanel(view) =~ "1 item to roll (value 360, a guess)"
+      text = lpanel(view)
+      assert text =~ "Items to roll: 1"
+      assert has_element?(view, ~s|input[name="lair[item_count]"][value="1"]|)
+      refute text =~ "360"
+      refute text =~ "a guess"
+    end
+
+    test "the number of items to roll is edited, undoably, and only the count byte changes", %{
+      conn: conn,
+      dir: dir
+    } do
+      view = editing(conn, lairs_save(dir), "lair")
+      click(view, 26, 25)
+      assert has_element?(view, ~s|input[name="lair[item_count]"][value="0"]|)
+
+      lair_form(view, %{"item_count" => "2"})
+      assert has_element?(view, "#lair-note", "items to roll to 2")
+      assert has_element?(view, ~s|input[name="lair[item_count]"][value="2"]|)
+      assert lpanel(view) =~ "Items to roll: 2"
+
+      target = Path.join(dir, "SAVE6.GAM")
+      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+      assert %{item_count: 2, gold: 120} = Enum.find(encounters_of(target), &(&1.index == 20))
+
+      render_click(view, "undo", %{})
+      assert has_element?(view, ~s|input[name="lair[item_count]"][value="0"]|)
+
+      lair_form(view, %{"item_count" => "4"})
+      assert has_element?(view, "#lair-note", "0 to 3")
     end
 
     test "clearing a site and emptying a guard slot", %{conn: conn, dir: dir} do

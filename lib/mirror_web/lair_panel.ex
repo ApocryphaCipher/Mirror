@@ -5,8 +5,9 @@ defmodule MirrorWeb.LairPanel do
   turned into `Mirror.SaveFile.Structures.edit_encounter/3` changes. Pure; the page
   (`MirrorWeb.MapLive`) draws it.
 
-  The treasure code, flags and items are shown, not edited: what the code means is
-  not decoded.
+  The treasure code and flags are shown, not edited: what the code means is not decoded. The
+  **item count** is edited (it is how many items the game makes when the site is cleared); the
+  three numbers after it are not shown as items and not edited, the game does not use them to pick the item.
   """
 
   alias Mirror.SaveFile.{Encounters, UnitTypes}
@@ -68,7 +69,7 @@ defmodule MirrorWeb.LairPanel do
 
   @doc """
   The form's params (`"intact"` with its `"intact_present"` marker, `"guard1_type"`,
-  `"guard1_count"`, `"guard2_type"`, `"guard2_count"`, `"gold"`, `"mana"`) as the keyword list
+  `"guard1_count"`, `"guard2_type"`, `"guard2_count"`, `"gold"`, `"mana"`, `"item_count"`) as the keyword list
   `Structures.edit_encounter/3` takes, keeping only what differs from `details`. `{:ok, []}` when
   nothing changed. A guard slot with a type needs a count (`:bad_guards`), a reward that is not a
   whole number is `:bad_gold` or `:bad_mana`, and an unreadable type is `:bad_guards`.
@@ -78,8 +79,10 @@ defmodule MirrorWeb.LairPanel do
     with {:ok, intact} <- intact_change(params, details),
          {:ok, guards} <- guard_changes(params, details),
          {:ok, gold} <- number_change(params, "gold", :gold, details.gold, :bad_gold),
-         {:ok, mana} <- number_change(params, "mana", :mana, details.mana, :bad_mana) do
-      {:ok, intact ++ guards ++ gold ++ mana}
+         {:ok, mana} <- number_change(params, "mana", :mana, details.mana, :bad_mana),
+         {:ok, items} <-
+           number_change(params, "item_count", :item_count, details.item_count, :bad_item_count) do
+      {:ok, intact ++ guards ++ gold ++ mana ++ items}
     end
   end
 
@@ -161,6 +164,7 @@ defmodule MirrorWeb.LairPanel do
       [:intact] -> if changes[:intact], do: "Restored #{what}", else: "Cleared #{what}"
       [:gold] -> "Set #{what}'s gold to #{changes[:gold]}"
       [:mana] -> "Set #{what}'s mana to #{changes[:mana]}"
+      [:item_count] -> "Set #{what}'s items to roll to #{changes[:item_count]}"
       [:guards] -> "Changed #{what}'s guards" <> guard_delta(changes[:guards])
       _ -> "Edited #{what}"
     end
@@ -182,6 +186,7 @@ defmodule MirrorWeb.LairPanel do
   def error_message(:bad_guards), do: "A guard needs a unit and a count from 1 to 8."
   def error_message(:bad_gold), do: "Gold is a whole number from 0 to 30000."
   def error_message(:bad_mana), do: "Mana is a whole number from 0 to 30000."
+  def error_message(:bad_item_count), do: "Items to roll is a whole number from 0 to 3."
   def error_message(:bad_intact), do: "That is not a valid state."
   def error_message(:no_such_encounter), do: "That site is no longer in the save."
   def error_message(:nothing_changed), do: "Nothing to change."

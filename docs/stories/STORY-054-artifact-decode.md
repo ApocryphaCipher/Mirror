@@ -30,9 +30,9 @@ already written in [wizard-heroes-diplomacy-items.md](../reference/wizard-heroes
 empty name. Read on `SAVE2.GAM` (no game session): five items, and Sir Harold's two (Mae Govannon, Plate of Enduring Immunity) and Jafar's vault item (Protection of Ramses) resolve to
 real items with sensible type and slot names.
 
-**Found on the way: a lair's three numbers are not item indexes.** The encounter record's `+18`, `+20`, `+22` (counted by `+16`) hold values from 360 up to 2400 in 22 saves and none is a
-position in the item block (1 to 137). So the lair panel's "items" are *not* items in the save. *Guess:* they are the worth of the item the game rolls when the lair is cleared;
-confirm by clearing a lair with a known value and reading the item the game makes. This corrects the old line that a lair's item ids point into the block.
+**Found on the way: a lair's three numbers are not item indexes, and (checked in the game, 2026-10-15) they do not set the quality of the reward.** The encounter record's `+18`, `+20`, `+22` hold 360 up to 2400 in 22 saves, never a position in the item block. In the game an item came with the value at 0, 100, 9000 and 30000 (costs 800, 600, 1250, 1550). The **count at `+16`** is how many items the game makes; see [the findings](../reference/wizard-heroes-diplomacy-items.md#findings-2026-10-15-lairs-new-items-and-the-premade-table-real-game). The lair panel now edits that count and no longer calls the numbers items.
+
+Also found there: the premade "in play" table in the last 810 bytes of the save, and where the game puts a new item (first unreferenced record, plus a working copy in record 136).
 
 Open: the **power names** (`ITEMPOW.LBX` is not in `Mirror.GameFiles.manifest/0`; adding it needs Kevin's say-so, so `abilities` stays a mask for now), the 6-byte tail of a premade record,
 how many items a hero may hold at once (three entries in the list), and a comparison with the game's own item screens.

@@ -187,3 +187,18 @@ Its editor screens show what its author found editable in 1995, which is a map f
   of 1,713 lair records here).
 - **City:** owner, race, population. **Units:** edit units in a city. **Structures:** select and move (we did these too).
 - There is **no diplomacy editor** in it: relations and treaties are new ground.
+
+
+## Findings 2026-10-15: lairs, new items and the premade table (real game)
+
+Found with the research DOSBox on `SAVE2.GAM`, writing the running game's memory (nothing saved) and clearing lairs; vault collection `mom-live-2026-10-15`, checkpoints 128 to 134.
+
+- **The "premade items still available" table is in the last 810 bytes of the save**, 250 bytes at `file size - 810` (`0x1DE7A` in a 123300-byte save), followed by the 35 hero names (see below). kazzmir's loader reads it after the grand vizier word (`loadPremadeItems`, then `loadHeroNames`, then end of file).
+  **A 1 means the premade item is already in play**, not available: SAVE2 has ones at 73, 97, 209 and 213, the four premade items it holds (Shield of Eros, Plate of Enduring Immunity, Mae Govannon, Protection of Ramses).
+  Each item the game made in the lair tests set its flag (191 Shield of Speed, 95 Plate Mail of Blessed Fear, 226 Blood Plate of Lucifer, 138 The Mighty Wand of Zod, 129 The Enlightener). The number is the table's "Item #n", counted from 1. In RAM the table was at `0x89AA0`.
+- **Where the game puts a new item:** in the first item record that nothing points at (record 3 in SAVE2 was a named leftover with cost 65535, then 4, 5, 6, 7), **and a copy in record 136 every time** (seen after each of the five items): record 136 looks like the game's working copy of the item being made, so Mirror never hands it out (nor 137). The new item's index went into the vault (the Items screen's "Fortress Vault").
+- **A lair's three numbers (`+18`, `+20`, `+22`) do not set the item's quality.** One item valued 100 gave a Shield of Speed (cost 600), 9000 a Plate Mail of Blessed Fear (1250), two items valued 30000 gave a Blood Plate of Lucifer (1550) and a Mighty Wand of Zod (1250), and **0 still gave an item, The Enlightener (800)**.
+  **The count at `+16` is what counts**: 1 gave one item, 2 gave two. Neither the count nor the values change when the site is cleared (the lair keeps them); the intact byte goes to 0, the guards' low nibble to 0 and the flags byte (`+15`) changed (to 6 or 7).
+  The reward text names the item's kind ("a Plate Mail", "a Wand", "a Staff"); prisoner heroes, spells and the gold and mana from the record came with the large lairs. So the numbers are *unused by the clear* (their origin is the map generator, *guess*), and kazzmir's own converter derives its loot budget from the guards' casting costs, not from them.
+- **A premade record keeps movement as shown, a save in half points** (confirmed again by kazzmir's converter: `item.Movement/2`).
+- **The 35 hero names with experience** (14-byte name plus an i16, 16 bytes each) are the last 560 bytes of the save (`0x1DF74`): index 31 is "Sir Harold" in SAVE2. Whether renaming a hero must also change this table (the hero list entry holds a name too) is *not known*; STORY-053 edits only the list entry, and a manual check of the game's hero screens after a rename has not been made.

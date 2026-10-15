@@ -467,13 +467,16 @@ defmodule Mirror.SaveFile.Structures do
     An empty slot is type 0, count 0.
   * `gold` and `mana`: 0..#{@max_reward}, the i16 values at `+10` and `+12` (the largest seen are
     620 and 330).
+  * `item_count`: 0..3, the byte at `+16`: **how many items the game makes when the site is cleared**
+    (checked in the game, 2026-10-15: a count of 1 gave one item, 2 gave two). The three numbers after it
+    (`+18`) do not gate the reward, an item came with the value at 0, 100, 9000 and 30000, so they are left alone.
 
   A Tower of Wizardry is two records (an Arcanus and a Myrror side) with the same guards, and
   the game clears both together, so a tower is edited on **both**. The spell code (`+14`), flags,
   items and the unknown bytes are left alone.
 
   Returns `{:ok, raw, %{changed: [...], records: [indexes written]}}` or `{:error, reason}`
-  (`:no_such_encounter`, `:bad_intact`, `:bad_guards`, `:bad_gold`, `:bad_mana` or
+  (`:no_such_encounter`, `:bad_intact`, `:bad_guards`, `:bad_gold`, `:bad_mana`, `:bad_item_count` or
   `{:unknown_field, field}`); nothing is written if any value is refused.
   """
   @spec edit_encounter(binary(), non_neg_integer(), keyword()) :: result()
@@ -513,6 +516,7 @@ defmodule Mirror.SaveFile.Structures do
 
   defp write_encounter_edit({:gold, n}, raw, at), do: put(raw, at + 10, <<n::little-signed-16>>)
   defp write_encounter_edit({:mana, n}, raw, at), do: put(raw, at + 12, <<n::little-signed-16>>)
+  defp write_encounter_edit({:item_count, n}, raw, at), do: put(raw, at + 16, <<n>>)
 
   defp write_encounter_edit({:guards, slots}, raw, at) do
     Enum.reduce(slots, raw, fn {slot, guard}, acc ->
@@ -545,6 +549,12 @@ defmodule Mirror.SaveFile.Structures do
 
       {:mana, _}, _ ->
         {:halt, {:error, :bad_mana}}
+
+      {:item_count, n}, {:ok, acc} when is_integer(n) and n in 0..3//1 ->
+        {:cont, {:ok, [{:item_count, n} | acc]}}
+
+      {:item_count, _}, _ ->
+        {:halt, {:error, :bad_item_count}}
 
       {:guards, slots}, {:ok, acc} ->
         if valid_guards?(slots),
@@ -881,53 +891,95 @@ defmodule Mirror.SaveFile.Structures do
     if type == code, do: :ok, else: {:error, :wrong_slot}
   end
 
+  # The game's own table of which premade items (`ITEMDATA.LBX`, numbered from 1) are already in play: 250 bytes, 1 once
+  # the game has made the item, 0 while it can still be handed out. It sits in the last 810 bytes of the save, just
+  # before the 35 hero names (kazzmir's loader; SAVE2: ones at 73, 97, 209 and 213, the four premade items in play;
+  # the game set 191, 95, 138, 226 and 129 as it made five more in a lair test, 2026-10-15).
+  @premade_flags 250
+  @save_tail 810
+  # Records 136 and 137 are not handed out: the game builds each new item in 136 as well as in its own record
+  # (seen three times), so it is treated as the game's working copy. A save keeps 138 records.
+  @item_pool 136
+
+  defp set_premade_flag(raw, number, value)
+       when is_integer(number) and number in 1..@premade_flags//1 and
+              byte_size(raw) >= @item_block + @item_count * @item_record + @save_tail do
+    put(raw, byte_size(raw) - @save_tail + number - 1, <<value>>)
+  end
+
+  defp set_premade_flag(raw, _number, _value), do: raw
+
+  # Gives the premade number back to the game when the record holding that item (matched by name) is overwritten or
+  # blanked: `names` is a map of premade name to number.
+  defp release_premade(raw, index, names) do
+    case Map.fetch(names, item_name_at(raw, index)) do
+      {:ok, number} -> set_premade_flag(raw, number, 0)
+      :error -> raw
+    end
+  end
+
+  defp item_name_at(raw, index),
+    do: raw |> binary_part(@item_block + index * @item_record, 30) |> :binary.split(<<0>>) |> hd()
+
   @doc """
   Fills the place `place` of wizard `record` with the 50-byte item record `item_record` (STORY-056; the premade items
   of `Mirror.ItemData.save_record/1`): a hero's item place or a vault place. The record's slot code must equal a hero
   place's slot type (the editor's rule, as in `move_item/4`).
 
   If the place already holds an item that nothing else points at, **that item's record is overwritten in place**;
-  otherwise the record goes into the first free one (a record with an empty name that no place points at) and its index
-  is written into the place. A place holding an item shared with another place keeps it there untouched.
+  otherwise the record goes into the first free one (a record with an empty name that no place points at, among the
+  first #{@item_pool}) and its index is written into the place. A place holding an item shared with another place
+  keeps it there untouched.
+
+  Options: `number:` the premade number of the item, whose **"in play" flag is set** as the game does when it makes
+  one; `premade_names:` a map of premade name to number, so that an overwritten item gives its number back.
 
   Refused: `:no_such_wizard`, `:no_such_hero`, `:no_item_there` (a place that does not exist), `:bad_item_record` (not 50
-  bytes, or no name), `:wrong_slot`, and `:no_free_item` when all #{@item_count} records are in use.
+  bytes, or no name), `:wrong_slot`, and `:no_free_item` when all #{@item_pool} records are in use.
   """
-  @spec put_item(binary(), non_neg_integer(), item_place(), binary()) :: result()
-  def put_item(raw, record, place, item_record)
+  @spec put_item(binary(), non_neg_integer(), item_place(), binary(), keyword()) :: result()
+  def put_item(raw, record, place, item_record, opts \\ [])
+
+  def put_item(raw, record, place, item_record, opts)
       when is_binary(item_record) and byte_size(item_record) == @item_record do
     with :ok <- check_wizard(raw, record),
          {:ok, at} <- place_at(raw, record, place),
          :ok <-
            if(:binary.at(item_record, 0) != 0, do: :ok, else: {:error, :bad_item_record}),
          :ok <- slot_code_fits(raw, record, place, :binary.at(item_record, 32)),
-         {:ok, index} <- record_for(raw, at) do
+         {:ok, index, overwriting?} <- record_for(raw, at) do
+      raw =
+        if overwriting?,
+          do: release_premade(raw, index, Keyword.get(opts, :premade_names, %{})),
+          else: raw
+
       raw =
         raw
         |> put(@item_block + index * @item_record, item_record)
         |> put(at, <<index::little-signed-16>>)
+        |> set_premade_flag(Keyword.get(opts, :number), 1)
 
       {:ok, raw, %{set: index, place: place}}
     end
   end
 
-  def put_item(_raw, _record, _place, _item_record), do: {:error, :bad_item_record}
+  def put_item(_raw, _record, _place, _item_record, _opts), do: {:error, :bad_item_record}
 
   # The record a place's new item is written to: the one it holds when nothing else shares it, else a free one.
   defp record_for(raw, at) do
     <<current::little-signed-16>> = binary_part(raw, at, 2)
 
-    if current >= 0 and current < @item_count and item_record_used?(raw, current) and
+    if current >= 0 and current < @item_pool and item_record_used?(raw, current) and
          item_refs(raw, current) == 1,
-       do: {:ok, current},
-       else: free_item(raw)
+       do: {:ok, current, true},
+       else: with({:ok, index} <- free_item(raw), do: {:ok, index, false})
   end
 
   defp item_record_used?(raw, index), do: :binary.at(raw, @item_block + index * @item_record) != 0
 
   defp free_item(raw) do
     case Enum.find(
-           0..(@item_count - 1),
+           0..(@item_pool - 1),
            &(not item_record_used?(raw, &1) and item_refs(raw, &1) == 0)
          ) do
       nil -> {:error, :no_free_item}
@@ -961,13 +1013,14 @@ defmodule Mirror.SaveFile.Structures do
 
   @doc """
   Empties the place `place` of wizard `record` (`-1`), and **blanks the item's record** (50 zero bytes) when no other
-  place points at it, which is how Mirror reads a free record (an empty name; the game's own marker is not known,
-  checked only that the game loads such a save, see STORY-056).
+  place points at it, which is how Mirror reads a free record (an empty name; checked only that the game loads and
+  reuses such a record, see STORY-056). Option `premade_names:` (premade name to number) gives the item's premade
+  number back to the game when its record is blanked.
 
   Refused: `:no_such_wizard`, `:no_such_hero`, `:no_item_there` (the place is already empty or does not exist).
   """
-  @spec clear_item(binary(), non_neg_integer(), item_place()) :: result()
-  def clear_item(raw, record, place) do
+  @spec clear_item(binary(), non_neg_integer(), item_place(), keyword()) :: result()
+  def clear_item(raw, record, place, opts \\ []) do
     with :ok <- check_wizard(raw, record),
          {:ok, at} <- place_at(raw, record, place),
          <<item::little-signed-16>> = binary_part(raw, at, 2),
@@ -975,9 +1028,13 @@ defmodule Mirror.SaveFile.Structures do
       raw = put(raw, at, <<-1::little-signed-16>>)
 
       raw =
-        if item < @item_count and item_refs(raw, item) == 0,
-          do: put(raw, @item_block + item * @item_record, :binary.copy(<<0>>, @item_record)),
-          else: raw
+        if item < @item_count and item_refs(raw, item) == 0 do
+          raw
+          |> release_premade(item, Keyword.get(opts, :premade_names, %{}))
+          |> put(@item_block + item * @item_record, :binary.copy(<<0>>, @item_record))
+        else
+          raw
+        end
 
       {:ok, raw, %{cleared: item, place: place}}
     end
