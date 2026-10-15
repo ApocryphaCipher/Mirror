@@ -376,4 +376,38 @@ defmodule MirrorWeb.WizardPanelTest do
       refute WizardPanel.details(binary_part(raw, 0, 0x9E8 + 6 * 0x4C8), 1).banished
     end
   end
+
+  describe "global enchantment checkboxes" do
+    setup do
+      %{d: WizardPanel.details(WizardFixture.synthetic(), 1)}
+    end
+
+    test "flags list all 24 in the save's order", %{d: d} do
+      assert length(d.global_flags) == 24
+      assert Enum.at(d.global_flags, 3) == {"Aura of Majesty", true}
+      assert Enum.at(d.global_flags, 7) == {"Nature Awareness", false}
+    end
+
+    test "unchanged boxes make no change", %{d: d} do
+      params = %{"globals_present" => "1", "globals" => %{"3" => "on", "18" => "on"}}
+      assert WizardPanel.changes(params, d) == {:ok, []}
+    end
+
+    test "ticking and unticking becomes one :globals change", %{d: d} do
+      params = %{"globals_present" => "1", "globals" => %{"3" => "on", "7" => "on"}}
+      assert {:ok, [globals: wanted]} = WizardPanel.changes(params, d)
+      assert for({true, i} <- Enum.with_index(wanted), do: i) == [3, 7]
+      assert WizardPanel.label(d, globals: wanted) == "Edited Jafar: global enchantments"
+    end
+
+    test "Time Stop keeps the save's value whatever the form says", %{d: d} do
+      params = %{"globals_present" => "1", "globals" => %{"3" => "on", "6" => "on", "18" => "on"}}
+      assert WizardPanel.changes(params, d) == {:ok, []}
+    end
+
+    test "a globals value that is not a map is refused", %{d: d} do
+      assert WizardPanel.changes(%{"globals_present" => "1", "globals" => "on"}, d) ==
+               {:error, :bad_globals}
+    end
+  end
 end

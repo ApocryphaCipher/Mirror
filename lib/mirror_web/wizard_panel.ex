@@ -54,6 +54,8 @@ defmodule MirrorWeb.WizardPanel do
     "Awareness"
   ]
 
+  @time_stop 6
+
   @realms ["Nature", "Sorcery", "Chaos", "Life", "Death"]
   @realms_atoms [:nature, :sorcery, :chaos, :life, :death]
 
@@ -168,6 +170,11 @@ defmodule MirrorWeb.WizardPanel do
           for(
             {name, value} when value != 0 <- Enum.zip(@globals, :binary.bin_to_list(globals)),
             do: name
+          ),
+        global_flags:
+          for(
+            {name, value} <- Enum.zip(@globals, :binary.bin_to_list(globals)),
+            do: {name, value != 0}
           ),
         candidates: for(<<n::little-16 <- candidates>>, n in 1..214//1, do: n),
         library: :binary.bin_to_list(binary_part(library, 0, 214)),
@@ -296,6 +303,7 @@ defmodule MirrorWeb.WizardPanel do
     with {:ok, nums} <- numbers(params, details),
          {:ok, books} <- books(params, details),
          {:ok, retorts} <- retorts(params, details),
+         {:ok, globals} <- globals_changes(params, details),
          {:ok, spells} <- spells(params, details),
          {:ok, research} <- research(params, details),
          {:ok, relations} <- relations_changes(params, details),
@@ -303,7 +311,7 @@ defmodule MirrorWeb.WizardPanel do
       changes =
         nums ++
           if(name != details.name, do: [name: name], else: []) ++
-          books ++ retorts ++ spells ++ research ++ relations
+          books ++ retorts ++ globals ++ spells ++ research ++ relations
 
       {:ok, changes}
     end
@@ -369,6 +377,32 @@ defmodule MirrorWeb.WizardPanel do
   end
 
   defp retorts(_params, _details), do: {:ok, []}
+
+  # The global-enchantment checkboxes (`globals[N]` = "on"); `globals_present` says the form had them. Time
+  # Stop's box is disabled in the form (a disabled box is not sent), so it always keeps the save's value.
+  defp globals_changes(%{"globals_present" => _} = params, details) do
+    case Map.get(params, "globals", %{}) do
+      given when is_map(given) ->
+        wanted =
+          for {{_name, on}, i} <- Enum.with_index(details.global_flags) do
+            if i == @time_stop,
+              do: on,
+              else: Map.get(given, Integer.to_string(i)) in ["on", "true"]
+          end
+
+        current = Enum.map(details.global_flags, &elem(&1, 1))
+        {:ok, if(wanted == current, do: [], else: [globals: wanted])}
+
+      _ ->
+        {:error, :bad_globals}
+    end
+  end
+
+  defp globals_changes(_params, _details), do: {:ok, []}
+
+  @doc "The save's byte index of Time Stop, the one global the page does not edit."
+  @spec time_stop_index() :: non_neg_integer()
+  def time_stop_index, do: @time_stop
 
   # The spell checkboxes (`spells[N]` = "on" for known); `spells_present` says the form had them. Ticking a
   # spell makes it known (2); unticking a known one makes it knowable again (1). Others are left as they are.
@@ -554,6 +588,7 @@ defmodule MirrorWeb.WizardPanel do
         {:name, n} -> "name #{n}"
         {:books, _} -> "books"
         {:retorts, _} -> "retorts"
+        {:globals, _} -> "global enchantments"
         {:spells, list} -> "#{length(list)} #{if length(list) == 1, do: "spell", else: "spells"}"
         {:researching, 0} -> "no spell researched"
         {:researching, n} -> "researching spell #{n}"
@@ -595,6 +630,7 @@ defmodule MirrorWeb.WizardPanel do
   def error_message(:bad_research_left),
     do: "Research points left is a whole number from 0 to 65535."
 
+  def error_message(:bad_globals), do: "Those global enchantments could not be read."
   def error_message(:bad_retorts), do: "Those retorts could not be read."
   def error_message(:no_such_wizard), do: "That wizard is no longer in the save."
   def error_message(:nothing_changed), do: "Nothing to change."

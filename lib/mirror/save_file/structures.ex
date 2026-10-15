@@ -1065,6 +1065,10 @@ defmodule Mirror.SaveFile.Structures do
   @max_books 13
   @retort_count 18
   @spell_count 214
+  @global_count 24
+  # Time Stop is byte 6 of the globals: the flag alone only draws the icon and charges the upkeep (the real
+  # spell keeps its state elsewhere, not found), so it can be neither added nor removed here.
+  @time_stop 6
 
   @doc """
   Edits wizard `record` (0 is the player, 0 to 4 the wizards) with `changes`, a keyword list:
@@ -1080,11 +1084,14 @@ defmodule Mirror.SaveFile.Structures do
       the figure the Diplomacy screen shows (`+0x128 + 42`) and the treaty code (`+0x128 + 48`), written on **both**
       wizards' records, since the game keeps each pair in both. Status 0 none, 1 wizard pact are checked in the game; 2 alliance, 3 war
       and 4 final war are *guesses* (2026-10-12). The AI's interest values are left alone.
+    * `:globals` (#{@global_count} booleans, the global enchantments in the save's byte order, `+0x482`; the flag is all
+      the game needs, as set by hand it shows in the Magic screen and is charged upkeep. Time Stop (byte #{@time_stop}) cannot be
+      changed: the list must keep it as it is)
     * `:researching` (the spell being researched, 0 for none, or a spell number 1..#{@spell_count}) and `:research_left` (research
       points left, 0 to 65535)
 
   Refused: a record with no name (`:no_such_wizard`), a bad value (`:bad_gold`, `:bad_mana`, `:bad_fame`,
-  `:bad_name`, `:bad_books`, `:bad_retorts`, `:bad_spells`, `:bad_researching`, `:bad_research_left`, `:bad_relations`) or an unknown field. The power base, casting skill and the
+  `:bad_name`, `:bad_books`, `:bad_retorts`, `:bad_globals`, `:bad_spells`, `:bad_researching`, `:bad_research_left`, `:bad_relations`) or an unknown field. The power base, casting skill and the
   research candidates are worked out again by the game, so they are not touched.
   """
   @spec edit_wizard(binary(), non_neg_integer(), keyword()) :: result()
@@ -1094,6 +1101,7 @@ defmodule Mirror.SaveFile.Structures do
     with true <- record in 0..4//1 and byte_size(raw) >= @wizard_offset + 5 * @wizard_record,
          true <- :binary.at(raw, at + 1) != 0,
          {:ok, edits} <- wizard_edits(changes),
+         :ok <- check_globals(raw, at, edits[:globals]),
          :ok <- check_relation_targets(raw, record, edits[:relations]) do
       raw =
         Enum.reduce(edits, raw, fn
@@ -1130,6 +1138,11 @@ defmodule Mirror.SaveFile.Structures do
 
           {:retorts, v}, acc ->
             put(acc, at + 0x64, for(on <- v, into: <<>>, do: <<bool_byte(on)>>))
+
+          {:globals, v}, acc ->
+            Enum.reduce(Enum.with_index(v), acc, fn {on, i}, acc ->
+              put(acc, at + 0x482 + i, <<bool_byte(on)>>)
+            end)
         end)
 
       {:ok, raw, %{changed: Keyword.keys(edits)}}
@@ -1167,6 +1180,15 @@ defmodule Mirror.SaveFile.Structures do
       end)
 
     if ok?, do: :ok, else: {:error, :bad_relations}
+  end
+
+  # Time Stop's flag must come back as it is in the save.
+  defp check_globals(_raw, _at, nil), do: :ok
+
+  defp check_globals(raw, at, globals) do
+    if bool_byte(Enum.at(globals, @time_stop)) == :binary.at(raw, at + 0x482 + @time_stop),
+      do: :ok,
+      else: {:error, :bad_globals}
   end
 
   defp bool_byte(true), do: 1
@@ -1208,6 +1230,12 @@ defmodule Mirror.SaveFile.Structures do
   end
 
   defp wizard_value(:retorts, _), do: {:error, :bad_retorts}
+
+  defp wizard_value(:globals, v) when is_list(v) and length(v) == @global_count do
+    if Enum.all?(v, &is_boolean/1), do: :ok, else: {:error, :bad_globals}
+  end
+
+  defp wizard_value(:globals, _), do: {:error, :bad_globals}
 
   defp wizard_value(:spells, v) when is_list(v) and v != [] do
     if Enum.all?(v, &match?({n, s} when n in 1..@spell_count//1 and s in 0..3//1, &1)),

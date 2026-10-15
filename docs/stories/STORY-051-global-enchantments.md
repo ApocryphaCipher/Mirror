@@ -1,7 +1,7 @@
 # STORY-051: Global enchantments: see, add, remove
 
 **Parent:** [EPIC-009](../epics/EPIC-009-wizard-editing.md)
-**Status:** open (2026-10-12). **Decoded in the real game:** an active global is a **1** in its byte (checked for Aura of Majesty, byte 3, and Just Cause, byte 18). Showing, adding and removing are not started.
+**Status:** built (2026-10-15): the wizard page edits the 24 flags (Time Stop excepted); not retried in the game here, see "Built (2026-10-15)" below. *Original note:* open (2026-10-12). **Decoded in the real game:** an active global is a **1** in its byte (checked for Aura of Majesty, byte 3, and Just Cause, byte 18). Showing, adding and removing are not started.
 **Size:** medium to large (the decode decides)
 **Raised by:** [Kevin](https://github.com/KevinAsbury), 2026-10-12
 
@@ -32,3 +32,18 @@ charged; does the spell show in the Magic screen's list), and removing one (does
 
 **Built (2026-10-13):** the wizard page lists the caster's active globals by name (read-only; only byte 3 and 18 have been seen set, the other names are the book's order). **Suggested next step:** one edit test on a copy of the advanced SAVE2: set Nature Awareness (byte 7, cheap) by hand, load it, look at the Magic screen's list and the map,
 End Turn once and see the upkeep; then clear it and check that it goes away.
+
+## Built (2026-10-15)
+
+Editing: `/wizard/:id` in edit mode has a checkbox per global; `Structures.edit_wizard/3` takes `globals: [24 booleans]` and writes 0 or 1 at
+`+0x482 + n`, one undo step like the other wizard edits. **Time Stop (byte 6) is not editable:** the form disables its box and `edit_wizard/3` refuses a
+list that changes it (`:bad_globals`).
+
+Evidence taken from the mompy project instead of a new game session (`~/repo/mompy/docs/reference/globals.md`, Kevin's game, 2026-10-13/14): a
+hand-set flag shows in the Magic screen's "Overland Enchantments" box at once and survives End Turn; the game charges its upkeep (four cheap
+globals together cost 17 mana a turn; Planar Seal 2). Effects seen for Aura of Majesty (relations rise), Great Wasting (corrupted tiles) and
+Meteor Storm (a volcano). **Time Stop** set by hand only draws the icon and charges about 100 mana, with no effect; the real spell keeps its state
+elsewhere (not found), so it is left alone. Not tried anywhere: an unaffordable upkeep, a value other than 1, two wizards holding the same global.
+Mirror's byte index is mompy's number minus one (Aura of Majesty is byte 3, mompy's #4).
+
+Not done: a list of globals on a map or world page (step 2's "proposed" panel).

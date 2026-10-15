@@ -254,6 +254,27 @@ defmodule MirrorWeb.WizardLive do
                 </label>
               </div>
             </fieldset>
+            <fieldset>
+              <legend class="mb-1 text-sm text-slate-300">Global enchantments</legend>
+              <input type="hidden" name="wizard[globals_present]" value="1" />
+              <div class="grid grid-cols-2 gap-1 sm:grid-cols-3">
+                <label
+                  :for={{{name, on}, i} <- Enum.with_index(@details.global_flags)}
+                  class="flex items-center gap-2 text-sm text-slate-200"
+                >
+                  <input
+                    type="checkbox"
+                    name={"wizard[globals][#{i}]"}
+                    checked={on}
+                    disabled={i == WizardPanel.time_stop_index()}
+                  />
+                  {name}
+                </label>
+              </div>
+              <p class="mt-1 text-xs text-slate-400">
+                Time Stop is not editable: the game keeps more state for it than the flag.
+              </p>
+            </fieldset>
             <p class="text-xs text-slate-400">
               Power base, casting skill and the research list are worked out again by the game.
               Undo and Save as are on the map pages.
