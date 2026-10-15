@@ -21,6 +21,7 @@ Offsets are from the start of a wizard record, `0x9e8 + n × 0x4c8`; continues
 | Offset | Field | Checked |
 | --- | --- | --- |
 | `+0x76` | **hero list**: 6 entries of 28 bytes: unit index (i16, −1 none), name (14 bytes, NUL-padded, the hero's own given name), 3 item indexes (i16, −1 none) into the item block below, 3 item slot types (i16) | **SAVE2:** Jafar's entry 0 is unit 51 "Sir Harold", and unit 51 is a Sir Harold at his capital; Freya's is unit 137 "Rockfist"; the item index 1 is a sword; slot types (1, 5, 6) |
+| *(file start)* `6 x 420` | **per-player hero table**, outside the wizard record: 35 heroes x 12 bytes for each of the six players, indexed by unit type 0 to 34: i16 (-20 = hired by that player, *meaning unknown*), 4 ability bytes (*not decoded*), casting skill, 4 spell numbers, 1 pad | **SAVE2, 2026-10-15:** Sir Harold (type 31) and Rockfist (type 6) carry -20 in their own player's table; heroes with spells hold numbers in their realm's range. Read by `Mirror.SaveFile.Heroes` |
 | `+0x11e` | 2 unknown bytes | kazzmir |
 | `+0x120` | **vault**: 4 item indexes (i16, −1 empty): the wizard's spare items | **SAVE2:** Jafar's vault holds item 2, "Protection of Ramses"; the others have none |
 | `+0x128` | **diplomacy**, 306 bytes, six entries per array (players 0 to 4 and 5 = neutral); layout below | **SAVE2:** see below |

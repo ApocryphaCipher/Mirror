@@ -1,6 +1,6 @@
 # EPIC-010: Heroes
 
-**Status:** proposed (2026-10-12), nothing built
+**Status:** in progress (2026-10-15): STORY-052 partly built (the wizard page lists heroes); editing (STORY-053) not started
 **Owner:** [Kevin](https://github.com/KevinAsbury)
 **Requested:** 2026-10-12, split out of EPIC-009 (wizard editing): heroes get their own epic.
 

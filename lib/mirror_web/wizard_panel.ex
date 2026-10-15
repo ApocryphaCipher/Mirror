@@ -12,7 +12,7 @@ defmodule MirrorWeb.WizardPanel do
   `docs/reference/wizard-record-and-exploration.md`.
   """
 
-  alias Mirror.SaveFile.{Cities, Sites, Units, Wizards}
+  alias Mirror.SaveFile.{Cities, Heroes, Sites, Units, Wizards}
 
   @offset 0x9E8
   @record 0x4C8
@@ -176,6 +176,7 @@ defmodule MirrorWeb.WizardPanel do
             {name, value} <- Enum.zip(@globals, :binary.bin_to_list(globals)),
             do: {name, value != 0}
           ),
+        heroes: Heroes.for_wizard(raw, record),
         candidates: for(<<n::little-16 <- candidates>>, n in 1..214//1, do: n),
         library: :binary.bin_to_list(binary_part(library, 0, 214)),
         spells: known_by_realm(library),
