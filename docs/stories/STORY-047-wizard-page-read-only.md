@@ -56,5 +56,9 @@ Kevin ran the current build (the Docker image from `main` at `7eb62f2`, with `IT
 edited a hero, set the researching spell, added spells and set a global or two on the page and looked at the results in the game (STORY-049, 051, 053 and 056 features; no numbers were recorded, so the real-game
 results written in those stories are still the ones from the vault checkpoints).
 
-Not reported: the page's colours against the map's flags. (Earlier notes in this story asked for a phone-width and light-theme check; Mirror is a desktop tool with one theme, so that requirement is dropped.) The remaining nice-to-haves are unchanged: the portrait is an id, the summoning-circle link does not centre the map,
-and there is no wizard link in the map page header.
+Not reported: the page's colours against the map's flags. (Earlier notes in this story asked for a phone-width and light-theme check; Mirror is a desktop tool with one theme, so that requirement is dropped.) The portrait is still only an id.
+
+## Follow-up (2026-10-15)
+
+The summoning-circle link now opens the map with `?x=..&y=..`, and the map zooms to 200% and centres on that tile (`center_tile` event, `centerOnTile` in
+`assets/js/view_click.mjs`, tested with Node). The map header has a link to each wizard in the save (by name) once a save is loaded. Left: the portrait.

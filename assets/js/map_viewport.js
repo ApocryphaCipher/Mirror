@@ -7,7 +7,7 @@
 // keeps tiles crisp, and MapCanvas's hover picking keeps working because it
 // reads the transformed bounding rect.
 
-import {tileAtViewportPoint} from "./view_click.mjs"
+import {centerOnTile, tileAtViewportPoint} from "./view_click.mjs"
 
 const ZOOM_LEVELS = [0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25, 1.5, 2, 3, 4]
 const DRAG_THRESHOLD_PX = 3
@@ -67,6 +67,9 @@ const MapViewport = {
       this.editing = payload.mode === "edit"
     })
 
+    // `?x=..&y=..` on the map URL: zoom in and centre on that tile.
+    this.handleEvent("center_tile", ({x, y}) => this.centerOn(x, y))
+
     this.el.addEventListener("wheel", event => this.onWheel(event), {passive: false})
     this.el.addEventListener("pointerdown", event => this.onPointerDown(event))
     this.el.addEventListener("pointermove", event => this.onPointerMove(event))
@@ -124,6 +127,23 @@ const MapViewport = {
     this.ty = (this.el.clientHeight - height * this.scale) / 2
     this.userZoomed = false
     this.apply()
+  },
+
+  centerOn(x, y) {
+    const tileSize = parseInt(this.canvas.dataset.tileSize || "12", 10)
+    this.scale = 2
+    const {tx, ty} = centerOnTile({
+      x,
+      y,
+      scale: this.scale,
+      tileSize,
+      viewWidth: this.el.clientWidth,
+      viewHeight: this.el.clientHeight,
+    })
+    this.tx = tx
+    this.ty = ty
+    this.userZoomed = true
+    this.clampAndApply()
   },
 
   // Step to the next zoom level up/down, keeping the point under `anchor`

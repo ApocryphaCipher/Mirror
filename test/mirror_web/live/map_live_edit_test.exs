@@ -79,6 +79,33 @@ defmodule MirrorWeb.MapLiveEditTest do
   end
 
   describe "view mode" do
+    test "?x and ?y centre the view on that tile; bad values are ignored", %{
+      conn: conn,
+      save: save
+    } do
+      {:ok, view, _} = live(conn, ~p"/arcanus")
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+
+      {:ok, centred, _} = live(conn, ~p"/arcanus?x=38&y=21")
+      assert_push_event(centred, "center_tile", %{x: 38, y: 21})
+
+      {:ok, bad, _} = live(conn, ~p"/arcanus?x=99&y=abc")
+      refute_push_event(bad, "center_tile", _)
+    end
+
+    test "the header links to each wizard in the save once it is loaded", %{
+      conn: conn,
+      save: save
+    } do
+      # the synthetic save has no wizards: give record 0 the name Jafar
+      File.write!(save, put_bytes(File.read!(save), 0x9E8 + 1, "Jafar" <> <<0>>))
+
+      {:ok, view, _} = live(conn, ~p"/arcanus")
+      refute has_element?(view, "#map-wizard-nav")
+      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      assert has_element?(view, "#map-wizard-nav a[href='/wizard/1']")
+    end
+
     test "ignores paint and wheel input", %{conn: conn, save: save} do
       {:ok, view, _} = live(conn, ~p"/arcanus")
       view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})

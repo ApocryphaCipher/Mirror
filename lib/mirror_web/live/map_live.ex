@@ -146,6 +146,18 @@ defmodule MirrorWeb.MapLive do
        |> push_patch(to: map_path(socket.assigns.plane), replace: true)}
     else
       handle_edit_params(requested, assign(socket, :fresh_mount, not connected?(socket)))
+      |> center_on_tile(params)
+    end
+  end
+
+  # `?x=..&y=..` (the wizard page's summoning-circle link) centres the view on that tile.
+  defp center_on_tile({:noreply, socket}, params) do
+    with true <- connected?(socket),
+         {x, ""} when x in 0..59//1 <- Integer.parse(params["x"] || ""),
+         {y, ""} when y in 0..39//1 <- Integer.parse(params["y"] || "") do
+      {:noreply, push_event(socket, "center_tile", %{x: x, y: y})}
+    else
+      _ -> {:noreply, socket}
     end
   end
 
@@ -1655,6 +1667,20 @@ defmodule MirrorWeb.MapLive do
                   aria-current={plane == @plane && "page"}
                 >
                   {plane_name(plane)}
+                </.link>
+              </nav>
+              <nav
+                :if={@state.save}
+                id="map-wizard-nav"
+                class="flex items-center gap-1 text-sm"
+                aria-label="Wizards"
+              >
+                <.link
+                  :for={{id, name} <- MirrorWeb.WizardPanel.wizards(@state.save.raw)}
+                  navigate={~p"/wizard/#{id}"}
+                  class="rounded-full border border-white/10 px-3 py-1 text-slate-300 hover:text-white"
+                >
+                  {name}
                 </.link>
               </nav>
               <span class="truncate text-sm text-slate-400">
