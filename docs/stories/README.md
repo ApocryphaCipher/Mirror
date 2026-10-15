@@ -44,7 +44,7 @@
 - [STORY-044](STORY-044-bug-stale-overlays-across-tabs.md): **bug**: cities/units/sites overlays go stale on cross-tab save updates (EPIC-004) **Fixed**
 - [STORY-045](STORY-045-enchanted-road-shimmer.md): enchanted roads shimmer on the overlay clock, frame `step mod 6` like the game (EPIC-005) **Done**
 - [STORY-046](STORY-046-tower-of-wizardry-lit-look.md): what clearing a Tower of Wizardry changes, and its lit look (EPIC-004); what clearing writes is decoded, the lit picture is not yet compared with the game
-- [STORY-047](STORY-047-wizard-page-read-only.md): the `/wizard/:id` page, read-only, with the flag-colour gradient (EPIC-009) **Built, merged; the comparison with the game's Info, Magic and Research screens was still pending in the last handoff**
+- [STORY-047](STORY-047-wizard-page-read-only.md): the `/wizard/:id` page, read-only, with the flag-colour gradient (EPIC-009) **Built, merged and checked against the game by Kevin (2026-10-15); phone width and the light theme not reported**
 - [STORY-048](STORY-048-wizard-basics-editing.md): edit a wizard's gold, mana, fame, name, books and retorts (EPIC-009) **Built, checked in the real game; merged**
 - [STORY-049](STORY-049-wizard-spells-and-research.md): the spell library and what is being researched (EPIC-009) **Built, checked in the real game; merged**
 - [STORY-050](STORY-050-wizard-relations.md): relations between wizards, peace/war/attitude (EPIC-009) **Built and checked in the real game (2026-10-13); merged**
