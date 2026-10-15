@@ -109,6 +109,20 @@ defmodule Mirror.SaveFile.Items do
 
   def vault(_raw, _record), do: []
 
+  @doc """
+  The four places of wizard `record`'s vault in order, an item index or `nil` for an empty place (`-1` in the save).
+  Moving an item needs the place, not just the list: `vault/2` leaves the empty ones out.
+  """
+  @spec vault_places(binary(), non_neg_integer()) :: [non_neg_integer() | nil]
+  def vault_places(raw, record)
+      when is_binary(raw) and record in 0..4//1 and
+             byte_size(raw) >= @wizard_offset + (record + 1) * @wizard_record do
+    at = @wizard_offset + record * @wizard_record + @vault_at
+    for <<i::little-signed-16 <- binary_part(raw, at, 8)>>, do: if(i >= 0, do: i)
+  end
+
+  def vault_places(_raw, _record), do: []
+
   @doc "The Create Artifact screen's type name for a type code (0 Sword to 9 Plate), or `nil`."
   @spec type_name(integer()) :: String.t() | nil
   def type_name(type) when type in 0..9//1, do: Enum.at(@types, type)

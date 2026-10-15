@@ -545,4 +545,68 @@ defmodule MirrorWeb.WizardPanelTest do
                "Edited item Staff of Zap: name Rod, movement 3.5, spell skill 9, powers"
     end
   end
+
+  describe "moving items" do
+    defp moving_save do
+      Mirror.WizardFixture.synthetic()
+      |> Mirror.WizardFixture.with_hero([1, 2, -1])
+      |> Mirror.WizardFixture.with_items(
+        %{
+          1 => {"Sword", 0, 1, 100, [0, 0, 0, 0, 0, 0, 0, 0], 0, 0},
+          2 => {"Shield", 7, 5, 100, [0, 0, 1, 0, 0, 0, 0, 0], 0, 0},
+          3 => {"Amulet", 6, 6, 100, [0, 0, 0, 0, 0, 0, 0, 0], 0, 0},
+          9 => {"Spare Shield", 7, 5, 100, [0, 0, 2, 0, 0, 0, 0, 0], 0, 0}
+        },
+        0,
+        [9, 3]
+      )
+    end
+
+    setup do
+      %{d: WizardPanel.details(moving_save(), 1)}
+    end
+
+    defp held(d, index),
+      do: Enum.find(Enum.flat_map(d.heroes, & &1.item_list) ++ d.vault, &(&1.index == index))
+
+    test "finds where an item is", %{d: d} do
+      assert WizardPanel.item_place(d, 1) == {:hero, 0, 0}
+      assert WizardPanel.item_place(d, 2) == {:hero, 0, 1}
+      assert WizardPanel.item_place(d, 9) == {:vault, 0}
+      assert WizardPanel.item_place(d, 3) == {:vault, 1}
+      assert WizardPanel.item_place(d, 77) == nil
+    end
+
+    test "offers the vault and the hero's empty places of the item's own kind", %{d: d} do
+      # the amulet (slot 6) fits the hero's empty third place; the vault is where it is, so not offered
+      assert WizardPanel.item_moves(d, held(d, 3)) == [{"hero:0:2", "Harold (misc)"}]
+
+      # the sword and the shield are carried: only the vault has room (a hero's matching place is taken)
+      assert WizardPanel.item_moves(d, held(d, 1)) == [{"vault:2", "the vault"}]
+      assert WizardPanel.item_moves(d, held(d, 2)) == [{"vault:2", "the vault"}]
+      # the spare shield (slot 5) has no free armor place on the hero
+      assert WizardPanel.item_moves(d, held(d, 9)) == []
+    end
+
+    test "a full vault is not offered", %{d: d} do
+      full = %{d | vault_places: [9, 3, 5, 6]}
+      assert WizardPanel.item_moves(full, held(d, 1)) == []
+    end
+
+    test "reads the move form and refuses what it cannot read", %{d: d} do
+      assert WizardPanel.move_request(d, 3, "hero:0:2") == {:ok, {{:vault, 1}, {:hero, 0, 2}}}
+      assert WizardPanel.move_request(d, 1, "vault:2") == {:ok, {{:hero, 0, 0}, {:vault, 2}}}
+      assert WizardPanel.move_request(d, 77, "vault:2") == {:error, :no_such_item}
+      assert WizardPanel.move_request(d, 1, "vault:x") == {:error, :bad_move}
+      assert WizardPanel.move_request(d, 1, "hero:0") == {:error, :bad_move}
+      assert WizardPanel.move_request(d, 1, "elsewhere") == {:error, :bad_move}
+      assert WizardPanel.move_request(d, 1, nil) == {:error, :bad_move}
+    end
+
+    test "the label names the item and where it goes", %{d: d} do
+      assert WizardPanel.move_label(d, held(d, 3), {:hero, 0, 2}) == "Moved Amulet to Harold"
+      assert WizardPanel.move_label(d, held(d, 1), {:vault, 2}) == "Moved Sword to the vault"
+      assert WizardPanel.error_message(:wrong_slot) =~ "place of its own kind"
+    end
+  end
 end

@@ -78,6 +78,30 @@ defmodule MirrorWeb.WizardLive do
     end
   end
 
+  # Move an item between this wizard's hero places and his vault (STORY-056). The source is read from the save, the
+  # form only names the destination.
+  def handle_event("item_move", %{"index" => index, "to" => to}, socket) do
+    with {index, ""} <- Integer.parse(index) do
+      held = fn details -> Enum.find(held_items(details), &(&1.index == index)) end
+
+      changes_for = fn details ->
+        with {:ok, move} <- WizardPanel.move_request(details, index, to), do: {:ok, [move: move]}
+      end
+
+      write = fn raw, details, [move: {from, to}] ->
+        Structures.move_item(raw, details.record, from, to)
+      end
+
+      label = fn details, [move: {_from, to}] ->
+        WizardPanel.move_label(details, held.(details), to)
+      end
+
+      {:noreply, apply_edit(socket, changes_for, write, label)}
+    else
+      _ -> {:noreply, socket}
+    end
+  end
+
   # "Learn every spell of a realm": the common edit, applied at once.
   def handle_event("learn_realm", %{"realm" => realm}, socket) do
     case Enum.find(Spells.realms(), &(Atom.to_string(&1) == realm)) do
@@ -144,12 +168,19 @@ defmodule MirrorWeb.WizardLive do
     |> assign(:wizards, WizardPanel.wizards(raw))
     |> assign(:spell_table, spell_table())
     |> assign(:powers, powers())
+    |> assign(:moves, moves(details))
     |> assign(:spell_rows, spell_rows(details))
     |> assign(:page_title, if(details, do: details.name, else: "Wizard"))
   end
 
   defp spell_rows(nil), do: []
   defp spell_rows(details), do: WizardPanel.spell_rows(details, spell_table())
+
+  # `index => [{value, label}]` of where each held item could go (see `WizardPanel.item_moves/2`).
+  defp moves(nil), do: %{}
+
+  defp moves(details),
+    do: Map.new(held_items(details), &{&1.index, WizardPanel.item_moves(details, &1)})
 
   defp powers do
     case ItemPowers.table() do
@@ -630,6 +661,7 @@ defmodule MirrorWeb.WizardLive do
                   prefix={"wizard-hero-#{h.slot}-item"}
                   editing={@editing}
                   powers={@powers}
+                  moves={@moves}
                 />
                 <form
                   :if={@editing}
@@ -700,6 +732,7 @@ defmodule MirrorWeb.WizardLive do
               prefix="wizard-vault-item"
               editing={@editing}
               powers={@powers}
+              moves={@moves}
             />
           </section>
 
@@ -747,6 +780,7 @@ defmodule MirrorWeb.WizardLive do
   attr :prefix, :string, required: true
   attr :editing, :boolean, default: false
   attr :powers, :any, default: nil
+  attr :moves, :map, default: %{}
 
   defp item_list(assigns) do
     ~H"""
@@ -828,6 +862,31 @@ defmodule MirrorWeb.WizardLive do
             class="rounded-lg bg-emerald-300 px-3 py-1 text-xs font-semibold text-slate-950 hover:bg-emerald-200"
           >
             Apply
+          </button>
+        </form>
+        <form
+          :if={@editing and Map.get(@moves, item.index, []) != []}
+          id={"wizard-item-move-#{item.index}"}
+          phx-submit="item_move"
+          class="mt-2 flex items-end gap-2"
+        >
+          <input type="hidden" name="index" value={item.index} />
+          <label class="text-xs text-slate-400">
+            Move to
+            <select
+              name="to"
+              class="mt-1 block rounded bg-slate-900 px-2 py-1 text-sm text-white"
+            >
+              <option :for={{value, label} <- Map.fetch!(@moves, item.index)} value={value}>
+                {label}
+              </option>
+            </select>
+          </label>
+          <button
+            type="submit"
+            class="rounded-lg border border-emerald-300/50 px-3 py-1 text-xs text-emerald-100 hover:border-emerald-200"
+          >
+            Move
           </button>
         </form>
       </li>

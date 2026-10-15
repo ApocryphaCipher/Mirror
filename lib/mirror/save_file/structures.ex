@@ -797,6 +797,85 @@ defmodule Mirror.SaveFile.Structures do
     end
   end
 
+  @vault_at 0x120
+  @vault_places 4
+
+  @typedoc "Where an item is kept: a hero's item place (the list entry `slot` 0 to 5, `place` 0 to 2) or a vault place 0 to 3."
+  @type item_place :: {:hero, 0..5, 0..2} | {:vault, 0..3}
+
+  @doc """
+  Moves the item at `from` to the empty place `to` in wizard `record`'s own hero list and vault (STORY-056): an item
+  index is written into the target and `-1` into the source. Nothing else changes; the item record is untouched.
+
+  A hero's place has a **slot type** (`+22` of his list entry: 1 melee weapon, 2 bow, 4 staff or wand, 5 armor, 6 misc),
+  and the item's slot code (`+32` of its record) has to equal it. *Guess:* the game relies on that match
+  (the Items screen puts an item in a slot of its own kind); not seen what it does with a mismatch, so it is refused.
+
+  Refused: a wizard that does not exist (`:no_such_wizard`), nothing at `from` (`:no_item_there`), a hero that is
+  not in the list (`:no_such_hero`), an occupied target (`:place_taken`), a hero place of another kind
+  (`:wrong_slot`) and the same place twice (`:same_place`). A swap is two moves through a free place.
+  """
+  @spec move_item(binary(), non_neg_integer(), item_place(), item_place()) :: result()
+  def move_item(raw, record, from, to) do
+    with :ok <- check_wizard(raw, record),
+         {:ok, from_at} <- place_at(raw, record, from),
+         {:ok, to_at} <- place_at(raw, record, to),
+         :ok <- if(from_at == to_at, do: {:error, :same_place}, else: :ok),
+         <<item::little-signed-16>> = binary_part(raw, from_at, 2),
+         :ok <- if(item >= 0, do: :ok, else: {:error, :no_item_there}),
+         :ok <- item_in_use(raw, item),
+         <<target::little-signed-16>> = binary_part(raw, to_at, 2),
+         :ok <- if(target < 0, do: :ok, else: {:error, :place_taken}),
+         :ok <- slot_fits(raw, record, to, item) do
+      raw =
+        raw
+        |> put(to_at, <<item::little-signed-16>>)
+        |> put(from_at, <<-1::little-signed-16>>)
+
+      {:ok, raw, %{moved: item, from: from, to: to}}
+    end
+  end
+
+  defp check_wizard(raw, record) do
+    if record in 0..4//1 and byte_size(raw) >= @hero_wizards + 5 * @hero_wizard_size and
+         :binary.at(raw, @hero_wizards + record * @hero_wizard_size + 1) != 0,
+       do: :ok,
+       else: {:error, :no_such_wizard}
+  end
+
+  # The byte offset of the i16 that holds the item index for a place; a hero place needs a hero in that entry.
+  defp place_at(raw, record, {:hero, slot, place})
+       when slot in 0..5//1 and place in 0..2//1 do
+    entry = @hero_wizards + record * @hero_wizard_size + @hero_list_at + slot * @hero_entry
+
+    case binary_part(raw, entry, 2) do
+      <<unit::little-signed-16>> when unit >= 0 -> {:ok, entry + 16 + place * 2}
+      _ -> {:error, :no_such_hero}
+    end
+  end
+
+  defp place_at(_raw, record, {:vault, place}) when place in 0..(@vault_places - 1)//1,
+    do: {:ok, @hero_wizards + record * @hero_wizard_size + @vault_at + place * 2}
+
+  defp place_at(_raw, _record, _place), do: {:error, :no_item_there}
+
+  defp item_in_use(raw, item) when item < @item_count do
+    if :binary.at(raw, @item_block + item * @item_record) != 0,
+      do: :ok,
+      else: {:error, :no_item_there}
+  end
+
+  defp item_in_use(_raw, _item), do: {:error, :no_item_there}
+
+  defp slot_fits(_raw, _record, {:vault, _}, _item), do: :ok
+
+  defp slot_fits(raw, record, {:hero, slot, place}, item) do
+    entry = @hero_wizards + record * @hero_wizard_size + @hero_list_at + slot * @hero_entry
+    <<type::little-signed-16>> = binary_part(raw, entry + 22 + place * 2, 2)
+    item_slot = :binary.at(raw, @item_block + item * @item_record + 32)
+    if type == item_slot, do: :ok, else: {:error, :wrong_slot}
+  end
+
   defp item_edits(changes) do
     Enum.reduce_while(changes, {:ok, []}, fn {field, value}, {:ok, acc} ->
       case item_value(field, value) do
