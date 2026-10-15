@@ -52,6 +52,14 @@ defmodule Mirror.GameFiles do
       required: false,
       used_for: "spell names, realms and costs (the wizard page)",
       sha256: "428e1fd02698ae0c1d5f48b753bb155df271f5bec10e65d32cd8ec1807926844"
+    },
+    # No hash yet: Kevin's GOG copy of the small ITEM* files is not on the machine this was added from, and two
+    # other copies differ in five records. Until one is hashed the import reports it as unverified (a warning).
+    %{
+      name: "ITEMPOW.LBX",
+      required: false,
+      used_for: "item power names (artifacts)",
+      sha256: nil
     }
   ]
 

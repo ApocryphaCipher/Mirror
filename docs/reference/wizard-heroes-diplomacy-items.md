@@ -142,7 +142,7 @@ free is not yet read.
   items), so "the premade items" depends on which game files a save was made with.
 - **`ITEMPOW.LBX`**: one entry, 67 records of 30 bytes: the **item powers** ("+1 Attack" to "Spell Charges"). A record is a name
   (22 bytes), then a kind (u8), a realm (u8), an amount (u8), a pad, and a **u32 ability mask**. The item's abilities are the OR of
-  its powers' masks.
+  its powers' masks. **Read by `Mirror.ItemPowers`** (2026-10-15; 66 named powers, the 67th record is empty): the stat powers have a zero mask (they are the item's stat bytes), the special powers one bit each. On SAVE2 the mask of "Plate of Enduring Immunity" (`0x82000`) comes out as Magic Immunity and Endurance, Mae Govannon's (`0x4`) as Lightning, Protection of Ramses' (`0x2008`) as Cloak of Fear and Endurance.
 
 **Checked against `ITEMMAKE.EXE` itself (Kevin ran it, 2026-10-12, 14 screenshots, item numbers 1, 15, 25, 31, 37, 45, 50, 53, 58, 62,
 65, 76, 85 and 95):** the program's "Item #n" is `ITEMDATA` record n − 1, and for **every one of the 14** the program's name,

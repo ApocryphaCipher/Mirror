@@ -17,7 +17,7 @@ Unsorted, not yet promoted to a story.
   still only on [Kevin](https://github.com/KevinAsbury)'s Drive, not in `~/.mirror_assets/GOG`. Mirror doesn't
   read any of them (see `Mirror.GameFiles.manifest/0`), so this only matters
   for exploring them in `/tile-probe`. `mix mirror.import_game` only copies
-  the five manifest LBX files; to explore extra files, point `MIRROR_MOM_PATH`
+  the manifest's LBX files; to explore extra files, point `MIRROR_MOM_PATH`
   directly at the complete install folder or copy the additional LBX files into
   `~/.mirror/game` manually.
 - ~~Decode `TERRTYPE.LBX` properly~~ — replaced by porting kazzmir's terrain tile table, completing phase 1 of [stories/STORY-017-terrain-editing-autotile.md](stories/STORY-017-terrain-editing-autotile.md).
