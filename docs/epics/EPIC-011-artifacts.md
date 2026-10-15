@@ -1,6 +1,6 @@
 # EPIC-011: Artifacts
 
-**Status:** proposed (2026-10-12), nothing built
+**Status:** in progress (2026-10-15): STORY-054 mostly done (decoder `Mirror.SaveFile.Items`); showing and editing not started
 **Owner:** [Kevin](https://github.com/KevinAsbury)
 **Requested:** 2026-10-12, split out of EPIC-009 (wizard editing): artifacts (magic items) get their own epic.
 

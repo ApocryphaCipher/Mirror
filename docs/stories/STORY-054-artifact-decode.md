@@ -1,7 +1,7 @@
 # STORY-054: Decode artifacts
 
 **Parent:** [EPIC-011](../epics/EPIC-011-artifacts.md)
-**Status:** open (2026-10-12). The item block is located and its record read (see below); the codes are not mapped.
+**Status:** mostly done (2026-10-15): `Mirror.SaveFile.Items` decodes the item block, a hero's and a vault's items; a lair's `+18..+22` turned out not to be item indexes. Not done: the power names (`ITEMPOW.LBX` is not in the manifest), the premade-table tail, and a check against the game's own screen. *Original note:* open (2026-10-12). The item block is located and its record read (see below); the codes are not mapped.
 **Size:** large
 **Raised by:** [Kevin](https://github.com/KevinAsbury), 2026-10-12
 
@@ -22,3 +22,17 @@ one from a lair) read through the DOSBox fork. Mark every guess as a guess.
 
 `docs/reference/` has the layout; a decoder in `Mirror.SaveFile` returns the items of a real save and agrees with what
 the game shows for at least one hero and one lair.
+
+## Built (2026-10-15)
+
+`Mirror.SaveFile.Items`: `parse/1` (the items in use), `get/2`, `for_indexes/2`, `vault/2`, `type_name/1`, `slot_name/1`. The record layout and the type and slot codes are the ones
+already written in [wizard-heroes-diplomacy-items.md](../reference/wizard-heroes-diplomacy-items.md) (checked against `ITEMMAKE.EXE` on 14 premade items); a free slot is a record with an
+empty name. Read on `SAVE2.GAM` (no game session): five items, and Sir Harold's two (Mae Govannon, Plate of Enduring Immunity) and Jafar's vault item (Protection of Ramses) resolve to
+real items with sensible type and slot names.
+
+**Found on the way: a lair's three numbers are not item indexes.** The encounter record's `+18`, `+20`, `+22` (counted by `+16`) hold values from 360 up to 2400 in 22 saves and none is a
+position in the item block (1 to 137). So the lair panel's "items" are *not* items in the save. *Guess:* they are the worth of the item the game rolls when the lair is cleared;
+confirm by clearing a lair with a known value and reading the item the game makes. This corrects the old line that a lair's item ids point into the block.
+
+Open: the **power names** (`ITEMPOW.LBX` is not in `Mirror.GameFiles.manifest/0`; adding it needs Kevin's say-so, so `abilities` stays a mask for now), the 6-byte tail of a premade record,
+how many items a hero may hold at once (three entries in the list), and a comparison with the game's own item screens.

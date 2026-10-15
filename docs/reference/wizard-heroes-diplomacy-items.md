@@ -111,7 +111,7 @@ So the game decides "banished" from the **fortress active byte** (`0x65F8 + 4 ×
 ## The item block: `0x6fb8`, 138 × 50 bytes
 
 Right after the encounters (`0x6628 + 102 × 24`) and right before the cities (`0x8aac`), so the sum checks: `0x6fb8 + 138 × 50 = 0x8aac`.
-Item indexes everywhere in the save (a hero's three, the vault's four, a lair's `+18..+22`) are positions in this array.
+Item indexes in the save (a hero's three, the vault's four) are positions in this array. **A lair's `+18..+22` are not** (2026-10-15, STORY-054): in 22 saves they hold 360, 520, 1200 and so on, up to 2400, never a value in 1 to 137, and there is one per counted item. *Guess:* the value the item rolled when the lair is cleared may be worth. The lair's reward is made at clearing (see STORY-020), so the lair never holds an item record before that.
 
 | In record | Field |
 | --- | --- |
@@ -123,7 +123,7 @@ Item indexes everywhere in the save (a hero's three, the vault's four, a lair's 
 | `+44` | charges (u16) |
 | `+46` | abilities (u32 bit mask) |
 
-**SAVE2:** index 1 is "Mae Govannon" (cost 1200, +1 to hit) and index 2 "Protection of Ramses" (cost 2100, +6 defense, +8 resistance,
+**Free slot** (2026-10-15): a record with an empty name; `Mirror.SaveFile.Items` skips it (SAVE2 has one such record, index 13, with leftover bytes in it). **SAVE2:** index 1 is "Mae Govannon" (cost 1200, +1 to hit) and index 2 "Protection of Ramses" (cost 2100, +6 defense, +8 resistance,
 a sword and a shield by name), the two items the heroes and the vault point at. A save always has 138 slots; how a slot is marked
 free is not yet read.
 

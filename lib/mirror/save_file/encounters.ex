@@ -11,7 +11,9 @@ defmodule Mirror.SaveFile.Encounters do
   guard slots (`+5` type, `+6` count byte; `+7` type, `+8` count byte), `+9` unknown,
   `+10` gold and `+12` mana (i16), `+14` a spell-reward code (0 to 6 in every save; what the
   codes mean is not decoded), `+15` flags (who has looked at it: not decoded), `+16` the item
-  count and `+18`, `+20`, `+22` three item ids (i16). A guard's count byte holds two nibbles: the low
+  count and `+18`, `+20`, `+22` three i16 that are **not item indexes**: in 22 saves they read 360, 520, 1200 ...
+  up to 2400, never a position in the item block (STORY-054; *guess:* the value the item rolled at clearing may be worth). The
+  field is still called `items` here. A guard's count byte holds two nibbles: the low
   one is the guards left, the high one the starting count (checked in the game,
   live-ram-map.md). An empty guard slot is type 0, count 0 in all 247 empty slots seen.
   """
