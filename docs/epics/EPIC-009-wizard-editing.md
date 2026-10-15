@@ -1,6 +1,6 @@
 # EPIC-009: Wizard editing: a page per wizard
 
-**Status:** in progress (2026-10-12): STORY-047, 048, 049 and 050 built; 051 (global enchantments) edit not started
+**Status:** in progress (2026-10-12): STORY-047, 048, 049 and 050 built; 051 (global enchantments) built 2026-10-15
 **Owner:** [Kevin](https://github.com/KevinAsbury)
 **Requested:** 2026-10-12. Kevin: a `/wizard/:id` page that shows a wizard's information and lets you edit
 gold, mana, fame and special abilities (retorts); a relationship editor; the global enchantments, with the

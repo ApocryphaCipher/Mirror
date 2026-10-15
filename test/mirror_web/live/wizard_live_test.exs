@@ -111,6 +111,30 @@ defmodule MirrorWeb.WizardLiveTest do
       assert undone.save.raw == before.save.raw
     end
 
+    test "a global enchantment is ticked in the form; Time Stop's box is disabled",
+         %{conn: conn, sid: sid} do
+      load_save(sid)
+      {:ok, view, _} = live(conn, ~p"/wizard/1")
+      view |> element("#wizard-edit-toggle") |> render_click()
+
+      assert has_element?(view, "input[name='wizard[globals][3]'][checked]")
+      assert has_element?(view, "input[name='wizard[globals][6]'][disabled]")
+
+      # Nature Awareness (7) ticked; the form's own ticked boxes (3, 18) are merged in by the test helper
+      # (unticking is covered by the WizardPanel tests)
+      submit(view, %{"globals_present" => "1", "globals" => %{"7" => "on"}})
+
+      assert has_element?(view, "#wizard-note", "global enchantments")
+      assert render(view) =~ "Nature Awareness"
+      assert has_element?(view, "#wizard-globals li", "Aura of Majesty")
+      assert has_element?(view, "#wizard-globals li", "Just Cause")
+
+      raw = SessionStore.get(sid).save.raw
+
+      assert binary_part(raw, 0x9E8 + 0x482, 24) ==
+               for(i <- 0..23, into: <<>>, do: <<if(i in [3, 7, 18], do: 1, else: 0)>>)
+    end
+
     test "a bad value is refused with the reason and changes nothing", %{conn: conn, sid: sid} do
       load_save(sid)
       {:ok, view, _} = live(conn, ~p"/wizard/1")

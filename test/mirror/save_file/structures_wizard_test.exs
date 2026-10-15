@@ -185,4 +185,30 @@ defmodule Mirror.SaveFile.StructuresWizardTest do
       end
     end
   end
+
+  test "globals are written as 0/1 bytes at +0x482 and nothing else; Time Stop must stay as it is" do
+    raw = WizardFixture.synthetic()
+    # the fixture has Aura of Majesty (3) and Just Cause (18) on
+    wanted = for i <- 0..23, do: i in [3, 7, 9]
+
+    assert {:ok, new, %{changed: [:globals]}} = Structures.edit_wizard(raw, 0, globals: wanted)
+
+    assert read(new, 0, 0x482, 24) ==
+             for(on <- wanted, into: <<>>, do: <<if(on, do: 1, else: 0)>>)
+
+    assert read(new, 0, 0, 0x482) == read(raw, 0, 0, 0x482)
+
+    assert read(new, 0, 0x482 + 24, @size - 0x482 - 24) ==
+             read(raw, 0, 0x482 + 24, @size - 0x482 - 24)
+
+    assert read(new, 1, 0, @size) == read(raw, 1, 0, @size)
+
+    assert Structures.edit_wizard(raw, 0, globals: List.replace_at(wanted, 6, true)) ==
+             {:error, :bad_globals}
+
+    assert Structures.edit_wizard(raw, 0, globals: [true]) == {:error, :bad_globals}
+
+    assert Structures.edit_wizard(raw, 0, globals: List.duplicate(1, 24)) ==
+             {:error, :bad_globals}
+  end
 end
