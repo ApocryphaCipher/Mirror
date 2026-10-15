@@ -735,6 +735,97 @@ defmodule Mirror.SaveFile.Structures do
   defp edit_hero_unit(raw, _unit, []), do: {:ok, raw, %{}}
   defp edit_hero_unit(raw, unit, changes), do: edit_unit(raw, unit, changes)
 
+  @item_block 0x6FB8
+  @item_record 50
+  @item_count 138
+  @item_name_max 26
+  # What the Create Artifact screen allows for each stat (the premade table's own maxima; the save keeps movement in
+  # half points, so its +4 is 8), and what the item record holds: cost u16, abilities u32.
+  @item_stat_max %{
+    attack: 6,
+    to_hit: 3,
+    defense: 6,
+    movement: 8,
+    resistance: 6,
+    spell_skill: 20,
+    spell_save: 4
+  }
+  # offsets in the 50-byte item record: stat bytes `+36..+42` in this order
+  @item_stat_at %{
+    attack: 36,
+    to_hit: 37,
+    defense: 38,
+    movement: 39,
+    resistance: 40,
+    spell_skill: 41,
+    spell_save: 42
+  }
+
+  @doc """
+  Edits the item at `index` (0 to #{@item_count - 1}) in place (STORY-056), wherever it is carried:
+
+    * `:name` (1 to #{@item_name_max} printable ASCII characters, the longest premade name is #{@item_name_max}; written NUL-padded to the record's 30 bytes)
+    * `:cost` (0 to 65535)
+    * `:attack` 0 to 6, `:to_hit` 0 to 3, `:defense` 0 to 6, `:movement` 0 to 8 (**half points**, so 8 is the screen's +4),
+      `:resistance` 0 to 6, `:spell_skill` 0 to 20, `:spell_save` 0 to 4: the Create Artifact screen's own limits
+    * `:abilities` (the u32 power mask, see `Mirror.ItemPowers`)
+
+  The charged spell, its charges, the icon, slot and type are not touched. The editor builds any combination the limits
+  allow: whether the game accepts powers that do not fit the item's type is not known (STORY-056).
+
+  Refused: an index with no item (`:no_such_item`: outside the block or a free slot), a bad value (`:bad_item_name`,
+  `:bad_item_cost`, `:bad_item_stat`, `:bad_item_abilities`) or an unknown field.
+  """
+  @spec edit_item(binary(), integer(), keyword()) :: result()
+  def edit_item(raw, index, changes) when is_list(changes) do
+    with true <-
+           (is_integer(index) and index in 0..(@item_count - 1)//1 and
+              byte_size(raw) >= @item_block + @item_count * @item_record) ||
+             {:error, :no_such_item},
+         at = @item_block + index * @item_record,
+         true <- :binary.at(raw, at) != 0 || {:error, :no_such_item},
+         {:ok, edits} <- item_edits(changes) do
+      raw =
+        Enum.reduce(edits, raw, fn
+          {:name, v}, acc -> put(acc, at, String.pad_trailing(v, 30, <<0>>))
+          {:cost, v}, acc -> put(acc, at + 34, <<v::little-16>>)
+          {:abilities, v}, acc -> put(acc, at + 46, <<v::little-32>>)
+          {stat, v}, acc -> put(acc, at + Map.fetch!(@item_stat_at, stat), <<v>>)
+        end)
+
+      {:ok, raw, %{changed: Keyword.keys(edits)}}
+    end
+  end
+
+  defp item_edits(changes) do
+    Enum.reduce_while(changes, {:ok, []}, fn {field, value}, {:ok, acc} ->
+      case item_value(field, value) do
+        :ok -> {:cont, {:ok, acc ++ [{field, value}]}}
+        {:error, _} = error -> {:halt, error}
+      end
+    end)
+  end
+
+  defp item_value(:name, v) when is_binary(v) and byte_size(v) in 1..@item_name_max//1 do
+    if String.match?(v, ~r/\A[\x20-\x7E]+\z/) and String.trim(v) != "",
+      do: :ok,
+      else: {:error, :bad_item_name}
+  end
+
+  defp item_value(:name, _), do: {:error, :bad_item_name}
+  defp item_value(:cost, v) when is_integer(v) and v in 0..65_535//1, do: :ok
+  defp item_value(:cost, _), do: {:error, :bad_item_cost}
+  defp item_value(:abilities, v) when is_integer(v) and v in 0..0xFFFFFFFF//1, do: :ok
+  defp item_value(:abilities, _), do: {:error, :bad_item_abilities}
+
+  defp item_value(stat, v) when is_map_key(@item_stat_max, stat) do
+    if is_integer(v) and v in 0..Map.fetch!(@item_stat_max, stat)//1,
+      do: :ok,
+      else: {:error, :bad_item_stat}
+  end
+
+  defp item_value(other, _), do: {:error, {:unknown_field, other}}
+
   @doc "One unit's fields; see `edit_units/3`."
   @spec edit_unit(binary(), non_neg_integer(), keyword()) :: result()
   def edit_unit(raw, index, changes), do: edit_units(raw, [index], changes)
