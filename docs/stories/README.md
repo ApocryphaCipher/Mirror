@@ -44,13 +44,13 @@
 - [STORY-044](STORY-044-bug-stale-overlays-across-tabs.md): **bug**: cities/units/sites overlays go stale on cross-tab save updates (EPIC-004) **Fixed**
 - [STORY-045](STORY-045-enchanted-road-shimmer.md): enchanted roads shimmer on the overlay clock, frame `step mod 6` like the game (EPIC-005) **Done**
 - [STORY-046](STORY-046-tower-of-wizardry-lit-look.md): what clearing a Tower of Wizardry changes, and its lit look (EPIC-004); what clearing writes is decoded, the lit picture is not yet compared with the game
-- [STORY-047](STORY-047-wizard-page-read-only.md): the `/wizard/:id` page, read-only, with the flag-colour gradient (EPIC-009) **Built, PR open; the game-screen check is pending**
-- [STORY-048](STORY-048-wizard-basics-editing.md): edit a wizard's gold, mana, fame, name, books and retorts (EPIC-009) **Built, checked in the real game; PR open**
-- [STORY-049](STORY-049-wizard-spells-and-research.md): the spell library and what is being researched (EPIC-009) **Built, checked in the real game; PR open**
-- [STORY-050](STORY-050-wizard-relations.md): relations between wizards, peace/war/attitude (EPIC-009) **Built and checked in the real game (2026-10-13); PR open**
-- [STORY-051](STORY-051-global-enchantments.md): global enchantments, see/add/remove (EPIC-009) **Decoded (real game, 2026-10-12); read-only list built, edit open**
-- [STORY-052](STORY-052-hero-list-decode-and-view.md): decode the hero list; show a wizard's heroes (EPIC-010) **Proposed**
-- [STORY-053](STORY-053-hero-editing.md): edit a hero: name, experience, owner, dismiss (EPIC-010) **Proposed**
-- [STORY-054](STORY-054-artifact-decode.md): decode artifacts: the item record and where items live (EPIC-011) **Proposed**
-- [STORY-055](STORY-055-artifacts-view.md): show artifacts on heroes, the wizard page and lair panels (EPIC-011) **Proposed**
-- [STORY-056](STORY-056-artifacts-editing.md): edit, move and create artifacts (EPIC-011) **Proposed**
+- [STORY-047](STORY-047-wizard-page-read-only.md): the `/wizard/:id` page, read-only, with the flag-colour gradient (EPIC-009) **Built, merged; the comparison with the game's Info, Magic and Research screens was still pending in the last handoff**
+- [STORY-048](STORY-048-wizard-basics-editing.md): edit a wizard's gold, mana, fame, name, books and retorts (EPIC-009) **Built, checked in the real game; merged**
+- [STORY-049](STORY-049-wizard-spells-and-research.md): the spell library and what is being researched (EPIC-009) **Built, checked in the real game; merged**
+- [STORY-050](STORY-050-wizard-relations.md): relations between wizards, peace/war/attitude (EPIC-009) **Built and checked in the real game (2026-10-13); merged**
+- [STORY-051](STORY-051-global-enchantments.md): global enchantments, see/add/remove (EPIC-009) **Built (2026-10-15): the globals are editable except Time Stop; merged**
+- [STORY-052](STORY-052-hero-list-decode-and-view.md): decode the hero list; show a wizard's heroes (EPIC-010) **Partly built (2026-10-15): the wizard page lists heroes; ability names, XP thresholds and units-panel rows open**
+- [STORY-053](STORY-053-hero-editing.md): edit a hero: name, experience, owner, dismiss (EPIC-010) **Partly built (2026-10-15): name, level, experience, damage; transfer, dismiss and add open**
+- [STORY-054](STORY-054-artifact-decode.md): decode artifacts: the item record and where items live (EPIC-011) **Mostly done (2026-10-15): the item block, a hero's and a vault's items and the power names are read; premade tail and game check of lair rewards open**
+- [STORY-055](STORY-055-artifacts-view.md): show artifacts on heroes, the wizard page and lair panels (EPIC-011) **Built and checked in the real game (2026-10-15)**
+- [STORY-056](STORY-056-artifacts-editing.md): edit, move and create artifacts (EPIC-011) **Edit in place and move within a wizard built and checked in the real game (2026-10-15); create, remove, other wizards and lair rewards open**
