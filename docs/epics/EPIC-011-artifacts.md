@@ -1,6 +1,6 @@
 # EPIC-011: Artifacts
 
-**Status:** in progress (2026-10-15): STORY-054 mostly done (decoder, power names); STORY-055 built and checked in the game (the wizard page shows hero items and the vault); STORY-056 first slice built and checked in the game (edit an item in place), move built and checked in the game, fill from the premade table and remove built (not yet checked in the game)
+**Status:** in progress (2026-10-15): STORY-054 mostly done (decoder, power names); STORY-055 built and checked in the game (the wizard page shows hero items and the vault); STORY-056 first slice built and checked in the game (edit an item in place), move built and checked in the game, fill from the premade table and remove built and checked in the game
 **Owner:** [Kevin](https://github.com/KevinAsbury)
 **Requested:** 2026-10-12, split out of EPIC-009 (wizard editing): artifacts (magic items) get their own epic.
 
