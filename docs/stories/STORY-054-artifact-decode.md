@@ -1,7 +1,7 @@
 # STORY-054: Decode artifacts
 
 **Parent:** [EPIC-011](../epics/EPIC-011-artifacts.md)
-**Status:** mostly done (2026-10-15): `Mirror.SaveFile.Items` decodes the item block, a hero's and a vault's items; a lair's `+18..+22` turned out not to be item indexes. Not done: the power names (`ITEMPOW.LBX` is not in the manifest), the premade-table tail, and a check against the game's own screen. *Original note:* open (2026-10-12). The item block is located and its record read (see below); the codes are not mapped.
+**Status:** mostly done (2026-10-15): `Mirror.SaveFile.Items` decodes the item block, a hero's and a vault's items; a lair's `+18..+22` turned out not to be item indexes. The power names are read by `Mirror.ItemPowers` (`ITEMPOW.LBX` is in the manifest, without a hash). Not done: the premade-table tail and a check against the game's own screen. *Original note:* open (2026-10-12). The item block is located and its record read (see below); the codes are not mapped.
 **Size:** large
 **Raised by:** [Kevin](https://github.com/KevinAsbury), 2026-10-12
 
