@@ -1,7 +1,7 @@
 # STORY-056: Edit, move and create artifacts
 
 **Parent:** [EPIC-011](../epics/EPIC-011-artifacts.md)
-**Status:** second slice built and checked in the real game (2026-10-15): items can be moved between a hero's places and the vault. First slice built and checked in the real game (2026-10-15): an item can be edited in place (name, cost, stats, special powers) from the wizard page, loaded and kept through one End Turn; move, create, remove and a lair's reward are not built. *Original note:* open (2026-10-12), after STORY-055
+**Status:** third slice built (2026-10-15): a hero's or the vault's place can be filled with a premade item or emptied, not yet loaded in the real game. Second slice built and checked in the real game (2026-10-15): items can be moved between a hero's places and the vault. First slice built and checked in the real game (2026-10-15): an item can be edited in place (name, cost, stats, special powers) from the wizard page, loaded and kept through one End Turn; move, create, remove and a lair's reward are not built. *Original note:* open (2026-10-12), after STORY-055
 **Size:** large
 
 ## What to do
@@ -71,3 +71,17 @@ the vault's first place to his armor place. Written to slot 8 (the previous slot
   So the game does not check an item's slot code against the place's slot type on display or over a turn. *Not tried:* whether the bonus counts, picking the item up with the mouse, or putting it back in play.
 
 Not built: giving an item to another wizard's hero or vault, create, remove, and a lair's reward.
+
+## Third slice built (2026-10-15): fill a place with a premade item, or empty it
+
+Kevin's design (2026-10-15): the game does not build artifacts from powers, it draws them from the premade table, so Mirror offers that table. In edit mode **every item place gets a drop-down**: a hero's three places (each
+lists the premade items whose slot code equals that place's slot type) and the vault's four (any premade item). "(keep what is there)", "(remove the item)" and "(empty)" are in the list too.
+
+- **The table is `ITEMDATA.LBX`**, 250 records of 56 bytes, read by `Mirror.ItemData` (now in the manifest, no hash; Kevin agreed to adding it). Two copies exist: `~/DOS/MAGIC` (rewritten by ITEMMAKE on 2026-10-12) and `~/DOS/MagicCom`
+  (2024); they differ only in the cost and the 6-byte tail of about 100 records, all stat bytes agree. The copy in `~/.mirror/game` is MagicCom's.
+- **A premade record stores movement as the screen shows it; a save stores half points**, so `ItemData.save_record/1` doubles it (Protection of Ramses: 4 here, 8 in a save).
+- `Structures.put_item/4` writes the 50-byte record: **over the record the place already holds** when nothing else points at it, else into **the first free record** (an empty name that no place points at) and the index into the place.
+  `Structures.clear_item/3` empties the place and **blanks the record** (50 zero bytes) when nothing else points at it. 138 records is the limit (`:no_free_item`).
+- **In a real save an empty hero slot is unit -1 but its three item places read 0**, not -1 (SAVE2). Counting those as references would make item 0 look shared, so only existing heroes' places count.
+- The game's own **free-record marker is unknown**: Mirror reads an empty name. A premade-items-still-available table the game keeps (kazzmir `loadPremadeItems`, 250 bytes, location not found) is **not** updated, so the game may later draw the same premade item again.
+- **Not loaded in the real game yet.**

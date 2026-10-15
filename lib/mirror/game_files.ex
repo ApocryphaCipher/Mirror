@@ -60,6 +60,13 @@ defmodule Mirror.GameFiles do
       required: false,
       used_for: "item power names (artifacts)",
       sha256: nil
+    },
+    # The same: no GOG hash on hand, and the copy in a played install can be rewritten by the game's own ITEMMAKE program.
+    %{
+      name: "ITEMDATA.LBX",
+      required: false,
+      used_for: "the premade items a hero's or the vault's place can be filled with",
+      sha256: nil
     }
   ]
 

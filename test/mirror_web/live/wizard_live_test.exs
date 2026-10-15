@@ -603,4 +603,121 @@ defmodule MirrorWeb.WizardLiveTest do
       assert SessionStore.get(sid).save.raw == raw
     end
   end
+
+  describe "filling and emptying item places" do
+    setup do
+      premade = [
+        %{
+          number: 7,
+          name: "Ring of Power",
+          slot: 6,
+          type: 6,
+          cost: 600,
+          icon: 4,
+          stats: <<0, 0, 2, 2, 2, 5, 0, 0>>,
+          charges: 0,
+          abilities: 0,
+          slot_name: "misc",
+          type_name: "Misc"
+        },
+        %{
+          number: 1,
+          name: "Black Asp",
+          slot: 1,
+          type: 0,
+          cost: 250,
+          icon: 3,
+          stats: <<1, 0, 0, 0, 0, 0, 0, 0>>,
+          charges: 0,
+          abilities: 0x200,
+          slot_name: "melee weapon",
+          type_name: "Sword"
+        }
+      ]
+
+      :persistent_term.put({Mirror.ItemData, :table}, premade)
+      on_exit(fn -> :persistent_term.erase({Mirror.ItemData, :table}) end)
+      :ok
+    end
+
+    defp load_places(sid) do
+      raw =
+        Mirror.WizardFixture.synthetic()
+        |> Mirror.WizardFixture.with_hero([1, 2, -1])
+        |> Mirror.WizardFixture.with_items(
+          %{
+            1 => {"Sword", 0, 1, 100, [0, 0, 0, 0, 0, 0, 0, 0], 0, 0},
+            2 => {"Shield", 7, 5, 100, [0, 0, 1, 0, 0, 0, 0, 0], 0, 0},
+            9 => {"Spare Shield", 7, 5, 100, [0, 0, 2, 0, 0, 0, 0, 0], 0, 0}
+          },
+          0,
+          [9]
+        )
+
+      SessionStore.put(sid, Mirror.SaveManager.normalize_state(%{save: %{raw: raw}}))
+    end
+
+    test "the forms show only in edit mode, each place with the choices of its kind", %{
+      conn: conn,
+      sid: sid
+    } do
+      load_places(sid)
+      {:ok, view, _} = live(conn, ~p"/wizard/1")
+      refute has_element?(view, "#wizard-place-hero-0-2")
+      view |> element("#wizard-edit-toggle") |> render_click()
+
+      assert has_element?(view, "#wizard-place-hero-0-2 option[value='item:7']", "Ring of Power")
+      refute has_element?(view, "#wizard-place-hero-0-2 option[value='item:1']")
+      assert has_element?(view, "#wizard-place-hero-0-0 option[value='item:1']", "Black Asp")
+      assert has_element?(view, "#wizard-place-vault-3 option[value='item:7']")
+      assert has_element?(view, "#wizard-place-vault-3 option[value='item:1']")
+    end
+
+    test "an empty place is filled, as one undo step, and emptied again", %{conn: conn, sid: sid} do
+      load_places(sid)
+      {:ok, view, _} = live(conn, ~p"/wizard/1")
+      view |> element("#wizard-edit-toggle") |> render_click()
+      before = SessionStore.get(sid)
+
+      view |> element("#wizard-place-hero-0-2") |> render_submit(%{"choice" => "item:7"})
+      assert has_element?(view, "#wizard-note", "Put Ring of Power in Harold")
+      assert has_element?(view, "#wizard-hero-0 li", "Ring of Power")
+
+      filled = SessionStore.get(sid)
+      assert length(filled.history.arcanus) == length(before.history.arcanus) + 1
+      {:ok, items} = Mirror.SaveFile.Items.parse(filled.save.raw)
+      # Ring of Power movement 2 as shown is stored as 4 half points
+      assert %{name: "Ring of Power", movement: 4, cost: 600, resistance: 2} =
+               Enum.find(items, &(&1.name == "Ring of Power"))
+
+      {undone, _} = Mirror.Editor.undo(filled, :arcanus)
+      assert undone.save.raw == before.save.raw
+
+      view |> element("#wizard-place-hero-0-2") |> render_submit(%{"choice" => "clear"})
+      assert has_element?(view, "#wizard-note", "Removed Ring of Power from Harold")
+      refute has_element?(view, "#wizard-hero-0 li", "Ring of Power")
+    end
+
+    test "keep changes nothing, a stale or wrong choice is refused in words", %{
+      conn: conn,
+      sid: sid
+    } do
+      load_places(sid)
+      {:ok, view, _} = live(conn, ~p"/wizard/1")
+      view |> element("#wizard-edit-toggle") |> render_click()
+      raw = SessionStore.get(sid).save.raw
+
+      view |> element("#wizard-place-hero-0-2") |> render_submit(%{"choice" => "keep"})
+      assert has_element?(view, "#wizard-note", "Nothing to change")
+
+      # a melee item for the misc place is refused by the save rules, not drawn from the page
+      render_hook(view, "place_set", %{"place" => "hero:0:2", "choice" => "item:1"})
+      assert has_element?(view, "#wizard-note", "place of its own kind")
+
+      render_hook(view, "place_set", %{"place" => "hero:0:2", "choice" => "item:999"})
+      assert has_element?(view, "#wizard-note", "no longer in the save")
+
+      assert SessionStore.get(sid).save.raw == raw
+    end
+  end
 end

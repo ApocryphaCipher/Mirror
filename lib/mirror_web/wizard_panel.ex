@@ -448,6 +448,113 @@ defmodule MirrorWeb.WizardPanel do
     end
   end
 
+  @doc """
+  Every place of the wizard's items, in page order: each hero's three (with the hero's name and the place's slot
+  type) and the four vault places. `key` is the form's name for the place (`"hero:SLOT:PLACE"` or `"vault:PLACE"`);
+  `item` is the item index there or `nil`.
+  """
+  @spec item_places(map()) :: [map()]
+  def item_places(details) do
+    heroes =
+      for h <- details.heroes, {item, place} <- Enum.with_index(h.item_places) do
+        %{
+          key: "hero:#{h.slot}:#{place}",
+          place: {:hero, h.slot, place},
+          hero: h.name,
+          slot_type: Enum.at(h.slot_types, place),
+          item: item
+        }
+      end
+
+    vault =
+      for {item, place} <- Enum.with_index(details.vault_places) do
+        %{key: "vault:#{place}", place: {:vault, place}, hero: nil, slot_type: nil, item: item}
+      end
+
+    heroes ++ vault
+  end
+
+  @doc """
+  The choices for one place's select, `{value, label}`: `"keep"` first (what is there now, or "empty"), then
+  `"clear"` for an occupied place, then `"item:N"` for each premade item whose slot code equals a hero place's slot
+  type (a vault place takes any). `premade` is `Mirror.ItemData.table/0`'s list; names come from the table.
+  """
+  @spec place_choices(map(), [map()]) :: [{String.t(), String.t()}]
+  def place_choices(%{item: item, slot_type: type}, premade) do
+    current = {"keep", if(item, do: "(keep what is there)", else: "(empty)")}
+
+    clear = if item, do: [{"clear", "(remove the item)"}], else: []
+
+    items =
+      for p <- Enum.sort_by(premade, &String.downcase(&1.name)),
+          is_nil(type) or p.slot == type,
+          do: {"item:#{p.number}", "#{p.name} (#{p.cost} gold)"}
+
+    [current] ++ clear ++ items
+  end
+
+  @doc """
+  What the place form asks for: `"keep"` (nothing), `"clear"` or `"item:N"` for the premade item number `N`, at the
+  place `key`. `{:ok, nil}` for keep, `{:ok, {:clear, place}}`, `{:ok, {:set, place, premade}}`, or an error
+  (`:bad_move` for a key or choice that is not one of those, `:no_such_item` for a number not in the table).
+  """
+  @spec set_request(map(), String.t(), term(), [map()]) ::
+          {:ok, nil | {:clear, term()} | {:set, term(), map()}} | {:error, atom()}
+  def set_request(details, key, choice, premade) do
+    with {:ok, place} <- parse_place(key),
+         true <- Enum.any?(item_places(details), &(&1.place == place)) || {:error, :bad_move} do
+      case choice do
+        "keep" ->
+          {:ok, nil}
+
+        "clear" ->
+          {:ok, {:clear, place}}
+
+        "item:" <> number ->
+          with {number, ""} <- Integer.parse(number),
+               %{} = p <- Enum.find(premade, &(&1.number == number)) do
+            {:ok, {:set, place, p}}
+          else
+            _ -> {:error, :no_such_item}
+          end
+
+        _ ->
+          {:error, :bad_move}
+      end
+    end
+  end
+
+  @doc "A short description of a place edit, for the notice and the undo list."
+  @spec set_label(map(), term(), map()) :: String.t()
+  def set_label(details, {:clear, place}, _) do
+    "Removed #{item_name_at(details, place)} from #{place_owner(details, place)}"
+  end
+
+  def set_label(details, {:set, place, premade}, _) do
+    "Put #{premade.name} in #{place_owner(details, place)}"
+  end
+
+  defp item_name_at(details, place) do
+    index =
+      case place do
+        {:vault, p} ->
+          Enum.at(details.vault_places, p)
+
+        {:hero, s, p} ->
+          details.heroes
+          |> Enum.find(&(&1.slot == s))
+          |> then(&(&1 && Enum.at(&1.item_places, p)))
+      end
+
+    held = Enum.flat_map(details.heroes, & &1.item_list) ++ details.vault
+    Enum.find_value(held, "an item", &(&1.index == index && &1.name))
+  end
+
+  defp place_owner(_details, {:vault, _}), do: "the vault"
+
+  defp place_owner(details, {:hero, slot, _}),
+    do: Enum.find_value(details.heroes, "a hero", &(&1.slot == slot && &1.name))
+
   @doc "A short description of an item move, for the notice and the undo list."
   @spec move_label(map(), map(), Mirror.SaveFile.Structures.item_place()) :: String.t()
   def move_label(details, item, to) do
@@ -899,6 +1006,8 @@ defmodule MirrorWeb.WizardPanel do
     do: "A hero carries each kind of item in a place of its own kind."
 
   def error_message(:same_place), do: "The item is already there."
+  def error_message(:no_free_item), do: "All 138 item records are in use."
+  def error_message(:bad_item_record), do: "That item could not be written."
   def error_message(:bad_move), do: "That is not a place the item can go."
   def error_message(:bad_item_abilities), do: "Those powers could not be read."
   def error_message(:no_such_item), do: "That item is no longer in the save."
