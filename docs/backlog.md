@@ -34,10 +34,7 @@ Unsorted, not yet promoted to a story.
   [reference/kazzmir-save-layouts.md](reference/kazzmir-save-layouts.md) ("Block offsets").
 - ~~`lib/mirror/map.ex` and related bitstring-match warnings on Elixir 1.20~~:
   fixed 2026-09-23 so CI can compile with `--warnings-as-errors` (EPIC-007).
-- `Mirror.Quality.SmoothingRules` (and its test) is dead code since terrain
-  renders from `TERRAIN.LBX` (EPIC-002); nothing in `lib/` calls it (checked 2026-10-07), and
-  STORY-017 was done with kazzmir's terrain table instead, so the "possible cross-check"
-  below never happened. Propose deleting it (its own decision, not slipped into another change).
+- ~~`Mirror.Quality.SmoothingRules` (and its test), dead code since terrain renders from `TERRAIN.LBX`~~: deleted 2026-10-15.
 - ~~`mix tailwind mirror` crashes with SIGKILL (exit 137)~~ — fixed
   2026-09-22. Root cause: Tailwind's standalone macOS binary (a Bun-compiled
   executable) ships with an invalid ad-hoc code signature. We checked it is
@@ -52,7 +49,7 @@ Unsorted, not yet promoted to a story.
   `shore_metrics.exs`), `build_momime_resources_index.sh`, the
   `MIRROR_TILE_BACKEND` switch, the tagged-LBX atlas fallback, and ~2,000
   lines of client-side MOMIME/shore/kind code. `Quality.SmoothingRules`
-  is kept (standalone, tested) as a possible cross-check for STORY-017.
+  was kept for a while as a possible cross-check for STORY-017; deleted 2026-10-15.
 - `/tile-probe`'s "Label tile" tagging (writes `priv/asset_map/*.json`
   via `AssetMap`) no longer feeds rendering (which uses `Mirror.TerrainLbx`
   directly). Decide whether to repurpose this tagging workflow for an
