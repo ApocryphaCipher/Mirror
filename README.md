@@ -6,6 +6,8 @@ files. It reads a `SAVEn.GAM`, draws the overland map of both planes
 terrain and save the result back to a new `.GAM`. It's a Phoenix/LiveView
 app; everything renders live in the browser.
 
+![Mirror's map page showing Arcanus from a save, with the wizard links, layer toggles and the Surveyor readout](docs/images/mirror-map.jpg)
+
 **Status:** terrain renders directly from the game's `TERRAIN.LBX` and matches a
 reference decode pixel for pixel, and the map pages draw the save's overland
 features with the game's own art: cities (owner-coloured flags, population

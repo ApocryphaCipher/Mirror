@@ -100,7 +100,8 @@ committed**, not even small fixtures cut from them.
   path).
 
 - Before committing, check the diff for anything that came out of a game
-  file.
+  file. The one exception, by Kevin's decision (2026-10-15): a screenshot of
+  Mirror's own pages in the README (`docs/images/`).
 
 ## 6. Ground truth: don't guess formats
 
