@@ -20,6 +20,7 @@ defmodule MirrorWeb.WizardLive do
      |> assign(:id_param, id)
      |> assign(:editing, false)
      |> assign(:note, nil)
+     |> assign(:note_seq, 0)
      |> load()}
   end
 
@@ -80,6 +81,8 @@ defmodule MirrorWeb.WizardLive do
 
   # Move an item between this wizard's hero places and his vault (STORY-056). The source is read from the save, the
   # form only names the destination.
+  def handle_event("item_move", %{"to" => ""}, socket), do: {:noreply, socket}
+
   def handle_event("item_move", %{"index" => index, "to" => to}, socket) do
     with {index, ""} <- Integer.parse(index) do
       held = fn details -> Enum.find(held_items(details), &(&1.index == index)) end
@@ -141,6 +144,8 @@ defmodule MirrorWeb.WizardLive do
 
   # Add a hero (STORY-053) to the first empty hero place: a new hero of the chosen type, level 0, on the wizard's
   # summoning circle. A hero already in play, whoever owns him, is refused.
+  def handle_event("hero_add", %{"type" => ""}, socket), do: {:noreply, socket}
+
   def handle_event("hero_add", %{"type" => type}, socket) do
     changes_for = fn details ->
       with {:ok, request} <- WizardPanel.hero_add_request(details, type),
@@ -155,6 +160,13 @@ defmodule MirrorWeb.WizardLive do
     {:noreply, apply_edit(socket, changes_for, write, label)}
   end
 
+  # Undo and Redo of the wizard page's own edits. They go through the same history as the map's (one for the whole
+  # session), but only a record edit (what this page makes) is taken back here: a map stroke needs the map's canvas
+  # and engine updated, so it is undone on the map.
+  def handle_event("undo", _params, socket), do: {:noreply, history_step(socket, :undo)}
+  def handle_event("redo", _params, socket), do: {:noreply, history_step(socket, :redo)}
+  def handle_event("dismiss_note", _params, socket), do: {:noreply, assign(socket, :note, nil)}
+
   # "Learn every spell of a realm": the common edit, applied at once.
   def handle_event("learn_realm", %{"realm" => realm}, socket) do
     case Enum.find(Spells.realms(), &(Atom.to_string(&1) == realm)) do
@@ -163,7 +175,9 @@ defmodule MirrorWeb.WizardLive do
     end
   end
 
-  # One apply is one undo step (`Editor.apply_record/5`); undo and Save as are on the map pages.
+  # One change is one undo step (`Editor.apply_record/5`). Nothing here needs a button: a field applies when it
+  # changes (a box when it loses focus), and a change that is no change (the form sent every field, only one moved, or
+  # a pick of "keep") says nothing.
   #
   # The wizard is read again from the save inside the update, so the form is compared with what is
   # there now, not with what the page showed when it was drawn. (A form from a stale page still
@@ -193,9 +207,41 @@ defmodule MirrorWeb.WizardLive do
       end)
 
     case result do
-      {:ok, label} -> socket |> assign(:note, {:ok, label}) |> load()
-      {:error, reason} -> assign(socket, :note, {:error, WizardPanel.error_message(reason)})
+      {:ok, label} -> socket |> put_note({:ok, label}) |> load()
+      {:error, reason} when reason in [:nothing_changed, :unchanged] -> socket
+      {:error, reason} -> put_note(socket, {:error, WizardPanel.error_message(reason)})
     end
+  end
+
+  # A new note is a new element (its id carries the sequence), so its fade starts over.
+  defp put_note(socket, note) do
+    socket |> assign(:note, note) |> assign(:note_seq, socket.assigns.note_seq + 1)
+  end
+
+  defp history_step(socket, direction) do
+    {take, verb} =
+      if direction == :undo, do: {&Editor.undo/2, "Undid"}, else: {&Editor.redo/2, "Redid"}
+
+    result =
+      SessionStore.update(socket.assigns.session_id, fn current ->
+        if record_next?(current, direction) do
+          {next, {:record, label, _parts}} = take.(current, :arcanus)
+          {next, {:ok, label}}
+        else
+          {:error, :nothing_to_take_back}
+        end
+      end)
+
+    case result do
+      {:ok, _state, {:ok, label}} -> socket |> put_note({:ok, "#{verb}: #{label}"}) |> load()
+      _ -> load(socket)
+    end
+  end
+
+  # Is the next step in this direction a record edit, which is what this page can take back or redo?
+  defp record_next?(state, direction) do
+    stack = if direction == :undo, do: state[:history], else: state[:redo]
+    match?([%{kind: :record} | _], Map.get(stack || %{}, :arcanus, []))
   end
 
   # The items this wizard holds: his heroes' and the vault's.
@@ -226,7 +272,13 @@ defmodule MirrorWeb.WizardLive do
     |> assign(:places, places(details))
     |> assign(:spell_rows, spell_rows(details))
     |> assign(:page_title, if(details, do: details.name, else: "Wizard"))
+    |> assign(:history, history_of(SessionStore.get(socket.assigns.session_id)))
   end
+
+  defp history_of(nil), do: %{undo: false, redo: false}
+
+  defp history_of(state),
+    do: %{undo: record_next?(state, :undo), redo: record_next?(state, :redo)}
 
   defp spell_rows(nil), do: []
   defp spell_rows(details), do: WizardPanel.spell_rows(details, spell_table())
@@ -267,7 +319,12 @@ defmodule MirrorWeb.WizardLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} slots={@slots} active={@details && {:wizard, @details.id}}>
+    <Layouts.app
+      flash={@flash}
+      slots={@slots}
+      history={@history}
+      active={@details && {:wizard, @details.id}}
+    >
       <div
         id="wizard-page"
         class="-mx-6 min-h-[70vh] px-6 pb-12 pt-6"
@@ -313,24 +370,37 @@ defmodule MirrorWeb.WizardLive do
             </button>
           </header>
 
-          <p
-            :if={@note}
-            id="wizard-note"
-            class={[
-              "text-sm",
-              elem(@note, 0) == :ok && "text-emerald-200",
-              elem(@note, 0) == :error && "text-rose-300"
-            ]}
-          >
-            {elem(@note, 1)}
-          </p>
+          <%!-- Where the answer to a change shows: always on screen, floating, so nothing moves --%>
+          <div :if={@note} id="wizard-note" class="fixed bottom-4 right-4 z-[60]">
+            <div
+              id={"wizard-note-#{@note_seq}"}
+              class={[
+                "flex max-w-sm items-start gap-3 rounded-xl border px-4 py-3 text-sm shadow-xl shadow-black/50",
+                elem(@note, 0) == :ok &&
+                  "mirror-fade border-emerald-300/30 bg-emerald-950 text-emerald-100",
+                elem(@note, 0) == :error && "border-rose-300/30 bg-rose-950 text-rose-100"
+              ]}
+            >
+              <p class="flex-1">{elem(@note, 1)}</p>
+              <button
+                type="button"
+                phx-click="dismiss_note"
+                aria-label="Dismiss"
+                class="opacity-60 hover:opacity-100"
+              >
+                <.icon name="hero-x-mark-mini" class="size-4" />
+              </button>
+            </div>
+          </div>
 
           <.form
             :if={@editing}
             for={%{}}
             as={:wizard}
             id="wizard-form"
+            phx-change="wizard_edit"
             phx-submit="wizard_edit"
+            novalidate
             class="space-y-4 rounded-xl border border-emerald-300/30 bg-black/40 p-4"
           >
             <input type="hidden" name="wizard[retorts_present]" value="1" />
@@ -340,6 +410,7 @@ defmodule MirrorWeb.WizardLive do
                 <input
                   type="text"
                   name="wizard[name]"
+                  phx-debounce="blur"
                   value={@details.name}
                   maxlength="19"
                   class="mt-1 w-full rounded bg-slate-900 px-2 py-1 text-white"
@@ -357,6 +428,7 @@ defmodule MirrorWeb.WizardLive do
                   min="0"
                   max="30000"
                   name={"wizard[#{field}]"}
+                  phx-debounce="blur"
                   value={value}
                   class="mt-1 w-full rounded bg-slate-900 px-2 py-1 text-white"
                 />
@@ -373,6 +445,7 @@ defmodule MirrorWeb.WizardLive do
                   min="0"
                   max="13"
                   name={"wizard[books][#{i}]"}
+                  phx-debounce="blur"
                   value={n}
                   class="mt-1 w-full rounded bg-slate-900 px-2 py-1 text-white"
                 />
@@ -412,16 +485,10 @@ defmodule MirrorWeb.WizardLive do
               </p>
             </fieldset>
             <p class="text-xs text-slate-400">
-              Power base, casting skill and the research list are worked out again by the game.
-              Undo and Save as are on the map pages.
+              Every change applies as soon as you leave the box (or pick, or tick). Power base,
+              casting skill and the research list are worked out again by the game. Save from the
+              top of the page.
             </p>
-            <button
-              type="submit"
-              id="wizard-apply"
-              class="rounded-lg bg-emerald-300 px-4 py-1 text-sm font-semibold text-slate-950 hover:bg-emerald-200"
-            >
-              Apply
-            </button>
           </.form>
 
           <section id="wizard-header" class="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -500,6 +567,7 @@ defmodule MirrorWeb.WizardLive do
                   min="0"
                   max="65535"
                   name="wizard[research_left]"
+                  phx-debounce="blur"
                   value={@details.research_left}
                   class="mt-1 w-full rounded bg-slate-900 px-2 py-1 text-white"
                 />
@@ -559,14 +627,6 @@ defmodule MirrorWeb.WizardLive do
                 </label>
               </div>
             </div>
-            <button
-              :if={@editing}
-              form="wizard-form"
-              type="submit"
-              class="rounded-lg bg-emerald-300 px-4 py-1 text-sm font-semibold text-slate-950 hover:bg-emerald-200"
-            >
-              Apply
-            </button>
           </section>
 
           <section id="wizard-relations" class="rounded-xl border border-white/10 bg-black/30 p-4">
@@ -638,6 +698,7 @@ defmodule MirrorWeb.WizardLive do
                       min="-100"
                       max="100"
                       name={"wizard[relations][#{r.other}][relation]"}
+                      phx-debounce="blur"
                       value={r.relation}
                       class="w-20 rounded bg-slate-900 px-1 py-0.5 text-right text-white"
                     />
@@ -663,14 +724,6 @@ defmodule MirrorWeb.WizardLive do
               A change is written to both wizards. The treaty codes are what the game keeps; it
               does not check them, so an alliance with someone at war with your ally is yours to sort out.
             </p>
-            <button
-              :if={@editing}
-              form="wizard-form"
-              type="submit"
-              class="mt-2 rounded-lg bg-emerald-300 px-4 py-1 text-sm font-semibold text-slate-950 hover:bg-emerald-200"
-            >
-              Apply
-            </button>
           </section>
 
           <section id="wizard-globals" class="rounded-xl border border-white/10 bg-black/30 p-4">
@@ -721,7 +774,9 @@ defmodule MirrorWeb.WizardLive do
                 <form
                   :if={@editing}
                   id={"wizard-hero-form-#{h.slot}"}
+                  phx-change="hero_edit"
                   phx-submit="hero_edit"
+                  novalidate
                   class="mt-2 flex flex-wrap items-end gap-2"
                 >
                   <input type="hidden" name="slot" value={h.slot} />
@@ -730,6 +785,7 @@ defmodule MirrorWeb.WizardLive do
                     <input
                       type="text"
                       name="hero[name]"
+                      phx-debounce="blur"
                       value={h.name}
                       maxlength="13"
                       class="mt-1 block w-36 rounded bg-slate-900 px-2 py-1 text-sm text-white"
@@ -740,6 +796,7 @@ defmodule MirrorWeb.WizardLive do
                     <input
                       type="number"
                       name="hero[level]"
+                      phx-debounce="blur"
                       value={h.level}
                       min="0"
                       max="9"
@@ -751,6 +808,7 @@ defmodule MirrorWeb.WizardLive do
                     <input
                       type="number"
                       name="hero[experience]"
+                      phx-debounce="blur"
                       value={h.experience}
                       min="0"
                       max="30000"
@@ -762,18 +820,13 @@ defmodule MirrorWeb.WizardLive do
                     <input
                       type="number"
                       name="hero[damage]"
+                      phx-debounce="blur"
                       value={h.damage}
                       min="0"
                       max="255"
                       class="mt-1 block w-20 rounded bg-slate-900 px-2 py-1 text-sm text-white"
                     />
                   </label>
-                  <button
-                    type="submit"
-                    class="rounded-lg bg-emerald-300 px-3 py-1 text-sm font-semibold text-slate-950 hover:bg-emerald-200"
-                  >
-                    Apply
-                  </button>
                 </form>
               </li>
             </ul>
@@ -781,7 +834,7 @@ defmodule MirrorWeb.WizardLive do
             <form
               :if={@editing and WizardPanel.hero_choices(@details) != []}
               id="wizard-hero-add"
-              phx-submit="hero_add"
+              phx-change="hero_add"
               class="mt-3 flex flex-wrap items-end gap-2"
             >
               <label class="text-xs text-slate-400">
@@ -790,19 +843,14 @@ defmodule MirrorWeb.WizardLive do
                   name="type"
                   class="mt-1 block w-48 rounded bg-slate-900 px-2 py-1 text-sm text-white"
                 >
+                  <option value="">Choose a hero to add…</option>
                   <option :for={{type, name} <- WizardPanel.hero_choices(@details)} value={type}>
                     {name}
                   </option>
                 </select>
               </label>
-              <button
-                type="submit"
-                class="rounded-lg border border-emerald-300/50 px-3 py-1 text-xs text-emerald-100 hover:border-emerald-200"
-              >
-                Add
-              </button>
               <span class="text-xs text-slate-500">
-                A new hero, level 0, on his summoning circle.
+                A new hero, level 0, on his summoning circle, as soon as you pick him.
               </span>
             </form>
           </section>
@@ -892,7 +940,9 @@ defmodule MirrorWeb.WizardLive do
         <form
           :if={@editing}
           id={"wizard-item-form-#{item.index}"}
+          phx-change="item_edit"
           phx-submit="item_edit"
+          novalidate
           class="mt-2 space-y-2"
         >
           <input type="hidden" name="index" value={item.index} />
@@ -902,6 +952,7 @@ defmodule MirrorWeb.WizardLive do
               <input
                 type="text"
                 name="item[name]"
+                phx-debounce="blur"
                 value={item.name}
                 maxlength="26"
                 class="mt-1 block w-44 rounded bg-slate-900 px-2 py-1 text-sm text-white"
@@ -912,6 +963,7 @@ defmodule MirrorWeb.WizardLive do
               <input
                 type="number"
                 name={"item[#{field}]"}
+                phx-debounce="blur"
                 value={Map.fetch!(item.raw, field)}
                 min="0"
                 max={max}
@@ -923,6 +975,7 @@ defmodule MirrorWeb.WizardLive do
               <input
                 type="number"
                 name="item[movement]"
+                phx-debounce="blur"
                 value={ItemPanel.movement_shown(item.raw.movement)}
                 min="0"
                 max="4"
@@ -948,17 +1001,11 @@ defmodule MirrorWeb.WizardLive do
               </label>
             </div>
           </fieldset>
-          <button
-            type="submit"
-            class="rounded-lg bg-emerald-300 px-3 py-1 text-xs font-semibold text-slate-950 hover:bg-emerald-200"
-          >
-            Apply
-          </button>
         </form>
         <form
           :if={@editing and Map.get(@moves, item.index, []) != []}
           id={"wizard-item-move-#{item.index}"}
-          phx-submit="item_move"
+          phx-change="item_move"
           class="mt-2 flex items-end gap-2"
         >
           <input type="hidden" name="index" value={item.index} />
@@ -968,17 +1015,12 @@ defmodule MirrorWeb.WizardLive do
               name="to"
               class="mt-1 block rounded bg-slate-900 px-2 py-1 text-sm text-white"
             >
+              <option value="">Move to…</option>
               <option :for={{value, label} <- Map.fetch!(@moves, item.index)} value={value}>
                 {label}
               </option>
             </select>
           </label>
-          <button
-            type="submit"
-            class="rounded-lg border border-emerald-300/50 px-3 py-1 text-xs text-emerald-100 hover:border-emerald-200"
-          >
-            Move
-          </button>
         </form>
       </li>
     </ul>
@@ -1002,14 +1044,14 @@ defmodule MirrorWeb.WizardLive do
   attr :premade, :list, required: true
 
   # One small form per item place: a select of what could go there (a hero's place takes the premade items of its own
-  # kind, the vault any) and a Set button.
+  # kind, the vault any). Choosing applies it.
   defp place_forms(assigns) do
     ~H"""
     <div class="mt-2 space-y-1">
       <form
         :for={pl <- @places}
         id={"wizard-place-#{String.replace(pl.key, ":", "-")}"}
-        phx-submit="place_set"
+        phx-change="place_set"
         class="flex flex-wrap items-end gap-2"
       >
         <input type="hidden" name="place" value={pl.key} />
@@ -1024,12 +1066,6 @@ defmodule MirrorWeb.WizardLive do
             </option>
           </select>
         </label>
-        <button
-          type="submit"
-          class="rounded-lg border border-emerald-300/50 px-3 py-1 text-xs text-emerald-100 hover:border-emerald-200"
-        >
-          Set
-        </button>
       </form>
     </div>
     """

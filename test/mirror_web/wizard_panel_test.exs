@@ -708,6 +708,31 @@ defmodule MirrorWeb.WizardPanelTest do
       assert length(WizardPanel.place_choices(vault_empty, @premade)) == 1 + 3
     end
 
+    test "the items come dearest first, ties alphabetical, after keep and remove", %{d: d} do
+      item = fn number, name, cost ->
+        %{
+          number: number,
+          name: name,
+          slot: 1,
+          cost: cost,
+          type: 0,
+          slot_name: "x",
+          type_name: "x"
+        }
+      end
+
+      premade = [
+        item.(1, "Aardvark Axe", 100),
+        item.(2, "Zed Blade", 900),
+        item.(3, "Bone Axe", 100)
+      ]
+
+      [_melee, _armor, _misc, vault_taken | _] = WizardPanel.item_places(d)
+
+      assert WizardPanel.place_choices(vault_taken, premade) |> Enum.map(&elem(&1, 0)) ==
+               ["keep", "clear", "item:2", "item:1", "item:3"]
+    end
+
     test "reads the form's choice", %{d: d} do
       assert WizardPanel.set_request(d, "hero:0:2", "keep", @premade) == {:ok, nil}
 
@@ -769,6 +794,9 @@ defmodule MirrorWeb.WizardPanelTest do
       choices = WizardPanel.hero_choices(d)
       assert length(choices) == 35
       assert {31, "Sir Harold"} in choices
+
+      names = Enum.map(choices, &elem(&1, 1))
+      assert names == Enum.sort_by(names, &String.downcase/1)
 
       assert length(WizardPanel.hero_choices(%{d | heroes_in_play: [31, 6]})) == 33
       refute {31, "Sir Harold"} in WizardPanel.hero_choices(%{d | heroes_in_play: [31]})

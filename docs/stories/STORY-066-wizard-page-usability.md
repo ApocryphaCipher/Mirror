@@ -1,7 +1,7 @@
 # STORY-066: Wizard page usability: no Apply buttons, feedback, dropdown order
 
 **Parent:** [EPIC-009](../epics/EPIC-009-wizard-editing.md) (wizard editing); the saving part belongs to [EPIC-012](../epics/EPIC-012-open-and-save-from-the-browser.md)
-**Status:** decided (2026-10-16), being built
+**Status:** done (2026-10-16), pending Kevin's try in Chrome and the game
 **Size:** small to medium
 **Raised by:** [Kevin](https://github.com/KevinAsbury), 2026-10-16, after using the wizard page on Windows with the Steam copy
 
@@ -23,11 +23,16 @@ Kevin's question: "Do we even need apply buttons? We have a save component at th
 
 - **Every field applies by itself.** Dropdowns and checkboxes apply the moment they change. Number and name boxes apply when the user **leaves the box or presses Enter** (not on every keystroke: typing "5000" must not be four edits). No Apply, Set or Add button is left on the page, except where a button is the action itself (adding a hero from its dropdown applies on choosing; there is nothing to "set").
 - **Each change is one undo step**, as today (`Editor.apply_record/5`).
-- **Feedback sits next to the field:** a small "applied" mark that fades, saying applied, not saved to disk (the header badge says what is unsaved). Nothing waits for the toasts ([STORY-062](STORY-062-fix-the-toasts.md)).
-- **A refused value says why, beside the field**, and the field keeps what the user typed. The browser's own form check (`max`, `min`) is not used to block the change, because it blocks silently. **Fame is not limited to 30000**: the game's own save holds 30001; a limit only where the game would break (a number that no longer fits its field: a u16 stops at 65535).
-- **Undo and Redo in the header**, next to the Unsaved badge, so a slip on any page is one click to take back. (The history is one for the whole session.)
+- **Feedback:** a message that says what changed ("Edited Jafar: gold 5000"), floating at the bottom right of the screen so it is always in view wherever the page is scrolled, green and fading by itself after about five seconds. (Built bottom right, not beside the field, because the whole form is compared at once: the server knows what changed, not which box.) It says applied, not saved to disk; the header badge says what is unsaved. Nothing waits for the toasts ([STORY-062](STORY-062-fix-the-toasts.md), which may later take this over).
+- **A refused value says why** (red, stays until dismissed or the next change), and the box keeps what the user typed. The browser's own form check (`max`, `min`) is switched off on these forms (`novalidate`), because it blocks silently. **Fame at 30001** (the game wrote it) no longer blocks anything: only a *changed* field is checked, so a value already in the save is left alone. Changing a gold, mana or fame to something above 30000 is still refused with a message (the limit was not widened: nothing shows where the game breaks).
+- **Undo and Redo in the header**, next to the Unsaved badge, on the wizard pages. They take back and redo the wizard page's own edits (record edits). A map stroke is left for the map, which has to redraw its canvas and tell the engine; the map page keeps its own Undo and Redo.
 - **Saving (3)** is done by EPIC-012: nothing to build here.
+- **Selects with a placeholder:** "Choose a hero to add…" and "Move to…" are the first choices of those two selects, so that picking any real choice is a change; picking the placeholder does nothing.
 - **Ordering (4, 5)** as below: items by price, highest first, ties alphabetical, with "(keep what is there)", "(empty)" and "(remove the item)" first; heroes alphabetical by name, the ones already in play stay out of the list.
+
+## Built (2026-10-16)
+
+`lib/mirror_web/live/wizard_live.ex` (forms listen for changes, no Apply/Set/Add/Move buttons, the floating note, Undo/Redo), `MirrorWeb.SaveSlots.header/1` (the buttons), `lib/mirror_web/wizard_panel.ex` (`place_choices/2` price descending, ties alphabetical; `hero_choices/1` alphabetical), `assets/css/app.css` (the fade). Tests in `wizard_live_test.exs` ("no Apply buttons") and `wizard_panel_test.exs`. Checked in the in-app browser against a real save with a fake folder: typing in Gold and leaving the box applied it with its message and enabled Undo, Undo took it back, a too-big Mana showed its reason and kept the typed value, the Fame 30001 save no longer blocks anything. **Not yet checked:** Kevin in Chrome; a wizard edit made this way loaded in the real game (the write path is unchanged; only how a change is triggered is new).
 
 ## Definition of done
 
