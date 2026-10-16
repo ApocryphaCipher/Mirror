@@ -7,9 +7,15 @@ defmodule Mirror.SaveManagerTest do
     test "normalize_path trims spaces and quotes" do
       assert SaveManager.normalize_path(nil) == ""
       assert SaveManager.normalize_path("  ") == ""
-      assert SaveManager.normalize_path("  /path/to/SAVE1.GAM  ") == "/path/to/SAVE1.GAM"
-      assert SaveManager.normalize_path("\"/path/to/SAVE1.GAM\"") == "/path/to/SAVE1.GAM"
-      assert SaveManager.normalize_path("'/path/to/SAVE1.GAM'") == "/path/to/SAVE1.GAM"
+
+      assert SaveManager.normalize_path("  /path/to/SAVE1.GAM  ") ==
+               Path.expand("/path/to/SAVE1.GAM")
+
+      assert SaveManager.normalize_path("\"/path/to/SAVE1.GAM\"") ==
+               Path.expand("/path/to/SAVE1.GAM")
+
+      assert SaveManager.normalize_path("'/path/to/SAVE1.GAM'") ==
+               Path.expand("/path/to/SAVE1.GAM")
     end
 
     test "saved_message distinguishes game-loadable names" do
@@ -121,9 +127,9 @@ defmodule Mirror.SaveManagerTest do
       assert Editor.changed_tile_count(edited_state) == 1
 
       {:ok, saved_state, saved_path} = SaveManager.save(edited_state, target_path)
-      assert saved_path == target_path
-      assert saved_state.save.path == target_path
-      assert saved_state.save_path == target_path
+      assert saved_path == Path.expand(target_path)
+      assert saved_state.save.path == Path.expand(target_path)
+      assert saved_state.save_path == Path.expand(target_path)
       # After save, changed_tile_count is 0 relative to new saved baseline
       assert Editor.changed_tile_count(saved_state) == 0
       assert File.exists?(target_path)
@@ -148,9 +154,9 @@ defmodule Mirror.SaveManagerTest do
       on_exit(fn -> File.rm_rf!(dir) end)
 
       assert {:ok, state, loaded_path} = SaveManager.load(path)
-      assert loaded_path == path
-      assert state.save.path == path
-      assert state.save_path == path
+      assert loaded_path == Path.expand(path)
+      assert state.save.path == Path.expand(path)
+      assert state.save_path == Path.expand(path)
       assert state.active_layer == :terrain
       assert is_map(state.planes.arcanus)
       assert is_map(state.planes.myrror)

@@ -125,8 +125,8 @@ defmodule Mirror.SaveFile do
     if is_nil(source) do
       :ok
     else
-      expanded_source = Path.expand(source)
-      expanded_target = Path.expand(target)
+      expanded_source = comparable_path(source)
+      expanded_target = comparable_path(target)
 
       cond do
         expanded_source == expanded_target ->
@@ -135,7 +135,7 @@ defmodule Mirror.SaveFile do
         true ->
           with {:ok, s_stat} <- File.stat(source),
                {:ok, t_stat} <- File.stat(target) do
-            if s_stat.inode == t_stat.inode and s_stat.major_device == t_stat.major_device do
+            if same_file?(s_stat, t_stat) or link_to?(target, expanded_source) do
               {:error, :would_overwrite_original}
             else
               :ok
@@ -144,6 +144,28 @@ defmodule Mirror.SaveFile do
             _ -> :ok
           end
       end
+    end
+  end
+
+  # Windows file names are not case sensitive, so "save1.gam" and "SAVE1.GAM"
+  # are the same file there.
+  defp comparable_path(path) do
+    expanded = Path.expand(path)
+    if match?({:win32, _}, :os.type()), do: String.downcase(expanded), else: expanded
+  end
+
+  # Windows reports inode 0 for every file, so only a real (non-zero) inode
+  # can say two paths are the same file.
+  defp same_file?(%{inode: inode} = a, %{inode: inode} = b) when inode != 0,
+    do: a.major_device == b.major_device
+
+  defp same_file?(_a, _b), do: false
+
+  # With no inode to compare, follow a symbolic link at `target` one step.
+  defp link_to?(target, source) do
+    case File.read_link(target) do
+      {:ok, dest} -> comparable_path(Path.expand(dest, Path.dirname(target))) == source
+      _ -> false
     end
   end
 

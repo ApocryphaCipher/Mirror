@@ -36,6 +36,7 @@ defmodule MirrorWeb.MapLoadPathTest do
       |> LazyHTML.attribute("value")
 
     assert value == Path.join(dir, "SAVE1.GAM")
-    refute value =~ "\\"
+    # Elsewhere a backslash would be a literal character in a relative filename.
+    unless match?({:win32, _}, :os.type()), do: refute(value =~ "\\")
   end
 end
