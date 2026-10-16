@@ -149,7 +149,7 @@ changes (a feature starts working, or a fix lands), not more often.
 
 ## Licence
 
-MIT, see [LICENSE](LICENSE). The files in `lib/mirror/engine/` carry a GPL-2.0-only header (ported from MOMIME); see [NOTICE.md](NOTICE.md). The game's own files are not covered and are never included.
+GPL-2.0, see [LICENSE](LICENSE). Parts of Mirror are ported from the GPLv2 MOMIME project (see [NOTICE.md](NOTICE.md)). The game's own files are not covered and are never included.
 
 ## Maintainer
 
