@@ -7,8 +7,8 @@
 
 ## What to do
 
-In the top bar: a **Choose game folder** button (`showDirectoryPicker`, Chrome and Edge). Once chosen, the bar shows slots 1 to 8 as buttons, filled (green) when `SAVEn.GAM` exists in the folder, empty (grey) when not.
-Clicking a filled slot reads the file in the browser and sends its bytes to the server, which loads it as today (`SaveFile.load` on bytes instead of a path). The loaded slot is highlighted.
+In the top bar: a **Choose game folder** button (`showDirectoryPicker`, Chrome and Edge). Once chosen, the bar shows slots 1 to 9 as buttons, filled (green) when `SAVEn.GAM` exists in the folder, empty (grey) when not.
+Clicking a filled slot reads the file in the browser and sends its bytes to the server, which loads it as today (`SaveFile.load` on bytes instead of a path). The loaded slot is highlighted. **Slot 9 (the autosave) loads like the others** (Kevin, 2026-10-15).
 
 - Remember the folder handle between visits (IndexedDB); if Chrome needs the user to re-allow access, show a single "Reconnect folder" button.
 - Refresh the slot buttons when the page regains focus (the game may have saved).

@@ -59,3 +59,4 @@
 - [STORY-059](STORY-059-pick-folder-and-load-slot.md): pick the game folder, show the slots, load a slot (EPIC-012) **Open**
 - [STORY-060](STORY-060-save-to-slot.md): save to a slot, with an overwrite warning (EPIC-012) **Open**
 - [STORY-061](STORY-061-retire-the-path-box.md): retire the path box and the old save-path rules (EPIC-012) **Open**
+- [STORY-062](STORY-062-fix-the-toasts.md): fix the toast messages: fade after a time, newest on top, slide then collapse into a stack **Open**
