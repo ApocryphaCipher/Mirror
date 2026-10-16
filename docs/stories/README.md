@@ -60,3 +60,4 @@
 - [STORY-060](STORY-060-save-to-slot.md): save to a slot, with an overwrite warning (EPIC-012) **Open**
 - [STORY-061](STORY-061-retire-the-path-box.md): retire the path box and the old save-path rules (EPIC-012) **Open**
 - [STORY-062](STORY-062-fix-the-toasts.md): fix the toast messages: fade after a time, newest on top, slide then collapse into a stack **Open**
+- [STORY-063](STORY-063-spike-fantasy-terrain.md): spike: a high-resolution terrain set of Kevin's own art, no game assets (terrain only; units and sprites later) **Open**
