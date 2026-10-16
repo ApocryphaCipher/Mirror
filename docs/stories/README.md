@@ -54,3 +54,4 @@
 - [STORY-054](STORY-054-artifact-decode.md): decode artifacts: the item record and where items live (EPIC-011) **Mostly done (2026-10-15): the item block, a hero's and a vault's items and the power names are read; premade tail and game check of lair rewards open**
 - [STORY-055](STORY-055-artifacts-view.md): show artifacts on heroes, the wizard page and lair panels (EPIC-011) **Built and checked in the real game (2026-10-15)**
 - [STORY-056](STORY-056-artifacts-editing.md): edit, move and create artifacts (EPIC-011) **Built and checked in the real game (2026-10-15): edit in place, move, fill any place from the premade table, remove, and a lair's item count; giving between wizards dropped by decision**
+- [STORY-057](STORY-057-first-release.md): the first release: source only, no registry; checklist **Plan written (2026-10-15); README install and run text brought up to date; the rest not started**

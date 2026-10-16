@@ -85,7 +85,7 @@ Unsorted, not yet promoted to a story.
   still missing or unproven in the real game, see [notes/2026-10-15-handoff.md](notes/2026-10-15-handoff.md)); the version number (`mix.exs` says 0.1.0); how people get it (the Docker image, a source checkout, or both) and
   what the README says to a newcomer; the game files (nobody can be given them: `mix mirror.import_game` from their own copy, which files are required and which only add names or pictures, and the unhashed manifest entries `ITEMPOW.LBX` and `ITEMDATA.LBX`);
   the licence and `NOTICE.md`; the known limits to state plainly (saves only from the GOG 1.31 game, the real-game checks that were not made, the guesses that remain); and a release checklist (CI green, a clean install from the README, a tag and notes).
-  A first step is a story that lists what is in scope and what is not.
+  Now [STORY-057](stories/STORY-057-first-release.md): source only (no registry), with a checklist.
 - **Test on a Steam copy of Master of Magic, if there is one** (Kevin, 2026-10-15). Everything so far was checked on the GOG 1.31 install (`~/DOS/MAGIC`) and the files taken from it (the unit, item and spell tables, the save layout, the `MAGIC.SET`
   and `SAVE*.GAM` names). A Steam release may ship different file hashes, a different install layout or a patched game, so before the first release (see "Plan the first release"): check whether such a copy exists, import it with `mix mirror.import_game`
   (the manifest hashes are GOG's, so expect "unverified" warnings), load and edit a save from it in Mirror and in the game, and write down any difference (save size, block offsets, item and unit tables). Not started.
