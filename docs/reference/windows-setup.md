@@ -106,9 +106,12 @@ mix mirror.import_game "<install folder>"
 
 Checked: the dev server started, `TEMPLATE.GAM` (copied out of the game
 folder) loaded from `/arcanus`, and the map drew correctly with terrain art
-from the Steam files. **Not checked:** the three differing files in use
+from the Steam files. **Not checked at that point:** the three differing files in use
 (item data and powers, map background), other tabs, editing and saving, real
-saves. Treat the Steam copy as "map viewing works", not "fully verified".
+saves. **Update (Kevin, 2026-10-16):** the three differing files (`MAPBACK.LBX`,
+`ITEMPOW.LBX`, `ITEMDATA.LBX`) were tested under Windows with the Steam copy
+and work as expected, and the edits listed under "Confirmed by Kevin" below
+worked too.
 
 ## Python tools
 
