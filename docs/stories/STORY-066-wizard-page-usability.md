@@ -1,7 +1,7 @@
 # STORY-066: Wizard page usability: no Apply buttons, feedback, dropdown order
 
 **Parent:** [EPIC-009](../epics/EPIC-009-wizard-editing.md) (wizard editing); the saving part belongs to [EPIC-012](../epics/EPIC-012-open-and-save-from-the-browser.md)
-**Status:** done (2026-10-16), pending Kevin's try in Chrome and the game
+**Status:** done (2026-10-16), checked by Kevin in Chrome and in the real game
 **Size:** small to medium
 **Raised by:** [Kevin](https://github.com/KevinAsbury), 2026-10-16, after using the wizard page on Windows with the Steam copy
 
@@ -32,7 +32,7 @@ Kevin's question: "Do we even need apply buttons? We have a save component at th
 
 ## Built (2026-10-16)
 
-`lib/mirror_web/live/wizard_live.ex` (forms listen for changes, no Apply/Set/Add/Move buttons, the floating note, Undo/Redo), `MirrorWeb.SaveSlots.header/1` (the buttons), `lib/mirror_web/wizard_panel.ex` (`place_choices/2` price descending, ties alphabetical; `hero_choices/1` alphabetical), `assets/css/app.css` (the fade). Tests in `wizard_live_test.exs` ("no Apply buttons") and `wizard_panel_test.exs`. Checked in the in-app browser against a real save with a fake folder: typing in Gold and leaving the box applied it with its message and enabled Undo, Undo took it back, a too-big Mana showed its reason and kept the typed value, the Fame 30001 save no longer blocks anything. **Not yet checked:** Kevin in Chrome; a wizard edit made this way loaded in the real game (the write path is unchanged; only how a change is triggered is new).
+`lib/mirror_web/live/wizard_live.ex` (forms listen for changes, no Apply/Set/Add/Move buttons, the floating note, Undo/Redo), `MirrorWeb.SaveSlots.header/1` (the buttons), `lib/mirror_web/wizard_panel.ex` (`place_choices/2` price descending, ties alphabetical; `hero_choices/1` alphabetical), `assets/css/app.css` (the fade). Tests in `wizard_live_test.exs` ("no Apply buttons") and `wizard_panel_test.exs`. Checked in the in-app browser against a real save with a fake folder: typing in Gold and leaving the box applied it with its message and enabled Undo, Undo took it back, a too-big Mana showed its reason and kept the typed value, the Fame 30001 save no longer blocks anything. **Checked by Kevin (Chrome, then the real game, 2026-10-16):** several edits to Jafar in one session (spells, retorts, books, heroes, magic items, relations), saved to slot 8 from the header; the game loaded slot 8 with every change in place and the next turn advanced with no problem.
 
 ## Definition of done
 
