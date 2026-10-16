@@ -29,7 +29,7 @@ and compare with what the game stored); the path tool is the smallest user inter
 
 ## Things to settle or check
 
-- **What a river may replace.** Forest, desert, hills, mountains? *Guess:* the game's own maps put rivers through plain land, forest and swamp; check what terrain sits beside and under real rivers before allowing more. A river through a mountain or a node is probably refused.
+- **What a river may replace (Kevin, 2026-10-15):** the game does **not** move a river over forest, hills or mountains. A river runs across **plains (grassland), tundra and desert**; the tool refuses any other square (and nodes, volcanoes, cities). *Not yet checked against real maps:* count what terrain is under and beside every river tile in a few saves to confirm, and whether swamp counts.
 - **Lakes and mouths.** A river must end in the sea, a lake, or off a spring; the combinations above allow all of that. Do rivers need to end anywhere at all? (A spring with no mouth is a one-side tile, so allowed.)
 - **Landmass ids.** Rivers count as land in the landmass layer ([classic-terrain-format.md](../reference/classic-terrain-format.md)); a river square on a former ocean or coast square joins or splits landmasses. Reuse the rule Paint type uses, as one undo step.
 - **Cities, roads, units on a changed square** (as Paint type handles them).
