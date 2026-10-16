@@ -22,9 +22,9 @@ hero ability names, hero rename vs the name table, and what a Time Stop edit doe
 ## Checklist
 
 1. README is true: install, import, run (source and Docker), where saves go. **Done 2026-10-15** (this story's PR): file count and which files are optional, the start step, how to load a save, the stale offsets claim removed, "no published image".
-2. A clean-install run from the README on a fresh machine or folder: `git clone`, `mix setup`, import, run, load a save, edit, Save as, load it in DOSBox. Not done.
-3. The Docker route from a clean checkout, game files mounted, loads a save. Not done.
-4. Test on a Steam copy if there is one (backlog item).
+2. A clean-install run from the README: **done 2026-10-15** on a fresh `git clone` of `main` (288b931) in a temp folder, on macOS: `mix setup` ran clean; `mix mirror.import_game ~/DOS/MAGIC --to <folder>` copied all eight LBX files and nine saves; `scripts/dev_server.sh` started the server; the map loaded a save, the header listed all five wizards, a gold edit on the wizard page plus Save as wrote a new `.GAM` that differs from the source by exactly the two gold bytes. Not repeated: loading that file in DOSBox (the gold editor was checked in the game earlier). Seen on the way: the import calls this install's `MAPBACK.LBX`, `ITEMPOW.LBX` and `ITEMDATA.LBX` "not the GOG release's version" (known: ITEMMAKE rewrote two of them; harmless).
+3. The Docker route from a clean checkout: **done 2026-10-15**: `MIRROR_HOME=<folder> docker compose up -d --build` built, served `/arcanus` and `/wizard/1` with 200, and loaded a save from the mounted `/game` with all five wizards listed.
+4. Test on a Steam copy: **postponed** (Kevin, 2026-10-15: Steam does not install on macOS; needs the Windows machine). State in the release notes that only GOG 1.31 was checked.
 5. Licence: **GPL-2.0** (Kevin, 2026-10-15; the engine files are GPLv2 ports of MOMIME, so the whole project is GPL-2.0). `LICENSE`, README and `NOTICE.md` are in their own PR. Done once that merges.
 6. Version: `mix.exs` says 0.1.0. Pick the first tag (suggest `v0.1.0`, since safe editing STORY-029 is open), bump if needed.
 7. CI green on `main` (format, warnings-as-errors compile, tests, Docker smoke test), `mix test --seed 1 --max-cases 8` clean.
