@@ -182,3 +182,7 @@ has none, so the first run said NOT READY. With a game loaded (see below) it say
 So the Steam copy works for the live API (mompy) and for a Mirror save round
 trip. Still unchecked on Steam: the three LBX files that differ from GOG in
 every screen that uses them.
+
+## Confirmed by Kevin (2026-10-16)
+
+On Windows with the Steam copy and the released DOSBox 0.83, Kevin edited these in Mirror and saw them in the game: wizard stats, learned spells, books, retorts, adding heroes, adding magic items to a hero, wizard reputation (relations) and global spells. (His report; no numbers were recorded here.) Usability notes from the same session are in [STORY-066](../stories/STORY-066-wizard-page-usability.md).
