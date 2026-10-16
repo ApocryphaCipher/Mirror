@@ -1,6 +1,6 @@
 # EPIC-012: Open and save from the browser
 
-**Status:** 058, 059 and 060 built (2026-10-16); 061 waits for Kevin. Not yet tried against a real Chrome folder picker: see "What was built"
+**Status:** 058, 059 and 060 built and checked by Kevin in Chrome and in the real game (2026-10-16); 061 waits for Kevin
 **Owner:** [Kevin](https://github.com/KevinAsbury)
 **Requested:** 2026-10-15
 
@@ -43,7 +43,7 @@ How it works: `MirrorWeb.SaveSlots` is mounted on every LiveView (`on_mount` in 
 - The path box survives only in the Lab, for browsers without the folder picker; STORY-061 deletes it (and `load_save`/`save_file`) when Kevin says so.
 - The old home page ("Survey both planes…") is gone; the README says what Mirror does.
 
-**Checked:** server tests (`save_slots_test.exs`, `save_manager_test.exs`), Node tests, and in the in-app browser against a **fake** folder (a stand-in object for `showDirectoryPicker`, backed by a real save): the start page, slots, opening one, the header on the map and a wizard page, the slots staying across page changes, Save to an empty slot, Replace with the backup made. **Not checked:** the real Chrome folder picker and its permission prompts (Kevin's first try found the folder did not show slots: *cause not found*, the fake folder works; first suspect is the real picker's handle or a folder Chrome refuses), the remembered folder after a restart, and a save written this way loading in DOSBox ([real-game-acceptance.md](../reference/real-game-acceptance.md)).
+**Checked:** server tests (`save_slots_test.exs`, `save_manager_test.exs`), Node tests, the in-app browser against a fake folder, and then **by Kevin with the real Chrome folder picker and the real game (2026-10-16)**: choose the folder, open a slot, save into an empty slot (slot 8), the game's Load Game screen shows the new name, the game loads the save and the next turn advances with no problem. His first try of the thin-bar version found no slots after choosing a folder (cause never found; the rebuilt start page works with the real picker). **Not checked:** the remembered folder after a restart of Chrome (the "Reconnect folder" button), and Replace with the backup against the real game folder (checked only against the fake one).
 
 ## Open questions
 

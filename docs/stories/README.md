@@ -56,8 +56,8 @@
 - [STORY-056](STORY-056-artifacts-editing.md): edit, move and create artifacts (EPIC-011) **Built and checked in the real game (2026-10-15): edit in place, move, fill any place from the premade table, remove, and a lair's item count; giving between wizards dropped by decision**
 - [STORY-057](STORY-057-first-release.md): the first release: source only, no registry; checklist **Done: v0.1.0 released (2026-10-15); the Steam test was done on 2026-10-16**
 - [STORY-058](STORY-058-top-bar-and-unsaved-badge.md): the page-wide top bar and the unsaved-changes badge (EPIC-012) **Built 2026-10-16**
-- [STORY-059](STORY-059-pick-folder-and-load-slot.md): pick the game folder, show the slots, load a slot (EPIC-012) **Built 2026-10-16**
-- [STORY-060](STORY-060-save-to-slot.md): save to a slot, with an overwrite warning (EPIC-012) **Built 2026-10-16**
+- [STORY-059](STORY-059-pick-folder-and-load-slot.md): pick the game folder, show the slots, load a slot (EPIC-012) **Done 2026-10-16**
+- [STORY-060](STORY-060-save-to-slot.md): save to a slot, with an overwrite warning (EPIC-012) **Done 2026-10-16**
 - [STORY-061](STORY-061-retire-the-path-box.md): retire the path box and the old save-path rules (EPIC-012) **Open**
 - [STORY-062](STORY-062-fix-the-toasts.md): fix the toast messages: fade after a time, newest on top, slide then collapse into a stack **Open**
 - [STORY-063](STORY-063-spike-fantasy-terrain.md): spike: a high-resolution terrain set of Kevin's own art, no game assets (terrain only; units and sprites later) **Open**
