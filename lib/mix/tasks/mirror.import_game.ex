@@ -10,7 +10,8 @@ defmodule Mix.Tasks.Mirror.ImportGame do
   `SOURCE` is an unpacked install, a `.zip` of one, or a folder holding
   either (e.g. the GOG install folder, or wherever you keep the zip). Only
   the files Mirror uses are copied (`TERRAIN.LBX`, `FONTS.LBX`,
-  `MAPBACK.LBX`, `UNITS1.LBX`, `UNITS2.LBX`) plus your `SAVE1..9.GAM`.
+  `MAPBACK.LBX`, `UNITS1.LBX`, `UNITS2.LBX`, `SPELLDAT.LBX`, `ITEMPOW.LBX`,
+  `ITEMDATA.LBX`) plus your `SAVE1..9.GAM`.
 
   Options:
 

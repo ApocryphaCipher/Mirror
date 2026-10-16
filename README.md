@@ -22,8 +22,8 @@ undo/redo, and Save as. Note on editing:
 **Paint type** keeps the landmass/continent IDs consistent; the raw tools (Cycle,
 Paint tile) update terrain tiles and the recomputed adjacency mask only and do
 **not** keep the landmass/continent IDs consistent (tracked in STORY-017 and
-STORY-029). Next is safe editing and the wizard records
-([EPIC-006](docs/epics/EPIC-006-map-first-ui-and-edit-mode.md)). Every edit
+STORY-029). The wizard pages (`/wizard/1` to `/wizard/5`) edit a wizard, its heroes and its artifacts (see below). Next is safe editing and a first release
+([EPIC-006](docs/epics/EPIC-006-map-first-ui-and-edit-mode.md), [STORY-057](docs/stories/STORY-057-first-release.md)). Every edit
 feature is checked against the real game before its story is closed
 ([how](docs/reference/real-game-acceptance.md)). The sprites are catalogued in the
 [sprite catalog](docs/reference/overland-sprites-and-save-blocks.md).
@@ -36,8 +36,8 @@ You need:
 - Elixir 1.20.4 / Erlang/OTP 29.1 (what CI uses; `mix.exs` has the minimum).
 - Your own copy of the classic game files. Mirror doesn't ship them; they
   are copyrighted and must never be committed. You need a **complete**
-  install (the GOG release works). CD-era installs often leave
-  `TERRAIN.LBX` and others on the disc.
+  install (the GOG release works; Steam is untested). CD-era installs often
+  leave `TERRAIN.LBX` and others on the disc.
 - A save file (`SAVEn.GAM`) from that install.
 
 ```bash
@@ -45,18 +45,26 @@ mix setup
 mix mirror.import_game "/path/to/your/Master of Magic"   # an install folder or a .zip
 ```
 
-`mirror.import_game` copies only the files Mirror reads (five LBX files,
+`mirror.import_game` copies only the files Mirror reads (eight LBX files,
 plus your `SAVEn.GAM` saves) into `~/.mirror/game`, checks each one, and
-says whether it matches the GOG release. Re-running it is safe: it never
+says whether it matches the GOG release. `TERRAIN.LBX` and `FONTS.LBX` are
+required; the rest (`MAPBACK`, `UNITS1`, `UNITS2`, `SPELLDAT`, `ITEMPOW`,
+`ITEMDATA`) add map sprites, unit figures, spell and item names and the
+premade-item lists, and Mirror still starts without them. Re-running it is safe: it never
 overwrites a save you've edited unless you pass `--force`.
 
 Then start the server with [scripts/dev_server.sh](scripts/dev_server.sh). It points
-`MIRROR_MOM_PATH` at `~/.mirror/game` (override by setting it yourself) and
-sets the save-block offsets (`MIRROR_*_OFFSET`).
+`MIRROR_MOM_PATH` at `~/.mirror/game` (override by setting it yourself) and runs
+`mix phx.server`.
 
 ```bash
 bash scripts/dev_server.sh
 ```
+
+Open <http://localhost:4000/arcanus>, type the path of a save in the header
+(for example `~/.mirror/game/SAVE1.GAM`) and press Load. Stop the server with
+Ctrl-C. **Save as** never overwrites the save you loaded; it suggests the next
+free `SAVE1.GAM` to `SAVE9.GAM` slot (the game only loads those names).
 
 ### Docker (no Elixir toolchain needed)
 
@@ -64,7 +72,7 @@ bash scripts/dev_server.sh
 docker compose up --build
 ```
 
-Builds the release image and starts Mirror on `localhost:4000`. Game files
+Builds the release image on your machine (Mirror is distributed as source, not as a published image) and starts it on `localhost:4000`. Game files
 and saves are read from (and written to) `~/.mirror/game` via a bind mount
 (set `MIRROR_HOME` to use a different folder).
 
