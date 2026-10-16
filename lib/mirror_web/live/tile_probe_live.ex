@@ -2,6 +2,7 @@ defmodule MirrorWeb.TileProbeLive do
   use MirrorWeb, :live_view
 
   alias Mirror.{AssetMap, LBX, Paths}
+  alias MirrorWeb.Toast
 
   @page_size 80
   @palette_entry_sizes [768, 1024]
@@ -117,7 +118,7 @@ defmodule MirrorWeb.TileProbeLive do
     selected_entry = socket.assigns.selected_entry
 
     if selected_entry == nil do
-      {:noreply, put_flash(socket, :error, "Select an entry before saving.")}
+      {:noreply, Toast.push(socket, :error, "Select an entry before saving.")}
     else
       entry = %{
         "lbx" => socket.assigns.selected_lbx,
@@ -129,13 +130,13 @@ defmodule MirrorWeb.TileProbeLive do
 
       case AssetMap.add_entry(kind, group, entry) do
         {:ok, _map} ->
-          {:noreply, put_flash(socket, :info, "Saved mapping for #{group}.")}
+          {:noreply, Toast.push(socket, :info, "Saved mapping for #{group}.")}
 
         {:error, :missing_group} ->
-          {:noreply, put_flash(socket, :error, "Add a group name before saving.")}
+          {:noreply, Toast.push(socket, :error, "Add a group name before saving.")}
 
         {:error, reason} ->
-          {:noreply, put_flash(socket, :error, "Save failed: #{inspect(reason)}")}
+          {:noreply, Toast.push(socket, :error, "Save failed: #{inspect(reason)}")}
       end
     end
   end

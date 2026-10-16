@@ -8,6 +8,7 @@ defmodule MirrorWeb.SaveSlotsTest do
   use MirrorWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
+  import MirrorWeb.ToastHelpers
 
   alias Mirror.{SaveManager, SessionStore, WizardFixture}
 
@@ -116,18 +117,18 @@ defmodule MirrorWeb.SaveSlotsTest do
       {:ok, view, _} = live(conn, ~p"/")
 
       bytes(view, 2, "not a save")
-      assert has_element?(view, "#slots-status", "does not look like")
+      assert_toast(view, "does not look like")
       assert SessionStore.get(sid).save.raw == before.save.raw
 
       render_hook(view, "slots:bytes", %{"slot" => 2, "data" => "%%%"})
-      assert has_element?(view, "#slots-status", "did not come through")
+      assert_toast(view, "did not come through")
     end
 
     test "an empty slot, or one outside 1 to 9, opens nothing", %{conn: conn, sid: sid} do
       {:ok, view, _} = live(conn, ~p"/")
       folder(view, [1])
       render_hook(view, "slots:open", %{"slot" => "4"})
-      assert has_element?(view, "#slots-status", "SAVE4.GAM is empty")
+      assert_toast(view, "SAVE4.GAM is empty")
 
       render_hook(view, "slots:bytes", %{"slot" => 10, "data" => Base.encode64(raw())})
       assert SessionStore.get(sid) == nil
@@ -222,7 +223,7 @@ defmodule MirrorWeb.SaveSlotsTest do
 
       render_hook(view, "slots:written", %{"slot" => 5})
       refute badge_shown?(view)
-      assert has_element?(view, "#slots-status", "Saved to SAVE5.GAM")
+      assert_toast(view, "Saved to SAVE5.GAM")
       assert SessionStore.get(sid).save_path == "SAVE5.GAM"
       assert SessionStore.get(sid).save.raw == written
     end
@@ -236,7 +237,7 @@ defmodule MirrorWeb.SaveSlotsTest do
       assert_push_event(view, "slots:write", %{slot: 5})
 
       render_hook(view, "slots:written", %{"slot" => 5, "named" => "Mirror Edit Slot 5"})
-      assert has_element?(view, "#slots-status", "named \"Mirror Edit Slot 5\"")
+      assert_toast(view, "named \"Mirror Edit Slot 5\"")
     end
 
     test "a full slot asks first, and Cancel writes nothing", %{view: view} do
@@ -259,7 +260,7 @@ defmodule MirrorWeb.SaveSlotsTest do
 
     test "slot 9, the autosave, is never written to", %{view: view} do
       render_hook(view, "slots:save", %{"slot" => "9"})
-      assert has_element?(view, "#slots-status", "autosave")
+      assert_toast(view, "autosave")
       refute_push_event(view, "slots:write", _)
     end
 
@@ -272,7 +273,7 @@ defmodule MirrorWeb.SaveSlotsTest do
         "message" => "Could not save SAVE5.GAM, nothing was changed: disk full"
       })
 
-      assert has_element?(view, "#slots-status", "disk full")
+      assert_toast(view, "disk full")
       assert badge_shown?(view)
 
       # and a late "written" for it is ignored
@@ -299,7 +300,7 @@ defmodule MirrorWeb.SaveSlotsTest do
     {:ok, view, _} = live(conn, ~p"/arcanus")
     folder(view, [1])
     view |> element("#save-slot-4") |> render_click()
-    assert has_element?(view, "#slots-status", "Open a save first")
+    assert_toast(view, "Open a save first")
     refute_push_event(view, "slots:write", _)
   end
 end

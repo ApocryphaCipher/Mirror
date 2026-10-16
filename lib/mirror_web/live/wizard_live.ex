@@ -7,7 +7,7 @@ defmodule MirrorWeb.WizardLive do
 
   alias Mirror.{Editor, ItemData, ItemPowers, SessionStore, Spells}
   alias Mirror.SaveFile.Structures
-  alias MirrorWeb.{ItemPanel, WizardPanel}
+  alias MirrorWeb.{ItemPanel, Toast, WizardPanel}
 
   @impl true
   def mount(%{"id" => id}, session, socket) do
@@ -19,8 +19,6 @@ defmodule MirrorWeb.WizardLive do
      |> assign(:session_id, session_id)
      |> assign(:id_param, id)
      |> assign(:editing, false)
-     |> assign(:note, nil)
-     |> assign(:note_seq, 0)
      |> load()}
   end
 
@@ -33,7 +31,7 @@ defmodule MirrorWeb.WizardLive do
 
   @impl true
   def handle_event("toggle_edit", _params, socket) do
-    {:noreply, socket |> assign(:editing, !socket.assigns.editing) |> assign(:note, nil)}
+    {:noreply, assign(socket, :editing, !socket.assigns.editing)}
   end
 
   def handle_event("wizard_edit", %{"wizard" => params}, socket) do
@@ -165,7 +163,6 @@ defmodule MirrorWeb.WizardLive do
   # and engine updated, so it is undone on the map.
   def handle_event("undo", _params, socket), do: {:noreply, history_step(socket, :undo)}
   def handle_event("redo", _params, socket), do: {:noreply, history_step(socket, :redo)}
-  def handle_event("dismiss_note", _params, socket), do: {:noreply, assign(socket, :note, nil)}
 
   # "Learn every spell of a realm": the common edit, applied at once.
   def handle_event("learn_realm", %{"realm" => realm}, socket) do
@@ -213,10 +210,9 @@ defmodule MirrorWeb.WizardLive do
     end
   end
 
-  # A new note is a new element (its id carries the sequence), so its fade starts over.
-  defp put_note(socket, note) do
-    socket |> assign(:note, note) |> assign(:note_seq, socket.assigns.note_seq + 1)
-  end
+  # What an edit did, as a toast: the label with an Undo button (an edit is one undo step), or why it was refused.
+  defp put_note(socket, {:ok, label}), do: Toast.push(socket, :ok, label, action: :undo)
+  defp put_note(socket, {:error, text}), do: Toast.push(socket, :error, text)
 
   defp history_step(socket, direction) do
     {take, verb} =
@@ -233,7 +229,7 @@ defmodule MirrorWeb.WizardLive do
       end)
 
     case result do
-      {:ok, _state, {:ok, label}} -> socket |> put_note({:ok, "#{verb}: #{label}"}) |> load()
+      {:ok, _state, {:ok, label}} -> socket |> Toast.push(:ok, "#{verb}: #{label}") |> load()
       _ -> load(socket)
     end
   end
@@ -369,29 +365,6 @@ defmodule MirrorWeb.WizardLive do
               {if @editing, do: "Done", else: "✎ Edit"}
             </button>
           </header>
-
-          <%!-- Where the answer to a change shows: always on screen, floating, so nothing moves --%>
-          <div :if={@note} id="wizard-note" class="fixed bottom-4 right-4 z-[60]">
-            <div
-              id={"wizard-note-#{@note_seq}"}
-              class={[
-                "flex max-w-sm items-start gap-3 rounded-xl border px-4 py-3 text-sm shadow-xl shadow-black/50",
-                elem(@note, 0) == :ok &&
-                  "mirror-fade border-emerald-300/30 bg-emerald-950 text-emerald-100",
-                elem(@note, 0) == :error && "border-rose-300/30 bg-rose-950 text-rose-100"
-              ]}
-            >
-              <p class="flex-1">{elem(@note, 1)}</p>
-              <button
-                type="button"
-                phx-click="dismiss_note"
-                aria-label="Dismiss"
-                class="opacity-60 hover:opacity-100"
-              >
-                <.icon name="hero-x-mark-mini" class="size-4" />
-              </button>
-            </div>
-          </div>
 
           <.form
             :if={@editing}

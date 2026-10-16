@@ -1,7 +1,7 @@
 # STORY-062: Fix the toast messages
 
 **Parent:** none (UI; relates to [EPIC-012](../epics/EPIC-012-open-and-save-from-the-browser.md), whose Save shows one)
-**Status:** open (2026-10-15)
+**Status:** done (2026-10-16), checked by Kevin in Chrome
 **Size:** small to medium
 **Raised by:** [Kevin](https://github.com/KevinAsbury), 2026-10-15
 
@@ -32,6 +32,19 @@ Keep it home-rolled: a small JS hook plus a little CSS (about 60 lines), no depe
 
 Hex has toast libraries for LiveView (for example `live_toast`) and there are JS toast libraries. None is used here. I have not tried them, so I do not know how they fit with this project's Tailwind 4 and daisyUI setup or how they behave on
 the slide-then-collapse effect. A dependency also brings upgrades to track for a feature that is about 60 lines to write. *Recommendation:* home-rolled; look at a package only if the hook turns out harder than it looks.
+
+## Built (2026-10-16)
+
+Home-rolled, as recommended: no dependency. `MirrorWeb.Toast.push/4` (`lib/mirror_web/toast.ex`) sends a `"toast"` push event; the stack is `assets/js/toast.js` (DOM) on top of `assets/js/toast.mjs` (pure logic, Node tests in `assets/test/toast.test.mjs`), styled in `assets/css/app.css`.
+
+- A stack, bottom right, **newest in front**; the older ones stay in view for a second, then tuck behind the front one (a little higher, a little smaller, out of sight past three); pointing at the stack spreads them out and pauses their timers. A cap of five.
+- They fade by themselves: 5 s for ok and info, 10 s for an error; a click on the × dismisses one. With "reduce motion" the slide is a plain fade.
+- The stack lives outside the LiveView page, so a toast pushed just before a page change ("Opened SAVE2.GAM.") is still there on the next page.
+- **Undo on the toast:** `action: :undo` adds an Undo button that clicks the page's own `#header-undo`, so a wizard edit can be taken back from its message.
+- Replaced: every `put_flash` (map and tile-probe pages), the save header's own message, and the wizard page's own note. The Replace question stays where it was (it is a question). The two connection banners ("We can't find the internet" and "Something went wrong") are unchanged.
+- Tests read toasts with `MirrorWeb.ToastHelpers` (`test/support/toast_helpers.ex`).
+
+**Checked** in the in-app browser: four toasts in a row stack with the newest in front, fold up after a second, spread out on hover and hold their timers (nothing expired in 11 s of hovering, an error went 10 s after leaving), a toast survives the start page's jump to the map, and the Undo on a wizard edit's toast took the edit back. **Checked by Kevin in Chrome (2026-10-16):** a row of edits stacks, folds up and fades one by one; hovering holds them; Undo on a toast took the edit back; a refusal (Gold 99999) shows a red toast; the stack stays across a page change until it fades. **Seen, not changed:** the toasts for a row of ticks all read "Edited Jafar: global enchantments"; naming which one ("Wind Mastery on") would help. **Not checked:** narrow phone widths; a screen reader.
 
 ## Definition of done
 

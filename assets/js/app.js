@@ -28,6 +28,7 @@ import {MapViewport} from "./map_viewport"
 import {MapOverlays} from "./map_overlays"
 import {RgbaCanvas} from "./lbx_hooks"
 import {SaveSlots} from "./save_slots"
+import {installToasts} from "./toast"
 import topbar from "../vendor/topbar"
 
 const StableInput = {
@@ -62,6 +63,8 @@ const liveSocket = new LiveSocket("/live", Socket, {
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
+
+installToasts()
 
 // connect if there are any LiveViews on the page
 liveSocket.connect()
