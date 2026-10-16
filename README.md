@@ -66,7 +66,7 @@ docker compose run --rm -v "/path/to/install:/source:ro" app bin/mirror eval 'Mi
 
 ## Good to know
 
-- The GOG 1.31 version of the game is the one every edit was checked against. On the Steam version (Master of Magic Classic) the map draws, and a save edited in Mirror loads in the game with the edits in place. Three of the files Mirror reads (`MAPBACK.LBX`, `ITEMPOW.LBX`, `ITEMDATA.LBX`) differ from GOG's, and the screens that use them haven't been checked on Steam.
+- The GOG 1.31 version of the game is the one every edit was checked against. On the Steam version (Master of Magic Classic) the map draws, and a save edited in Mirror loads in the game with the edits in place. Three of the files Mirror reads (`MAPBACK.LBX`, `ITEMPOW.LBX`, `ITEMDATA.LBX`) differ from GOG's; they were tested on Windows with Steam and work as expected, so the import's warning about them can be ignored.
 - Paint type keeps coasts and continents right. The raw tile tools (Cycle, Paint tile) don't, so use them with care.
 - Time Stop can't be edited.
 
