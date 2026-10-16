@@ -54,7 +54,7 @@
 - [STORY-054](STORY-054-artifact-decode.md): decode artifacts: the item record and where items live (EPIC-011) **Mostly done (2026-10-15): the item block, a hero's and a vault's items and the power names are read; premade tail and game check of lair rewards open**
 - [STORY-055](STORY-055-artifacts-view.md): show artifacts on heroes, the wizard page and lair panels (EPIC-011) **Built and checked in the real game (2026-10-15)**
 - [STORY-056](STORY-056-artifacts-editing.md): edit, move and create artifacts (EPIC-011) **Built and checked in the real game (2026-10-15): edit in place, move, fill any place from the premade table, remove, and a lair's item count; giving between wizards dropped by decision**
-- [STORY-057](STORY-057-first-release.md): the first release: source only, no registry; checklist **Done: v0.1.0 released (2026-10-15); only the Steam test is left**
+- [STORY-057](STORY-057-first-release.md): the first release: source only, no registry; checklist **Done: v0.1.0 released (2026-10-15); the Steam test was done on 2026-10-16**
 - [STORY-058](STORY-058-top-bar-and-unsaved-badge.md): the page-wide top bar and the unsaved-changes badge (EPIC-012) **Open**
 - [STORY-059](STORY-059-pick-folder-and-load-slot.md): pick the game folder, show the slots, load a slot (EPIC-012) **Open**
 - [STORY-060](STORY-060-save-to-slot.md): save to a slot, with an overwrite warning (EPIC-012) **Open**

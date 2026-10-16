@@ -1,7 +1,7 @@
 # STORY-057: The first release
 
 **Parent:** none (cross-cutting)
-**Status:** done: v0.1.0 released by Kevin (2026-10-15), https://github.com/ApocryphaCipher/Mirror/releases/tag/v0.1.0. Left over: the Steam test (item 4).
+**Status:** done: v0.1.0 released by Kevin (2026-10-15), https://github.com/ApocryphaCipher/Mirror/releases/tag/v0.1.0. The Steam test was done afterwards (item 4).
 **Size:** medium
 **Raised by:** [Kevin](https://github.com/KevinAsbury), 2026-10-15
 
@@ -24,7 +24,7 @@ hero ability names, hero rename vs the name table, and what a Time Stop edit doe
 1. README is true: install, import, run (source and Docker), where saves go. **Done 2026-10-15** (this story's PR): file count and which files are optional, the start step, how to load a save, the stale offsets claim removed, "no published image".
 2. A clean-install run from the README: **done 2026-10-15** on a fresh `git clone` of `main` (288b931) in a temp folder, on macOS: `mix setup` ran clean; `mix mirror.import_game ~/DOS/MAGIC --to <folder>` copied all eight LBX files and nine saves; `scripts/dev_server.sh` started the server; the map loaded a save, the header listed all five wizards, a gold edit on the wizard page plus Save as wrote a new `.GAM` that differs from the source by exactly the two gold bytes. Not repeated: loading that file in DOSBox (the gold editor was checked in the game earlier). Seen on the way: the import calls this install's `MAPBACK.LBX`, `ITEMPOW.LBX` and `ITEMDATA.LBX` "not the GOG release's version" (known: ITEMMAKE rewrote two of them; harmless).
 3. The Docker route from a clean checkout: **done 2026-10-15**: `MIRROR_HOME=<folder> docker compose up -d --build` built, served `/arcanus` and `/wizard/1` with 200, and loaded a save from the mounted `/game` with all five wizards listed.
-4. Test on a Steam copy: **postponed** (Kevin, 2026-10-15: Steam does not install on macOS; needs the Windows machine). State in the release notes that only GOG 1.31 was checked.
+4. Test on a Steam copy: **done 2026-10-16** on Kevin's Windows machine (see [../reference/windows-setup.md](../reference/windows-setup.md)). It works; the import warns that three LBX files differ from GOG's. The v0.1.0 release notes still say Steam was untried; the README now says what was checked.
 5. Licence: **GPL-2.0** (Kevin, 2026-10-15; the engine files are GPLv2 ports of MOMIME, so the whole project is GPL-2.0). `LICENSE`, README and `NOTICE.md` are in their own PR. Done once that merges.
 6. Version: **v0.1.0**, `mix.exs` already said 0.1.0. Done.
 7. **Checked 2026-10-15 (main at 9b4a877, CI success):** CI green on `main` (format, warnings-as-errors compile, tests, Docker smoke test), `mix test --seed 1 --max-cases 8` clean.
