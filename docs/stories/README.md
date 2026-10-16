@@ -63,4 +63,4 @@
 - [STORY-063](STORY-063-spike-fantasy-terrain.md): spike: a high-resolution terrain set of Kevin's own art, no game assets (terrain only; units and sprites later) **Open**
 - [STORY-064](STORY-064-river-editing.md): river editing: a path tool or a river layer, translated to the 43 river tiles (EPIC-006) **Open (idea)**
 - [STORY-065](STORY-065-drag-and-drop-units.md): drag and drop units (and cities, lairs, nodes) instead of click, click (EPIC-006) **Open (idea)**
-- [STORY-066](STORY-066-wizard-page-usability.md): wizard page usability: no Apply buttons, feedback, dropdown order (EPIC-009) **Decided 2026-10-16**
+- [STORY-066](STORY-066-wizard-page-usability.md): wizard page usability: no Apply buttons, feedback, dropdown order (EPIC-009) **Done 2026-10-16**

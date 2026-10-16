@@ -33,6 +33,7 @@ defmodule MirrorWeb.Layouts do
 
   attr :slots, :map, default: nil, doc: "the socket's `@slots` (MirrorWeb.SaveSlots)"
   attr :active, :any, default: nil, doc: ":arcanus, :myrror or {:wizard, id}, for the header"
+  attr :history, :map, default: nil, doc: "`%{undo: bool, redo: bool}` to show Undo and Redo"
 
   attr :full_bleed, :boolean,
     default: false,
@@ -50,7 +51,7 @@ defmodule MirrorWeb.Layouts do
       </div>
 
       <div class="relative z-10">
-        <MirrorWeb.SaveSlots.header slots={@slots} active={@active} />
+        <MirrorWeb.SaveSlots.header slots={@slots} active={@active} history={@history} />
 
         <main class={[
           @full_bleed && "w-full p-0",

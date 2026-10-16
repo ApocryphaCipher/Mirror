@@ -479,9 +479,10 @@ defmodule MirrorWeb.WizardPanel do
   def hero_choices(%{free_hero_slots: []}), do: []
 
   def hero_choices(details) do
-    for type <- 0..34,
-        type not in details.heroes_in_play,
-        do: {type, UnitTypes.name(type)}
+    0..34
+    |> Enum.reject(&(&1 in details.heroes_in_play))
+    |> Enum.map(&{&1, UnitTypes.name(&1)})
+    |> Enum.sort_by(fn {_type, name} -> String.downcase(name) end)
   end
 
   @doc """
@@ -541,7 +542,8 @@ defmodule MirrorWeb.WizardPanel do
   @doc """
   The choices for one place's select, `{value, label}`: `"keep"` first (what is there now, or "empty"), then
   `"clear"` for an occupied place, then `"item:N"` for each premade item whose slot code equals a hero place's slot
-  type (a vault place takes any). `premade` is `Mirror.ItemData.table/0`'s list; names come from the table.
+  type (a vault place takes any), the dearest first and ties alphabetical (Kevin, 2026-10-16). `premade` is
+  `Mirror.ItemData.table/0`'s list; names come from the table.
   """
   @spec place_choices(map(), [map()]) :: [{String.t(), String.t()}]
   def place_choices(%{item: item, slot_type: type}, premade) do
@@ -550,7 +552,7 @@ defmodule MirrorWeb.WizardPanel do
     clear = if item, do: [{"clear", "(remove the item)"}], else: []
 
     items =
-      for p <- Enum.sort_by(premade, &String.downcase(&1.name)),
+      for p <- Enum.sort_by(premade, &{-&1.cost, String.downcase(&1.name)}),
           is_nil(type) or Items.slot_accepts?(type, p.slot),
           do: {"item:#{p.number}", "#{p.name} (#{p.cost} gold)"}
 

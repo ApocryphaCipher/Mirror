@@ -336,6 +336,7 @@ defmodule MirrorWeb.SaveSlots do
 
   attr :slots, :map, default: nil
   attr :active, :any, default: nil, doc: ":arcanus, :myrror, or {:wizard, id}"
+  attr :history, :map, default: nil, doc: "`%{undo: bool, redo: bool}` when the page can undo"
 
   def header(assigns) do
     ~H"""
@@ -354,6 +355,24 @@ defmodule MirrorWeb.SaveSlots do
           phx-hook="SaveSlots"
           class="flex items-center gap-3 text-sm text-slate-300"
         >
+          <div :if={@history} class="flex gap-1" id="header-history">
+            <button
+              :for={
+                {id, event, label, on} <- [
+                  {"header-undo", "undo", "Undo", @history.undo},
+                  {"header-redo", "redo", "Redo", @history.redo}
+                ]
+              }
+              type="button"
+              id={id}
+              phx-click={event}
+              disabled={!on}
+              class="rounded-lg border border-white/20 px-3 py-1 font-medium text-slate-200 hover:border-white/50 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {label}
+            </button>
+          </div>
+
           <%!-- always in the same place; hidden with `invisible`, not removed, so nothing shifts --%>
           <span
             id="unsaved-badge"

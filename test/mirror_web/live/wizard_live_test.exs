@@ -331,8 +331,9 @@ defmodule MirrorWeb.WizardLiveTest do
       submit(view, %{"name" => "Zoë"})
       assert has_element?(view, "#wizard-note", "no accents")
 
+      # a change that is no change (the form always sends every field) says nothing and writes nothing
       submit(view, %{"gold" => "1234"})
-      assert has_element?(view, "#wizard-note", "Nothing to change")
+      refute has_element?(view, "#wizard-note", "Nothing to change")
 
       assert SessionStore.get(sid).save.raw == raw
     end
@@ -402,7 +403,7 @@ defmodule MirrorWeb.WizardLiveTest do
 
       # nothing left to learn
       view |> element("#learn-death") |> render_click()
-      assert has_element?(view, "#wizard-note", "Nothing to change")
+      refute has_element?(view, "#wizard-note", "Nothing to change")
     end
 
     test "the form changes spells, what is researched and the points left", %{
@@ -554,7 +555,7 @@ defmodule MirrorWeb.WizardLiveTest do
       refute has_element?(view, "#wizard-item-move-9")
 
       before = SessionStore.get(sid)
-      view |> element("#wizard-item-move-3") |> render_submit(%{"to" => "hero:0:2"})
+      view |> element("#wizard-item-move-3") |> render_change(%{"to" => "hero:0:2"})
 
       assert has_element?(view, "#wizard-note", "Moved Amulet to Harold")
       assert has_element?(view, "#wizard-hero-0-item-3", "Amulet")
@@ -565,7 +566,7 @@ defmodule MirrorWeb.WizardLiveTest do
       assert Mirror.SaveFile.Items.vault_places(moved.save.raw, 0) == [9, nil, nil, nil]
 
       # back to the vault
-      view |> element("#wizard-item-move-3") |> render_submit(%{"to" => "vault:1"})
+      view |> element("#wizard-item-move-3") |> render_change(%{"to" => "vault:1"})
       assert has_element?(view, "#wizard-vault-item-3", "Amulet")
 
       assert Mirror.SaveFile.Items.vault_places(SessionStore.get(sid).save.raw, 0) == [
@@ -679,7 +680,7 @@ defmodule MirrorWeb.WizardLiveTest do
       view |> element("#wizard-edit-toggle") |> render_click()
       before = SessionStore.get(sid)
 
-      view |> element("#wizard-place-hero-0-2") |> render_submit(%{"choice" => "item:7"})
+      view |> element("#wizard-place-hero-0-2") |> render_change(%{"choice" => "item:7"})
       assert has_element?(view, "#wizard-note", "Put Ring of Power in Harold")
       assert has_element?(view, "#wizard-hero-0 li", "Ring of Power")
 
@@ -696,7 +697,7 @@ defmodule MirrorWeb.WizardLiveTest do
       {undone, _} = Mirror.Editor.undo(filled, :arcanus)
       assert undone.save.raw == before.save.raw
 
-      view |> element("#wizard-place-hero-0-2") |> render_submit(%{"choice" => "clear"})
+      view |> element("#wizard-place-hero-0-2") |> render_change(%{"choice" => "clear"})
       assert has_element?(view, "#wizard-note", "Removed Ring of Power from Harold")
       refute has_element?(view, "#wizard-hero-0 li", "Ring of Power")
     end
@@ -710,8 +711,9 @@ defmodule MirrorWeb.WizardLiveTest do
       view |> element("#wizard-edit-toggle") |> render_click()
       raw = SessionStore.get(sid).save.raw
 
-      view |> element("#wizard-place-hero-0-2") |> render_submit(%{"choice" => "keep"})
-      assert has_element?(view, "#wizard-note", "Nothing to change")
+      view |> element("#wizard-place-hero-0-2") |> render_change(%{"choice" => "keep"})
+      refute has_element?(view, "#wizard-note")
+      assert SessionStore.get(sid).save.raw == raw
 
       # a melee item for the misc place is refused by the save rules, not drawn from the page
       render_hook(view, "place_set", %{"place" => "hero:0:2", "choice" => "item:1"})
@@ -750,7 +752,7 @@ defmodule MirrorWeb.WizardLiveTest do
       assert has_element?(view, "#wizard-hero-add option[value='0']", "Brax")
       before = SessionStore.get(sid)
 
-      view |> element("#wizard-hero-add") |> render_submit(%{"type" => "31"})
+      view |> element("#wizard-hero-add") |> render_change(%{"type" => "31"})
       assert has_element?(view, "#wizard-note", "Added Sir Harold to Jafar's heroes")
       assert has_element?(view, "#wizard-hero-0", "Sir Harold")
       assert has_element?(view, "#wizard-hero-0", "level 1")
@@ -771,7 +773,7 @@ defmodule MirrorWeb.WizardLiveTest do
       load_empty_heroes(sid)
       {:ok, view, _} = live(conn, ~p"/wizard/1")
       view |> element("#wizard-edit-toggle") |> render_click()
-      view |> element("#wizard-hero-add") |> render_submit(%{"type" => "31"})
+      view |> element("#wizard-hero-add") |> render_change(%{"type" => "31"})
       raw = SessionStore.get(sid).save.raw
 
       render_hook(view, "hero_add", %{"type" => "31"})
@@ -780,6 +782,152 @@ defmodule MirrorWeb.WizardLiveTest do
       render_hook(view, "hero_add", %{"type" => "99"})
       assert has_element?(view, "#wizard-note", "35 heroes")
       assert SessionStore.get(sid).save.raw == raw
+    end
+  end
+
+  describe "no Apply buttons (STORY-066)" do
+    defp edit_mode(conn, sid, raw \\ nil) do
+      if raw,
+        do: SessionStore.put(sid, Mirror.SaveManager.normalize_state(%{save: %{raw: raw}})),
+        else: load_save(sid)
+
+      {:ok, view, _} = live(conn, ~p"/wizard/1")
+      view |> element("#wizard-edit-toggle") |> render_click()
+      view
+    end
+
+    defp change(view, fields),
+      do: view |> element("#wizard-form") |> render_change(%{"wizard" => fields})
+
+    test "the page has no Apply, Set, Add or Move button in edit mode", %{conn: conn, sid: sid} do
+      view = edit_mode(conn, sid)
+
+      for word <- ["Apply", "Set", "Add", "Move"] do
+        refute has_element?(view, "#wizard-page button", word), word
+      end
+
+      refute has_element?(view, "#wizard-page button[type=submit]")
+    end
+
+    test "a field applies when it changes: the forms listen for changes, a box when it loses focus",
+         %{conn: conn, sid: sid} do
+      view = edit_mode(conn, sid)
+
+      assert has_element?(view, "form#wizard-form[phx-change=wizard_edit][novalidate]")
+      assert has_element?(view, ~s(#wizard-form input[name="wizard[gold]"][phx-debounce=blur]))
+
+      assert has_element?(
+               view,
+               ~s(input[name="wizard[relations][1][relation]"][phx-debounce=blur])
+             )
+
+      # a pick or a tick applies at once: no debounce on a select or a checkbox
+      refute has_element?(view, ~s(input[type=checkbox][phx-debounce]))
+      refute has_element?(view, "select[phx-debounce]")
+    end
+
+    test "a change event applies the edit as one undo step and says so", %{conn: conn, sid: sid} do
+      view = edit_mode(conn, sid)
+      before = SessionStore.get(sid)
+
+      change(view, %{"gold" => "5000"})
+
+      assert has_element?(view, "#wizard-note", "gold 5000")
+      assert has_element?(view, "#wizard-note .mirror-fade")
+      assert length(SessionStore.get(sid).history.arcanus) == length(before.history.arcanus) + 1
+      assert has_element?(view, ~s(input[name="wizard[gold]"][value="5000"]))
+    end
+
+    test "a refusal stays on screen until dismissed, and says why", %{conn: conn, sid: sid} do
+      view = edit_mode(conn, sid)
+      raw = SessionStore.get(sid).save.raw
+
+      change(view, %{"gold" => "99999"})
+      assert has_element?(view, "#wizard-note", "0 to 30000")
+      refute has_element?(view, "#wizard-note .mirror-fade")
+      assert SessionStore.get(sid).save.raw == raw
+
+      view |> element("#wizard-note button") |> render_click()
+      refute has_element?(view, "#wizard-note")
+    end
+
+    test "a fame the game itself wrote above 30000 does not block another edit", %{
+      conn: conn,
+      sid: sid
+    } do
+      raw =
+        Mirror.WizardFixture.field(
+          Mirror.WizardFixture.synthetic(),
+          0,
+          0x24,
+          <<30_001::little-16>>
+        )
+
+      view = edit_mode(conn, sid, raw)
+      assert has_element?(view, ~s(input[name="wizard[fame]"][value="30001"]))
+
+      change(view, %{"gold" => "777", "fame" => "30001"})
+
+      assert has_element?(view, "#wizard-note", "gold 777")
+      refute has_element?(view, "#wizard-note", "0 to 30000")
+    end
+
+    test "the placeholder choices do nothing and say nothing", %{conn: conn, sid: sid} do
+      empty = <<-1::little-signed-16>> <> :binary.copy(<<0>>, 26)
+
+      raw =
+        Enum.reduce(0..4, Mirror.WizardFixture.synthetic(), fn w, acc ->
+          Mirror.WizardFixture.field(acc, w, 0x76, :binary.copy(empty, 6))
+        end)
+
+      view = edit_mode(conn, sid, raw)
+
+      assert has_element?(view, "#wizard-hero-add option[value='']", "Choose a hero")
+      view |> element("#wizard-hero-add") |> render_change(%{"type" => ""})
+
+      refute has_element?(view, "#wizard-note")
+      assert SessionStore.get(sid).save.raw == raw
+    end
+
+    test "the header's Undo and Redo take a wizard edit back and forward", %{conn: conn, sid: sid} do
+      view = edit_mode(conn, sid)
+      assert has_element?(view, "#header-undo[disabled]")
+      assert has_element?(view, "#header-redo[disabled]")
+      original = SessionStore.get(sid).save.raw
+
+      change(view, %{"gold" => "5000"})
+      edited = SessionStore.get(sid).save.raw
+      assert has_element?(view, "#header-undo:not([disabled])")
+      assert has_element?(view, "#header-redo[disabled]")
+
+      view |> element("#header-undo") |> render_click()
+      assert SessionStore.get(sid).save.raw == original
+      assert has_element?(view, "#wizard-note", "Undid: Edited Jafar: gold 5000")
+      assert has_element?(view, ~s(input[name="wizard[gold]"][value="1234"]))
+      assert has_element?(view, "#header-undo[disabled]")
+      assert has_element?(view, "#header-redo:not([disabled])")
+
+      view |> element("#header-redo") |> render_click()
+      assert SessionStore.get(sid).save.raw == edited
+      assert has_element?(view, "#wizard-note", "Redid: Edited Jafar: gold 5000")
+    end
+
+    test "Undo on this page leaves a map stroke alone", %{conn: conn, sid: sid} do
+      view = edit_mode(conn, sid)
+
+      {:ok, _} =
+        SessionStore.update(sid, fn s ->
+          %{s | history: %{s.history | arcanus: [%{kind: :stroke, id: -1, changes: []}]}}
+        end)
+
+      render_click(view, "undo", %{})
+      assert length(SessionStore.get(sid).history.arcanus) == 1
+    end
+
+    test "the header shows Undo and Redo only where the page can undo", %{conn: conn} do
+      {:ok, map, _} = live(conn, ~p"/arcanus")
+      assert has_element?(map, "#app-header")
+      refute has_element?(map, "#header-undo")
     end
   end
 end
