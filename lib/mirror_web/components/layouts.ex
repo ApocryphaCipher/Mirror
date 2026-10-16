@@ -39,7 +39,8 @@ defmodule MirrorWeb.Layouts do
 
   def app(assigns) do
     ~H"""
-    <div class="min-h-screen bg-slate-950 text-slate-100">
+    <%!-- 2.5rem is the save bar above (SaveBarLive, h-10): the page plus the bar is one screen, no scrollbar --%>
+    <div class="min-h-[calc(100svh-2.5rem)] bg-slate-950 text-slate-100">
       <div class="pointer-events-none absolute inset-0 overflow-hidden">
         <div class="absolute -left-40 top-0 h-[36rem] w-[36rem] rounded-full bg-sky-500/10 blur-[160px]" />
         <div class="absolute right-[-10rem] top-32 h-[28rem] w-[28rem] rounded-full bg-amber-400/10 blur-[140px]" />

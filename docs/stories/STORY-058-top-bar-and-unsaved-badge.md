@@ -1,7 +1,7 @@
 # STORY-058: A page-wide top bar and an unsaved-changes badge
 
 **Parent:** [EPIC-012](../epics/EPIC-012-open-and-save-from-the-browser.md)
-**Status:** open (2026-10-15)
+**Status:** done (2026-10-16), except Undo/Redo (not added) and moving the path box (it stays as the fallback until STORY-061)
 **Size:** small to medium
 **Raised by:** [Kevin](https://github.com/KevinAsbury), 2026-10-15
 

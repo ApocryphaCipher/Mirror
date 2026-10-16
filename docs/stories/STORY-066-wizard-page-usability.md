@@ -11,7 +11,7 @@ Confirmed working in Mirror and the game (released DOSBox 0.83 on Windows): wiza
 
 Problems on the wizard edit screen:
 
-1. **Apply gives no feedback.** Clicking an Apply button shows nothing.
+1. **Apply gives no feedback.** Clicking an Apply button shows nothing. *Found 2026-10-16:* at least one cause is the browser's own form check blocking the submit silently: the wizard form's Fame field has `max` 30000, and a real save (SAVE2) holds 30001, so Apply on that page does nothing at all until the field is changed. The fix belongs here: show the problem, and don't set a limit tighter than what the game's own saves hold.
 2. **Several Apply buttons are confusing.** The page has many small forms, each with its own Apply or Set (the wizard form, each hero's form, each item's form and move form, each place's Set, the hero add form).
 3. **No Save on the wizard page.** To save: press every Apply, click Done, click Arcanus or Myrror, click Edit, click Save. (Edits are held in the session and only reach a file through Save as on the map page.)
 4. **Hero artifact dropdowns** should be ordered by **price, highest first**. Today they are alphabetical (`place_choices/2` in `lib/mirror_web/wizard_panel.ex`).

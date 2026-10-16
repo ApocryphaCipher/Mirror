@@ -209,4 +209,58 @@ defmodule Mirror.SaveManagerTest do
       assert SaveManager.restore_engine_session(state, nil) == state
     end
   end
+
+  describe "saves that arrive as bytes (EPIC-012)" do
+    alias Mirror.{SaveFile, WizardFixture}
+
+    test "load_bytes builds the same kind of state as loading a file, labelled with the name" do
+      raw = WizardFixture.synthetic()
+      assert {:ok, state, "SAVE3.GAM"} = SaveManager.load_bytes(raw, "SAVE3.GAM")
+      assert state.save.raw == raw
+      assert state.save_path == "SAVE3.GAM"
+      assert state.original_raw == raw
+      assert SaveManager.unsaved_count(state) == 0
+      SaveManager.stop_engine_session(state.engine_session_id)
+    end
+
+    test "bad bytes are an error, not a crash" do
+      assert {:error, _} = SaveManager.load_bytes("not a save", "SAVE1.GAM")
+      assert {:error, _} = SaveManager.load_bytes(<<>>, "SAVE1.GAM")
+    end
+
+    test "slot_bytes without a save, and mark_saved on a state without one" do
+      assert SaveManager.slot_bytes(%{save: nil, planes: %{}}) == {:error, :no_save}
+      assert SaveManager.mark_saved(%{save: nil}, "SAVE1.GAM", <<>>) == %{save: nil}
+    end
+
+    test "mark_saved clears the unsaved count only for exactly the bytes that were written" do
+      {:ok, state, _} = SaveManager.load_bytes(WizardFixture.synthetic(), "SAVE1.GAM")
+
+      edited = %{
+        state
+        | save: %{state.save | raw: WizardFixture.field(state.save.raw, 0, 0x24, <<99, 0>>)}
+      }
+
+      assert SaveManager.unsaved_count(edited) > 0
+
+      {:ok, bytes} = SaveManager.slot_bytes(edited)
+      saved = SaveManager.mark_saved(edited, "SAVE4.GAM", bytes)
+      assert SaveManager.unsaved_count(saved) == 0
+      assert saved.save_path == "SAVE4.GAM"
+      assert %SaveFile{path: "SAVE4.GAM", raw: ^bytes} = saved.save
+
+      # something else changed after those bytes were made: still unsaved
+      later = %{
+        edited
+        | save: %{edited.save | raw: WizardFixture.field(edited.save.raw, 0, 0x24, <<7, 0>>)}
+      }
+
+      assert SaveManager.mark_saved(later, "SAVE4.GAM", bytes) == later
+      SaveManager.stop_engine_session(state.engine_session_id)
+    end
+
+    test "a bare slot name suggests no save path on the server's disk" do
+      assert SaveManager.suggested_save_path("SAVE3.GAM") == ""
+    end
+  end
 end

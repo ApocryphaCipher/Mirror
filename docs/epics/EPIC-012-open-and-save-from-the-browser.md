@@ -1,6 +1,6 @@
 # EPIC-012: Open and save from the browser
 
-**Status:** planned (2026-10-15), not started
+**Status:** 058, 059 and 060 built (2026-10-16); 061 waits for Kevin. Not yet tried against a real Chrome folder picker: see "What was built"
 **Owner:** [Kevin](https://github.com/KevinAsbury)
 **Requested:** 2026-10-15
 
@@ -20,10 +20,23 @@ buttons (green = a save is there, grey = empty). Click a slot to load it, pick a
 - **A plain "unsaved changes" badge** in the top bar, so a wizard edit is clearly not saved until the user saves.
 - The top bar is **page-wide** (map, wizard pages, Lab), not part of the map header.
 
-## How it works (the plan, none of it built)
+## How it works
 
 The browser holds the folder handle and reads and writes the files; the server never sees the user's disk, so this works the same from Docker. Load: the page reads `SAVEn.GAM` and sends its bytes to the
 server's session (about 123 KB). Save: the server builds the file's bytes and sends them to the page, which writes them into the chosen slot. The server keeps the save and its edit history in memory as it does now; only where the bytes come from and go to changes.
+
+## What was built (2026-10-16)
+
+`MirrorWeb.SaveBarLive` is rendered once in the root layout as a **sticky** child, so it keeps its state while pages change. Its browser half is the `SaveSlots` hook (`assets/js/save_slots.js`, pure helpers in `save_slots.mjs` with Node tests). Server side: `SaveFile.from_binary/2`, `SaveManager.load_bytes/3`, `slot_bytes/1`, `mark_saved/3`, `unsaved_count/1`.
+
+- Open: click a green slot, the browser reads the file and sends the bytes. Slot 9 opens like the others.
+- Save to: slots 1 to 8, the server builds the bytes, the browser writes them. A full slot asks first (in the bar). **The old file is copied to `SAVEn.GAM.mirror-backup` once: an existing backup is kept, so it stays the save as the game wrote it** (Kevin's note said only "a backup"; keeping the first one is my choice, because overwriting it on every save would lose the original on the second save). A failed backup or write stops the save and leaves the edits marked unsaved.
+- The "Unsaved changes" badge sits in a fixed spot and is hidden with `invisible`, so nothing shifts.
+- The pages' height accounts for the 2.5 rem bar, so there is no extra scrollbar.
+- The folder handle is kept in IndexedDB; when Chrome wants the permission again the bar shows **Reconnect folder**. The slots refresh when the tab regains focus.
+- The path box on the map page stays as the fallback (and for browsers without the picker) until STORY-061.
+
+**Checked:** server tests (`save_bar_live_test.exs`, `save_manager_test.exs`), Node tests, and in the in-app browser against a **fake** folder (a stand-in object for `showDirectoryPicker`, backed by a real save): open, live navigation to a wizard page with the bar and folder kept, a wizard edit showing the badge, Save to an empty slot (exactly the two edited places differed from the original), Replace with the backup made, slot 9 refused, no scrollbar. **Not checked:** the real Chrome folder picker and permission prompts, the remembered folder after a restart, and a save written this way loading in DOSBox (do it as in [real-game-acceptance.md](../reference/real-game-acceptance.md)).
 
 ## Open questions
 

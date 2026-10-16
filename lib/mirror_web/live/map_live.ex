@@ -993,8 +993,8 @@ defmodule MirrorWeb.MapLive do
     ~H"""
     <Layouts.app flash={@flash} full_bleed>
       <%= if @lab? do %>
-        <div class="relative min-h-[100svh]">
-          <div class="relative flex min-h-[100svh] flex-col">
+        <div class="relative min-h-[calc(100svh-2.5rem)]">
+          <div class="relative flex min-h-[calc(100svh-2.5rem)] flex-col">
             <header class="pointer-events-auto border-b border-white/10 bg-slate-950/80 px-6 py-5 shadow-lg shadow-black/60 backdrop-blur">
               <div class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-xl shadow-black/60 backdrop-blur">
                 <div class="flex flex-wrap items-end justify-between gap-4">
