@@ -25,14 +25,12 @@ hero ability names, hero rename vs the name table, and what a Time Stop edit doe
 2. A clean-install run from the README on a fresh machine or folder: `git clone`, `mix setup`, import, run, load a save, edit, Save as, load it in DOSBox. Not done.
 3. The Docker route from a clean checkout, game files mounted, loads a save. Not done.
 4. Test on a Steam copy if there is one (backlog item).
-5. Licence: **MIT chosen (Kevin, 2026-10-15); `LICENSE` added in its own PR.** Still open: seven modules in `lib/mirror/engine/` carry `SPDX-License-Identifier: GPL-2.0-only` (ports of MOMIME), which does not sit with MIT for the whole repo. Options: find out what of the engine is still used and whether it can be rewritten from the game's data or kazzmir's BSD code, or ship it as GPL and say so. `docs/reference/momime-source/` also holds copies of GPL source. Not resolved.
+5. Licence: **GPL-2.0** (Kevin, 2026-10-15; the engine files are GPLv2 ports of MOMIME, so the whole project is GPL-2.0). `LICENSE`, README and `NOTICE.md` are in their own PR. Done once that merges.
 6. Version: `mix.exs` says 0.1.0. Pick the first tag (suggest `v0.1.0`, since safe editing STORY-029 is open), bump if needed.
 7. CI green on `main` (format, warnings-as-errors compile, tests, Docker smoke test), `mix test --seed 1 --max-cases 8` clean.
 8. Repo hygiene: nothing from a game file in the tree or the history (AGENTS.md section 5); `erl_crash.dump` and `tmp/` are not tracked.
 9. Tag, GitHub release notes (what it does, the limits above, how to install), link from the README.
 
 ## Not decided
-
-- How to square MIT with the GPL-2.0-only engine files (item 5).
 
 Decided: do **not** wait for STORY-029 (Kevin, 2026-10-15); the limit is stated in the notes instead.
