@@ -135,7 +135,8 @@ Kevin's session; `gama surveyor hits.jsonl`).
 All in `scripts/`; they only read through the API (writes stay off).
 
 - `live_session.sh start | cp "name" | status`: launches the fork with the
-  webserver and file log on; `cp` is `gama checkpoint` with the vault set;
+  webserver and file log on (macOS; on Windows use `scriptsive_session.ps1`,
+  same three commands, settings through environment variables, see its header); `cp` is `gama checkpoint` with the vault set;
   `status` lists the latest checkpoints.
 - `terrain_watch.py [--targets 18,33,179]`: polls the terrain block (RAM
   `0x72630`) and logs every new map to `~/.mirror/dev/DOSbox/terrain-watch.jsonl`.
