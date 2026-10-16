@@ -59,3 +59,7 @@ SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+## Licence of Mirror itself
+
+Mirror is MIT-licensed (`LICENSE`, decided by Kevin 2026-10-15). **Open question:** the modules in `lib/mirror/engine/` are marked `SPDX-License-Identifier: GPL-2.0-only` because they are ports of MOMIME code. Until they are rewritten, replaced, or MOMIME's authors agree otherwise, those files stay GPL-2.0-only and a build that includes them is a combined work that GPLv2 may cover. Resolve this before the first tag (STORY-057).
