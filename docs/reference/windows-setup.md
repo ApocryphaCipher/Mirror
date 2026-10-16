@@ -10,7 +10,7 @@ release, not GOG 1.31.
 | Part | State |
 | --- | --- |
 | Mirror: `mix setup`, tests, dev server, map drawing | Works (Steam game files). 5 test failures on Windows, fixed in PR #147. |
-| mompy | `--version` and its 312 tests pass. `mompy doctor` reaches DOSBox 0.83.0 and reads memory; the game step needs a saved game loaded (none on this machine yet). |
+| mompy | `--version` and its 312 tests pass. With the Steam game loaded in DOSBox 0.83.0, `mompy doctor` says READY and `poke city` changed a city's population (confirmed in game). |
 | evi / gama | Install and tests pass. `gama status` runs against the vault but prints nothing: the `checkpoints` table is empty. |
 | DOSBox Staging 0.83.0 (released) | Web API works on Windows. |
 | Research fork build, Windows `live_session`, rest of the Steam test | Not done (see "Left to do"). |
@@ -143,15 +143,42 @@ dosbox.exe --set webserver_enabled=true -c "mount c <copy of game>" -c c: -c WIZ
 
 So the web API works on Windows with the released build and memory reads
 work. The game step needs a game loaded with all five wizards; Steam's copy
-has none. The verdict is therefore NOT READY until a saved game is loaded.
+has none, so the first run said NOT READY. With a game loaded (see below) it says READY.
 
 ## Left to do
 
-* Load a real saved game in DOSBox and re-run `mompy doctor` (reads, then writes).
-* Steam: check the three differing LBX files in use, and a real save round trip.
 * Research fork (`ApocryphaCipher/dosbox-staging`, branch `apocrypha/research`):
   not built. Needs CMake, vcpkg and Visual Studio 2022 C++ tools. The
   `dosbox-staging` checkout downloaded is on `main`.
 * A PowerShell equivalent of `scripts/live_session.sh` (it is macOS-only).
 * Try `scripts/dev_server.sh` and `scripts/test_game.sh` under Git Bash.
 * `gama rebuild` / why the vault's `checkpoints` table is empty.
+
+## Round trip on the Steam copy (tested)
+
+1. DOSBox Staging 0.83.0 with the **Steam game folder mounted directly** and
+   the web API on (the mount goes in a small config file, because quoting a
+   path with spaces on the command line broke):
+
+   ```
+   [autoexec]
+   mount c "E:\SteamLibrary\...\Master of Magic Official Release"
+   c:
+   ```
+
+   ```powershell
+   dosbox.exe --noprimaryconf -conf steam-mount.conf --set webserver_enabled=true
+   ```
+
+   Start the game by hand from `C:\>`. Saves then land in the Steam folder.
+2. In-game, with a map loaded: `mompy doctor` gave **READY** (wizard table at
+   0x3239a, 28 cities, 42 units, writes accepted). `mompy where pointer`
+   named the city under the mouse; `mompy poke city <name> population 25`
+   changed it (4 -> 25). `poke city` takes a name, not `pointer`.
+3. Saved from the game, loaded in **Mirror** from `~/.mirror/game`, edited
+   the map and saved as `SAVE3.GAM`. Copied `SAVE3.GAM` into the Steam folder
+   and loaded it in the game: it loads and **the map edits are in place**.
+
+So the Steam copy works for the live API (mompy) and for a Mirror save round
+trip. Still unchecked on Steam: the three LBX files that differ from GOG in
+every screen that uses them.
