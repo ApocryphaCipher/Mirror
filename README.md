@@ -1,173 +1,74 @@
 # Mirror
 
-Mirror is a viewer and editor for classic *Master of Magic* (1994 DOS) save
-files. It reads a `SAVEn.GAM`, draws the overland map of both planes
-(Arcanus and Myrror) with the game's own tile art, and lets you edit the
-terrain and save the result back to a new `.GAM`. It's a Phoenix/LiveView
-app; everything renders live in the browser.
+**Look inside your *Master of Magic* saves, and change them.**
+
+Mirror opens a save file from the classic 1994 DOS game and shows you the whole world in your browser: both planes, every city, army, tower and lair, drawn with the game's own art. Then it lets you change things: reshape the land, move a city, give a wizard more gold, hand a hero a new sword. Save the result as a new file and load it in the game.
 
 ![Mirror's map page showing Arcanus from a save, with the wizard links, layer toggles and the Surveyor readout](docs/images/mirror-map.jpg)
 
-**Status:** terrain renders directly from the game's `TERRAIN.LBX` and matches a
-reference decode pixel for pixel, and the map pages draw the save's overland
-features with the game's own art: cities (owner-coloured flags, population
-frames, walls, names), units on banner-colour plaques, towers and encounter
-sites, roads, specials and corruption, the sparkles on owned magic nodes, and the
-player's fog of war. The ocean, the other animated tiles, the node sparkles and
-enchanted roads move on the game's 0.6 s step (an **Animate terrain** toggle turns
-it off). The map pages have a view mode (zoom, pan, a hover readout with the full
-Surveyor card, and a toggle for each layer) and an edit mode: paint a terrain type
-with auto-tiling, cycle or paint raw tiles, set roads, enchanted roads, corruption
-and specials, reveal the whole map, move cities, towers, lairs, magic nodes and unit stacks,
-edit a city (name, population, buildings, enchantments, race, owner), a lair's cleared state, guards, gold, mana and how many items it gives, a node's owner and guardians and a unit's level, experience, damage and owner,
-undo/redo, and Save as. Note on editing:
-**Paint type** keeps the landmass/continent IDs consistent; the raw tools (Cycle,
-Paint tile) update terrain tiles and the recomputed adjacency mask only and do
-**not** keep the landmass/continent IDs consistent (tracked in STORY-017 and
-STORY-029). The wizard pages (`/wizard/1` to `/wizard/5`) edit a wizard, its heroes and its artifacts (see below). Next is safe editing and a first release
-([EPIC-006](docs/epics/EPIC-006-map-first-ui-and-edit-mode.md), [STORY-057](docs/stories/STORY-057-first-release.md)). Every edit
-feature is checked against the real game before its story is closed
-([how](docs/reference/real-game-acceptance.md)). The sprites are catalogued in the
-[sprite catalog](docs/reference/overland-sprites-and-save-blocks.md).
-[docs/epics/](docs/epics/) is the living status; this paragraph is a summary.
+## What you can do
 
-## Quick start
+- **Explore the map.** Zoom and pan Arcanus and Myrror, hover any tile to see what it is, and switch layers on and off (units, cities, fog of war and more).
+- **Edit the map.** Paint terrain, lay roads, move cities and armies, and open any city, lair or node to change what's in it. Undo and redo everything.
+- **Edit the wizards.** Gold, mana, spell books, retorts, spells, relations, global enchantments, heroes and their artifacts.
+- **Stay safe.** Mirror never overwrites the save you opened. **Save as** writes a new file, and you load that in the game.
 
-You need:
+Every kind of edit has been checked by loading the result in the real game.
 
-- Elixir 1.20.4 / Erlang/OTP 29.1 (what CI uses; `mix.exs` has the minimum).
-- Your own copy of the classic game files. Mirror doesn't ship them; they
-  are copyrighted and must never be committed. You need a **complete**
-  install (the GOG release works; Steam is untested). CD-era installs often
-  leave `TERRAIN.LBX` and others on the disc.
-- A save file (`SAVEn.GAM`) from that install.
+## Get it running
+
+You need **your own copy of the game**. Mirror can't include it. The GOG version works (Steam hasn't been tried). You also need [Elixir](https://elixir-lang.org/install.html) 1.20 with Erlang/OTP 29, or Docker.
 
 ```bash
+git clone https://github.com/ApocryphaCipher/Mirror.git
+cd Mirror
 mix setup
-mix mirror.import_game "/path/to/your/Master of Magic"   # an install folder or a .zip
-```
-
-`mirror.import_game` copies only the files Mirror reads (eight LBX files,
-plus your `SAVEn.GAM` saves) into `~/.mirror/game`, checks each one, and
-says whether it matches the GOG release. `TERRAIN.LBX` and `FONTS.LBX` are
-required; the rest (`MAPBACK`, `UNITS1`, `UNITS2`, `SPELLDAT`, `ITEMPOW`,
-`ITEMDATA`) add map sprites, unit figures, spell and item names and the
-premade-item lists, and Mirror still starts without them. Re-running it is safe: it never
-overwrites a save you've edited unless you pass `--force`.
-
-Then start the server with [scripts/dev_server.sh](scripts/dev_server.sh). It points
-`MIRROR_MOM_PATH` at `~/.mirror/game` (override by setting it yourself) and runs
-`mix phx.server`.
-
-```bash
+mix mirror.import_game "/path/to/your/Master of Magic"   # a folder or a .zip
 bash scripts/dev_server.sh
 ```
 
-Open <http://localhost:4000/arcanus>, type the path of a save in the header
-(for example `~/.mirror/game/SAVE1.GAM`) and press Load. Stop the server with
-Ctrl-C. **Save as** never overwrites the save you loaded; it suggests the next
-free `SAVE1.GAM` to `SAVE9.GAM` slot (the game only loads those names).
+Open <http://localhost:4000/arcanus>, type the path of a save (for example `~/.mirror/game/SAVE1.GAM`) and press **Load**. Press Ctrl-C to stop.
 
-### Docker (no Elixir toolchain needed)
+The import step copies just the files Mirror needs, and your saves, into `~/.mirror/game`. It's safe to run again; it won't overwrite a save you've edited.
+
+**Prefer Docker?**
 
 ```bash
 docker compose up --build
 ```
 
-Builds the release image on your machine (Mirror is distributed as source, not as a published image) and starts it on `localhost:4000`. Game files
-and saves are read from (and written to) `~/.mirror/game` via a bind mount
-(set `MIRROR_HOME` to use a different folder).
-
-To import game files without an Elixir toolchain:
+That builds Mirror on your machine and serves it on port 4000, reading your game files from `~/.mirror/game`. To import them without Elixir installed:
 
 ```bash
 docker compose run --rm -v "/path/to/install:/source:ro" app bin/mirror eval 'Mirror.GameFiles.import("/source", "/game")'
 ```
 
-(Or populate `~/.mirror/game` using `mix mirror.import_game /path/to/install` if you have Elixir installed.)
+## Playing your edited save
 
-Visit `localhost:4000`:
+**Save as** suggests the next free slot. The game only loads `SAVE1.GAM` to `SAVE9.GAM`, and its Load screen shows slots 1 to 8, so use one of those names, copy the file into your game folder, and load it as usual.
 
-- `/arcanus`, `/myrror`: the map for each plane. Pan, zoom, inspect tiles with
-  the Surveyor readout, and toggle layers (cities, settleable sites, fog of war).
-  Load a save with the path field in the header (it defaults to
-  `$MIRROR_MOM_PATH/SAVE1.GAM`), then ✎ Edit. **Paint type** paints water or a land type (dropdown, brush 1×1 to 5×5, fill; right-click picks the terrain under the pointer) and re-tiles the coast and edges around it; **Paint tile** writes one exact tile number (with a quick pick of plain tiles) and leaves neighbours alone; **Cycle** steps a tile to the next picture. **Road** steps a tile none, road, enchanted road; **Corruption** switches it on or off; **Special** places an ore, gems, crystals, wild game or nightshade. **Reveal** marks every tile of this plane, or both, as explored. **🏰 Move** picks up a city, tower, lair or node and puts it down on another tile; **👥 Units** lists a tile's units and moves or edits the ticked ones; **🏙️ City**, **🏚️ Lair** and **🔮 Node** open a panel for the structure you click. In view mode a click on a city, a stack or a site opens the same panel read-only. Undo and redo cover everything, including the landmass layer and every structure edit.
-- `/wizard/1` to `/wizard/5`: one wizard of the loaded save, (fame, gold, mana, books, retorts, research, heroes (name, level, experience and damage editable; a new hero can be added to an empty place) with their items (name, cost, stats and powers editable; items can be moved between the heroes and the vault, a place can be filled with a premade item or emptied), the vault, standing; ✎ Edit changes name, gold, mana, fame, books, retorts, spells and what is researched; relations (with their standing) and global enchantments (all but Time Stop) are editable),
-  on a gradient of their banner colour; reached from the owner names in the map panels.
-- `/lab/arcanus`, `/lab/myrror`: the research workbench. Raw layers,
-  value/bit labelling, histograms, the raw-value painter.
-- `/tile-probe`: the LBX explorer. Browse any LBX file's entries by name,
-  preview images and animation frames in the game palette, and inspect
-  palette indices and hex dumps.
+## Good to know
 
-## Tests
+- Only the GOG 1.31 version of the game has been tested.
+- Paint type keeps coasts and continents right. The raw tile tools (Cycle, Paint tile) don't, so use them with care.
+- Time Stop can't be edited.
 
-```bash
-mix test                  # everything that doesn't need game files (including editing/save-safety tests,
-                          # and the client's JavaScript unit tests in assets/test when `node` is installed)
-bash scripts/test_game.sh # real-file tests using dev_server.sh's game-file env
-```
+The full list is in the [release notes](docs/releases/v0.1.0.md).
 
-Tests that need real game files read from `MIRROR_MOM_PATH` (or a frozen save
-fixture for Surveyor tests, `MIRROR_SURVEYOR_SAVE`, which defaults to
-`~/.mirror/dev/surveyor-fixtures/SAVE9-dior-2026-09-24.GAM`) and are skipped
-when they are missing, so CI (which has no game files) runs `mix test` only.
+## Under the hood
 
-`scripts/test_game.sh` exports the variables from `scripts/dev_server.sh`
-(`MIRROR_MOM_PATH` and the save-block offsets), but does **not** set
-`MIRROR_SURVEYOR_SAVE`. Running the Surveyor real-save tests therefore requires
-manually exporting `MIRROR_SURVEYOR_SAVE` (or placing the frozen Dior save at the
-default fixture path).
+Mirror is a Phoenix LiveView app. The game's file formats are undocumented, so every format fact in the code was checked against the game itself, and the write-ups are in [docs/reference](docs/reference/). Project status, stories and session notes are in [docs/](docs/README.md).
 
 ## Contributing
 
-All changes go through a pull request: branch, commit, open a PR, CI
-passes, merge. Nobody pushes to `main` directly. CI runs
-`mix format --check-formatted`, `mix compile --warnings-as-errors` and
-`mix test` on every PR and on `main`.
+Changes go through a pull request: branch, commit, open a PR, and CI must pass. The standards, for people and AI agents alike, are in [AGENTS.md](AGENTS.md). To run the tests:
 
-Coding standards and project conventions, for humans and AI agents, are in
-[AGENTS.md](AGENTS.md).
-
-## How the project is tracked
-
-Mirror depends on undocumented binary formats (the save file, the LBX asset
-containers) and on reimplementing game logic nobody published. What has
-worked every time is finding a primary source instead of guessing from
-patterns: the game's own data files, or an independent implementation.
-[docs/reference/](docs/reference/) holds the format write-ups and where
-each fact came from; [docs/notes/](docs/notes/) holds dated session notes.
-
-**`docs/` is where the project state lives:** epics, stories, the backlog
-and research notes. If you're picking this project up (human or AI), start
-at [docs/README.md](docs/README.md).
-
-**Checking against the real game.** Mirror's guesses about the formats are
-checked in the real game, not assumed. For edits, load the saved file in DOSBox
-([docs/reference/real-game-acceptance.md](docs/reference/real-game-acceptance.md)).
-For research, a DOSBox Staging fork with a read-only web API lets an agent read
-the running game's memory and screen
-([docs/reference/live-ram-map.md](docs/reference/live-ram-map.md),
-`scripts/live_session.sh`); it is a research tool, and Mirror itself never talks to
-DOSBox.
-
-## Keeping this file current
-
-This README describes what Mirror does *now*; plans belong in `docs/epics/`.
-Update the Status paragraph when something in `docs/epics/` materially
-changes (a feature starts working, or a fix lands), not more often.
+```bash
+mix test
+```
 
 ## Licence
 
-GPL-2.0, see [LICENSE](LICENSE). Parts of Mirror are ported from the GPLv2 MOMIME project (see [NOTICE.md](NOTICE.md)). The game's own files are not covered and are never included.
+GPL-2.0, see [LICENSE](LICENSE). Parts of Mirror are ported from the GPLv2 MOMIME project, and the terrain table comes from [kazzmir/master-of-magic](https://github.com/kazzmir/master-of-magic). Details are in [NOTICE.md](NOTICE.md). The game's own files aren't included and aren't covered.
 
-## Maintainer
-
-Mirror is maintained by [Kevin Asbury](https://github.com/KevinAsbury). "Kevin"
-in the docs and tickets means him.
-
-## Attribution
-
-Mirror's early rendering logic was informed by the MOMIME project (GPLv2).
-See [NOTICE.md](NOTICE.md) and [docs/reference/momime-source/](docs/reference/momime-source/) for
-details and citations.
+Mirror is maintained by [Kevin Asbury](https://github.com/KevinAsbury).
