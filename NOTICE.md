@@ -59,3 +59,7 @@ SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+## Licence of Mirror itself
+
+Mirror is licensed under the GNU General Public License, version 2 (`LICENSE`; Kevin's decision, 2026-10-15). It was chosen because the modules in `lib/mirror/engine/` are ports of MOMIME code, which is GPLv2. The dependencies (Phoenix and friends, MIT or Apache-2.0) and the kazzmir table above (BSD 3-Clause) are compatible with it; their notices stay with them. Master of Magic's own files are not covered.

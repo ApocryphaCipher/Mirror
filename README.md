@@ -155,6 +155,10 @@ This README describes what Mirror does *now*; plans belong in `docs/epics/`.
 Update the Status paragraph when something in `docs/epics/` materially
 changes (a feature starts working, or a fix lands), not more often.
 
+## Licence
+
+GPL-2.0, see [LICENSE](LICENSE). Parts of Mirror are ported from the GPLv2 MOMIME project (see [NOTICE.md](NOTICE.md)). The game's own files are not covered and are never included.
+
 ## Maintainer
 
 Mirror is maintained by [Kevin Asbury](https://github.com/KevinAsbury). "Kevin"
