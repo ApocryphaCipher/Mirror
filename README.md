@@ -6,6 +6,8 @@ Mirror opens a save file from the classic 1994 DOS game and shows you the whole 
 
 ![Mirror's map page showing Arcanus from a save, with the wizard links, layer toggles and the Surveyor readout](docs/images/mirror-map.jpg)
 
+![Mirror's wizard page for Freya: fame, gold, mana, books, retorts, research and known spells, on her green banner colour](docs/images/mirror-wizard.jpg)
+
 ## What you can do
 
 - **Explore the map.** Zoom and pan Arcanus and Myrror, hover any tile to see what it is, and switch layers on and off (units, cities, fog of war and more).
