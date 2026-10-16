@@ -1,7 +1,7 @@
 # STORY-062: Fix the toast messages
 
 **Parent:** none (UI; relates to [EPIC-012](../epics/EPIC-012-open-and-save-from-the-browser.md), whose Save shows one)
-**Status:** done (2026-10-16), pending Kevin's try
+**Status:** done (2026-10-16), checked by Kevin in Chrome
 **Size:** small to medium
 **Raised by:** [Kevin](https://github.com/KevinAsbury), 2026-10-15
 
@@ -44,7 +44,7 @@ Home-rolled, as recommended: no dependency. `MirrorWeb.Toast.push/4` (`lib/mirro
 - Replaced: every `put_flash` (map and tile-probe pages), the save header's own message, and the wizard page's own note. The Replace question stays where it was (it is a question). The two connection banners ("We can't find the internet" and "Something went wrong") are unchanged.
 - Tests read toasts with `MirrorWeb.ToastHelpers` (`test/support/toast_helpers.ex`).
 
-**Checked** in the in-app browser: four toasts in a row stack with the newest in front, fold up after a second, spread out on hover and hold their timers (nothing expired in 11 s of hovering, an error went 10 s after leaving), a toast survives the start page's jump to the map, and the Undo on a wizard edit's toast took the edit back. **Not checked:** Kevin's try in Chrome; narrow phone widths; a screen reader.
+**Checked** in the in-app browser: four toasts in a row stack with the newest in front, fold up after a second, spread out on hover and hold their timers (nothing expired in 11 s of hovering, an error went 10 s after leaving), a toast survives the start page's jump to the map, and the Undo on a wizard edit's toast took the edit back. **Checked by Kevin in Chrome (2026-10-16):** a row of edits stacks, folds up and fades one by one; hovering holds them; Undo on a toast took the edit back; a refusal (Gold 99999) shows a red toast; the stack stays across a page change until it fades. **Seen, not changed:** the toasts for a row of ticks all read "Edited Jafar: global enchantments"; naming which one ("Wind Mastery on") would help. **Not checked:** narrow phone widths; a screen reader.
 
 ## Definition of done
 
