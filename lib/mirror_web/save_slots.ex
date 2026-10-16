@@ -339,7 +339,12 @@ defmodule MirrorWeb.SaveSlots do
 
   def header(assigns) do
     ~H"""
-    <header id="app-header" class="border-b border-white/10 bg-slate-950/80 backdrop-blur">
+    <%!-- backdrop-blur makes the header its own stacking layer, so it needs its own z-index
+         or the map (positioned, later in the page) paints over the floating messages below it --%>
+    <header
+      id="app-header"
+      class="relative z-50 border-b border-white/10 bg-slate-950/80 backdrop-blur"
+    >
       <div class="relative flex items-start justify-between gap-4 px-4 pb-2 pt-3">
         <.logo />
 
