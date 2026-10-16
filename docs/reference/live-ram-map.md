@@ -136,7 +136,9 @@ All in `scripts/`; they only read through the API (writes stay off).
 
 - `live_session.sh start | cp "name" | status`: launches the fork with the
   webserver and file log on; `cp` is `gama checkpoint` with the vault set;
-  `status` lists the latest checkpoints.
+  `status` lists the latest checkpoints. This one is macOS-only; on Windows
+  use `scripts\live_session.ps1` (same three commands, settings through
+  environment variables, see its header).
 - `terrain_watch.py [--targets 18,33,179]`: polls the terrain block (RAM
   `0x72630`) and logs every new map to `~/.mirror/dev/DOSbox/terrain-watch.jsonl`.
   When a target tile number shows up it takes a checkpoint by itself. Use it
