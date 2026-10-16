@@ -61,3 +61,4 @@
 - [STORY-061](STORY-061-retire-the-path-box.md): retire the path box and the old save-path rules (EPIC-012) **Open**
 - [STORY-062](STORY-062-fix-the-toasts.md): fix the toast messages: fade after a time, newest on top, slide then collapse into a stack **Open**
 - [STORY-063](STORY-063-spike-fantasy-terrain.md): spike: a high-resolution terrain set of Kevin's own art, no game assets (terrain only; units and sprites later) **Open**
+- [STORY-064](STORY-064-river-editing.md): river editing: a path tool or a river layer, translated to the 43 river tiles (EPIC-006) **Open (idea)**
