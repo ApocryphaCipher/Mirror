@@ -1,111 +1,19 @@
 defmodule Mirror.SaveManager do
   @moduledoc """
-  Coordinates save file loading, writing, overwrite protection, engine session lifecycle,
-  and initial editor state normalization.
+  Coordinates opening a save (from the bytes the browser sends, `load_bytes/3`), the bytes to write
+  back (`slot_bytes/1`, `mark_saved/3`), the engine session lifecycle, and initial editor state
+  normalization. Where a save is read from and written to is the browser's business
+  (`MirrorWeb.SaveSlots`); nothing here touches the server's disk for a save.
   """
 
   alias Mirror.Editor
   alias Mirror.Engine.{Session, SessionSupervisor}
-  alias Mirror.{Paths, SaveFile, SessionStore, Stats}
-
-  @doc "Normalizes a user-entered save path by trimming whitespace and surrounding quotes."
-  def normalize_path(nil), do: ""
-
-  def normalize_path(path) when is_binary(path) do
-    trimmed =
-      path
-      |> String.trim()
-      |> String.trim("\"")
-      |> String.trim("'")
-
-    case trimmed do
-      "" -> ""
-      _ -> Path.expand(trimmed)
-    end
-  end
-
-  def normalize_path(_), do: ""
-
-  @doc "Default path to propose when loading, using MIRROR_MOM_PATH/SAVE1.GAM if set."
-  def default_load_path do
-    case Paths.mom_path() do
-      nil -> ""
-      "" -> ""
-      path -> Path.join(path, "SAVE1.GAM")
-    end
-  end
-
-  @doc "Suggests the next free SAVEn.GAM slot beside the loaded file."
-  def suggested_save_path(original) when is_binary(original) do
-    # a save loaded from a slot button has only a name, no folder on the server
-    with dir when dir != "." <- Path.dirname(original),
-         {:ok, path} <- SaveFile.next_free_slot(dir) do
-      path
-    else
-      _ -> ""
-    end
-  end
-
-  def suggested_save_path(_), do: ""
-
-  @doc "User-facing message after a successful save."
-  def saved_message(path) do
-    if SaveFile.game_loadable_name?(path) do
-      "Saved to #{path}."
-    else
-      "Saved to #{path}. The game only loads SAVE1.GAM to SAVE9.GAM, so rename it to play it."
-    end
-  end
-
-  @doc "User-facing message for load errors."
-  def load_error_message({:missing_offset, layer}, _path) do
-    "Missing block offset for #{layer}. Set config before loading."
-  end
-
-  def load_error_message(:enoent, path) when path in [nil, ""] do
-    "Provide a save path before loading."
-  end
-
-  def load_error_message(:enoent, path) do
-    "Save file not found at #{path}. Check the path."
-  end
-
-  def load_error_message(reason, _path) do
-    "Unable to load save: #{inspect(reason)}"
-  end
-
-  @doc "User-facing message for save errors."
-  def save_error_message(:no_save) do
-    "Load a save before saving."
-  end
-
-  def save_error_message(:would_overwrite_original) do
-    "Choose a new file name: Save as won't overwrite the file you loaded."
-  end
-
-  def save_error_message(reason) do
-    "Save failed: #{inspect(reason)}"
-  end
+  alias Mirror.{SaveFile, SessionStore, Stats}
 
   @doc """
-  Loads a save file from `path`, terminates any previous engine session in `current_state`,
-  builds normalized planes with computed layers, starts a new engine session, and initializes
-  research statistics.
-
-  Returns `{:ok, state, normalized_path}` or `{:error, reason}`.
-  """
-  def load(path, current_state \\ nil) do
-    normalized = normalize_path(path)
-
-    case SaveFile.load(normalized) do
-      {:ok, save} -> {:ok, build_state(save, current_state), normalized}
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  @doc """
-  Like `load/2`, for a save that arrived as bytes from a slot button (EPIC-012). `name` is
-  the label shown for it (`"SAVE3.GAM"`). Returns `{:ok, state, name}` or `{:error, reason}`.
+  Opens a save that arrived as bytes from a slot button (EPIC-012), ending any engine session of
+  `current_state` and starting a new one. `name` is the label shown for it (`"SAVE3.GAM"`).
+  Returns `{:ok, state, name}` or `{:error, reason}`: bad bytes are an error, never a raise.
   """
   def load_bytes(raw, name, current_state \\ nil) do
     case SaveFile.from_binary(raw, name) do
@@ -192,44 +100,6 @@ defmodule Mirror.SaveManager do
   def unsaved_count(state),
     do: Editor.changed_tile_count(state) + Editor.changed_record_count(state)
 
-  @doc """
-  Saves the current editor state to `target_path` (or `state.save_path`).
-  Universal overwrite protection prevents overwriting the loaded file.
-
-  Returns `{:ok, updated_state, saved_path}` or `{:error, reason}`.
-  """
-  def save(state, requested_path \\ nil) do
-    path = normalize_path(requested_path)
-    target_path = if path == "", do: nil, else: path
-
-    case state.save do
-      %SaveFile{} = save ->
-        saved_planes = Editor.strip_computed(state.planes)
-
-        case SaveFile.write(%{save | planes: saved_planes}, target_path || state.save_path) do
-          {:ok, save_path} ->
-            save = %{save | path: save_path, planes: saved_planes}
-
-            updated_state =
-              Map.merge(state, %{
-                save: save,
-                save_path: save_path,
-                original_planes: saved_planes,
-                original_raw: save.raw,
-                record_mark: System.unique_integer([:positive, :monotonic])
-              })
-
-            {:ok, updated_state, save_path}
-
-          {:error, reason} ->
-            {:error, reason}
-        end
-
-      _ ->
-        {:error, :no_save}
-    end
-  end
-
   @doc "Restarts the engine session using the restored save file after a discard."
   def restore_engine_session(state, %SaveFile{} = restored_save) do
     stop_engine_session(Map.get(state, :engine_session_id))
@@ -286,7 +156,7 @@ defmodule Mirror.SaveManager do
     end
   end
 
-  @doc "Starts a new engine session for a save struct or file path."
+  @doc "Starts a new engine session for a save."
   def start_engine_session(%SaveFile{} = save) do
     case SessionSupervisor.start_session(seed: System.unique_integer([:positive])) do
       {:ok, pid} ->
@@ -303,25 +173,6 @@ defmodule Mirror.SaveManager do
         {:error, reason}
     end
   end
-
-  def start_engine_session(path) when is_binary(path) and path != "" do
-    case SessionSupervisor.start_session(seed: System.unique_integer([:positive])) do
-      {:ok, pid} ->
-        case Session.load_save(pid, path) do
-          {:ok, session_id} ->
-            {:ok, session_id}
-
-          {:error, reason} ->
-            SessionSupervisor.stop_session(pid)
-            {:error, reason}
-        end
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
-
-  def start_engine_session(_path), do: {:error, :missing_path}
 
   @doc "Default selection mapping each layer to 0."
   def default_selection do

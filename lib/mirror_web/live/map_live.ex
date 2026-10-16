@@ -124,8 +124,6 @@ defmodule MirrorWeb.MapLive do
       |> assign(:tile_assets, nil)
       |> assign(:overlays_primed, false)
       |> assign(:overlay_sprites_sent, false)
-      |> assign(:load_path, SaveManager.default_load_path())
-      |> assign(:save_path_input, state.save_path || "")
       |> assign_forms()
 
     if connected?(socket) do
@@ -216,6 +214,7 @@ defmodule MirrorWeb.MapLive do
         |> assign_from_state(current_state)
         |> assign_forms()
         |> refresh_hover()
+        |> drop_picks_for_another_save(previous_state, current_state)
 
       socket =
         if connected?(socket) do
@@ -499,67 +498,6 @@ defmodule MirrorWeb.MapLive do
   end
 
   @impl true
-  def handle_event("load_save", %{"load" => %{"path" => path}}, socket) do
-    path = SaveManager.normalize_path(path)
-
-    socket =
-      socket
-      |> assign(:load_path, path)
-      |> assign_forms()
-
-    case SaveManager.load(path, socket.assigns.state) do
-      {:ok, state, normalized_path} ->
-        SessionStore.put(socket.assigns.session_id, state)
-
-        socket =
-          socket
-          |> assign_from_state(state)
-          |> assign_forms()
-          |> reset_picks()
-          |> Toast.push(:info, "Loaded save from #{normalized_path}.")
-
-        socket =
-          if connected?(socket) do
-            socket
-            |> push_map_state()
-            |> push_map_reload()
-            |> maybe_push_tile_assets()
-          else
-            socket
-          end
-
-        {:noreply, socket}
-
-      {:error, reason} ->
-        {:noreply, Toast.push(socket, :error, SaveManager.load_error_message(reason, path))}
-    end
-  end
-
-  def handle_event("save_file", %{"save" => %{"path" => path}}, socket) do
-    path = SaveManager.normalize_path(path)
-    socket = assign(socket, :save_path_input, path)
-
-    update_result =
-      SessionStore.update(socket.assigns.session_id, fn current ->
-        case SaveManager.save(current, path) do
-          {:ok, updated_state, save_path} ->
-            {updated_state, save_path}
-
-          {:error, reason} ->
-            {:error, reason}
-        end
-      end)
-
-    case update_result do
-      {:ok, state, save_path} ->
-        {:noreply,
-         Toast.push(assign_state(socket, state), :info, SaveManager.saved_message(save_path))}
-
-      {:error, reason} ->
-        {:noreply, Toast.push(socket, :error, SaveManager.save_error_message(reason))}
-    end
-  end
-
   def handle_event("set_active_layer", %{"layer" => layer}, socket) do
     {:ok, state} =
       SessionStore.update(socket.assigns.session_id, fn current ->
@@ -794,16 +732,6 @@ defmodule MirrorWeb.MapLive do
     else
       {:noreply, Toast.push(socket, :error, "Load a save to export snapshots.")}
     end
-  end
-
-  def handle_event("update_load_path", %{"load" => %{"path" => path}}, socket) do
-    load_form = to_form(%{"path" => path || ""}, as: :load)
-    {:noreply, assign(socket, load_path: path, load_form: load_form)}
-  end
-
-  def handle_event("update_save_path", %{"save" => %{"path" => path}}, socket) do
-    save_form = to_form(%{"path" => path || ""}, as: :save)
-    {:noreply, assign(socket, save_path_input: path, save_form: save_form)}
   end
 
   def handle_event("toggle_render_mode", _params, socket) do
@@ -1137,54 +1065,6 @@ defmodule MirrorWeb.MapLive do
                     </button>
                   </div>
                 </div>
-              </div>
-
-              <div class="mt-4 grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
-                <.form
-                  for={@load_form}
-                  id="load-form"
-                  phx-submit="load_save"
-                  phx-change="update_load_path"
-                  class="grid gap-3 md:grid-cols-[1fr_auto]"
-                >
-                  <.input
-                    field={@load_form[:path]}
-                    type="text"
-                    placeholder="C:\\games\\MOM\\SAVES\\SAVE1.GAM"
-                    phx-hook="StableInput"
-                    class="w-full rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200 placeholder:text-slate-500"
-                  />
-                  <button
-                    id="load-save-button"
-                    type="submit"
-                    class="rounded-2xl bg-amber-300 px-5 py-2 text-sm font-semibold text-slate-950 shadow-lg shadow-amber-500/30 transition hover:-translate-y-0.5 hover:bg-amber-200"
-                  >
-                    Load save
-                  </button>
-                </.form>
-
-                <.form
-                  for={@save_form}
-                  id="save-form"
-                  phx-submit="save_file"
-                  phx-change="update_save_path"
-                  class="grid gap-3 md:grid-cols-[1fr_auto]"
-                >
-                  <.input
-                    field={@save_form[:path]}
-                    type="text"
-                    placeholder="Output path (optional)"
-                    phx-hook="StableInput"
-                    class="w-full rounded-2xl border border-white/10 bg-slate-950/60 text-slate-200 placeholder:text-slate-500"
-                  />
-                  <button
-                    id="save-button"
-                    type="submit"
-                    class="rounded-2xl border border-emerald-300/40 px-5 py-2 text-sm font-semibold text-emerald-100 transition hover:border-emerald-200"
-                  >
-                    Save
-                  </button>
-                </.form>
               </div>
             </header>
 
@@ -3960,23 +3840,6 @@ defmodule MirrorWeb.MapLive do
   defp assign_forms(socket) do
     state = socket.assigns.state
 
-    load_form = to_form(%{"path" => socket.assigns.load_path || ""}, as: :load)
-
-    save_input = socket.assigns.save_path_input || state.save_path || ""
-
-    # In edit mode, never offer the loaded file itself: suggest the next free
-    # SAVEn.GAM slot beside it (MoM only loads SAVE1..SAVE9.GAM).
-    save_input =
-      with true <- socket.assigns[:edit] != nil,
-           %SaveFile{path: original} when is_binary(original) <- state.save,
-           true <- save_input in ["", original] do
-        SaveManager.suggested_save_path(original)
-      else
-        _ -> save_input
-      end
-
-    save_form = to_form(%{"path" => save_input}, as: :save)
-
     selection_form =
       to_form(%{"value" => Map.get(state.selection, state.active_layer, 0)}, as: :selection)
 
@@ -4006,8 +3869,6 @@ defmodule MirrorWeb.MapLive do
       end)
 
     assign(socket,
-      load_form: load_form,
-      save_form: save_form,
       selection_form: selection_form,
       phase_form: phase_form,
       brush_form: brush_form,
@@ -4447,6 +4308,15 @@ defmodule MirrorWeb.MapLive do
   # The picked city, the armed units and the half-made move are indexes into one version of the
   # save: when the save is replaced under them (a load, a discard, another tab's edit) they would
   # point at other cities and units, so they are dropped.
+  # A different save was opened from another tab or page (a new `loaded_at`): whatever was picked on the map (a
+  # unit, a lair, a node) belonged to the old one. An edit keeps the same `loaded_at`, so it keeps the picks.
+  defp drop_picks_for_another_save(socket, previous, current) do
+    if loaded_at(previous) != loaded_at(current), do: reset_picks(socket), else: socket
+  end
+
+  defp loaded_at(%{save: %{loaded_at: at}}), do: at
+  defp loaded_at(_state), do: nil
+
   defp reset_picks(socket) do
     assign(socket,
       city_sel: nil,
