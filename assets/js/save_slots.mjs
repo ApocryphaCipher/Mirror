@@ -48,3 +48,40 @@ export function base64ToBytes(text) {
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
   return bytes
 }
+
+// --- the game's slot names (MAGIC.SET) ---
+//
+// The Load Game screen shows a name for each slot, kept in MAGIC.SET: eight names of 20 bytes
+// from offset 0x40, zero padded (checked in four copies of the file; the game's own names stop
+// at 18 characters). A save with no name there still loads, but shows up blank.
+
+export const SET_FILE = "MAGIC.SET"
+const NAME_START = 0x40
+const NAME_SIZE = 20
+const NAME_END = NAME_START + 8 * NAME_SIZE
+const NAME_MAX = 18
+
+export function slotLabel(slot) {
+  return `Mirror Edit Slot ${slot}`
+}
+
+// The file name in `names` that is MAGIC.SET, whatever its case, or null.
+export function findSetFile(names) {
+  return [...names].find((name) => name.toUpperCase() === SET_FILE) ?? null
+}
+
+// MAGIC.SET with `label` as the name of `slot`, or null when nothing should change: the slot
+// already has a name (the user's, or the game's, is never overwritten), the slot is not one of
+// the eight, or the file is too short to be MAGIC.SET (we never invent one).
+export function withSlotName(bytes, slot, label = slotLabel(slot)) {
+  if (!Number.isInteger(slot) || slot < 1 || slot > 8) return null
+  if (bytes.length < NAME_END) return null
+
+  const at = NAME_START + (slot - 1) * NAME_SIZE
+  if (bytes[at] !== 0) return null
+
+  const copy = bytes.slice()
+  copy.fill(0, at, at + NAME_SIZE)
+  for (let i = 0; i < Math.min(label.length, NAME_MAX); i++) copy[at + i] = label.charCodeAt(i) & 0x7f
+  return copy
+}

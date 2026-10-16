@@ -92,7 +92,7 @@ defmodule MirrorWeb.SaveSlots do
     end
   end
 
-  defp event("written", %{"slot" => slot}, socket) do
+  defp event("written", %{"slot" => slot} = params, socket) do
     %{session_id: sid, pending: pending, filled: filled} = socket.assigns.slots
 
     with {:ok, slot} <- parse_slot(slot),
@@ -106,7 +106,7 @@ defmodule MirrorWeb.SaveSlots do
       |> put(
         pending: nil,
         filled: MapSet.put(filled, slot),
-        status: {:ok, "Saved to #{name}. The game can load it now."}
+        status: {:ok, saved_message(name, params["named"])}
       )
       |> refresh()
     else
@@ -193,6 +193,11 @@ defmodule MirrorWeb.SaveSlots do
       wizards: if(save, do: MirrorWeb.WizardPanel.wizards(save.raw), else: [])
     )
   end
+
+  defp saved_message(name, label) when is_binary(label) and label != "",
+    do: "Saved to #{name} and named \"#{label}\" in the game's list. The game can load it now."
+
+  defp saved_message(name, _), do: "Saved to #{name}. The game can load it now."
 
   defp parse_slot(value) when is_integer(value) and value in @slots, do: {:ok, value}
 
@@ -487,10 +492,10 @@ defmodule MirrorWeb.SaveSlots do
         @size == "lg" && "h-14 w-14 text-xl",
         @size == "sm" && "h-7 w-7 text-xs",
         @filled && "bg-emerald-500 text-slate-950 hover:bg-emerald-400",
-        !@filled && "border border-white/20 bg-slate-800 text-slate-400",
-        !@filled && !@disabled && "hover:border-white/50 hover:text-white",
+        !@filled && "bg-slate-600 text-slate-300",
+        !@filled && !@disabled && "hover:bg-slate-500 hover:text-white",
         @current && "ring-2 ring-amber-300",
-        @disabled && "cursor-not-allowed opacity-40"
+        @disabled && "cursor-not-allowed opacity-60"
       ]}
     >
       {@n}

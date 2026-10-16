@@ -37,6 +37,8 @@ How it works: `MirrorWeb.SaveSlots` is mounted on every LiveView (`on_mount` in 
 
 - Opening: slots 1 to 9. Saving: slots 1 to 8 only. A full slot asks first (a floating box, so nothing shifts); a failed write leaves the edits marked unsaved.
 - **The old file is copied to `SAVEn.GAM.mirror-backup` once: an existing backup is kept, so it stays the save as the game wrote it** (Kevin's note said only "a backup"; keeping the first one is my choice, because overwriting it on every save would lose the original on the second save). A failed backup stops the save.
+- **Slot names:** saving into a slot whose name in the game's `MAGIC.SET` is empty gives it the name `Mirror Edit Slot n`, so the game's Load Game screen does not show it blank; an existing name is never changed. See [../reference/magic-set.md](../reference/magic-set.md).
+- Empty slots are shown clearly grey and cannot be clicked on the start page.
 - The folder's *name* is shown, not its full path: browsers do not tell a page where a folder is.
 - The path box survives only in the Lab, for browsers without the folder picker; STORY-061 deletes it (and `load_save`/`save_file`) when Kevin says so.
 - The old home page ("Survey both planes…") is gone; the README says what Mirror does.

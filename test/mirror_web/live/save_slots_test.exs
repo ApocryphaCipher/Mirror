@@ -227,6 +227,18 @@ defmodule MirrorWeb.SaveSlotsTest do
       assert SessionStore.get(sid).save.raw == written
     end
 
+    test "the message says when the browser also named the slot in the game's list", %{
+      view: view,
+      sid: sid
+    } do
+      edit(sid)
+      view |> element("#save-slot-5") |> render_click()
+      assert_push_event(view, "slots:write", %{slot: 5})
+
+      render_hook(view, "slots:written", %{"slot" => 5, "named" => "Mirror Edit Slot 5"})
+      assert has_element?(view, "#slots-status", "named \"Mirror Edit Slot 5\"")
+    end
+
     test "a full slot asks first, and Cancel writes nothing", %{view: view} do
       view |> element("#save-slot-2") |> render_click()
       assert has_element?(view, "#replace-confirm", "Replace SAVE2.GAM?")

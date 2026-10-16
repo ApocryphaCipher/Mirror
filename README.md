@@ -65,7 +65,7 @@ docker compose run --rm -v "/path/to/install:/source:ro" app bin/mirror eval 'Mi
 
 Click a slot under **Save to** at the top of the page (slots 1 to 8). The game only loads `SAVE1.GAM` to `SAVE9.GAM`, and its Load screen shows slots 1 to 8 (slot 9 is the autosave, which Mirror can open but never writes to). Then load the slot in the game as usual.
 
-When you replace a slot that already has a save, Mirror first copies the old one to `SAVEn.GAM.mirror-backup` in the same folder. The game ignores that file. The copy is made once, so it stays the save as the game wrote it; delete it if you want a fresh one next time.
+When you replace a slot that already has a save, Mirror first copies the old one to `SAVEn.GAM.mirror-backup` in the same folder. The game ignores that file. If the slot has no name in the game's Load Game list, Mirror gives it one ("Mirror Edit Slot 3"), so it doesn't show up blank. The copy is made once, so it stays the save as the game wrote it; delete it if you want a fresh one next time.
 
 ## Good to know
 

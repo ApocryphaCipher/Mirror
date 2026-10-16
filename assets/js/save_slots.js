@@ -4,6 +4,9 @@ import {
   filledSlots,
   existingSlotName,
   backupFileName,
+  findSetFile,
+  withSlotName,
+  slotLabel,
   bytesToBase64,
   base64ToBytes,
 } from "./save_slots.mjs"
@@ -143,6 +146,35 @@ export const SaveSlots = {
     }
   },
 
+  // Give the slot a name in the game's list (MAGIC.SET) when it has none, so the Load Game
+  // screen does not show it blank. The save is already written, so a problem here is not an
+  // error: it just returns null and the slot loads, blank, as before. Returns the name given.
+  async nameSlot(slot, names) {
+    try {
+      const setName = findSetFile(names)
+      if (!setName) return null
+
+      const handle = await dir.getFileHandle(setName)
+      const bytes = new Uint8Array(await (await handle.getFile()).arrayBuffer())
+      const updated = withSlotName(bytes, slot)
+      if (!updated) return null
+
+      // the same rule as for saves: the first backup is the file as the game wrote it
+      if (!names.includes(`${setName}.mirror-backup`)) {
+        const copy = await (await dir.getFileHandle(`${setName}.mirror-backup`, {create: true})).createWritable()
+        await copy.write(bytes)
+        await copy.close()
+      }
+
+      const out = await handle.createWritable()
+      await out.write(updated)
+      await out.close()
+      return slotLabel(slot)
+    } catch (_) {
+      return null
+    }
+  },
+
   // Backup first, and only if there is none yet: the first backup is the save as the game
   // wrote it, which is the one worth keeping. A failed backup stops the save. A writable
   // stream only replaces the file when it is closed, so a crash cannot leave half a save.
@@ -162,7 +194,9 @@ export const SaveSlots = {
       await out.write(base64ToBytes(data))
       await out.close()
 
-      this.pushEvent("slots:written", {slot})
+      const named = await this.nameSlot(slot, names)
+
+      this.pushEvent("slots:written", {slot, named})
       await this.scan()
     } catch (error) {
       this.pushEvent("slots:error", {
