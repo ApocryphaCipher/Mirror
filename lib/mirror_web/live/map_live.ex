@@ -20,7 +20,17 @@ defmodule MirrorWeb.MapLive do
   alias Mirror.TileAtlas
   alias Mirror.SaveFile.{Cities, Encounters, Roads, Sites, Structures, Units, Wizards}
   alias Mirror.Map, as: MirrorMap
-  alias MirrorWeb.{CityPanel, LairPanel, MoveTool, NodePanel, PaintTool, RoadTool, UnitPanel}
+
+  alias MirrorWeb.{
+    CityPanel,
+    LairPanel,
+    MoveTool,
+    NodePanel,
+    PaintTool,
+    RoadTool,
+    Toast,
+    UnitPanel
+  }
 
   @layers [
     :terrain,
@@ -469,7 +479,7 @@ defmodule MirrorWeb.MapLive do
           |> assign_forms()
           |> refresh_hover()
           |> assign(:reveal_report, nil)
-          |> put_flash(:info, "Edits discarded.")
+          |> Toast.push(:info, "Edits discarded.")
 
         socket =
           if connected?(socket),
@@ -506,7 +516,7 @@ defmodule MirrorWeb.MapLive do
           |> assign_from_state(state)
           |> assign_forms()
           |> reset_picks()
-          |> put_flash(:info, "Loaded save from #{normalized_path}.")
+          |> Toast.push(:info, "Loaded save from #{normalized_path}.")
 
         socket =
           if connected?(socket) do
@@ -521,7 +531,7 @@ defmodule MirrorWeb.MapLive do
         {:noreply, socket}
 
       {:error, reason} ->
-        {:noreply, put_flash(socket, :error, SaveManager.load_error_message(reason, path))}
+        {:noreply, Toast.push(socket, :error, SaveManager.load_error_message(reason, path))}
     end
   end
 
@@ -543,10 +553,10 @@ defmodule MirrorWeb.MapLive do
     case update_result do
       {:ok, state, save_path} ->
         {:noreply,
-         put_flash(assign_state(socket, state), :info, SaveManager.saved_message(save_path))}
+         Toast.push(assign_state(socket, state), :info, SaveManager.saved_message(save_path))}
 
       {:error, reason} ->
-        {:noreply, put_flash(socket, :error, SaveManager.save_error_message(reason))}
+        {:noreply, Toast.push(socket, :error, SaveManager.save_error_message(reason))}
     end
   end
 
@@ -757,7 +767,7 @@ defmodule MirrorWeb.MapLive do
          content: json
        })}
     else
-      {:noreply, put_flash(socket, :error, "Load a save to export stats.")}
+      {:noreply, Toast.push(socket, :error, "Load a save to export stats.")}
     end
   end
 
@@ -782,7 +792,7 @@ defmodule MirrorWeb.MapLive do
 
       {:noreply, socket}
     else
-      {:noreply, put_flash(socket, :error, "Load a save to export snapshots.")}
+      {:noreply, Toast.push(socket, :error, "Load a save to export snapshots.")}
     end
   end
 
@@ -858,10 +868,10 @@ defmodule MirrorWeb.MapLive do
 
     cond do
       not state.save ->
-        {:noreply, put_flash(socket, :error, "Load a save to detect the phase loop.")}
+        {:noreply, Toast.push(socket, :error, "Load a save to detect the phase loop.")}
 
       state.render_mode != :tiles ->
-        {:noreply, put_flash(socket, :error, "Switch to Tiles render mode to detect phases.")}
+        {:noreply, Toast.push(socket, :error, "Switch to Tiles render mode to detect phases.")}
 
       true ->
         {:ok, state} =
@@ -936,7 +946,7 @@ defmodule MirrorWeb.MapLive do
       end)
 
     {flash_type, flash_msg} = flash
-    socket = put_flash(socket, flash_type, flash_msg)
+    socket = Toast.push(socket, flash_type, flash_msg)
 
     socket =
       socket

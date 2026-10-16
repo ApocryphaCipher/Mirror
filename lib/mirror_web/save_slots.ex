@@ -19,6 +19,7 @@ defmodule MirrorWeb.SaveSlots do
   import Phoenix.LiveView, only: [attach_hook: 4, push_event: 3, push_navigate: 2]
 
   alias Mirror.{SaveManager, SessionStore}
+  alias MirrorWeb.Toast
 
   @slots 1..9//1
   @save_slots 1..8//1
@@ -38,7 +39,6 @@ defmodule MirrorWeb.SaveSlots do
       filled: MapSet.new(),
       confirm: nil,
       pending: nil,
-      status: nil,
       save_name: nil,
       unsaved: 0,
       wizards: []
@@ -81,14 +81,14 @@ defmodule MirrorWeb.SaveSlots do
          name = slot_name(slot),
          {:ok, state, _} <- SaveManager.load_bytes(raw, name, SessionStore.get(sid)) do
       SessionStore.put(sid, state)
-      socket = socket |> put(confirm: nil, status: {:ok, "Opened #{name}."}) |> refresh()
+      socket = socket |> put(confirm: nil) |> Toast.push(:ok, "Opened #{name}.") |> refresh()
 
       # the start page goes on to the map once a save is open
       if socket.view == MirrorWeb.LandingLive,
         do: push_navigate(socket, to: ~p"/arcanus"),
         else: socket
     else
-      {:error, reason} -> put(socket, status: {:error, load_error(reason)})
+      {:error, reason} -> Toast.push(socket, :error, load_error(reason))
     end
   end
 
@@ -103,11 +103,8 @@ defmodule MirrorWeb.SaveSlots do
         SessionStore.update(sid, fn state -> SaveManager.mark_saved(state, name, bytes) end)
 
       socket
-      |> put(
-        pending: nil,
-        filled: MapSet.put(filled, slot),
-        status: {:ok, saved_message(name, params["named"])}
-      )
+      |> put(pending: nil, filled: MapSet.put(filled, slot))
+      |> Toast.push(:ok, saved_message(name, params["named"]))
       |> refresh()
     else
       _ -> socket
@@ -115,7 +112,7 @@ defmodule MirrorWeb.SaveSlots do
   end
 
   defp event("error", %{"message" => message}, socket),
-    do: put(socket, pending: nil, status: {:error, to_string(message)})
+    do: socket |> put(pending: nil) |> Toast.push(:error, to_string(message))
 
   # --- what the user clicks ---
 
@@ -123,9 +120,9 @@ defmodule MirrorWeb.SaveSlots do
   defp event("open", %{"slot" => slot}, socket) do
     with {:ok, slot} <- parse_slot(slot) do
       if MapSet.member?(socket.assigns.slots.filled, slot) do
-        socket |> put(status: nil) |> push_event("slots:read", %{slot: slot})
+        push_event(socket, "slots:read", %{slot: slot})
       else
-        put(socket, status: {:error, "#{slot_name(slot)} is empty."})
+        Toast.push(socket, :error, "#{slot_name(slot)} is empty.")
       end
     else
       _ -> socket
@@ -139,17 +136,17 @@ defmodule MirrorWeb.SaveSlots do
 
       cond do
         slots.save_name == nil ->
-          put(socket, status: {:error, "Open a save first, then save it into a slot."})
+          Toast.push(socket, :error, "Open a save first, then save it into a slot.")
 
         MapSet.member?(slots.filled, slot) ->
-          put(socket, status: nil, confirm: slot)
+          put(socket, confirm: slot)
 
         true ->
           start_write(socket, slot, false)
       end
     else
       _ ->
-        put(socket, status: {:error, "Slot 9 is the game's autosave. Pick a slot from 1 to 8."})
+        Toast.push(socket, :error, "Slot 9 is the game's autosave. Pick a slot from 1 to 8.")
     end
   end
 
@@ -161,18 +158,17 @@ defmodule MirrorWeb.SaveSlots do
   end
 
   defp event("cancel", _params, socket), do: put(socket, confirm: nil)
-  defp event("dismiss", _params, socket), do: put(socket, status: nil)
   defp event(_unknown, _params, socket), do: socket
 
   defp start_write(socket, slot, backup?) do
     case SessionStore.get(socket.assigns.slots.session_id) |> SaveManager.slot_bytes() do
       {:ok, bytes} ->
         socket
-        |> put(pending: {slot, bytes}, status: nil)
+        |> put(pending: {slot, bytes})
         |> push_event("slots:write", %{slot: slot, data: Base.encode64(bytes), backup: backup?})
 
       {:error, reason} ->
-        put(socket, status: {:error, "Could not build the save: #{inspect(reason)}"})
+        Toast.push(socket, :error, "Could not build the save: #{inspect(reason)}")
     end
   end
 
@@ -326,7 +322,7 @@ defmodule MirrorWeb.SaveSlots do
           Continue with {@slots.save_name} →
         </.link>
 
-        <.status slots={@slots} class="static" />
+        <.confirm slots={@slots} class="static" />
       </div>
     </main>
     """
@@ -411,7 +407,7 @@ defmodule MirrorWeb.SaveSlots do
               </div>
           <% end %>
 
-          <.status slots={@slots} class="absolute right-4 top-full z-40 mt-1" />
+          <.confirm slots={@slots} class="absolute right-4 top-full z-40 mt-1" />
         </div>
       </div>
 
@@ -538,58 +534,40 @@ defmodule MirrorWeb.SaveSlots do
   attr :slots, :map, required: true
   attr :class, :string, default: ""
 
-  # The answer to the last click. It floats, so it never moves the page under the pointer.
-  defp status(assigns) do
+  # "Replace SAVE3.GAM?": a question, not a message, so it is not a toast and does not fade. It floats, so it
+  # never moves the page under the pointer.
+  defp confirm(assigns) do
     ~H"""
     <div
-      :if={@slots.confirm || @slots.status}
-      id={if @slots.confirm, do: "replace-confirm", else: "slots-status"}
+      :if={@slots.confirm}
+      id="replace-confirm"
       class={[
-        "max-w-sm rounded-xl border px-4 py-3 text-sm shadow-xl shadow-black/50",
-        @slots.confirm && "border-amber-300/40 bg-slate-900 text-amber-100",
-        !@slots.confirm && elem(@slots.status, 0) == :ok &&
-          "border-emerald-300/30 bg-emerald-950 text-emerald-100",
-        !@slots.confirm && elem(@slots.status, 0) == :error &&
-          "border-rose-300/30 bg-rose-950 text-rose-100",
+        "max-w-sm rounded-xl border border-amber-300/40 bg-slate-900 px-4 py-3 text-sm text-amber-100 shadow-xl shadow-black/50",
         @class
       ]}
     >
-      <%= if @slots.confirm do %>
-        <p>
-          Replace <strong>{slot_name(@slots.confirm)}</strong>?
-          The old one is kept as a backup.
-        </p>
-        <div class="mt-2 flex gap-2">
-          <button
-            type="button"
-            id="confirm-replace"
-            phx-click="slots:confirm"
-            class="rounded-lg bg-rose-500 px-3 py-1 font-semibold text-white hover:bg-rose-400"
-          >
-            Replace
-          </button>
-          <button
-            type="button"
-            id="cancel-replace"
-            phx-click="slots:cancel"
-            class="rounded-lg border border-white/20 px-3 py-1 text-slate-200 hover:text-white"
-          >
-            Cancel
-          </button>
-        </div>
-      <% else %>
-        <div class="flex items-start gap-3">
-          <p class="flex-1">{elem(@slots.status, 1)}</p>
-          <button
-            type="button"
-            phx-click="slots:dismiss"
-            aria-label="Dismiss"
-            class="opacity-60 hover:opacity-100"
-          >
-            <.icon name="hero-x-mark-mini" class="size-4" />
-          </button>
-        </div>
-      <% end %>
+      <p>
+        Replace <strong>{slot_name(@slots.confirm)}</strong>?
+        The old one is kept as a backup.
+      </p>
+      <div class="mt-2 flex gap-2">
+        <button
+          type="button"
+          id="confirm-replace"
+          phx-click="slots:confirm"
+          class="rounded-lg bg-rose-500 px-3 py-1 font-semibold text-white hover:bg-rose-400"
+        >
+          Replace
+        </button>
+        <button
+          type="button"
+          id="cancel-replace"
+          phx-click="slots:cancel"
+          class="rounded-lg border border-white/20 px-3 py-1 text-slate-200 hover:text-white"
+        >
+          Cancel
+        </button>
+      </div>
     </div>
     """
   end

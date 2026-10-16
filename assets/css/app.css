@@ -125,9 +125,49 @@ h4 {
   image-rendering: pixelated;
 }
 
-/* A message that fades by itself (the wizard page's answer to a change). */
-@keyframes mirror-fade {
-  0%, 75% { opacity: 1; }
-  100% { opacity: 0; visibility: hidden; }
+/* The toast stack (STORY-062; assets/js/toast.js). Plain CSS: the elements are made by script. */
+#toast-stack {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 70;
+  width: min(22rem, calc(100vw - 2rem));
+  height: 0;
+  pointer-events: none;
 }
-.mirror-fade { animation: mirror-fade 5s forwards; }
+#toast-stack .mirror-toast {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: 0.75rem 1rem;
+  border: 1px solid;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.5);
+  transform-origin: bottom center;
+  transition: transform 0.25s ease, opacity 0.25s ease, height 0.25s ease;
+}
+#toast-stack .mirror-toast-ok { background: #022c22; border-color: rgb(110 231 183 / 0.3); color: #d1fae5; }
+#toast-stack .mirror-toast-info { background: #0c2a3d; border-color: rgb(125 211 252 / 0.3); color: #e0f2fe; }
+#toast-stack .mirror-toast-error { background: #4c0519; border-color: rgb(253 164 175 / 0.3); color: #ffe4e6; }
+#toast-stack .mirror-toast-text { flex: 1; margin: 0; overflow-wrap: anywhere; }
+#toast-stack .mirror-toast-undo {
+  flex: none;
+  padding: 0 0.5rem;
+  border: 1px solid currentColor;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  opacity: 0.9;
+}
+#toast-stack .mirror-toast-close { flex: none; opacity: 0.6; font-size: 1.25rem; line-height: 1; }
+#toast-stack .mirror-toast-undo:hover, #toast-stack .mirror-toast-close:hover { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  #toast-stack .mirror-toast { transition: opacity 0.15s ease; }
+}

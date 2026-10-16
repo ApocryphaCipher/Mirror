@@ -171,6 +171,7 @@ These all bit a previous session:
   pointer, so clicks land on the wrong tile. Toolbars and notices are
   overlays.
 - Canvas `ImageData` is RGBA, in that order.
+- Tell the user what happened with `MirrorWeb.Toast.push(socket, :ok | :info | :error, text)` (STORY-062), not `put_flash`: toasts stack, fade by themselves and survive a page change. A question ("Replace SAVE3.GAM?") is not a toast.
 
 ## 9. Saves: editing safely
 
@@ -219,6 +220,7 @@ These all bit a previous session:
     history id from `System.unique_integer([:positive, :monotonic])`; a test that used
     `stroke: 3` passed until another test shifted the counter to 3, then failed on one seed
     in CI. Use a value the counter can't reach (a negative one).
+- Toasts are push events. Read them with `MirrorWeb.ToastHelpers` (`assert_toast/3`, `refute_toast/2`, `toasts/1`, `flush_toasts/1`), which look at all of them, not only the first.
 - A client change needs a client check: pure helpers go in `assets/js/*.mjs` with Node tests
   in `assets/test/` (`mix test` runs them), and the canvas result is checked in a browser or
   against the game, in numbers where possible.

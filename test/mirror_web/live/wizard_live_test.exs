@@ -2,6 +2,7 @@ defmodule MirrorWeb.WizardLiveTest do
   use MirrorWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
+  import MirrorWeb.ToastHelpers
 
   alias Mirror.SessionStore
 
@@ -79,11 +80,7 @@ defmodule MirrorWeb.WizardLiveTest do
     |> element("#wizard-hero-form-0")
     |> render_submit(%{"hero" => %{"name" => "Sir Harold", "experience" => "150"}})
 
-    assert has_element?(
-             view,
-             "#wizard-note",
-             "Edited hero Harold: name Sir Harold, experience 150"
-           )
+    assert_toast(view, "Edited hero Harold: name Sir Harold, experience 150")
 
     assert has_element?(view, "#wizard-hero-0", "Sir Harold")
     assert has_element?(view, "#wizard-hero-0", "150 xp")
@@ -98,7 +95,7 @@ defmodule MirrorWeb.WizardLiveTest do
     |> element("#wizard-hero-form-0")
     |> render_submit(%{"hero" => %{"level" => "99"}})
 
-    assert has_element?(view, "#wizard-note", "Level is a whole number")
+    assert_toast(view, "Level is a whole number")
     assert SessionStore.get(sid).save.raw == after_state.save.raw
   end
 
@@ -161,11 +158,7 @@ defmodule MirrorWeb.WizardLiveTest do
     |> element("#wizard-item-form-9")
     |> render_submit(%{"item" => %{"name" => "Big Shield", "cost" => "500", "movement" => "2.5"}})
 
-    assert has_element?(
-             view,
-             "#wizard-note",
-             "Edited item Spare Shield: name Big Shield, cost 500, movement 2.5"
-           )
+    assert_toast(view, "Edited item Spare Shield: name Big Shield, cost 500, movement 2.5")
 
     assert has_element?(view, "#wizard-vault-item-9", "Big Shield")
     assert has_element?(view, "#wizard-vault-item-9", "500 gold")
@@ -182,7 +175,7 @@ defmodule MirrorWeb.WizardLiveTest do
 
     # a bad value is refused in words and changes nothing
     view |> element("#wizard-item-form-1") |> render_submit(%{"item" => %{"attack" => "99"}})
-    assert has_element?(view, "#wizard-note", "Stats stay within")
+    assert_toast(view, "Stats stay within")
     assert SessionStore.get(sid).save.raw == edited.save.raw
   end
 
@@ -200,7 +193,7 @@ defmodule MirrorWeb.WizardLiveTest do
     view |> element("#wizard-edit-toggle") |> render_click()
 
     render_hook(view, "item_edit", %{"index" => "7", "item" => %{"name" => "Hijacked"}})
-    assert has_element?(view, "#wizard-note", "no longer in the save")
+    assert_toast(view, "no longer in the save")
     assert SessionStore.get(sid).save.raw == raw
   end
 
@@ -282,7 +275,7 @@ defmodule MirrorWeb.WizardLiveTest do
       before = SessionStore.get(sid)
       submit(view, %{"gold" => "5000", "name" => "Jafar the Great", "retorts_present" => "1"})
 
-      assert has_element?(view, "#wizard-note", "Edited Jafar: gold 5000")
+      assert_toast(view, "Edited Jafar: gold 5000")
       assert has_element?(view, "#wizard-name", "Jafar the Great")
       assert render(view) =~ "5000"
 
@@ -308,7 +301,7 @@ defmodule MirrorWeb.WizardLiveTest do
       # (unticking is covered by the WizardPanel tests)
       submit(view, %{"globals_present" => "1", "globals" => %{"7" => "on"}})
 
-      assert has_element?(view, "#wizard-note", "global enchantments")
+      assert_toast(view, "global enchantments")
       assert render(view) =~ "Nature Awareness"
       assert has_element?(view, "#wizard-globals li", "Aura of Majesty")
       assert has_element?(view, "#wizard-globals li", "Just Cause")
@@ -326,14 +319,14 @@ defmodule MirrorWeb.WizardLiveTest do
       raw = SessionStore.get(sid).save.raw
 
       submit(view, %{"gold" => "99999"})
-      assert has_element?(view, "#wizard-note", "0 to 30000")
+      assert_toast(view, "0 to 30000")
 
       submit(view, %{"name" => "Zoë"})
-      assert has_element?(view, "#wizard-note", "no accents")
+      assert_toast(view, "no accents")
 
       # a change that is no change (the form always sends every field) says nothing and writes nothing
       submit(view, %{"gold" => "1234"})
-      refute has_element?(view, "#wizard-note", "Nothing to change")
+      refute_toast(view, "Nothing to change")
 
       assert SessionStore.get(sid).save.raw == raw
     end
@@ -356,8 +349,8 @@ defmodule MirrorWeb.WizardLiveTest do
       # this form was drawn with gold 1234 and the old name, and only mana is changed on it
       submit(view, %{"gold" => "111", "name" => "Merlin", "mana" => "9"})
 
-      assert has_element?(view, "#wizard-note", "Edited Merlin: mana 9")
-      refute has_element?(view, "#wizard-note", "gold")
+      assert_toast(view, "Edited Merlin: mana 9")
+      refute_toast(view, "gold")
     end
 
     test "malformed form values show a note instead of crashing the page", %{conn: conn, sid: sid} do
@@ -366,15 +359,15 @@ defmodule MirrorWeb.WizardLiveTest do
       view |> element("#wizard-edit-toggle") |> render_click()
 
       render_hook(view, "wizard_edit", %{"wizard" => %{"name" => nil}})
-      assert has_element?(view, "#wizard-note", "1 to 19")
+      assert_toast(view, "1 to 19")
       render_hook(view, "wizard_edit", %{"wizard" => %{"books" => "x"}})
-      assert has_element?(view, "#wizard-note", "Books")
+      assert_toast(view, "Books")
 
       render_hook(view, "wizard_edit", %{
         "wizard" => %{"retorts_present" => "1", "retorts" => nil}
       })
 
-      assert has_element?(view, "#wizard-note", "retorts")
+      assert_toast(view, "retorts")
     end
 
     defp library(sid), do: binary_part(SessionStore.get(sid).save.raw, 0x9E8 + 0x264, 214)
@@ -398,12 +391,12 @@ defmodule MirrorWeb.WizardLiveTest do
                binary_part(Mirror.WizardFixture.synthetic(), 0x9E8 + 0x264, 160)
 
       assert has_element?(view, "#wizard-spells-death", "40 of 40 known")
-      assert has_element?(view, "#wizard-note", "Edited Jafar: 40 spells")
+      assert_toast(view, "Edited Jafar: 40 spells")
       assert length(SessionStore.get(sid).history.arcanus) == length(before.history.arcanus) + 1
 
       # nothing left to learn
       view |> element("#learn-death") |> render_click()
-      refute has_element?(view, "#wizard-note", "Nothing to change")
+      refute_toast(view, "Nothing to change")
     end
 
     test "the form changes spells, what is researched and the points left", %{
@@ -444,7 +437,7 @@ defmodule MirrorWeb.WizardLiveTest do
       raw = SessionStore.get(sid).save.raw
 
       submit(view, %{"researching" => "98"})
-      assert has_element?(view, "#wizard-note", "research list")
+      assert_toast(view, "research list")
       assert SessionStore.get(sid).save.raw == raw
     end
 
@@ -473,7 +466,7 @@ defmodule MirrorWeb.WizardLiveTest do
 
       assert {-60, 3} == rel_bytes(sid, 0, 1)
       assert {-60, 3} == rel_bytes(sid, 1, 0)
-      assert has_element?(view, "#wizard-note", "Edited Jafar: relations with Sharee")
+      assert_toast(view, "Edited Jafar: relations with Sharee")
       # still in edit mode, so the row shows the inputs with the new values
       assert has_element?(
                view,
@@ -497,7 +490,7 @@ defmodule MirrorWeb.WizardLiveTest do
         "relations" => %{"1" => %{"relation" => "500", "status" => "1"}}
       })
 
-      assert has_element?(view, "#wizard-note", "-100 to 100")
+      assert_toast(view, "-100 to 100")
       assert SessionStore.get(sid).save.raw == raw
     end
 
@@ -557,7 +550,7 @@ defmodule MirrorWeb.WizardLiveTest do
       before = SessionStore.get(sid)
       view |> element("#wizard-item-move-3") |> render_change(%{"to" => "hero:0:2"})
 
-      assert has_element?(view, "#wizard-note", "Moved Amulet to Harold")
+      assert_toast(view, "Moved Amulet to Harold")
       assert has_element?(view, "#wizard-hero-0-item-3", "Amulet")
       refute has_element?(view, "#wizard-vault-item-3")
 
@@ -590,16 +583,16 @@ defmodule MirrorWeb.WizardLiveTest do
 
       # the sword's own place: the hero's first place is taken, as a stale form would find it
       render_hook(view, "item_move", %{"index" => "3", "to" => "hero:0:0"})
-      assert has_element?(view, "#wizard-note", "already taken")
+      assert_toast(view, "already taken")
 
       render_hook(view, "item_move", %{"index" => "3", "to" => "hero:0:1"})
-      assert has_element?(view, "#wizard-note", "already taken")
+      assert_toast(view, "already taken")
 
       render_hook(view, "item_move", %{"index" => "77", "to" => "vault:3"})
-      assert has_element?(view, "#wizard-note", "no longer in the save")
+      assert_toast(view, "no longer in the save")
 
       render_hook(view, "item_move", %{"index" => "9", "to" => "hero:0:2"})
-      assert has_element?(view, "#wizard-note", "place of its own kind")
+      assert_toast(view, "place of its own kind")
 
       assert SessionStore.get(sid).save.raw == raw
     end
@@ -681,7 +674,7 @@ defmodule MirrorWeb.WizardLiveTest do
       before = SessionStore.get(sid)
 
       view |> element("#wizard-place-hero-0-2") |> render_change(%{"choice" => "item:7"})
-      assert has_element?(view, "#wizard-note", "Put Ring of Power in Harold")
+      assert_toast(view, "Put Ring of Power in Harold")
       assert has_element?(view, "#wizard-hero-0 li", "Ring of Power")
 
       filled = SessionStore.get(sid)
@@ -698,7 +691,7 @@ defmodule MirrorWeb.WizardLiveTest do
       assert undone.save.raw == before.save.raw
 
       view |> element("#wizard-place-hero-0-2") |> render_change(%{"choice" => "clear"})
-      assert has_element?(view, "#wizard-note", "Removed Ring of Power from Harold")
+      assert_toast(view, "Removed Ring of Power from Harold")
       refute has_element?(view, "#wizard-hero-0 li", "Ring of Power")
     end
 
@@ -712,15 +705,15 @@ defmodule MirrorWeb.WizardLiveTest do
       raw = SessionStore.get(sid).save.raw
 
       view |> element("#wizard-place-hero-0-2") |> render_change(%{"choice" => "keep"})
-      refute has_element?(view, "#wizard-note")
+      assert toasts(view) == []
       assert SessionStore.get(sid).save.raw == raw
 
       # a melee item for the misc place is refused by the save rules, not drawn from the page
       render_hook(view, "place_set", %{"place" => "hero:0:2", "choice" => "item:1"})
-      assert has_element?(view, "#wizard-note", "place of its own kind")
+      assert_toast(view, "place of its own kind")
 
       render_hook(view, "place_set", %{"place" => "hero:0:2", "choice" => "item:999"})
-      assert has_element?(view, "#wizard-note", "no longer in the save")
+      assert_toast(view, "no longer in the save")
 
       assert SessionStore.get(sid).save.raw == raw
     end
@@ -753,7 +746,7 @@ defmodule MirrorWeb.WizardLiveTest do
       before = SessionStore.get(sid)
 
       view |> element("#wizard-hero-add") |> render_change(%{"type" => "31"})
-      assert has_element?(view, "#wizard-note", "Added Sir Harold to Jafar's heroes")
+      assert_toast(view, "Added Sir Harold to Jafar's heroes")
       assert has_element?(view, "#wizard-hero-0", "Sir Harold")
       assert has_element?(view, "#wizard-hero-0", "level 1")
       assert has_element?(view, "#wizard-hero-0", "at 38, 21 Myrror")
@@ -777,10 +770,10 @@ defmodule MirrorWeb.WizardLiveTest do
       raw = SessionStore.get(sid).save.raw
 
       render_hook(view, "hero_add", %{"type" => "31"})
-      assert has_element?(view, "#wizard-note", "already in the game")
+      assert_toast(view, "already in the game")
 
       render_hook(view, "hero_add", %{"type" => "99"})
-      assert has_element?(view, "#wizard-note", "35 heroes")
+      assert_toast(view, "35 heroes")
       assert SessionStore.get(sid).save.raw == raw
     end
   end
@@ -832,23 +825,23 @@ defmodule MirrorWeb.WizardLiveTest do
 
       change(view, %{"gold" => "5000"})
 
-      assert has_element?(view, "#wizard-note", "gold 5000")
-      assert has_element?(view, "#wizard-note .mirror-fade")
+      assert_toast(view, "gold 5000", "ok")
+      # an edit's toast has an Undo button: it asks the page's own Undo
+      assert [%{action: "undo"} | _] = Enum.filter(toasts(view), &(&1.text =~ "gold 5000"))
       assert length(SessionStore.get(sid).history.arcanus) == length(before.history.arcanus) + 1
       assert has_element?(view, ~s(input[name="wizard[gold]"][value="5000"]))
     end
 
-    test "a refusal stays on screen until dismissed, and says why", %{conn: conn, sid: sid} do
+    test "a refusal is an error toast that says why, and nothing is written", %{
+      conn: conn,
+      sid: sid
+    } do
       view = edit_mode(conn, sid)
       raw = SessionStore.get(sid).save.raw
 
       change(view, %{"gold" => "99999"})
-      assert has_element?(view, "#wizard-note", "0 to 30000")
-      refute has_element?(view, "#wizard-note .mirror-fade")
+      assert_toast(view, "0 to 30000", "error")
       assert SessionStore.get(sid).save.raw == raw
-
-      view |> element("#wizard-note button") |> render_click()
-      refute has_element?(view, "#wizard-note")
     end
 
     test "a fame the game itself wrote above 30000 does not block another edit", %{
@@ -868,8 +861,8 @@ defmodule MirrorWeb.WizardLiveTest do
 
       change(view, %{"gold" => "777", "fame" => "30001"})
 
-      assert has_element?(view, "#wizard-note", "gold 777")
-      refute has_element?(view, "#wizard-note", "0 to 30000")
+      assert_toast(view, "gold 777")
+      refute_toast(view, "0 to 30000")
     end
 
     test "the placeholder choices do nothing and say nothing", %{conn: conn, sid: sid} do
@@ -885,7 +878,7 @@ defmodule MirrorWeb.WizardLiveTest do
       assert has_element?(view, "#wizard-hero-add option[value='']", "Choose a hero")
       view |> element("#wizard-hero-add") |> render_change(%{"type" => ""})
 
-      refute has_element?(view, "#wizard-note")
+      assert toasts(view) == []
       assert SessionStore.get(sid).save.raw == raw
     end
 
@@ -902,14 +895,14 @@ defmodule MirrorWeb.WizardLiveTest do
 
       view |> element("#header-undo") |> render_click()
       assert SessionStore.get(sid).save.raw == original
-      assert has_element?(view, "#wizard-note", "Undid: Edited Jafar: gold 5000")
+      assert_toast(view, "Undid: Edited Jafar: gold 5000")
       assert has_element?(view, ~s(input[name="wizard[gold]"][value="1234"]))
       assert has_element?(view, "#header-undo[disabled]")
       assert has_element?(view, "#header-redo:not([disabled])")
 
       view |> element("#header-redo") |> render_click()
       assert SessionStore.get(sid).save.raw == edited
-      assert has_element?(view, "#wizard-note", "Redid: Edited Jafar: gold 5000")
+      assert_toast(view, "Redid: Edited Jafar: gold 5000")
     end
 
     test "Undo on this page leaves a map stroke alone", %{conn: conn, sid: sid} do

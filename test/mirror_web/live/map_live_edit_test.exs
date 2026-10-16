@@ -9,6 +9,7 @@ defmodule MirrorWeb.MapLiveEditTest do
   use MirrorWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
+  import MirrorWeb.ToastHelpers
 
   @mom_path System.get_env("MIRROR_MOM_PATH")
   @real_save_source @mom_path && Path.join(@mom_path, "SAVE1.GAM")
@@ -576,8 +577,8 @@ defmodule MirrorWeb.MapLiveEditTest do
     original = File.read!(save)
     click(view, 1, 1)
 
-    html = render_submit(view, "save_file", %{"save" => %{"path" => save}})
-    assert html =~ "won&#39;t overwrite"
+    render_submit(view, "save_file", %{"save" => %{"path" => save}})
+    assert_toast(view, "won't overwrite", "error")
     assert File.read!(save) == original
 
     target = Path.join(dir, "SAVE2.GAM")
