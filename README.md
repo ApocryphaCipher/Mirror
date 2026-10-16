@@ -31,7 +31,7 @@ bash scripts/dev_server.sh
 
 Open <http://localhost:4000> in **Chrome or Edge**, click **Choose folder** and pick the folder your game saves into. The slots with a save in them turn green; click one to open it. To open a different save later, click the logo to come back to this page. Press Ctrl-C to stop the server.
 
-Other browsers can't pick a folder. There you can open a save by its path in the Lab (the **Lab** link at the top): type the path of a save (for example `~/.mirror/game/SAVE1.GAM`) and press **Load**.
+Mirror opens and saves games through the browser's folder picker, which only Chrome and Edge have. Other browsers (Firefox, Safari) can't open a save.
 
 The import step copies just the files Mirror needs, and your saves, into `~/.mirror/game`. It's safe to run again; it won't overwrite a save you've edited. (The game folder you pick in the browser is where your saves live, which can be your real game folder; `~/.mirror/game` is where Mirror keeps its copy of the game's data files.)
 
@@ -47,7 +47,7 @@ The import step copies just the files Mirror needs, and your saves, into `~/.mir
   mix phx.server
   ```
 
-- Choose the game folder on the start page. With Steam that is the install folder, which has `SAVE1.GAM` to `SAVE9.GAM` in it. (In the Lab's path box, a full path with backslashes works too.)
+- Choose the game folder on the start page. With Steam that is the install folder, which has `SAVE1.GAM` to `SAVE9.GAM` in it.
 
 **Prefer Docker?**
 

@@ -1,6 +1,6 @@
 # EPIC-012: Open and save from the browser
 
-**Status:** 058, 059 and 060 built and checked by Kevin in Chrome and in the real game (2026-10-16); 061 waits for Kevin
+**Status:** 058, 059 and 060 built and checked by Kevin in Chrome and in the real game (2026-10-16); 061 done too (the path box is gone)
 **Owner:** [Kevin](https://github.com/KevinAsbury)
 **Requested:** 2026-10-15
 
@@ -40,7 +40,7 @@ How it works: `MirrorWeb.SaveSlots` is mounted on every LiveView (`on_mount` in 
 - **Slot names:** saving into a slot whose name in the game's `MAGIC.SET` is empty gives it the name `Mirror Edit Slot n`, so the game's Load Game screen does not show it blank; an existing name is never changed. See [../reference/magic-set.md](../reference/magic-set.md). Seen in the game's Load Game screen (2026-10-16).
 - Empty slots are shown clearly grey and cannot be clicked on the start page.
 - The folder's *name* is shown, not its full path: browsers do not tell a page where a folder is.
-- The path box survives only in the Lab, for browsers without the folder picker; STORY-061 deletes it (and `load_save`/`save_file`) when Kevin says so.
+- The path box is gone (STORY-061, 2026-10-16): the Lab's too, with `load_save`/`save_file` and the path code behind them. Other browsers cannot open a save.
 - The old home page ("Survey both planes…") is gone; the README says what Mirror does.
 
 **Checked:** server tests (`save_slots_test.exs`, `save_manager_test.exs`), Node tests, the in-app browser against a fake folder, and then **by Kevin with the real Chrome folder picker and the real game (2026-10-16)**: choose the folder, open a slot, save into an empty slot (slot 8), the game's Load Game screen shows the new name, the game loads the save and the next turn advances with no problem. His first try of the thin-bar version found no slots after choosing a folder (cause never found; the rebuilt start page works with the real picker). Kevin also used **Reconnect folder** with the real picker (it appeared after the page reloaded, one click, and worked). After a **full restart of Chrome** the folder came back by itself (Kevin). **Replace** was checked on the real folder: opening SAVE9 and saving it over SAVE8 asked first, wrote `SAVE8.GAM`, and made `SAVE8.GAM.mirror-backup` (123300 bytes, as the old slot). The backup's bytes equal the new save's only because both were unedited copies of the same save, so *this* run does not show that the backup holds the previous content (the fake-folder run did). **Not checked:** nothing else is open for this epic.

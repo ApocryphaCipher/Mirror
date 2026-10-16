@@ -23,45 +23,10 @@ defmodule Mirror.SaveFile do
           loaded_at: DateTime.t()
         }
 
-  # The game only loads these (STORY-038).
-  @slot_names for(n <- 1..9, do: "SAVE#{n}.GAM")
-
   @doc """
-  Returns `{:ok, path}` where `path` is `dir`/`SAVEn.GAM` for the
-  lowest `n` in 1..9 whose file does not already exist in `dir`
-  (comparison is case-insensitive).
-
-  Returns `:none` when all nine slots are occupied.
-  A missing or unreadable directory is treated as empty.
-  This function never raises.
+  Reads and decodes a save file from disk. (Mirror itself gets saves as bytes from the browser,
+  `from_binary/2`; this is for tests, scripts and the engine's own loader.)
   """
-  def next_free_slot(dir) do
-    taken =
-      dir
-      |> File.ls()
-      |> then(fn
-        {:ok, files} -> files
-        _ -> []
-      end)
-      |> MapSet.new(&String.upcase/1)
-
-    case Enum.find(1..9, &(not MapSet.member?(taken, "SAVE#{&1}.GAM"))) do
-      nil -> :none
-      n -> {:ok, Path.join(dir, "SAVE#{n}.GAM")}
-    end
-  end
-
-  @doc """
-  Returns `true` only when the basename of `path`, compared case-insensitively,
-  is exactly one of `SAVE1.GAM` through `SAVE9.GAM`.
-
-  Returns `false` for anything else (e.g. `"SAVE10.GAM"`, `"SAVE0.GAM"`,
-  `"foo-edited.GAM"`, `"SAVE1.GAM.bak"`).
-  """
-  def game_loadable_name?(path) do
-    String.upcase(Path.basename(path)) in @slot_names
-  end
-
   def load(path) do
     with {:ok, raw} <- File.read(path),
          {:ok, planes} <- decode_planes(raw),
@@ -113,105 +78,6 @@ defmodule Mirror.SaveFile do
         {:error, reason} -> {:halt, {:error, reason}}
       end
     end)
-  end
-
-  @doc """
-  Writes `save` to `target`, never to the file it was loaded from
-  (AGENTS.md §9): that file is refused by path and by inode, so a symlink
-  or different letter case can't get round it. An existing `target` is
-  backed up to `target.bak` first (unless one exists, or `backup: false`),
-  and the write is atomic: a temporary file in the same folder, renamed
-  over `target`.
-  """
-  def write(%__MODULE__{} = save, target, opts \\ []) do
-    with :ok <- validate_target(target),
-         :ok <- check_not_original(save, target),
-         :ok <- maybe_backup(target, opts),
-         {:ok, binary} <- serialize(save),
-         :ok <- atomic_write(target, binary) do
-      {:ok, target}
-    end
-  end
-
-  defp validate_target(nil), do: {:error, :no_destination}
-  defp validate_target(""), do: {:error, :no_destination}
-  defp validate_target(_target), do: :ok
-
-  defp check_not_original(save, target) do
-    source = save.path
-
-    if is_nil(source) do
-      :ok
-    else
-      expanded_source = comparable_path(source)
-      expanded_target = comparable_path(target)
-
-      cond do
-        expanded_source == expanded_target ->
-          {:error, :would_overwrite_original}
-
-        true ->
-          with {:ok, s_stat} <- File.stat(source),
-               {:ok, t_stat} <- File.stat(target) do
-            if same_file?(s_stat, t_stat) or link_to?(target, expanded_source) do
-              {:error, :would_overwrite_original}
-            else
-              :ok
-            end
-          else
-            _ -> :ok
-          end
-      end
-    end
-  end
-
-  # Windows file names are not case sensitive, so "save1.gam" and "SAVE1.GAM"
-  # are the same file there.
-  defp comparable_path(path) do
-    expanded = Path.expand(path)
-    if match?({:win32, _}, :os.type()), do: String.downcase(expanded), else: expanded
-  end
-
-  # Windows reports inode 0 for every file, so only a real (non-zero) inode
-  # can say two paths are the same file.
-  defp same_file?(%{inode: inode} = a, %{inode: inode} = b) when inode != 0,
-    do: a.major_device == b.major_device
-
-  defp same_file?(_a, _b), do: false
-
-  # With no inode to compare, follow a symbolic link at `target` one step.
-  defp link_to?(target, source) do
-    case File.read_link(target) do
-      {:ok, dest} -> comparable_path(Path.expand(dest, Path.dirname(target))) == source
-      _ -> false
-    end
-  end
-
-  defp maybe_backup(target, opts) do
-    if Keyword.get(opts, :backup, true) and File.exists?(target) do
-      backup_path = target <> ".bak"
-
-      if File.exists?(backup_path) do
-        :ok
-      else
-        File.cp(target, backup_path)
-      end
-    else
-      :ok
-    end
-  end
-
-  defp atomic_write(target, binary) do
-    tmp = target <> ".tmp-" <> Integer.to_string(System.unique_integer([:positive]))
-
-    with :ok <- File.write(tmp, binary),
-         :ok <- File.rename(tmp, target) do
-      :ok
-    else
-      {:error, reason} ->
-        File.rm(tmp)
-        {:error, reason}
-    end
   end
 
   defp decode_planes(raw) do

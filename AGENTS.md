@@ -177,17 +177,15 @@ These all bit a previous session:
 
 - Real-game sign-off: every editing story must be manually tested against DOSBox.
   See `docs/reference/real-game-acceptance.md` for the procedure.
-- Two ways to write a save. **The slot bar** (EPIC-012, the normal one): the browser writes
-  `SAVEn.GAM` into the user's game folder; slots 1 to 8 only (slot 9 is the game's autosave: it can
-  be opened, never written); a full slot asks first, in the page (never `window.confirm`), and the
-  old file is copied to `SAVEn.GAM.mirror-backup` first (once: an existing backup is kept, so it
-  stays the game's own save), and a failed backup stops the save. The server never touches the
-  user's disk for this. **The Lab's path box** (a fallback for other browsers, until STORY-061 removes it): never overwrite
-  the save that was loaded; `SaveFile.write/3` enforces this (by canonical path and device/inode)
-  for those callers. **Save as** suggests the next free `SAVE1.GAM`–`SAVE9.GAM` slot (or leaves
-  it empty if all 9 are taken). Arbitrary names can be written but the UI warns that Master of
-  Magic only loads `SAVE1`–`SAVE9`. (In the game's Load Game screen slot 9 is the autosave and
-  cannot be picked, so for a save you want to load, use slots 1–8; Kevin, 2026-10-04.)
+- Saves are opened and written by the browser (EPIC-012), never by a path on the server: the page reads
+  `SAVEn.GAM` from the user's game folder and sends the bytes (`Mirror.SaveManager.load_bytes/3`), and writes the
+  bytes the server builds (`slot_bytes/1`) back into a slot. Slots 1 to 8 only; slot 9 is the game's autosave: it can
+  be opened, never written. A full slot asks first, in the page (never `window.confirm`), and the old file is copied
+  to `SAVEn.GAM.mirror-backup` first (once: an existing backup is kept, so it stays the game's own save); a failed
+  backup stops the save. A slot with no name in `MAGIC.SET` gets one (`docs/reference/magic-set.md`). (In the game's
+  Load Game screen slot 9 is the autosave and cannot be picked, so for a save you want to load, use slots 1 to 8;
+  Kevin, 2026-10-04.) There is no path box and no "Save as" any more (STORY-061, 2026-10-16). Tests open and save
+  through `MirrorWeb.SaveHelpers` (`open_save/2`, `save_to/2`).
 - An edit must leave the save consistent. The raw editors (Cycle, raw Paint)
   update terrain bytes and the derived adjacency mask only. They do **not**
   keep landmass/continent IDs consistent across land/water transitions;

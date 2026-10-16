@@ -256,12 +256,9 @@ defmodule MirrorWeb.SaveSlots do
               id="slots-unsupported"
               class="max-w-md rounded-xl border border-amber-300/30 bg-amber-300/10 p-4 text-amber-100"
             >
-              Picking a folder needs <strong>Chrome</strong>
-              or <strong>Edge</strong>.
-              In another browser you can still open a save by its path in the <.link
-                navigate={~p"/lab/arcanus"}
-                class="underline"
-              >Lab</.link>.
+              Mirror opens and saves games through your browser's folder picker, which needs
+              <strong>Chrome</strong>
+              or <strong>Edge</strong>. Please open this page in one of them.
             </p>
           <% @slots.needs_permission -> %>
             <div class="flex flex-col items-center gap-3">

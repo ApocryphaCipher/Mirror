@@ -71,8 +71,7 @@ mix test --warnings-as-errors
     on `:os.type()` / a non-zero inode so macOS and Linux behave as before.
   * Three `SaveManager` tests and one load-box test assumed POSIX paths
     (`Path.expand` returns `c:/...` on Windows).
-* Paths with backslashes typed into the Load box work
-  (`C:\Users\kevin\mirror-test\TEMPLATE.GAM` loaded).
+* Paths with backslashes typed into the Load box worked at the time (`C:\Users\kevin\mirror-test\TEMPLATE.GAM` loaded). *The path box was removed on 2026-10-16 (STORY-061): saves are now opened from the game folder chosen in Chrome or Edge.*
 
 ### Environment variables
 

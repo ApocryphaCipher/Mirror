@@ -58,7 +58,7 @@
 - [STORY-058](STORY-058-top-bar-and-unsaved-badge.md): the page-wide top bar and the unsaved-changes badge (EPIC-012) **Built 2026-10-16**
 - [STORY-059](STORY-059-pick-folder-and-load-slot.md): pick the game folder, show the slots, load a slot (EPIC-012) **Done 2026-10-16**
 - [STORY-060](STORY-060-save-to-slot.md): save to a slot, with an overwrite warning (EPIC-012) **Done 2026-10-16**
-- [STORY-061](STORY-061-retire-the-path-box.md): retire the path box and the old save-path rules (EPIC-012) **Open**
+- [STORY-061](STORY-061-retire-the-path-box.md): retire the path box and the old save-path rules (EPIC-012) **Done 2026-10-16**
 - [STORY-062](STORY-062-fix-the-toasts.md): fix the toast messages: fade after a time, newest on top, slide then collapse into a stack **Done 2026-10-16**
 - [STORY-063](STORY-063-spike-fantasy-terrain.md): spike: a high-resolution terrain set of Kevin's own art, no game assets (terrain only; units and sprites later) **Open**
 - [STORY-064](STORY-064-river-editing.md): river editing: a path tool or a river layer, translated to the 43 river tiles (EPIC-006) **Open (idea)**
