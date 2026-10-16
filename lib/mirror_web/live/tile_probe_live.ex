@@ -143,7 +143,7 @@ defmodule MirrorWeb.TileProbeLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash}>
+    <Layouts.app flash={@flash} slots={@slots}>
       <div class="space-y-8">
         <div class="flex flex-wrap items-end justify-between gap-4">
           <div>

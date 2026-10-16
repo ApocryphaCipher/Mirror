@@ -991,10 +991,10 @@ defmodule MirrorWeb.MapLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} full_bleed>
+    <Layouts.app flash={@flash} slots={@slots} active={@plane} full_bleed>
       <%= if @lab? do %>
-        <div class="relative min-h-[calc(100svh-2.5rem)]">
-          <div class="relative flex min-h-[calc(100svh-2.5rem)] flex-col">
+        <div class="relative min-h-[100svh]">
+          <div class="relative flex min-h-[100svh] flex-col">
             <header class="pointer-events-auto border-b border-white/10 bg-slate-950/80 px-6 py-5 shadow-lg shadow-black/60 backdrop-blur">
               <div class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-xl shadow-black/60 backdrop-blur">
                 <div class="flex flex-wrap items-end justify-between gap-4">
@@ -1655,63 +1655,13 @@ defmodule MirrorWeb.MapLive do
         <div class="flex flex-col">
           <header class="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-slate-950/80 px-4 py-2">
             <div class="flex items-center gap-4">
-              <nav class="flex rounded-xl border border-white/10 p-0.5 text-sm" aria-label="Plane">
-                <.link
-                  :for={plane <- [:arcanus, :myrror]}
-                  navigate={map_path(plane)}
-                  class={[
-                    "rounded-lg px-3 py-1 transition",
-                    plane == @plane && "bg-white/10 font-semibold text-white",
-                    plane != @plane && "text-slate-400 hover:text-white"
-                  ]}
-                  aria-current={plane == @plane && "page"}
-                >
-                  {plane_name(plane)}
-                </.link>
-              </nav>
-              <nav
-                :if={@state.save}
-                id="map-wizard-nav"
-                class="flex items-center gap-1 text-sm"
-                aria-label="Wizards"
-              >
-                <.link
-                  :for={{id, name} <- MirrorWeb.WizardPanel.wizards(@state.save.raw)}
-                  navigate={~p"/wizard/#{id}"}
-                  class="rounded-full border border-white/10 px-3 py-1 text-slate-300 hover:text-white"
-                >
-                  {name}
-                </.link>
-              </nav>
-              <span class="truncate text-sm text-slate-400">
-                {if @state.save_path, do: Path.basename(@state.save_path), else: "No save loaded"}
+              <span id="map-title" class="truncate text-sm text-slate-400">
+                {plane_name(@plane)}
+                {if @state.save_path, do: "· #{Path.basename(@state.save_path)}"}
               </span>
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
-              <.form
-                for={@load_form}
-                id="load-form"
-                phx-submit="load_save"
-                phx-change="update_load_path"
-                class="flex items-center gap-2"
-              >
-                <.input
-                  field={@load_form[:path]}
-                  type="text"
-                  placeholder="Path to SAVEn.GAM"
-                  phx-hook="StableInput"
-                  class="w-72 rounded-lg border border-white/10 bg-slate-950/60 py-1 text-sm text-slate-200 placeholder:text-slate-500"
-                />
-                <button
-                  id="load-save-button"
-                  type="submit"
-                  class="rounded-lg bg-amber-300 px-3 py-1 text-sm font-semibold text-slate-950 transition hover:bg-amber-200"
-                >
-                  Load
-                </button>
-              </.form>
-
               <button
                 id="toggle-edit-button"
                 type="button"
@@ -2082,28 +2032,6 @@ defmodule MirrorWeb.MapLive do
                     do: " · #{@changed_records} edited"}
                 </span>
                 <.discard_control changed_tiles={@changed_tiles} armed={@discard_armed} />
-                <.form
-                  for={@save_form}
-                  id="save-form"
-                  phx-submit="save_file"
-                  phx-change="update_save_path"
-                  class="flex items-center gap-2"
-                >
-                  <.input
-                    field={@save_form[:path]}
-                    type="text"
-                    placeholder="Save as… (new file path)"
-                    phx-hook="StableInput"
-                    class="w-72 rounded-lg border border-white/10 bg-slate-950/60 py-0.5 text-sm text-slate-200 placeholder:text-slate-500"
-                  />
-                  <button
-                    id="save-button"
-                    type="submit"
-                    class="rounded-lg bg-emerald-300 px-3 py-0.5 font-semibold text-slate-950 hover:bg-emerald-200"
-                  >
-                    Save as
-                  </button>
-                </.form>
               </div>
             </div>
 

@@ -34,7 +34,7 @@ defmodule MirrorWeb.MapLiveEditTest do
   # Open the map, load the save, enter edit mode with the given tool.
   defp editing(conn, save, tool \\ "cycle") do
     {:ok, view, _} = live(conn, ~p"/arcanus")
-    view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+    render_submit(view, "load_save", %{"load" => %{"path" => save}})
     render_click(view, "toggle_edit", %{})
     render_click(view, "set_tool", %{"tool" => tool})
     view
@@ -84,7 +84,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       save: save
     } do
       {:ok, view, _} = live(conn, ~p"/arcanus")
-      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      render_submit(view, "load_save", %{"load" => %{"path" => save}})
 
       {:ok, centred, _} = live(conn, ~p"/arcanus?x=38&y=21")
       assert_push_event(centred, "center_tile", %{x: 38, y: 21})
@@ -101,14 +101,14 @@ defmodule MirrorWeb.MapLiveEditTest do
       File.write!(save, put_bytes(File.read!(save), 0x9E8 + 1, "Jafar" <> <<0>>))
 
       {:ok, view, _} = live(conn, ~p"/arcanus")
-      refute has_element?(view, "#map-wizard-nav")
-      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
-      assert has_element?(view, "#map-wizard-nav a[href='/wizard/1']")
+      refute has_element?(view, "#header-wizards")
+      render_submit(view, "load_save", %{"load" => %{"path" => save}})
+      assert has_element?(view, "#header-wizards a[href='/wizard/1']")
     end
 
     test "ignores paint and wheel input", %{conn: conn, save: save} do
       {:ok, view, _} = live(conn, ~p"/arcanus")
-      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      render_submit(view, "load_save", %{"load" => %{"path" => save}})
 
       click(view, 1, 1)
       pointer(view, "drag", 2, 1)
@@ -171,7 +171,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       conn2 = init_test_session(conn, %{"mirror_session_id" => session_id})
 
       {:ok, tab1, _} = live(conn1, ~p"/arcanus")
-      tab1 |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      render_submit(tab1, "load_save", %{"load" => %{"path" => save}})
 
       {:ok, tab2, _} = live(conn2, ~p"/arcanus")
 
@@ -201,7 +201,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       conn2 = init_test_session(conn, %{"mirror_session_id" => session_id})
 
       {:ok, tab1, _} = live(conn1, ~p"/arcanus")
-      tab1 |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      render_submit(tab1, "load_save", %{"load" => %{"path" => save}})
 
       {:ok, tab2, _} = live(conn2, ~p"/arcanus")
 
@@ -241,7 +241,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       conn1 = init_test_session(conn, %{"mirror_session_id" => session_id})
 
       {:ok, tab1, _} = live(conn1, ~p"/arcanus")
-      tab1 |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      render_submit(tab1, "load_save", %{"load" => %{"path" => save}})
       render_click(tab1, "toggle_edit", %{})
       render_click(tab1, "set_tool", %{"tool" => "cycle"})
       click(tab1, 1, 1)
@@ -260,7 +260,7 @@ defmodule MirrorWeb.MapLiveEditTest do
 
       # Tab 1 now submits save to SAVE2.GAM with its stale socket assigns
       target_save = Path.join(dir, "SAVE2.GAM")
-      tab1 |> element("#save-form") |> render_submit(%{"save" => %{"path" => target_save}})
+      render_submit(tab1, "save_file", %{"save" => %{"path" => target_save}})
 
       # Both Tab 1's edit at (1, 1) and Tab 2's edit at (2, 2) must survive in SessionStore
       store_after = Mirror.SessionStore.get(session_id)
@@ -288,7 +288,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       conn1 = init_test_session(conn, %{"mirror_session_id" => session_id})
 
       {:ok, tab1, _} = live(conn1, ~p"/arcanus")
-      tab1 |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      render_submit(tab1, "load_save", %{"load" => %{"path" => save}})
       render_click(tab1, "toggle_edit", %{})
       render_click(tab1, "set_tool", %{"tool" => "paint"})
 
@@ -314,7 +314,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       conn2 = init_test_session(conn, %{"mirror_session_id" => session_id})
 
       {:ok, tab1, _} = live(conn1, ~p"/arcanus")
-      tab1 |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      render_submit(tab1, "load_save", %{"load" => %{"path" => save}})
       render_click(tab1, "toggle_edit", %{})
       render_click(tab1, "set_tool", %{"tool" => "paint"})
 
@@ -399,7 +399,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       conn = init_test_session(conn, %{"mirror_session_id" => session_id})
 
       {:ok, view, _} = live(conn, ~p"/arcanus")
-      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      render_submit(view, "load_save", %{"load" => %{"path" => save}})
       render_click(view, "toggle_edit", %{})
 
       before = Mirror.SessionStore.get(session_id)
@@ -576,12 +576,12 @@ defmodule MirrorWeb.MapLiveEditTest do
     original = File.read!(save)
     click(view, 1, 1)
 
-    html = view |> element("#save-form") |> render_submit(%{"save" => %{"path" => save}})
+    html = render_submit(view, "save_file", %{"save" => %{"path" => save}})
     assert html =~ "won&#39;t overwrite"
     assert File.read!(save) == original
 
     target = Path.join(dir, "SAVE2.GAM")
-    view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+    render_submit(view, "save_file", %{"save" => %{"path" => target}})
     assert File.exists?(target)
     assert File.read!(target) != original
     assert changed(view) =~ "0 tiles changed"
@@ -602,7 +602,7 @@ defmodule MirrorWeb.MapLiveEditTest do
     assert saved_tile_1_1 != start_1_1
 
     target = Path.join(dir, "SAVE2.GAM")
-    view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+    render_submit(view, "save_file", %{"save" => %{"path" => target}})
 
     # Paint another tile after Save as
     click(view, 2, 2)
@@ -619,7 +619,7 @@ defmodule MirrorWeb.MapLiveEditTest do
   describe "cities overlay (STORY-010)" do
     test "loading a save pushes this plane's cities with owner banners", %{conn: conn, save: save} do
       {:ok, view, _} = live(conn, ~p"/arcanus")
-      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      render_submit(view, "load_save", %{"load" => %{"path" => save}})
 
       assert_push_event(view, "overlay_data", %{layer: "cities", items: items})
       assert length(items) == 16
@@ -634,7 +634,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       File.write!(save, put_byte(File.read!(save), 0x8AAC + 66, 1))
 
       {:ok, view, _} = live(conn, ~p"/arcanus")
-      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      render_submit(view, "load_save", %{"load" => %{"path" => save}})
 
       assert_push_event(view, "overlay_data", %{layer: "cities", items: items})
       assert %{name: "Deventor", walled: true} = Enum.find(items, &(&1.name == "Deventor"))
@@ -668,7 +668,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       File.write!(save_with_pops, raw)
 
       {:ok, view, _} = live(conn, ~p"/arcanus")
-      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save_with_pops}})
+      render_submit(view, "load_save", %{"load" => %{"path" => save_with_pops}})
 
       assert_push_event(view, "overlay_data", %{layer: "cities", items: items})
 
@@ -687,7 +687,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       save: save
     } do
       {:ok, view, _} = live(conn, ~p"/arcanus")
-      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      render_submit(view, "load_save", %{"load" => %{"path" => save}})
 
       pointer(view, "hover", 38, 21)
       card = view |> element("#surveyor") |> render() |> text_of()
@@ -724,7 +724,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       assert html =~ ~r/value="cities"[^>]*checked/
       assert html =~ ~r/value="units"[^>]*checked/
 
-      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      render_submit(view, "load_save", %{"load" => %{"path" => save}})
 
       assert_push_event(view, "overlay_data", %{layer: "units", items: []})
 
@@ -791,7 +791,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       File.write!(save_with_units, raw)
 
       {:ok, view, _} = live(conn, ~p"/arcanus")
-      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save_with_units}})
+      render_submit(view, "load_save", %{"load" => %{"path" => save_with_units}})
 
       assert_push_event(view, "overlay_data", %{layer: "units", items: items})
       assert length(items) == 1
@@ -814,7 +814,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       session_id = "reveal-test-#{System.unique_integer([:positive])}"
       conn = init_test_session(conn, %{"mirror_session_id" => session_id})
       {:ok, view, _} = live(conn, ~p"/arcanus")
-      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      render_submit(view, "load_save", %{"load" => %{"path" => save}})
       render_click(view, "toggle_edit", %{})
       {view, session_id}
     end
@@ -875,7 +875,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       view |> element("#reveal-both") |> render_click()
 
       target = Path.join(dir, "REVEALED.GAM")
-      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+      render_submit(view, "save_file", %{"save" => %{"path" => target}})
 
       assert explored(target, :arcanus) == :binary.copy(<<15>>, 2400)
       assert explored(target, :myrror) == :binary.copy(<<15>>, 2400)
@@ -929,7 +929,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       session_id = "reveal-view-#{System.unique_integer([:positive])}"
       conn = init_test_session(conn, %{"mirror_session_id" => session_id})
       {:ok, view, _} = live(conn, ~p"/arcanus")
-      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      render_submit(view, "load_save", %{"load" => %{"path" => save}})
       before = session_planes(session_id)
 
       refute has_element?(view, "#reveal-plane")
@@ -955,7 +955,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       save: save
     } do
       {:ok, view, _} = live(conn, ~p"/arcanus")
-      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      render_submit(view, "load_save", %{"load" => %{"path" => save}})
 
       assert_push_event(view, "overlay_data", %{layer: "auras", items: items})
       assert aura_tiles(items) == Enum.sort(@aura_tiles)
@@ -974,14 +974,14 @@ defmodule MirrorWeb.MapLiveEditTest do
       File.write!(unowned, <<head::binary, 0xFF, tail::binary>>)
 
       {:ok, view, _} = live(conn, ~p"/arcanus")
-      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => unowned}})
+      render_submit(view, "load_save", %{"load" => %{"path" => unowned}})
 
       assert_push_event(view, "overlay_data", %{layer: "auras", items: []})
     end
 
     test "only the viewed plane's nodes are pushed", %{conn: conn, save: save} do
       {:ok, view, _} = live(conn, ~p"/myrror")
-      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      render_submit(view, "load_save", %{"load" => %{"path" => save}})
 
       assert_push_event(view, "overlay_data", %{layer: "auras", items: []})
     end
@@ -993,7 +993,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       {:ok, tab1, _} = live(conn, ~p"/arcanus")
       {:ok, tab2, _} = live(conn, ~p"/arcanus")
 
-      tab1 |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      render_submit(tab1, "load_save", %{"load" => %{"path" => save}})
       assert aura_tiles(latest_overlay(tab2, "auras")) == Enum.sort(@aura_tiles)
 
       render_click(tab1, "toggle_edit", %{})
@@ -1042,7 +1042,7 @@ defmodule MirrorWeb.MapLiveEditTest do
     end
 
     defp load(view, path),
-      do: view |> element("#load-form") |> render_submit(%{"load" => %{"path" => path}})
+      do: render_submit(view, "load_save", %{"load" => %{"path" => path}})
 
     test "a save loaded in one tab shows its cities, units and sites in the other", %{
       conn: conn,
@@ -1252,7 +1252,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       assert changed(view) =~ "1 tile changed"
 
       target = Path.join(dir, "SAVE3.GAM")
-      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+      render_submit(view, "save_file", %{"save" => %{"path" => target}})
       assert flags_byte(target, 30, 5) == 0x08
       assert flags_byte(save, 30, 5) == 0x00
 
@@ -1271,7 +1271,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       conn1 = init_test_session(conn, %{"mirror_session_id" => session_id})
 
       {:ok, tab1, _} = live(conn1, ~p"/arcanus")
-      tab1 |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      render_submit(tab1, "load_save", %{"load" => %{"path" => save}})
       render_click(tab1, "toggle_edit", %{})
       render_click(tab1, "set_tool", %{"tool" => "road"})
 
@@ -1338,7 +1338,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       File.write!(save_with_sites, raw)
 
       {:ok, view, _} = live(conn, ~p"/arcanus")
-      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save_with_sites}})
+      render_submit(view, "load_save", %{"load" => %{"path" => save_with_sites}})
 
       assert_push_event(view, "overlay_data", %{layer: "sites", items: items})
       assert length(items) == 9
@@ -1369,7 +1369,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       File.write!(save_with_sites, raw)
 
       {:ok, view, _} = live(conn, ~p"/myrror")
-      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save_with_sites}})
+      render_submit(view, "load_save", %{"load" => %{"path" => save_with_sites}})
 
       assert_push_event(view, "overlay_data", %{layer: "sites", items: items})
       assert %{x: 15, y: 15, sprite: "abandoned_keep"} in items
@@ -1621,7 +1621,7 @@ defmodule MirrorWeb.MapLiveEditTest do
 
     test "view mode ignores painting", %{conn: conn, save: save} do
       {:ok, view, _} = live(conn, ~p"/arcanus")
-      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      render_submit(view, "load_save", %{"load" => %{"path" => save}})
       click(view, 30, 20)
       assert changed(reopen_in_edit(conn)) =~ "0 tiles changed"
     end
@@ -1766,7 +1766,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       refute note(view) =~ "Laid a road"
 
       target = Path.join(dir, "SAVE5.GAM")
-      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+      render_submit(view, "save_file", %{"save" => %{"path" => target}})
       assert flags_byte(target, 40, 23) == 0x08
       assert flags_byte(target, 42, 25) == 0x08
     end
@@ -1777,7 +1777,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       click(view, 40, 23)
 
       target = Path.join(dir, "SAVE4.GAM")
-      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+      render_submit(view, "save_file", %{"save" => %{"path" => target}})
       assert {:ok, cities} = Mirror.SaveFile.Cities.parse(File.read!(target))
       assert %{x: 40, y: 23} = Enum.find(cities, &(&1.name == "Deventor"))
       assert {:ok, original} = Mirror.SaveFile.Cities.parse(File.read!(save))
@@ -1928,7 +1928,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       assert changed(view) =~ "2 edited"
 
       target = Path.join(dir, "SAVE6.GAM")
-      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+      render_submit(view, "save_file", %{"save" => %{"path" => target}})
       assert {:ok, cities} = Mirror.SaveFile.Cities.parse(File.read!(target))
       assert %{name: "Nar", population: 9} = Enum.find(cities, &(&1.x == 38 and &1.y == 21))
 
@@ -1970,7 +1970,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       assert changed(view) =~ "1 edited"
 
       target = Path.join(dir, "SAVE7.GAM")
-      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+      render_submit(view, "save_file", %{"save" => %{"path" => target}})
       assert {:ok, cities} = Mirror.SaveFile.Cities.parse(File.read!(target))
 
       assert %{buildings: %{23 => :built, 26 => :built}} =
@@ -2038,7 +2038,7 @@ defmodule MirrorWeb.MapLiveEditTest do
              )
 
       target = Path.join(dir, "SAVE8.GAM")
-      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+      render_submit(view, "save_file", %{"save" => %{"path" => target}})
       assert {:ok, cities} = Mirror.SaveFile.Cities.parse(File.read!(target))
       assert %{enchantments: %{natures_eye: 0}} = Enum.find(cities, &(&1.name == "Deventor"))
 
@@ -2152,7 +2152,7 @@ defmodule MirrorWeb.MapLiveEditTest do
   describe "City inspector in View mode (STORY-020)" do
     defp viewing(conn, save) do
       {:ok, view, _} = live(conn, ~p"/arcanus")
-      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => save}})
+      render_submit(view, "load_save", %{"load" => %{"path" => save}})
       view
     end
 
@@ -2294,7 +2294,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       assert changed(view) =~ "1 edited"
 
       target = Path.join(dir, "SAVE5.GAM")
-      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+      render_submit(view, "save_file", %{"save" => %{"path" => target}})
 
       assert [%{level: 3, experience: 150, damage: 2}, %{level: 3}, %{level: 0}] =
                Mirror.SaveFile.Units.stack(File.read!(target), {10, 10, 0})
@@ -2405,7 +2405,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       refute Enum.any?(auras, &match?(%{x: 42, y: 10}, &1))
 
       target = Path.join(dir, "SAVE5.GAM")
-      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+      render_submit(view, "save_file", %{"save" => %{"path" => target}})
       assert {:ok, saved} = Mirror.SaveFile.load(target)
       assert {:ok, %{nodes: nodes}} = Mirror.SaveFile.Sites.parse(saved.raw)
       assert Enum.any?(nodes, &match?(%{x: 44, y: 12, type: :sorcery}, &1))
@@ -2474,7 +2474,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       arm_units(view, ["0", "1"])
       assert has_element?(view, "#units-note", "Moving 2 units")
 
-      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => path}})
+      render_submit(view, "load_save", %{"load" => %{"path" => path}})
       refute has_element?(view, "#unit-panel")
 
       # no longer armed: this click selects a tile, it does not move anything
@@ -2514,7 +2514,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       dir: dir
     } do
       {:ok, view, _} = live(conn, ~p"/arcanus")
-      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => units_save(dir)}})
+      render_submit(view, "load_save", %{"load" => %{"path" => units_save(dir)}})
 
       pointer(view, "click", 10, 10)
       assert upanel(view) =~ "3 units"
@@ -2597,7 +2597,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       assert changed(view) =~ "1 edited"
 
       target = Path.join(dir, "SAVE5.GAM")
-      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+      render_submit(view, "save_file", %{"save" => %{"path" => target}})
 
       assert %{gold: 500, guards: [%{type: 196, left: 2, start: 2}]} =
                Enum.find(encounters_of(target), &(&1.index == 20))
@@ -2644,7 +2644,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       assert lpanel(view) =~ "Items to roll: 2"
 
       target = Path.join(dir, "SAVE6.GAM")
-      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+      render_submit(view, "save_file", %{"save" => %{"path" => target}})
       assert %{item_count: 2, gold: 120} = Enum.find(encounters_of(target), &(&1.index == 20))
 
       render_click(view, "undo", %{})
@@ -2699,7 +2699,7 @@ defmodule MirrorWeb.MapLiveEditTest do
 
       lair_form(view, %{"guard1_type" => "108", "guard1_count" => "2", "gold" => "99"})
       target = Path.join(dir, "SAVE6.GAM")
-      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+      render_submit(view, "save_file", %{"save" => %{"path" => target}})
 
       sides = encounters_of(target) |> Enum.filter(&(&1.kind == 0))
       assert Enum.map(sides, & &1.plane) |> Enum.sort() == [0, 1]
@@ -2711,7 +2711,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       dir: dir
     } do
       {:ok, view, _} = live(conn, ~p"/arcanus")
-      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => lairs_save(dir)}})
+      render_submit(view, "load_save", %{"load" => %{"path" => lairs_save(dir)}})
 
       pointer(view, "click", 26, 25)
       assert lpanel(view) =~ "Abandoned keep"
@@ -2733,7 +2733,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       view = editing(conn, path, "lair")
       click(view, 26, 25)
       assert has_element?(view, "#lair-panel")
-      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => path}})
+      render_submit(view, "load_save", %{"load" => %{"path" => path}})
       refute has_element?(view, "#lair-panel")
     end
   end
@@ -2796,7 +2796,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       assert changed(view) =~ "1 edited"
 
       target = Path.join(dir, "SAVE5.GAM")
-      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+      render_submit(view, "save_file", %{"save" => %{"path" => target}})
       assert %{owner: 1} = node_of(target)
       assert %{intact: false, guards: [%{type: 195, left: 2}]} = guardian_of(target)
 
@@ -2851,7 +2851,7 @@ defmodule MirrorWeb.MapLiveEditTest do
 
       path = nodes_save(dir)
       click(view, 42, 10)
-      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => path}})
+      render_submit(view, "load_save", %{"load" => %{"path" => path}})
       refute has_element?(view, "#node-panel")
     end
   end
@@ -2865,7 +2865,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       File.cp!(@real_save_source, real_save)
 
       {:ok, view, _} = live(conn, ~p"/arcanus")
-      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => real_save}})
+      render_submit(view, "load_save", %{"load" => %{"path" => real_save}})
 
       assert_push_event(view, "overlay_data", %{layer: "cities", items: items})
       assert length(items) == 16
@@ -2905,7 +2905,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       {:ok, tab1, _} = live(conn, ~p"/arcanus")
       {:ok, tab2, _} = live(conn, ~p"/arcanus")
 
-      tab1 |> element("#load-form") |> render_submit(%{"load" => %{"path" => real_save}})
+      render_submit(tab1, "load_save", %{"load" => %{"path" => real_save}})
 
       assert_push_event(tab2, "overlay_sprites", %{cities: %{city: %{width: 32}}})
       assert_push_event(tab2, "overlay_data", %{layer: "cities", items: items})
@@ -2921,11 +2921,11 @@ defmodule MirrorWeb.MapLiveEditTest do
       File.cp!(@real_save_source, real_save)
 
       {:ok, view, _} = live(conn, ~p"/arcanus")
-      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => real_save}})
+      render_submit(view, "load_save", %{"load" => %{"path" => real_save}})
       assert_push_event(view, "overlay_sprites", %{cities: %{city: %{width: 32}}})
 
       # Loading again re-sends the items, but not the sprite bank.
-      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => real_save}})
+      render_submit(view, "load_save", %{"load" => %{"path" => real_save}})
       assert_push_event(view, "overlay_data", %{layer: "cities", items: [_ | _]})
       refute_push_event(view, "overlay_sprites", _, 100)
     end
@@ -2938,12 +2938,12 @@ defmodule MirrorWeb.MapLiveEditTest do
       original = File.read!(real_save)
       click(view, 1, 1)
 
-      html = view |> element("#save-form") |> render_submit(%{"save" => %{"path" => real_save}})
+      html = render_submit(view, "save_file", %{"save" => %{"path" => real_save}})
       assert html =~ "won&#39;t overwrite"
       assert File.read!(real_save) == original
 
       target = Path.join(dir, "SAVE2.GAM")
-      view |> element("#save-form") |> render_submit(%{"save" => %{"path" => target}})
+      render_submit(view, "save_file", %{"save" => %{"path" => target}})
       assert File.exists?(target)
       assert byte_size(File.read!(target)) == byte_size(original)
       assert File.read!(target) != original
@@ -2955,7 +2955,7 @@ defmodule MirrorWeb.MapLiveEditTest do
       File.cp!(@real_save_source, real_save)
 
       {:ok, view, _} = live(conn, ~p"/arcanus")
-      view |> element("#load-form") |> render_submit(%{"load" => %{"path" => real_save}})
+      render_submit(view, "load_save", %{"load" => %{"path" => real_save}})
 
       pointer(view, "hover", 38, 21)
       card = view |> element("#surveyor") |> render() |> text_of()

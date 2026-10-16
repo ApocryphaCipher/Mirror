@@ -31,11 +31,6 @@
     </script>
   </head>
   <body>
-    {live_render(@conn, MirrorWeb.SaveBarLive,
-      id: "save-bar-live",
-      sticky: true,
-      session: %{"mirror_session_id" => Plug.Conn.get_session(@conn, :mirror_session_id)}
-    )}
     {@inner_content}
   </body>
 </html>

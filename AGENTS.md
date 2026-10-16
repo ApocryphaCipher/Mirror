@@ -181,7 +181,7 @@ These all bit a previous session:
   be opened, never written); a full slot asks first, in the page (never `window.confirm`), and the
   old file is copied to `SAVEn.GAM.mirror-backup` first (once: an existing backup is kept, so it
   stays the game's own save), and a failed backup stops the save. The server never touches the
-  user's disk for this. **The path box** (a fallback, until STORY-061 removes it): never overwrite
+  user's disk for this. **The Lab's path box** (a fallback for other browsers, until STORY-061 removes it): never overwrite
   the save that was loaded; `SaveFile.write/3` enforces this (by canonical path and device/inode)
   for those callers. **Save as** suggests the next free `SAVE1.GAM`–`SAVE9.GAM` slot (or leaves
   it empty if all 9 are taken). Arbitrary names can be written but the UI warns that Master of
