@@ -1,7 +1,7 @@
 # STORY-060: Save to a slot, with an overwrite warning
 
 **Parent:** [EPIC-012](../epics/EPIC-012-open-and-save-from-the-browser.md)
-**Status:** open (2026-10-15), after STORY-059
+**Status:** done (2026-10-16): saved from Mirror into an empty slot with Chrome's real picker, loaded in the game, next turn advanced (Kevin). Replace was checked on the real folder too: the confirmation, the overwrite and the `.mirror-backup` file (its bytes were identical to the new save, both being unedited copies, so the "holds the old bytes" part was shown only with the fake folder). The backup is kept once (the first one stays), see the epic
 **Size:** medium
 **Raised by:** [Kevin](https://github.com/KevinAsbury), 2026-10-15
 

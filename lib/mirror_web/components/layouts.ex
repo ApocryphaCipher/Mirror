@@ -31,6 +31,9 @@ defmodule MirrorWeb.Layouts do
     default: nil,
     doc: "the current [scope](https://hexdocs.pm/phoenix/scopes.html)"
 
+  attr :slots, :map, default: nil, doc: "the socket's `@slots` (MirrorWeb.SaveSlots)"
+  attr :active, :any, default: nil, doc: ":arcanus, :myrror or {:wizard, id}, for the header"
+
   attr :full_bleed, :boolean,
     default: false,
     doc: "when true, remove max width/padding so content can span the viewport"
@@ -47,47 +50,7 @@ defmodule MirrorWeb.Layouts do
       </div>
 
       <div class="relative z-10">
-        <header class="border-b border-white/10 bg-slate-950/70 backdrop-blur">
-          <div class={[
-            "flex flex-wrap items-center justify-between gap-4 py-4",
-            @full_bleed && "w-full px-4",
-            !@full_bleed && "mx-auto max-w-6xl px-6"
-          ]}>
-            <div class="flex items-center gap-3">
-              <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-300/80 via-sky-300/70 to-emerald-300/80 text-slate-950 shadow-lg">
-                <.icon name="hero-sparkles" class="size-5" />
-              </div>
-              <div>
-                <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Mirror</p>
-                <p class="text-lg font-semibold text-white">Master of Magic Classic</p>
-              </div>
-            </div>
-            <nav class="flex flex-wrap items-center gap-4 text-sm text-slate-200">
-              <.link navigate={~p"/"} class="group relative">
-                <span class="transition group-hover:text-white">Overview</span>
-                <span class="absolute -bottom-1 left-0 h-px w-0 bg-amber-300 transition-all group-hover:w-full" />
-              </.link>
-              <.link navigate={~p"/arcanus"} class="group relative">
-                <span class="transition group-hover:text-white">Arcanus</span>
-                <span class="absolute -bottom-1 left-0 h-px w-0 bg-sky-300 transition-all group-hover:w-full" />
-              </.link>
-              <.link navigate={~p"/myrror"} class="group relative">
-                <span class="transition group-hover:text-white">Myrror</span>
-                <span class="absolute -bottom-1 left-0 h-px w-0 bg-emerald-300 transition-all group-hover:w-full" />
-              </.link>
-              <span class="h-4 w-px bg-white/15" aria-hidden="true" />
-              <.link navigate={~p"/lab/arcanus"} class="text-slate-400 transition hover:text-white">
-                Lab
-              </.link>
-              <.link navigate={~p"/tile-probe"} class="text-slate-400 transition hover:text-white">
-                Tile probe
-              </.link>
-              <div class="ml-2">
-                <.theme_toggle />
-              </div>
-            </nav>
-          </div>
-        </header>
+        <MirrorWeb.SaveSlots.header slots={@slots} active={@active} />
 
         <main class={[
           @full_bleed && "w-full p-0",

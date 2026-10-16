@@ -37,9 +37,12 @@ defmodule Mirror.SaveManager do
 
   @doc "Suggests the next free SAVEn.GAM slot beside the loaded file."
   def suggested_save_path(original) when is_binary(original) do
-    case SaveFile.next_free_slot(Path.dirname(original)) do
-      {:ok, path} -> path
-      :none -> ""
+    # a save loaded from a slot button has only a name, no folder on the server
+    with dir when dir != "." <- Path.dirname(original),
+         {:ok, path} <- SaveFile.next_free_slot(dir) do
+      path
+    else
+      _ -> ""
     end
   end
 
@@ -95,50 +98,99 @@ defmodule Mirror.SaveManager do
     normalized = normalize_path(path)
 
     case SaveFile.load(normalized) do
-      {:ok, save} ->
-        if current_state, do: stop_engine_session(Map.get(current_state, :engine_session_id))
-        planes = Editor.with_computed_layers(save.planes)
-
-        state = %{
-          save: save,
-          planes: planes,
-          original_planes: save.planes,
-          original_raw: save.raw,
-          active_layer: :terrain,
-          selection: default_selection(),
-          history: %{arcanus: [], myrror: []},
-          redo: %{arcanus: [], myrror: []},
-          save_path: save.path,
-          dataset_id: save.dataset_id,
-          render_mode: (current_state && Map.get(current_state, :render_mode)) || :tiles,
-          phase_index: (current_state && Map.get(current_state, :phase_index)) || 0,
-          snapshot_mode: Map.get(current_state || %{}, :snapshot_mode, true),
-          snapshot_values: %{},
-          phase_loop_len: Map.get(current_state || %{}, :phase_loop_len),
-          phase_loop_status:
-            normalize_phase_loop_status(
-              Map.get(current_state || %{}, :phase_loop_status, :unknown)
-            ),
-          phase_loop_detecting: false,
-          engine_session_id: nil,
-          engine_player_id: Map.get(current_state || %{}, :engine_player_id, :observer)
-        }
-
-        state =
-          case start_engine_session(normalized) do
-            {:ok, engine_session_id} -> %{state | engine_session_id: engine_session_id}
-            {:error, _reason} -> state
-          end
-
-        state = normalize_state(state)
-        observe_stats(state)
-
-        {:ok, state, normalized}
-
-      {:error, reason} ->
-        {:error, reason}
+      {:ok, save} -> {:ok, build_state(save, current_state), normalized}
+      {:error, reason} -> {:error, reason}
     end
   end
+
+  @doc """
+  Like `load/2`, for a save that arrived as bytes from a slot button (EPIC-012). `name` is
+  the label shown for it (`"SAVE3.GAM"`). Returns `{:ok, state, name}` or `{:error, reason}`.
+  """
+  def load_bytes(raw, name, current_state \\ nil) do
+    case SaveFile.from_binary(raw, name) do
+      {:ok, save} -> {:ok, build_state(save, current_state), name}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp build_state(%SaveFile{} = save, current_state) do
+    if current_state, do: stop_engine_session(Map.get(current_state, :engine_session_id))
+    planes = Editor.with_computed_layers(save.planes)
+
+    state = %{
+      save: save,
+      planes: planes,
+      original_planes: save.planes,
+      original_raw: save.raw,
+      active_layer: :terrain,
+      selection: default_selection(),
+      history: %{arcanus: [], myrror: []},
+      redo: %{arcanus: [], myrror: []},
+      save_path: save.path,
+      dataset_id: save.dataset_id,
+      render_mode: (current_state && Map.get(current_state, :render_mode)) || :tiles,
+      phase_index: (current_state && Map.get(current_state, :phase_index)) || 0,
+      snapshot_mode: Map.get(current_state || %{}, :snapshot_mode, true),
+      snapshot_values: %{},
+      phase_loop_len: Map.get(current_state || %{}, :phase_loop_len),
+      phase_loop_status:
+        normalize_phase_loop_status(Map.get(current_state || %{}, :phase_loop_status, :unknown)),
+      phase_loop_detecting: false,
+      engine_session_id: nil,
+      engine_player_id: Map.get(current_state || %{}, :engine_player_id, :observer)
+    }
+
+    state =
+      case start_engine_session(save) do
+        {:ok, engine_session_id} -> %{state | engine_session_id: engine_session_id}
+        {:error, _reason} -> state
+      end
+
+    state = normalize_state(state)
+    observe_stats(state)
+    state
+  end
+
+  @doc """
+  The bytes of the save as it is now, with the edits in it, for the browser to write into
+  a slot. `{:error, :no_save}` when nothing is loaded.
+  """
+  def slot_bytes(%{save: %SaveFile{} = save, planes: planes}) do
+    SaveFile.serialize(%{save | planes: Editor.strip_computed(planes)})
+  end
+
+  def slot_bytes(_state), do: {:error, :no_save}
+
+  @doc """
+  Marks the edits as saved after the browser wrote `bytes` into `name` (`"SAVE3.GAM"`):
+  the unsaved count goes back to zero. If the state changed since `bytes` were made, it
+  is returned unchanged, so an edit made in between still counts as unsaved.
+  """
+  def mark_saved(%{save: %SaveFile{} = save} = state, name, bytes) do
+    case slot_bytes(state) do
+      {:ok, ^bytes} ->
+        saved_planes = Editor.strip_computed(state.planes)
+        save = %{save | path: name, raw: bytes, planes: saved_planes}
+
+        Map.merge(state, %{
+          save: save,
+          save_path: name,
+          original_planes: saved_planes,
+          original_raw: bytes,
+          record_mark: System.unique_integer([:positive, :monotonic])
+        })
+
+      _ ->
+        state
+    end
+  end
+
+  def mark_saved(state, _name, _bytes), do: state
+
+  @doc "How many edits are not in the save yet (terrain tiles and records)."
+  def unsaved_count(state),
+    do: Editor.changed_tile_count(state) + Editor.changed_record_count(state)
 
   @doc """
   Saves the current editor state to `target_path` (or `state.save_path`).
@@ -205,7 +257,7 @@ defmodule Mirror.SaveManager do
       true ->
         stop_engine_session(Map.get(state, :engine_session_id))
 
-        case start_engine_session(state.save.path) do
+        case start_engine_session(state.save) do
           {:ok, engine_session_id} ->
             {:ok, state} =
               SessionStore.update(session_id, fn current ->

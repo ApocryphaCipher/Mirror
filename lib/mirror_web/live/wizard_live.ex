@@ -267,27 +267,12 @@ defmodule MirrorWeb.WizardLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash}>
+    <Layouts.app flash={@flash} slots={@slots} active={@details && {:wizard, @details.id}}>
       <div
         id="wizard-page"
         class="-mx-6 min-h-[70vh] px-6 pb-12 pt-6"
         style={@details && gradient(@details.colour)}
       >
-        <nav id="wizard-switcher" class="mb-6 flex flex-wrap items-center gap-2 text-sm">
-          <.link navigate={~p"/arcanus"} class="text-slate-300 hover:text-white">← Map</.link>
-          <.link
-            :for={{id, name} <- @wizards}
-            navigate={~p"/wizard/#{id}"}
-            class={[
-              "rounded-full border px-3 py-1",
-              @details && @details.id == id && "border-white/60 text-white",
-              !(@details && @details.id == id) && "border-white/10 text-slate-300 hover:text-white"
-            ]}
-          >
-            {name}
-          </.link>
-        </nav>
-
         <div :if={!@loaded?} id="wizard-no-save" class="text-slate-300">
           No save is loaded. Open one on the
           <.link navigate={~p"/arcanus"} class="underline">map</.link>

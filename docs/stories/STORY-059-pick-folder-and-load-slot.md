@@ -1,7 +1,7 @@
 # STORY-059: Pick the game folder, show the slots, load a slot
 
 **Parent:** [EPIC-012](../epics/EPIC-012-open-and-save-from-the-browser.md)
-**Status:** open (2026-10-15), after STORY-058
+**Status:** done (2026-10-16), checked with the real folder picker in Chrome. Reconnect folder checked (Kevin: it appeared after a reload and worked); a full Chrome restart not checked
 **Size:** medium
 **Raised by:** [Kevin](https://github.com/KevinAsbury), 2026-10-15
 

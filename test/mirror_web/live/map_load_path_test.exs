@@ -1,6 +1,6 @@
 defmodule MirrorWeb.MapLoadPathTest do
   @moduledoc """
-  The Load box's default path must be a real path on this OS. It used to
+  The Lab's Load box (the only path box left, EPIC-012): its default path must be a real path on this OS. It used to
   swap `/` for `\\`, which on macOS/Linux became a relative filename that
   never loads.
   """
@@ -26,7 +26,7 @@ defmodule MirrorWeb.MapLoadPathTest do
   end
 
   test "defaults to SAVE1.GAM in MIRROR_MOM_PATH, as a native path", %{conn: conn, dir: dir} do
-    {:ok, view, _html} = live(conn, "/arcanus")
+    {:ok, view, _html} = live(conn, "/lab/arcanus")
 
     [value] =
       view

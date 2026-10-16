@@ -24,7 +24,7 @@ defmodule MirrorWeb.Router do
   scope "/", MirrorWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
+    live "/", LandingLive, :index
     live "/arcanus", MapLive, :arcanus
     live "/myrror", MapLive, :myrror
     live "/tile-probe", TileProbeLive, :index

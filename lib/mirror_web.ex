@@ -52,6 +52,9 @@ defmodule MirrorWeb do
     quote do
       use Phoenix.LiveView
 
+      # opening and saving from the browser works on every page (EPIC-012)
+      on_mount {MirrorWeb.SaveSlots, :default}
+
       unquote(html_helpers())
     end
   end

@@ -1,6 +1,6 @@
 # EPIC-012: Open and save from the browser
 
-**Status:** planned (2026-10-15), not started
+**Status:** 058, 059 and 060 built and checked by Kevin in Chrome and in the real game (2026-10-16); 061 waits for Kevin
 **Owner:** [Kevin](https://github.com/KevinAsbury)
 **Requested:** 2026-10-15
 
@@ -20,10 +20,30 @@ buttons (green = a save is there, grey = empty). Click a slot to load it, pick a
 - **A plain "unsaved changes" badge** in the top bar, so a wizard edit is clearly not saved until the user saves.
 - The top bar is **page-wide** (map, wizard pages, Lab), not part of the map header.
 
-## How it works (the plan, none of it built)
+## How it works
 
 The browser holds the folder handle and reads and writes the files; the server never sees the user's disk, so this works the same from Docker. Load: the page reads `SAVEn.GAM` and sends its bytes to the
 server's session (about 123 KB). Save: the server builds the file's bytes and sends them to the page, which writes them into the chosen slot. The server keeps the save and its edit history in memory as it does now; only where the bytes come from and go to changes.
+
+## What was built (2026-10-16)
+
+First try: a thin bar above every page. Kevin tried it and it was confusing (tiny, easy to miss, a second load bar still on the map page, no slots after choosing a folder), so he drew the layout below on paper (the two sketches are not kept in the repo) and it was rebuilt to match.
+
+**The start page** (`/`, `MirrorWeb.LandingLive`): "Welcome to Mirror! To get started, pick your game folder", the folder's name and a **Choose folder** button. After a folder is chosen, "Select your save:" shows slots 1 to 8 (green when a save is there, grey when empty) and slot 9 (the autosave) beside them; clicking a green slot opens it and goes on to `/arcanus`. To open a different save later, click the logo. A **Continue with SAVEn.GAM** link shows when a save is already open.
+
+**The header** (every other page, `MirrorWeb.SaveSlots.header/1`): logo; **Arcanus / Myrror** tabs and a pill for each wizard in the save; at the right an **Unsaved changes** badge and **Save to:** with squares 1 to 8. The old site header (Overview, theme) and the map page's own plane tabs, wizard links, path box and "Save as" box are gone; Lab, Tile probe and the theme switch moved to the small row at the right of the tabs. The map page keeps its own menu row (title, Edit, Lab).
+
+How it works: `MirrorWeb.SaveSlots` is mounted on every LiveView (`on_mount` in `MirrorWeb`), gives the socket a `:slots` assign and handles the `slots:` events, so every page shares one implementation. Its browser half is the `SaveSlots` hook (`assets/js/save_slots.js`; pure helpers in `save_slots.mjs` with Node tests). The folder handle lives in the tab (and in IndexedDB between visits), so it is there on every page. Server side: `SaveFile.from_binary/2`, `SaveManager.load_bytes/3`, `slot_bytes/1`, `mark_saved/3`, `unsaved_count/1`.
+
+- Opening: slots 1 to 9. Saving: slots 1 to 8 only. A full slot asks first (a floating box, so nothing shifts); a failed write leaves the edits marked unsaved.
+- **The old file is copied to `SAVEn.GAM.mirror-backup` once: an existing backup is kept, so it stays the save as the game wrote it** (Kevin's note said only "a backup"; keeping the first one is my choice, because overwriting it on every save would lose the original on the second save). A failed backup stops the save.
+- **Slot names:** saving into a slot whose name in the game's `MAGIC.SET` is empty gives it the name `Mirror Edit Slot n`, so the game's Load Game screen does not show it blank; an existing name is never changed. See [../reference/magic-set.md](../reference/magic-set.md). Seen in the game's Load Game screen (2026-10-16).
+- Empty slots are shown clearly grey and cannot be clicked on the start page.
+- The folder's *name* is shown, not its full path: browsers do not tell a page where a folder is.
+- The path box survives only in the Lab, for browsers without the folder picker; STORY-061 deletes it (and `load_save`/`save_file`) when Kevin says so.
+- The old home page ("Survey both planes…") is gone; the README says what Mirror does.
+
+**Checked:** server tests (`save_slots_test.exs`, `save_manager_test.exs`), Node tests, the in-app browser against a fake folder, and then **by Kevin with the real Chrome folder picker and the real game (2026-10-16)**: choose the folder, open a slot, save into an empty slot (slot 8), the game's Load Game screen shows the new name, the game loads the save and the next turn advances with no problem. His first try of the thin-bar version found no slots after choosing a folder (cause never found; the rebuilt start page works with the real picker). Kevin also used **Reconnect folder** with the real picker (it appeared after the page reloaded, one click, and worked). After a **full restart of Chrome** the folder came back by itself (Kevin). **Replace** was checked on the real folder: opening SAVE9 and saving it over SAVE8 asked first, wrote `SAVE8.GAM`, and made `SAVE8.GAM.mirror-backup` (123300 bytes, as the old slot). The backup's bytes equal the new save's only because both were unedited copies of the same save, so *this* run does not show that the backup holds the previous content (the fake-folder run did). **Not checked:** nothing else is open for this epic.
 
 ## Open questions
 

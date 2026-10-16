@@ -13,7 +13,7 @@ Mirror opens a save file from the classic 1994 DOS game and shows you the whole 
 - **Explore the map.** Zoom and pan Arcanus and Myrror, hover any tile to see what it is, and switch layers on and off (units, cities, fog of war and more).
 - **Edit the map.** Paint terrain, lay roads, move cities and armies, and open any city, lair or node to change what's in it. Undo and redo everything.
 - **Edit the wizards.** Gold, mana, spell books, retorts, spells, relations, global enchantments, heroes and their artifacts.
-- **Stay safe.** Mirror never overwrites the save you opened. **Save as** writes a new file, and you load that in the game.
+- **Open and save without copying files.** Pick your game folder once and click the slot you want to open. When you're done, click a slot under **Save to** at the top of the page. Replacing a full slot asks first and keeps the old save as a backup.
 
 Every kind of edit has been checked by loading the result in the real game.
 
@@ -29,9 +29,11 @@ mix mirror.import_game "/path/to/your/Master of Magic"   # a folder or a .zip
 bash scripts/dev_server.sh
 ```
 
-Open <http://localhost:4000/arcanus>, type the path of a save (for example `~/.mirror/game/SAVE1.GAM`) and press **Load**. Press Ctrl-C to stop.
+Open <http://localhost:4000> in **Chrome or Edge**, click **Choose folder** and pick the folder your game saves into. The slots with a save in them turn green; click one to open it. To open a different save later, click the logo to come back to this page. Press Ctrl-C to stop the server.
 
-The import step copies just the files Mirror needs, and your saves, into `~/.mirror/game`. It's safe to run again; it won't overwrite a save you've edited.
+Other browsers can't pick a folder. There you can open a save by its path in the Lab (the **Lab** link at the top): type the path of a save (for example `~/.mirror/game/SAVE1.GAM`) and press **Load**.
+
+The import step copies just the files Mirror needs, and your saves, into `~/.mirror/game`. It's safe to run again; it won't overwrite a save you've edited. (The game folder you pick in the browser is where your saves live, which can be your real game folder; `~/.mirror/game` is where Mirror keeps its copy of the game's data files.)
 
 **On Windows** (tried on Windows 11, PowerShell), the same steps with these differences. The full write-up is in [docs/reference/windows-setup.md](docs/reference/windows-setup.md).
 
@@ -45,8 +47,7 @@ The import step copies just the files Mirror needs, and your saves, into `~/.mir
   mix phx.server
   ```
 
-- In the Load box type a full path, for example `C:\Users\<you>\.mirror\game\SAVE1.GAM`. Backslashes work.
-- To play an edited save, copy it into the game folder, as above. With Steam that is the install folder, which has `SAVE1.GAM` to `SAVE9.GAM` in it.
+- Choose the game folder on the start page. With Steam that is the install folder, which has `SAVE1.GAM` to `SAVE9.GAM` in it. (In the Lab's path box, a full path with backslashes works too.)
 
 **Prefer Docker?**
 
@@ -62,7 +63,9 @@ docker compose run --rm -v "/path/to/install:/source:ro" app bin/mirror eval 'Mi
 
 ## Playing your edited save
 
-**Save as** suggests the next free slot. The game only loads `SAVE1.GAM` to `SAVE9.GAM`, and its Load screen shows slots 1 to 8, so use one of those names, copy the file into your game folder, and load it as usual.
+Click a slot under **Save to** at the top of the page (slots 1 to 8). The game only loads `SAVE1.GAM` to `SAVE9.GAM`, and its Load screen shows slots 1 to 8 (slot 9 is the autosave, which Mirror can open but never writes to). Then load the slot in the game as usual.
+
+When you replace a slot that already has a save, Mirror first copies the old one to `SAVEn.GAM.mirror-backup` in the same folder. The game ignores that file. If the slot has no name in the game's Load Game list, Mirror gives it one ("Mirror Edit Slot 3"), so it doesn't show up blank. The copy is made once, so it stays the save as the game wrote it; delete it if you want a fresh one next time.
 
 ## Good to know
 

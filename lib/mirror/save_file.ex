@@ -77,6 +77,24 @@ defmodule Mirror.SaveFile do
     end
   end
 
+  @doc """
+  Decodes a save that arrived as bytes (EPIC-012: the browser reads the file from the
+  user's game folder). `name` is only a label (`"SAVE3.GAM"`): nothing is read from or
+  written to the server's disk. Bad bytes give `{:error, reason}`, never a raise.
+  """
+  def from_binary(raw, name) when is_binary(raw) and is_binary(name) do
+    with {:ok, planes} <- decode_planes(raw) do
+      {:ok,
+       %__MODULE__{
+         path: name,
+         raw: raw,
+         planes: planes,
+         dataset_id: {:mom_classic, "#{byte_size(raw)}-#{:erlang.phash2(raw)}"},
+         loaded_at: DateTime.utc_now()
+       }}
+    end
+  end
+
   def serialize(%__MODULE__{} = save) do
     Enum.reduce_while(save.planes, {:ok, save.raw}, fn {plane_key, layers}, {:ok, acc} ->
       plane_index = plane_index(plane_key)

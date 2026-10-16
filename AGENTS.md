@@ -176,13 +176,17 @@ These all bit a previous session:
 
 - Real-game sign-off: every editing story must be manually tested against DOSBox.
   See `docs/reference/real-game-acceptance.md` for the procedure.
-- Never overwrite the save that was loaded; `SaveFile.write/3` universally
-  enforces this (by canonical path and device/inode) for all callers.
-  **Save as** suggests the next free `SAVE1.GAM`–`SAVE9.GAM` slot (or leaves
-  it empty if all 9 are taken). Arbitrary names can be written but the
-  UI warns that Master of Magic only loads `SAVE1`–`SAVE9`. (In the game's Load
-  Game screen slot 9 is the autosave and cannot be picked, so for a save you want to
-  load, use slots 1–8; Kevin, 2026-10-04.)
+- Two ways to write a save. **The slot bar** (EPIC-012, the normal one): the browser writes
+  `SAVEn.GAM` into the user's game folder; slots 1 to 8 only (slot 9 is the game's autosave: it can
+  be opened, never written); a full slot asks first, in the page (never `window.confirm`), and the
+  old file is copied to `SAVEn.GAM.mirror-backup` first (once: an existing backup is kept, so it
+  stays the game's own save), and a failed backup stops the save. The server never touches the
+  user's disk for this. **The Lab's path box** (a fallback for other browsers, until STORY-061 removes it): never overwrite
+  the save that was loaded; `SaveFile.write/3` enforces this (by canonical path and device/inode)
+  for those callers. **Save as** suggests the next free `SAVE1.GAM`–`SAVE9.GAM` slot (or leaves
+  it empty if all 9 are taken). Arbitrary names can be written but the UI warns that Master of
+  Magic only loads `SAVE1`–`SAVE9`. (In the game's Load Game screen slot 9 is the autosave and
+  cannot be picked, so for a save you want to load, use slots 1–8; Kevin, 2026-10-04.)
 - An edit must leave the save consistent. The raw editors (Cycle, raw Paint)
   update terrain bytes and the derived adjacency mask only. They do **not**
   keep landmass/continent IDs consistent across land/water transitions;
