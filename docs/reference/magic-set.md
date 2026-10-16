@@ -18,4 +18,6 @@ Slot 9 (the autosave) has no name here. The longest names the game itself wrote 
 
 When the browser saves into slot *n* (EPIC-012), and that slot's name in `MAGIC.SET` is **empty**, Mirror writes `Mirror Edit Slot n` (18 characters). A name that is already there, whoever wrote it, is never changed. If the file is missing or shorter than `0xE0`, nothing is done (Mirror does not invent a `MAGIC.SET`, because its settings words are unknown). Before the first change Mirror copies the file to `MAGIC.SET.mirror-backup`; an existing backup is kept. The code is `withSlotName` in `assets/js/save_slots.mjs` (Node tests in `assets/test/save_slots.test.mjs`).
 
-**Not checked in the game yet:** that the Load Game screen shows the new name. Checked so far: the bytes (only the 20 bytes of that slot change) against the four files.
+**Checked in the game (Kevin, 2026-10-16):** after a save from Mirror into the empty slot 8, the game's Load Game screen shows "Mirror Edit Slot 8" on row 8, with the other seven names as before.
+
+**What the game does with the names (seen the same day):** when it starts, it blanks the name of every slot that has no save file (slot 8 went from "SAVE 8" to empty after `SAVE8.GAM` had been moved away), and it keeps the names of slots that have one. So a save written into an empty slot comes out blank unless Mirror names it. *Guess:* the game also rewrites `MAGIC.SET` when it quits, which would undo Mirror's edit if the game is open while Mirror saves, so save from Mirror with the game closed (not checked).
