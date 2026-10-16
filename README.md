@@ -19,7 +19,7 @@ Every kind of edit has been checked by loading the result in the real game.
 
 ## Get it running
 
-You need **your own copy of the game**. Mirror can't include it. The GOG version works (Steam hasn't been tried). You also need [Elixir](https://elixir-lang.org/install.html) 1.20 with Erlang/OTP 29, or Docker.
+You need **your own copy of the game**. Mirror can't include it. The GOG version works, and the Steam version works for viewing and editing (see [Good to know](#good-to-know)). You also need [Elixir](https://elixir-lang.org/install.html) 1.20 with Erlang/OTP 29, or Docker.
 
 ```bash
 git clone https://github.com/ApocryphaCipher/Mirror.git
@@ -32,6 +32,21 @@ bash scripts/dev_server.sh
 Open <http://localhost:4000/arcanus>, type the path of a save (for example `~/.mirror/game/SAVE1.GAM`) and press **Load**. Press Ctrl-C to stop.
 
 The import step copies just the files Mirror needs, and your saves, into `~/.mirror/game`. It's safe to run again; it won't overwrite a save you've edited.
+
+**On Windows** (tried on Windows 11, PowerShell), the same steps with these differences. The full write-up is in [docs/reference/windows-setup.md](docs/reference/windows-setup.md).
+
+- Install [Git](https://git-scm.com/download/win) (the heroicons dependency is fetched from GitHub), Elixir 1.20 and Erlang/OTP 29. A version manager such as [mise](https://mise.jdx.dev/) does both per user: `mise install erlang@29.1 elixir@1.20.4-otp-29`. Node.js is optional (it adds the client's JavaScript tests).
+- Tell Git to leave line endings alone before cloning: `git config --global core.autocrlf input`. With the default `true`, files are checked out with CRLF and `mix format --check-formatted` fails.
+- `mix setup` works as it is (it downloads the Windows Tailwind and esbuild itself). Give `mix mirror.import_game` the folder in quotes, for example `mix mirror.import_game "E:\SteamLibrary\steamapps\common\Master of Magic Classic\Master of Magic Official Release"`. The game files go to `C:\Users\<you>\.mirror\game`.
+- `scripts/dev_server.sh` is a bash script and was not tried. In PowerShell run:
+
+  ```powershell
+  $env:MIRROR_MOM_PATH = "$env:USERPROFILE\.mirror\game"
+  mix phx.server
+  ```
+
+- In the Load box type a full path, for example `C:\Users\<you>\.mirror\game\SAVE1.GAM`. Backslashes work.
+- To play an edited save, copy it into the game folder, as above. With Steam that is the install folder, which has `SAVE1.GAM` to `SAVE9.GAM` in it.
 
 **Prefer Docker?**
 
@@ -51,7 +66,7 @@ docker compose run --rm -v "/path/to/install:/source:ro" app bin/mirror eval 'Mi
 
 ## Good to know
 
-- Only the GOG 1.31 version of the game has been tested.
+- The GOG 1.31 version of the game is the one every edit was checked against. On the Steam version (Master of Magic Classic) the map draws, and a save edited in Mirror loads in the game with the edits in place. Three of the files Mirror reads (`MAPBACK.LBX`, `ITEMPOW.LBX`, `ITEMDATA.LBX`) differ from GOG's, and the screens that use them haven't been checked on Steam.
 - Paint type keeps coasts and continents right. The raw tile tools (Cycle, Paint tile) don't, so use them with care.
 - Time Stop can't be edited.
 
